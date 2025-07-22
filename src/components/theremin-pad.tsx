@@ -95,7 +95,6 @@ export function ThereminPad({
         event.currentTarget.releasePointerCapture(event.pointerId);
         if (!isLatchOn) {
             setOrbPosition(null);
-            onInteraction(null);
         }
         onPointerUp(lastFrequency.current);
         lastFrequency.current = null;
@@ -107,7 +106,6 @@ export function ThereminPad({
                 setIsActive(false);
                 event.currentTarget.releasePointerCapture(event.pointerId);
                 setOrbPosition(null);
-                onInteraction(null);
                 onPointerUp(lastFrequency.current);
                 lastFrequency.current = null;
             }

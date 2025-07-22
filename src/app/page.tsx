@@ -23,8 +23,8 @@ const beatPatterns: BeatPattern[] = [
     { name: 'Off', sequence: [] },
 ];
 
-export type MelodyInstrument = 'synth' | 'organ' | 'guitar' | 'violin';
-const melodyInstruments: MelodyInstrument[] = ['synth', 'organ', 'guitar', 'violin'];
+export type MelodyInstrument = 'synth' | 'organ' | 'theremin' | 'glass';
+const melodyInstruments: MelodyInstrument[] = ['synth', 'organ', 'theremin', 'glass'];
 
 
 export default function Home() {
@@ -46,7 +46,7 @@ export default function Home() {
 
     // Tone.js refs
     const audioInitialized = useRef(false);
-    const melodySynth = useRef<Tone.PolySynth | Tone.PluckSynth | null>(null);
+    const melodySynth = useRef<Tone.PolySynth | Tone.PluckSynth | Tone.FMSynth | null>(null);
     const bassSynth = useRef<Tone.MonoSynth | null>(null);
     const drumSynths = useRef<{ kick: Tone.MembraneSynth, snare: Tone.NoiseSynth, hat: Tone.MetalSynth } | null>(null);
     const channels = useRef<{ melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel } | null>(null);
@@ -128,21 +128,18 @@ export default function Home() {
                         envelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 0.3 }
                     });
                     break;
-                case 'guitar':
-                    newSynth = new Tone.PluckSynth({
-                        attackNoise: 1,
-                        dampening: 4000,
-                        resonance: 0.7
+                case 'theremin':
+                     newSynth = new Tone.PolySynth(Tone.Synth, {
+                        oscillator: { type: "sine" },
+                        envelope: { attack: 0.1, decay: 0.1, sustain: 0.8, release: 0.5 }
                     });
                     break;
-                case 'violin':
-                     newSynth = new Tone.PolySynth(Tone.AMSynth, {
-                        harmonicity: 3,
-                        detune: 0,
-                        oscillator: { type: "fatsawtooth", count: 3, spread: 20 },
-                        envelope: { attack: 0.2, decay: 0.1, sustain: 0.8, release: 0.5 },
-                        modulation: { type: "sine" },
-                        modulationEnvelope: { attack: 0.5, decay: 0, sustain: 1, release: 0.5 }
+                case 'glass':
+                     newSynth = new Tone.PolySynth(Tone.FMSynth, {
+                        harmonicity: 1.2,
+                        modulationIndex: 10,
+                        envelope: { attack: 0.3, decay: 0, sustain: 1, release: 0.8 },
+                        modulationEnvelope: { attack: 0.5, decay: 0.2, sustain: 0.8, release: 0.5 }
                     });
                     break;
                 case 'synth':
@@ -168,10 +165,6 @@ export default function Home() {
     
     const handlePlayPause = async () => {
         const Tone = await import('tone');
-        if (!isReady) {
-            // This should ideally not be hit if useEffect works correctly
-            await initializeAudio();
-        }
         
         // Start audio context on user gesture
         if (Tone.context.state !== 'running') {
@@ -252,8 +245,8 @@ export default function Home() {
         if (drumSequence.current) {
             if (drumSequence.current.state === 'started') {
                  drumSequence.current.stop();
+                 drumSequence.current.clear();
             }
-            drumSequence.current.clear();
             drumSequence.current.events = activePattern.sequence;
             if (isPlaying && activePattern.name !== 'Off') {
                 drumSequence.current.start(0);
@@ -300,7 +293,7 @@ export default function Home() {
             
             if (synth instanceof (require('tone')).PluckSynth) {
                  synth.triggerAttack(data.frequency);
-            } else if (synth instanceof (require('tone')).PolySynth || synth instanceof (require('tone')).AMSynth) {
+            } else if (synth instanceof (require('tone')).PolySynth || synth instanceof (require('tone')).AMSynth || synth instanceof (require('tone')).FMSynth) {
                 synth.set({ "volume": dbVolume });
                 synth.triggerAttack(data.frequency);
             } else if (synth instanceof (require('tone')).MonoSynth) {
@@ -340,8 +333,10 @@ export default function Home() {
         }
 
         if (type === 'melody' && melodySynth.current && frequency) {
-            if (melodySynth.current instanceof (require('tone')).PolySynth || melodySynth.current instanceof (require('tone')).AMSynth) {
-                melodySynth.current.triggerRelease(frequency);
+            if ('triggerRelease' in melodySynth.current && typeof melodySynth.current.triggerRelease === 'function') {
+                if (melodySynth.current instanceof (require('tone')).PolySynth || melodySynth.current instanceof (require('tone')).AMSynth || melodySynth.current instanceof (require('tone')).FMSynth) {
+                    melodySynth.current.triggerRelease(frequency);
+                }
             }
         } else if (type === 'bass' && bassSynth.current) {
             bassSynth.current.triggerRelease();
