@@ -69,6 +69,7 @@ export function ThereminPad({ title, onInteraction, onPointerUp, frequencyRange,
         setIsActive(false);
         event.currentTarget.releasePointerCapture(event.pointerId);
         setOrbPosition(null);
+        onInteraction(null); // Explicitly send null to stop sound
         onPointerUp(lastFrequency.current);
         lastFrequency.current = null;
     };
@@ -142,3 +143,4 @@ export function ThereminPad({ title, onInteraction, onPointerUp, frequencyRange,
         </Card>
     );
 }
+    

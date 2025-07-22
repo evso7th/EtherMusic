@@ -271,9 +271,11 @@ export default function Home() {
         } else {
             if (synth instanceof (require('tone')).PluckSynth) {
                 // PluckSynth doesn't have triggerRelease in the same way
-            } else {
-                // @ts-ignore
-                synth.triggerRelease(data.frequency);
+            } else if (type === 'melody' && melodySynth.current && data?.frequency) {
+                 // @ts-ignore
+                melodySynth.current.triggerRelease(data.frequency);
+            } else if (type === 'bass' && bassSynth.current) {
+                bassSynth.current.triggerRelease();
             }
         }
     }, [isPlaying, isBassPulsating]);
@@ -357,3 +359,4 @@ export default function Home() {
         </div>
     );
 }
+    
