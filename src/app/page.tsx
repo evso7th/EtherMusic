@@ -104,6 +104,16 @@ export default function Home() {
         }
     };
 
+    const handleStop = async () => {
+        const Tone = await import('tone');
+        if (!isReady) return;
+
+        Tone.Transport.stop();
+        melodySynth.current?.triggerRelease();
+        bassSynth.current?.triggerRelease();
+        setIsPlaying(false);
+    };
+
     const handleRecord = () => {
         if (!recorder.current) return;
         if (!isRecording) {
@@ -191,9 +201,12 @@ export default function Home() {
                                 isRecording={isRecording}
                                 onPlayPause={handlePlayPause}
                                 onRecord={handleRecord}
+                                onStop={handleStop}
                             />
-                            <SidebarTrigger>
-                                <SlidersHorizontal />
+                            <SidebarTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                    <SlidersHorizontal />
+                                </Button>
                             </SidebarTrigger>
                         </div>
                     </header>
