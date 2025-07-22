@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { PointerEvent } from 'react';
@@ -114,14 +115,17 @@ export function ThereminPad({ title, onInteraction, onPointerUp, frequencyRange,
             <CardContent className="flex-grow p-0">
                 <div
                     ref={padRef}
-                    className="w-full h-full relative overflow-hidden cursor-crosshair touch-none bg-grid"
+                    className="w-full h-full relative overflow-hidden cursor-crosshair touch-none"
                     onPointerDown={handlePointerDown}
                     onPointerUp={handlePointerUp}
                     onPointerMove={handlePointerMove}
                     onPointerLeave={handlePointerLeave}
                     style={{
-                        backgroundSize: '2rem 2rem',
-                        backgroundImage: `radial-gradient(hsl(var(--border) / 0.5) 1px, transparent 1px)`,
+                        backgroundSize: '4rem 4rem',
+                        backgroundImage: `
+                            linear-gradient(to right, hsl(var(--border) / 0.25) 1px, transparent 1px),
+                            linear-gradient(to bottom, hsl(var(--border) / 0.25) 1px, transparent 1px)
+                        `,
                     }}
                 >
                     {isActive && orbPosition && (
@@ -143,4 +147,3 @@ export function ThereminPad({ title, onInteraction, onPointerUp, frequencyRange,
         </Card>
     );
 }
-    
