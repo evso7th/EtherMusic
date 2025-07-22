@@ -92,7 +92,7 @@ export default function Home() {
             if (note === 'C1') drumSynths.current?.kick.triggerAttackRelease('C1', '8n', time);
             if (note === 'C2') drumSynths.current?.snare.triggerAttackRelease('16n', time);
             if (note === 'D2') drumSynths.current?.hat.triggerAttackRelease('16n', time);
-        }, activePattern.sequence, '8n').start(0);
+        }, activePattern.sequence, '8n');
 
         recorder.current = new Tone.Recorder();
         Tone.getDestination().connect(recorder.current);
@@ -100,6 +100,12 @@ export default function Home() {
         Tone.Transport.bpm.value = tempo;
         setIsReady(true);
     }, [volumes.melody, volumes.bass, volumes.drums, tempo, activePattern.sequence]);
+    
+    useEffect(() => {
+        if (!audioInitialized.current) {
+            initializeAudio();
+        }
+    }, [initializeAudio]);
     
     useEffect(() => {
         const createMelodySynth = async () => {
@@ -163,9 +169,15 @@ export default function Home() {
     const handlePlayPause = async () => {
         const Tone = await import('tone');
         if (!isReady) {
-            await Tone.start();
+            // This should ideally not be hit if useEffect works correctly
             await initializeAudio();
         }
+        
+        // Start audio context on user gesture
+        if (Tone.context.state !== 'running') {
+            await Tone.start();
+        }
+
         if (Tone.Transport.state === 'started') {
             Tone.Transport.pause();
             setIsPlaying(false);
@@ -238,13 +250,14 @@ export default function Home() {
     useEffect(() => {
         const Tone = require('tone');
         if (drumSequence.current) {
-            drumSequence.current.stop();
+            if (drumSequence.current.state === 'started') {
+                 drumSequence.current.stop();
+            }
             drumSequence.current.clear();
             drumSequence.current.events = activePattern.sequence;
-        }
-
-        if (isPlaying && activePattern.name !== 'Off') {
-            drumSequence.current?.start(0);
+            if (isPlaying && activePattern.name !== 'Off') {
+                drumSequence.current.start(0);
+            }
         }
     }, [activePattern, isPlaying]);
 
@@ -346,6 +359,7 @@ export default function Home() {
                         onPlayPause={handlePlayPause}
                         onRecord={handleRecord}
                         onStop={handleStop}
+                        isReady={isReady}
                     />
                      <Dialog>
                         <DialogTrigger asChild>
@@ -397,7 +411,15 @@ export default function Home() {
                     />
                 </div>
             </main>
-            {!isReady && !isPlaying && (
+            {!isReady && (
+                 <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50">
+                     <div className="text-center text-white">
+                        <p className="text-xl mb-4">Loading audio engine...</p>
+                        <div className="w-24 h-24 border-4 border-dashed rounded-full animate-spin border-primary mx-auto"></div>
+                    </div>
+                </div>
+            )}
+             {isReady && !isPlaying && (
                  <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50">
                     <Button size="lg" onClick={handlePlayPause}>Click to Start EtherMusic</Button>
                 </div>
