@@ -5,7 +5,9 @@ import type { PointerEvent } from 'react';
 import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Zap, Anchor } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { MelodyInstrument } from '@/app/page';
@@ -16,14 +18,34 @@ interface ThereminPadProps {
     onPointerUp: (frequency: number | null) => void;
     frequencyRange: [number, number];
     color: string;
+    // Pulsation props
     isPulsating?: boolean;
     onPulsateToggle?: () => void;
+    // Instrument props
     instruments?: MelodyInstrument[];
     activeInstrument?: MelodyInstrument;
     onInstrumentChange?: (instrument: MelodyInstrument) => void;
+    // Latch props
+    isLatchOn?: boolean;
+    onLatchToggle?: (checked: boolean) => void;
+    isLatched?: boolean;
 }
 
-export function ThereminPad({ title, onInteraction, onPointerUp, frequencyRange, color, isPulsating, onPulsateToggle, instruments, activeInstrument, onInstrumentChange }: ThereminPadProps) {
+export function ThereminPad({ 
+    title, 
+    onInteraction, 
+    onPointerUp, 
+    frequencyRange, 
+    color, 
+    isPulsating, 
+    onPulsateToggle, 
+    instruments, 
+    activeInstrument, 
+    onInstrumentChange,
+    isLatchOn,
+    onLatchToggle,
+    isLatched
+}: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
     const [isActive, setIsActive] = useState(false);
     const [orbPosition, setOrbPosition] = useState<{ x: number; y: number } | null>(null);
@@ -48,7 +70,7 @@ export function ThereminPad({ title, onInteraction, onPointerUp, frequencyRange,
     }
 
     const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
-        if (!isActive) return;
+        if (!isActive || (isLatchOn && isLatched)) return;
         const interactionData = calculateInteraction(event);
         if (interactionData) {
             setOrbPosition({ x: interactionData.x, y: interactionData.y });
@@ -61,7 +83,9 @@ export function ThereminPad({ title, onInteraction, onPointerUp, frequencyRange,
         event.currentTarget.setPointerCapture(event.pointerId);
         const interactionData = calculateInteraction(event);
         if (interactionData) {
-            setOrbPosition({ x: interactionData.x, y: interactionData.y });
+            if (!isLatchOn) {
+                setOrbPosition({ x: interactionData.x, y: interactionData.y });
+            }
             onInteraction({ frequency: interactionData.frequency, volume: interactionData.volume });
         }
     };
@@ -69,23 +93,27 @@ export function ThereminPad({ title, onInteraction, onPointerUp, frequencyRange,
     const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
         setIsActive(false);
         event.currentTarget.releasePointerCapture(event.pointerId);
-        setOrbPosition(null);
-        onInteraction(null); // Explicitly send null to stop sound
+        if (!isLatchOn) {
+            setOrbPosition(null);
+        }
         onPointerUp(lastFrequency.current);
         lastFrequency.current = null;
     };
 
     const handlePointerLeave = (event: PointerEvent<HTMLDivElement>) => {
-        if (isActive) {
+        if (isActive && !isLatchOn) {
             handlePointerUp(event);
         }
     };
     
     return (
-        <Card className="flex flex-col h-full bg-card/50 border-2 border-transparent hover:border-primary transition-all duration-300">
+        <Card className={cn(
+            "flex flex-col h-full bg-card/50 border-2 border-transparent hover:border-primary transition-all duration-300",
+            isLatched && "border-accent ring-4 ring-accent/50"
+        )}>
             <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between p-4">
                 <CardTitle className="text-xl font-bold" style={{ color }}>{title}</CardTitle>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
                     {instruments && activeInstrument && onInstrumentChange && (
                         <Select value={activeInstrument} onValueChange={onInstrumentChange}>
                             <SelectTrigger className="w-[120px] capitalize">
@@ -98,12 +126,18 @@ export function ThereminPad({ title, onInteraction, onPointerUp, frequencyRange,
                             </SelectContent>
                         </Select>
                     )}
+                     {onLatchToggle && (
+                        <div className="flex items-center space-x-2">
+                            <Switch id="latch-mode" checked={isLatchOn} onCheckedChange={onLatchToggle} />
+                            <Label htmlFor="latch-mode" className="flex items-center gap-1"><Anchor className="w-4 h-4" /> Latch</Label>
+                        </div>
+                    )}
                     {onPulsateToggle && (
                          <Button
-                            variant={isPulsating ? 'default' : 'outline'}
+                            variant={(isPulsating || isLatched) ? 'default' : 'outline'}
                             size="icon"
                             onClick={onPulsateToggle}
-                            className={cn('transition-all', isPulsating && 'animate-pulse-accent')}
+                            className={cn('transition-all', (isPulsating || isLatched) && 'animate-pulse-accent')}
                             style={{ '--accent': 'hsl(var(--accent))' } as React.CSSProperties}
 
                          >
@@ -121,7 +155,7 @@ export function ThereminPad({ title, onInteraction, onPointerUp, frequencyRange,
                     onPointerMove={handlePointerMove}
                     onPointerLeave={handlePointerLeave}
                     style={{
-                        backgroundColor: 'hsl(var(--muted) / 0.1)',
+                        backgroundColor: 'hsl(var(--muted) / 0.2)',
                         backgroundSize: '4rem 4rem',
                         backgroundImage: `
                             linear-gradient(to right, hsl(var(--border) / 0.25) 1px, transparent 1px),
@@ -129,11 +163,11 @@ export function ThereminPad({ title, onInteraction, onPointerUp, frequencyRange,
                         `,
                     }}
                 >
-                    {isActive && orbPosition && (
+                    {(isActive || isLatched) && orbPosition && (
                         <div
                             className={cn(
                                 'absolute rounded-full w-12 h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none',
-                                title.includes('Melody') ? 'animate-pulse-primary' : 'animate-pulse-accent'
+                                title.includes('Melody') ? 'animate-pulse-primary' : (isPulsating || isLatched) ? 'animate-pulse-accent' : ''
                             )}
                             style={{
                                 left: orbPosition.x,

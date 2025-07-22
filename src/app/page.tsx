@@ -32,7 +32,6 @@ export default function Home() {
     const [isReady, setIsReady] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
-    const [isBassPulsating, setIsBassPulsating] = useState(false);
     
     // Audio state
     const [tempo, setTempo] = useState(120);
@@ -40,6 +39,10 @@ export default function Home() {
     const [activePattern, setActivePattern] = useState<BeatPattern>(beatPatterns[3]);
     const [melodyInstrument, setMelodyInstrument] = useState<MelodyInstrument>('synth');
 
+    // Bass specific state
+    const [isBassPulsating, setIsBassPulsating] = useState(false);
+    const [isBassLatchOn, setIsBassLatchOn] = useState(false);
+    const [latchedBassNote, setLatchedBassNote] = useState<{ frequency: number; volume: number } | null>(null);
 
     // Tone.js refs
     const audioInitialized = useRef(false);
@@ -103,7 +106,7 @@ export default function Home() {
             const Tone = await import('tone');
             
             if (melodySynth.current) {
-                if ('releaseAll' in melodySynth.current && typeof melodySynth.current.releaseAll === 'function') {
+                 if ('releaseAll' in melodySynth.current && typeof melodySynth.current.releaseAll === 'function') {
                     melodySynth.current.releaseAll();
                 }
                 melodySynth.current.disconnect();
@@ -182,6 +185,9 @@ export default function Home() {
         }
         bassSynth.current?.triggerRelease();
         setIsPlaying(false);
+        if (latchedBassNote) {
+            setLatchedBassNote(null);
+        }
     };
 
     const handleRecord = () => {
@@ -208,17 +214,26 @@ export default function Home() {
         setIsBassPulsating(prev => !prev);
     }
 
+    const handleLatchToggle = (checked: boolean) => {
+        setIsBassLatchOn(checked);
+        if (!checked && latchedBassNote) {
+            setLatchedBassNote(null);
+            bassSynth.current?.triggerRelease();
+        }
+    }
+
+    // Effect for pulsation LFO
     useEffect(() => {
         if (bassLFO.current && bassSynth.current) {
-            if(isBassPulsating) {
+            const isPulsationActive = isBassPulsating || (isBassLatchOn && !!latchedBassNote);
+            if(isPulsationActive) {
                 bassLFO.current.connect(bassSynth.current.volume);
             } else {
                 bassLFO.current.disconnect();
-                // Reset volume to avoid it getting stuck at LFO value
-                bassSynth.current.volume.value = 0; 
+                bassSynth.current.volume.value = 0;
             }
         }
-    }, [isBassPulsating]);
+    }, [isBassPulsating, isBassLatchOn, latchedBassNote]);
     
     useEffect(() => {
         const Tone = require('tone');
@@ -252,6 +267,18 @@ export default function Home() {
         const synth = type === 'melody' ? melodySynth.current : bassSynth.current;
         if (!synth || !isPlaying) return;
 
+        if (type === 'bass' && isBassLatchOn) {
+            if (data && !latchedBassNote) {
+                // Latch the note on first press
+                setLatchedBassNote(data);
+            } else if (data && latchedBassNote) {
+                // Unlatch on second press
+                setLatchedBassNote(null);
+                bassSynth.current?.triggerRelease();
+            }
+            return;
+        }
+
         if (data) {
             const minDb = -48;
             const maxDb = 0;
@@ -273,19 +300,33 @@ export default function Home() {
                 }
             }
         } else {
-            if (synth instanceof (require('tone')).PluckSynth) {
-                // PluckSynth doesn't have triggerRelease in the same way
-            } else if (type === 'melody' && melodySynth.current && data?.frequency) {
-                 // @ts-ignore
-                melodySynth.current.triggerRelease(data.frequency);
-            } else if (type === 'bass' && bassSynth.current) {
+             if (type === 'bass' && bassSynth.current) {
                 bassSynth.current.triggerRelease();
             }
         }
-    }, [isPlaying, isBassPulsating]);
+    }, [isPlaying, isBassPulsating, isBassLatchOn, latchedBassNote]);
+
+    useEffect(() => {
+        if (latchedBassNote && bassSynth.current && isPlaying) {
+            const minDb = -48;
+            const maxDb = 0;
+            const dbVolume = minDb + latchedBassNote.volume * (maxDb - minDb);
+
+            bassSynth.current.triggerAttack(latchedBassNote.frequency);
+            if (!isBassPulsating) { // Pulsation handles its own volume
+                 bassSynth.current.volume.rampTo(dbVolume, 0.1);
+            }
+        }
+    }, [latchedBassNote, isPlaying, isBassPulsating]);
     
      const handleThereminPointerUp = (type: 'melody' | 'bass', frequency: number | null) => {
         if (!isPlaying) return;
+        
+        if (type === 'bass' && isBassLatchOn) {
+            // In latch mode, we don't trigger release on pointer up
+            return;
+        }
+
         if (type === 'melody' && melodySynth.current && frequency) {
             if (!(melodySynth.current instanceof (require('tone')).PluckSynth)) {
                  // @ts-ignore
@@ -333,6 +374,9 @@ export default function Home() {
                         color="hsl(var(--accent))"
                         isPulsating={isBassPulsating}
                         onPulsateToggle={handlePulsateToggle}
+                        isLatchOn={isBassLatchOn}
+                        onLatchToggle={handleLatchToggle}
+                        isLatched={!!latchedBassNote}
                     />
                     <ThereminPad
                         title="Melody"
