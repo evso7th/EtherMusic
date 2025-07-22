@@ -164,9 +164,6 @@ export default function Home() {
         if (!synth || !isPlaying) return;
 
         if (data) {
-            // Volume is already scaled from 0 to 1 in the component
-            // Tone.js uses decibels. A linear volume of 0 to 1 can be mapped to a dB range.
-            // 0 -> -Infinity dB, 1 -> 0 dB. Let's map it to a more usable range like -48dB to 0dB.
             const minDb = -48;
             const maxDb = 0;
             const dbVolume = minDb + data.volume * (maxDb - minDb);
