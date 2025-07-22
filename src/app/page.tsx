@@ -326,7 +326,7 @@ export default function Home() {
             <main className="flex-grow flex flex-col gap-6">
                 <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-6 h-[calc(80vh-4rem)]">
                     <ThereminPad
-                        title="Bass (Left Hand)"
+                        title="Bass"
                         onInteraction={(data) => handleThereminInteraction('bass', data)}
                         onPointerUp={(freq) => handleThereminPointerUp('bass', freq)}
                         frequencyRange={[55, 220]} // A1 to A3
@@ -335,7 +335,7 @@ export default function Home() {
                         onPulsateToggle={handlePulsateToggle}
                     />
                     <ThereminPad
-                        title="Melody (Right Hand)"
+                        title="Melody"
                         onInteraction={(data) => handleThereminInteraction('melody', data)}
                         onPointerUp={(freq) => handleThereminPointerUp('melody', freq)}
                         frequencyRange={[220, 880]} // A3 to A5
