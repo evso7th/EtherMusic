@@ -23,6 +23,10 @@ const beatPatterns: BeatPattern[] = [
     { name: 'Off', sequence: [] },
 ];
 
+export type MelodyInstrument = 'synth' | 'organ' | 'guitar' | 'violin';
+const melodyInstruments: MelodyInstrument[] = ['synth', 'organ', 'guitar', 'violin'];
+
+
 export default function Home() {
     const { toast } = useToast();
     const [isReady, setIsReady] = useState(false);
@@ -34,10 +38,12 @@ export default function Home() {
     const [tempo, setTempo] = useState(120);
     const [volumes, setVolumes] = useState({ melody: -6, bass: -6, drums: -6 });
     const [activePattern, setActivePattern] = useState<BeatPattern>(beatPatterns[3]);
+    const [melodyInstrument, setMelodyInstrument] = useState<MelodyInstrument>('synth');
+
 
     // Tone.js refs
     const audioInitialized = useRef(false);
-    const melodySynth = useRef<Tone.AMSynth | null>(null);
+    const melodySynth = useRef<Tone.PolySynth | Tone.PluckSynth | null>(null);
     const bassSynth = useRef<Tone.MonoSynth | null>(null);
     const drumSynths = useRef<{ kick: Tone.MembraneSynth, snare: Tone.NoiseSynth, hat: Tone.MetalSynth } | null>(null);
     const channels = useRef<{ melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel } | null>(null);
@@ -50,12 +56,6 @@ export default function Home() {
         audioInitialized.current = true;
         
         const Tone = await import('tone');
-
-        melodySynth.current = new Tone.AMSynth({
-            harmonicity: 1.5,
-            envelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 0.2 },
-            modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.3, release: 0.1 }
-        }).toDestination();
         
         bassSynth.current = new Tone.MonoSynth({
             oscillator: { type: 'fatsawtooth' },
@@ -77,7 +77,6 @@ export default function Home() {
             drums: new Tone.Channel(volumes.drums).connect(Tone.getDestination()),
         };
 
-        melodySynth.current.connect(channels.current.melody);
         bassSynth.current.connect(channels.current.bass);
         
         drumSynths.current = {
@@ -99,6 +98,63 @@ export default function Home() {
         setIsReady(true);
     }, [volumes.melody, volumes.bass, volumes.drums, tempo, activePattern.sequence]);
     
+    useEffect(() => {
+        const createMelodySynth = async () => {
+            const Tone = await import('tone');
+            
+            if (melodySynth.current) {
+                melodySynth.current.releaseAll();
+                melodySynth.current.disconnect();
+                melodySynth.current.dispose();
+            }
+
+            let newSynth;
+
+            switch (melodyInstrument) {
+                case 'organ':
+                    newSynth = new Tone.PolySynth(Tone.Synth, {
+                        oscillator: { type: 'fatsine' },
+                        envelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 0.3 }
+                    });
+                    break;
+                case 'guitar':
+                    newSynth = new Tone.PluckSynth({
+                        attackNoise: 1,
+                        dampening: 4000,
+                        resonance: 0.7
+                    });
+                    break;
+                case 'violin':
+                     newSynth = new Tone.PolySynth(Tone.AMSynth, {
+                        harmonicity: 3,
+                        detune: 0,
+                        oscillator: { type: "fatsawtooth", count: 3, spread: 20 },
+                        envelope: { attack: 0.2, decay: 0.1, sustain: 0.8, release: 0.5 },
+                        modulation: { type: "sine" },
+                        modulationEnvelope: { attack: 0.5, decay: 0, sustain: 1, release: 0.5 }
+                    });
+                    break;
+                case 'synth':
+                default:
+                    newSynth = new Tone.PolySynth(Tone.AMSynth, {
+                        harmonicity: 1.5,
+                        envelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 0.2 },
+                        modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.3, release: 0.1 }
+                    });
+                    break;
+            }
+
+            if (channels.current?.melody) {
+                newSynth.connect(channels.current.melody);
+            }
+            melodySynth.current = newSynth;
+        };
+        
+        if(isReady) {
+            createMelodySynth();
+        }
+    }, [melodyInstrument, isReady]);
+    
     const handlePlayPause = async () => {
         const Tone = await import('tone');
         if (!isReady) {
@@ -119,7 +175,7 @@ export default function Home() {
         if (!isReady) return;
 
         Tone.Transport.stop();
-        melodySynth.current?.triggerRelease();
+        melodySynth.current?.releaseAll();
         bassSynth.current?.triggerRelease();
         setIsPlaying(false);
     };
@@ -153,7 +209,7 @@ export default function Home() {
             if(isBassPulsating) {
                 bassLFO.current.connect(bassSynth.current.volume);
             } else {
-                bassLFO.current.disconnect(bassSynth.current.volume);
+                bassLFO.current.disconnect();
                 // Reset volume to avoid it getting stuck at LFO value
                 bassSynth.current.volume.value = 0; 
             }
@@ -196,10 +252,16 @@ export default function Home() {
             const minDb = -48;
             const maxDb = 0;
             const dbVolume = minDb + data.volume * (maxDb - minDb);
-
-            synth.triggerAttack(data.frequency);
+            
+            if (synth instanceof (require('tone')).PluckSynth) {
+                synth.triggerAttack(data.frequency);
+            } else {
+                 // @ts-ignore
+                synth.triggerAttack(data.frequency);
+            }
             
             if(type === 'melody' && melodySynth.current) {
+                // @ts-ignore
                 melodySynth.current.volume.rampTo(dbVolume, 0.1);
             } else if (type === 'bass' && bassSynth.current) {
                  if (!isBassPulsating) {
@@ -207,9 +269,26 @@ export default function Home() {
                 }
             }
         } else {
-            synth.triggerRelease();
+            if (synth instanceof (require('tone')).PluckSynth) {
+                // PluckSynth doesn't have triggerRelease in the same way
+            } else {
+                // @ts-ignore
+                synth.triggerRelease(data.frequency);
+            }
         }
     }, [isPlaying, isBassPulsating]);
+    
+     const handleThereminPointerUp = (type: 'melody' | 'bass', frequency: number | null) => {
+        if (!isPlaying) return;
+        if (type === 'melody' && melodySynth.current && frequency) {
+            if (!(melodySynth.current instanceof (require('tone')).PluckSynth)) {
+                 // @ts-ignore
+                melodySynth.current.triggerRelease(frequency);
+            }
+        } else if (type === 'bass' && bassSynth.current) {
+            bassSynth.current.triggerRelease();
+        }
+    };
 
     return (
         <div className="flex flex-col h-screen bg-background font-headline p-4 md:p-6 lg:p-8">
@@ -239,10 +318,11 @@ export default function Home() {
                 </div>
             </header>
             <main className="flex-grow flex flex-col gap-6">
-                <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-6 h-[80vh]">
+                <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-6 h-[calc(80vh-4rem)]">
                     <ThereminPad
                         title="Bass (Left Hand)"
                         onInteraction={(data) => handleThereminInteraction('bass', data)}
+                        onPointerUp={(freq) => handleThereminPointerUp('bass', freq)}
                         frequencyRange={[55, 220]} // A1 to A3
                         color="hsl(var(--accent))"
                         isPulsating={isBassPulsating}
@@ -251,11 +331,15 @@ export default function Home() {
                     <ThereminPad
                         title="Melody (Right Hand)"
                         onInteraction={(data) => handleThereminInteraction('melody', data)}
+                        onPointerUp={(freq) => handleThereminPointerUp('melody', freq)}
                         frequencyRange={[220, 880]} // A3 to A5
                         color="hsl(var(--primary))"
+                        instruments={melodyInstruments}
+                        activeInstrument={melodyInstrument}
+                        onInstrumentChange={setMelodyInstrument}
                     />
                 </div>
-                <div className="h-[20vh] flex flex-col">
+                <div className="h-[calc(20vh-2rem)] flex flex-col">
                     <BeatBoxControls
                         patterns={beatPatterns}
                         activePattern={activePattern}
@@ -272,3 +356,4 @@ export default function Home() {
             )}
         </div>
     );
+}

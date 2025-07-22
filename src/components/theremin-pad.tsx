@@ -6,20 +6,27 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { MelodyInstrument } from '@/app/page';
 
 interface ThereminPadProps {
     title: string;
     onInteraction: (params: { frequency: number; volume: number } | null) => void;
+    onPointerUp: (frequency: number | null) => void;
     frequencyRange: [number, number];
     color: string;
     isPulsating?: boolean;
     onPulsateToggle?: () => void;
+    instruments?: MelodyInstrument[];
+    activeInstrument?: MelodyInstrument;
+    onInstrumentChange?: (instrument: MelodyInstrument) => void;
 }
 
-export function ThereminPad({ title, onInteraction, frequencyRange, color, isPulsating, onPulsateToggle }: ThereminPadProps) {
+export function ThereminPad({ title, onInteraction, onPointerUp, frequencyRange, color, isPulsating, onPulsateToggle, instruments, activeInstrument, onInstrumentChange }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
     const [isActive, setIsActive] = useState(false);
     const [orbPosition, setOrbPosition] = useState<{ x: number; y: number } | null>(null);
+    const lastFrequency = useRef<number | null>(null);
 
     const calculateInteraction = (event: PointerEvent<HTMLDivElement>) => {
         if (!padRef.current) return null;
@@ -30,13 +37,12 @@ export function ThereminPad({ title, onInteraction, frequencyRange, color, isPul
         const normalizedX = Math.min(Math.max(x / rect.width, 0), 1);
         const normalizedY = Math.min(Math.max(y / rect.height, 0), 1);
 
-        // Logarithmic scale for frequency (more musical)
         const [minFreq, maxFreq] = frequencyRange;
         const frequency = minFreq * Math.pow(maxFreq / minFreq, normalizedX);
         
-        // Linear scale for volume (y-axis, inverted)
         const volume = 1 - normalizedY;
-
+        
+        lastFrequency.current = frequency;
         return { x, y, frequency, volume };
     }
 
@@ -63,34 +69,46 @@ export function ThereminPad({ title, onInteraction, frequencyRange, color, isPul
         setIsActive(false);
         event.currentTarget.releasePointerCapture(event.pointerId);
         setOrbPosition(null);
-        onInteraction(null);
+        onPointerUp(lastFrequency.current);
+        lastFrequency.current = null;
     };
 
     const handlePointerLeave = (event: PointerEvent<HTMLDivElement>) => {
         if (isActive) {
-            setIsActive(false);
-            event.currentTarget.releasePointerCapture(event.pointerId);
-            setOrbPosition(null);
-            onInteraction(null);
+            handlePointerUp(event);
         }
     };
     
     return (
         <Card className="flex flex-col h-full bg-card/50 border-2 border-transparent hover:border-primary transition-all duration-300">
-            <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between">
-                <CardTitle className="text-2xl font-bold" style={{ color }}>{title}</CardTitle>
-                {onPulsateToggle && (
-                     <Button
-                        variant={isPulsating ? 'default' : 'outline'}
-                        size="icon"
-                        onClick={onPulsateToggle}
-                        className={cn('transition-all', isPulsating && 'animate-pulse-accent')}
-                        style={{ '--accent': 'hsl(var(--accent))' } as React.CSSProperties}
+            <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between p-4">
+                <CardTitle className="text-xl font-bold" style={{ color }}>{title}</CardTitle>
+                <div className="flex items-center gap-2">
+                    {instruments && activeInstrument && onInstrumentChange && (
+                        <Select value={activeInstrument} onValueChange={onInstrumentChange}>
+                            <SelectTrigger className="w-[120px] capitalize">
+                                <SelectValue placeholder="Instrument" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {instruments.map(inst => (
+                                    <SelectItem key={inst} value={inst} className="capitalize">{inst}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    )}
+                    {onPulsateToggle && (
+                         <Button
+                            variant={isPulsating ? 'default' : 'outline'}
+                            size="icon"
+                            onClick={onPulsateToggle}
+                            className={cn('transition-all', isPulsating && 'animate-pulse-accent')}
+                            style={{ '--accent': 'hsl(var(--accent))' } as React.CSSProperties}
 
-                     >
-                         <Zap className="w-5 h-5" />
-                     </Button>
-                )}
+                         >
+                             <Zap className="w-5 h-5" />
+                         </Button>
+                    )}
+                </div>
             </CardHeader>
             <CardContent className="flex-grow p-0">
                 <div
@@ -115,6 +133,7 @@ export function ThereminPad({ title, onInteraction, frequencyRange, color, isPul
                                 left: orbPosition.x,
                                 top: orbPosition.y,
                                 backgroundColor: color,
+                                animationDuration: '1s',
                             }}
                         />
                     )}
