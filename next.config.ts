@@ -20,8 +20,10 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     // This is needed to allow cross-origin requests in the dev environment.
-    allowedDevOrigins: ['**.cloudworkstations.dev'],
+    // allowedDevOrigins: ['**.cloudworkstations.dev'], - This was incorrect
   },
+  // This is needed to allow cross-origin requests in the dev environment.
+  allowedDevOrigins: ['**.cloudworkstations.dev'],
 };
 
 export default nextConfig;
