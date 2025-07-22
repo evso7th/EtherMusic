@@ -103,7 +103,9 @@ export default function Home() {
             const Tone = await import('tone');
             
             if (melodySynth.current) {
-                melodySynth.current.releaseAll();
+                if ('releaseAll' in melodySynth.current && typeof melodySynth.current.releaseAll === 'function') {
+                    melodySynth.current.releaseAll();
+                }
                 melodySynth.current.disconnect();
                 melodySynth.current.dispose();
             }
@@ -175,7 +177,9 @@ export default function Home() {
         if (!isReady) return;
 
         Tone.Transport.stop();
-        melodySynth.current?.releaseAll();
+        if (melodySynth.current && 'releaseAll' in melodySynth.current && typeof melodySynth.current.releaseAll === 'function') {
+            melodySynth.current.releaseAll();
+        }
         bassSynth.current?.triggerRelease();
         setIsPlaying(false);
     };
