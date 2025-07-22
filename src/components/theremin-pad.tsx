@@ -61,13 +61,13 @@ export function ThereminPad({ title, onInteraction, frequencyRange, color }: The
     
     return (
         <Card className="flex flex-col h-full bg-card/50 border-2 border-transparent hover:border-primary transition-all duration-300">
-            <CardHeader>
+            <CardHeader className="flex-shrink-0">
                 <CardTitle className="text-2xl font-bold" style={{ color }}>{title}</CardTitle>
             </CardHeader>
             <CardContent className="flex-grow p-0">
                 <div
                     ref={padRef}
-                    className="w-full h-full min-h-[200px] md:min-h-[300px] relative overflow-hidden cursor-crosshair touch-none bg-grid"
+                    className="w-full h-full relative overflow-hidden cursor-crosshair touch-none bg-grid"
                     onPointerDown={handlePointerDown}
                     onPointerUp={handlePointerUp}
                     onPointerMove={handlePointerMove}

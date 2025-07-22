@@ -26,8 +26,8 @@ export function BeatBoxControls({
     onTempoChange,
 }: BeatBoxControlsProps) {
     return (
-        <Card className="bg-card/50">
-            <CardContent className="p-4 md:p-6 flex flex-col md:flex-row items-center gap-6">
+        <Card className="bg-card/50 h-full">
+            <CardContent className="p-4 md:p-6 flex flex-col md:flex-row items-center gap-6 h-full">
                 <div className="flex-shrink-0">
                     <Label className="text-lg font-bold mb-2 block">Beat Box</Label>
                     <div className="flex flex-wrap gap-2">

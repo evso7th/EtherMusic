@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type * as Tone from 'tone';
 import { Button } from "@/components/ui/button";
-import { SidebarProvider, Sidebar, SidebarTrigger, SidebarInset, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ThereminPad } from '@/components/theremin-pad';
 import { BeatBoxControls } from '@/components/beat-box-controls';
 import { MixerControls } from '@/components/mixer-controls';
@@ -180,67 +180,61 @@ export default function Home() {
     }, [isPlaying]);
 
     return (
-        <SidebarProvider>
-            <Sidebar side="right">
-                <SidebarHeader>
-                    <h2 className="text-xl font-bold">Mixer</h2>
-                </SidebarHeader>
-                <SidebarContent>
-                    <MixerControls volumes={volumes} onVolumeChange={setVolumes} />
-                </SidebarContent>
-                <SidebarFooter>
-                    <p className="text-xs text-muted-foreground p-4">Adjust channel volumes.</p>
-                </SidebarFooter>
-            </Sidebar>
-            <SidebarInset>
-                <div className="flex flex-col min-h-screen bg-background font-headline p-4 md:p-6 lg:p-8">
-                    <header className="flex items-center justify-between mb-4">
-                        <h1 className="text-3xl md:text-4xl font-bold text-primary">EtherMusic</h1>
-                        <div className="flex items-center gap-2">
-                            <PlaybackControls
-                                isPlaying={isPlaying}
-                                isRecording={isRecording}
-                                onPlayPause={handlePlayPause}
-                                onRecord={handleRecord}
-                                onStop={handleStop}
-                            />
-                            <SidebarTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                    <SlidersHorizontal />
-                                </Button>
-                            </SidebarTrigger>
-                        </div>
-                    </header>
-                    <main className="flex-grow flex flex-col gap-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-grow">
-                            <ThereminPad
-                                title="Bass (Left Hand)"
-                                onInteraction={(data) => handleThereminInteraction('bass', data)}
-                                frequencyRange={[55, 220]} // A1 to A3
-                                color="hsl(var(--accent))"
-                            />
-                            <ThereminPad
-                                title="Melody (Right Hand)"
-                                onInteraction={(data) => handleThereminInteraction('melody', data)}
-                                frequencyRange={[220, 880]} // A3 to A5
-                                color="hsl(var(--primary))"
-                            />
-                        </div>
-                        <BeatBoxControls
-                            patterns={beatPatterns}
-                            activePattern={activePattern}
-                            onPatternChange={setActivePattern}
-                            tempo={tempo}
-                            onTempoChange={setTempo}
-                        />
-                    </main>
-                    {!isReady && !isPlaying && (
-                         <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50">
-                            <Button size="lg" onClick={handlePlayPause}>Click to Start EtherMusic</Button>
-                        </div>
-                    )}
+        <div className="flex flex-col h-screen bg-background font-headline p-4 md:p-6 lg:p-8">
+            <header className="flex items-center justify-between mb-4 flex-shrink-0">
+                <h1 className="text-3xl md:text-4xl font-bold text-primary">EtherMusic</h1>
+                <div className="flex items-center gap-2">
+                    <PlaybackControls
+                        isPlaying={isPlaying}
+                        isRecording={isRecording}
+                        onPlayPause={handlePlayPause}
+                        onRecord={handleRecord}
+                        onStop={handleStop}
+                    />
+                     <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                                <SlidersHorizontal />
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Mixer</DialogTitle>
+                            </DialogHeader>
+                            <MixerControls volumes={volumes} onVolumeChange={setVolumes} />
+                        </DialogContent>
+                    </Dialog>
                 </div>
-            </SidebarInset>
-        </SidebarProvider>
+            </header>
+            <main className="flex-grow flex flex-col gap-6">
+                <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-6 h-[80vh]">
+                    <ThereminPad
+                        title="Bass (Left Hand)"
+                        onInteraction={(data) => handleThereminInteraction('bass', data)}
+                        frequencyRange={[55, 220]} // A1 to A3
+                        color="hsl(var(--accent))"
+                    />
+                    <ThereminPad
+                        title="Melody (Right Hand)"
+                        onInteraction={(data) => handleThereminInteraction('melody', data)}
+                        frequencyRange={[220, 880]} // A3 to A5
+                        color="hsl(var(--primary))"
+                    />
+                </div>
+                <div className="h-[20vh] flex flex-col">
+                    <BeatBoxControls
+                        patterns={beatPatterns}
+                        activePattern={activePattern}
+                        onPatternChange={setActivePattern}
+                        tempo={tempo}
+                        onTempoChange={setTempo}
+                    />
+                </div>
+            </main>
+            {!isReady && !isPlaying && (
+                 <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50">
+                    <Button size="lg" onClick={handlePlayPause}>Click to Start EtherMusic</Button>
+                </div>
+            )}
+        </div>
     );
-}
