@@ -192,10 +192,8 @@ export default function Home() {
                                 onPlayPause={handlePlayPause}
                                 onRecord={handleRecord}
                             />
-                            <SidebarTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                    <SlidersHorizontal />
-                                </Button>
+                            <SidebarTrigger>
+                                <SlidersHorizontal />
                             </SidebarTrigger>
                         </div>
                     </header>
