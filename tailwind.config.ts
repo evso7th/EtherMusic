@@ -10,8 +10,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['Inter', 'sans-serif'],
-        headline: ['Inter', 'sans-serif'],
+        body: ['Space Grotesk', 'sans-serif'],
+        headline: ['Space Grotesk', 'sans-serif'],
         code: ['monospace'],
       },
       colors: {
@@ -88,10 +88,20 @@ export default {
             height: '0',
           },
         },
+        'pulse-primary': {
+          '0%, 100%': { boxShadow: '0 0 0 0 hsl(var(--primary) / 0.7)' },
+          '70%': { boxShadow: '0 0 0 20px hsl(var(--primary) / 0)' },
+        },
+        'pulse-accent': {
+          '0%, 100%': { boxShadow: '0 0 0 0 hsl(var(--accent) / 0.7)' },
+          '70%': { boxShadow: '0 0 0 20px hsl(var(--accent) / 0)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        'pulse-primary': 'pulse-primary 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'pulse-accent': 'pulse-accent 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       },
     },
   },
