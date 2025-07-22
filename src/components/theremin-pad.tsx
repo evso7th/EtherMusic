@@ -121,6 +121,7 @@ export function ThereminPad({ title, onInteraction, onPointerUp, frequencyRange,
                     onPointerMove={handlePointerMove}
                     onPointerLeave={handlePointerLeave}
                     style={{
+                        backgroundColor: 'hsl(var(--muted) / 0.1)',
                         backgroundSize: '4rem 4rem',
                         backgroundImage: `
                             linear-gradient(to right, hsl(var(--border) / 0.25) 1px, transparent 1px),
