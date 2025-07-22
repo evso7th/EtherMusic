@@ -106,7 +106,7 @@ export default function Home() {
             const Tone = await import('tone');
             
             if (melodySynth.current) {
-                 if ('releaseAll' in melodySynth.current && typeof melodySynth.current.releaseAll === 'function') {
+                if ('releaseAll' in melodySynth.current && typeof melodySynth.current.releaseAll === 'function') {
                     melodySynth.current.releaseAll();
                 }
                 melodySynth.current.disconnect();
@@ -286,15 +286,18 @@ export default function Home() {
             
             if (synth instanceof (require('tone')).PluckSynth) {
                 synth.triggerAttack(data.frequency);
+            } else if (synth instanceof (require('tone')).PolySynth){
+                // For PolySynth, we can control individual notes
+                synth.set({ "volume": dbVolume });
+                synth.triggerAttack(data.frequency);
             } else {
-                 // @ts-ignore
+                 // Fallback for other synth types
                 synth.triggerAttack(data.frequency);
             }
             
-            if(type === 'melody' && melodySynth.current) {
-                // @ts-ignore
-                melodySynth.current.volume.rampTo(dbVolume, 0.1);
-            } else if (type === 'bass' && bassSynth.current) {
+            // This volume ramp is now handled more granularly above,
+            // but we keep a general volume control on the synth itself for non-polyphonic synths
+            if(type === 'bass' && bassSynth.current) {
                  if (!isBassPulsating) {
                     bassSynth.current.volume.rampTo(dbVolume, 0.1);
                 }
@@ -328,8 +331,7 @@ export default function Home() {
         }
 
         if (type === 'melody' && melodySynth.current && frequency) {
-            if (!(melodySynth.current instanceof (require('tone')).PluckSynth)) {
-                 // @ts-ignore
+            if (melodySynth.current instanceof (require('tone')).PolySynth) {
                 melodySynth.current.triggerRelease(frequency);
             }
         } else if (type === 'bass' && bassSynth.current) {
