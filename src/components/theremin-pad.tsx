@@ -17,8 +17,8 @@ export function ThereminPad({ title, onInteraction, frequencyRange, color }: The
     const [isActive, setIsActive] = useState(false);
     const [orbPosition, setOrbPosition] = useState<{ x: number; y: number } | null>(null);
 
-    const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
-        if (!isActive || !padRef.current) return;
+    const calculateInteraction = (event: PointerEvent<HTMLDivElement>) => {
+        if (!padRef.current) return null;
         const rect = padRef.current.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
@@ -33,14 +33,26 @@ export function ThereminPad({ title, onInteraction, frequencyRange, color }: The
         // Linear scale for volume (y-axis, inverted)
         const volume = 1 - normalizedY;
 
-        setOrbPosition({ x, y });
-        onInteraction({ frequency, volume });
+        return { x, y, frequency, volume };
+    }
+
+    const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+        if (!isActive) return;
+        const interactionData = calculateInteraction(event);
+        if (interactionData) {
+            setOrbPosition({ x: interactionData.x, y: interactionData.y });
+            onInteraction({ frequency: interactionData.frequency, volume: interactionData.volume });
+        }
     };
 
     const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
         setIsActive(true);
         event.currentTarget.setPointerCapture(event.pointerId);
-        handlePointerMove(event);
+        const interactionData = calculateInteraction(event);
+        if (interactionData) {
+            setOrbPosition({ x: interactionData.x, y: interactionData.y });
+            onInteraction({ frequency: interactionData.frequency, volume: interactionData.volume });
+        }
     };
 
     const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
