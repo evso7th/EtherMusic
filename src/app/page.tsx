@@ -216,7 +216,7 @@ export default function Home() {
                     </header>
                     <main className="flex-grow flex flex-col gap-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-grow">
-                             <ThereminPad
+                            <ThereminPad
                                 title="Bass (Left Hand)"
                                 onInteraction={(data) => handleThereminInteraction('bass', data)}
                                 frequencyRange={[55, 220]} // A1 to A3
