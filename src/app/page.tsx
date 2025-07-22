@@ -28,6 +28,7 @@ export default function Home() {
     const [isReady, setIsReady] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
+    const [isBassPulsating, setIsBassPulsating] = useState(false);
     
     // Audio state
     const [tempo, setTempo] = useState(120);
@@ -42,6 +43,7 @@ export default function Home() {
     const channels = useRef<{ melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel } | null>(null);
     const drumSequence = useRef<Tone.Sequence | null>(null);
     const recorder = useRef<Tone.Recorder | null>(null);
+    const bassLFO = useRef<Tone.LFO | null>(null);
 
     const initializeAudio = useCallback(async () => {
         if (audioInitialized.current) return;
@@ -60,6 +62,14 @@ export default function Home() {
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
             filterEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.2, release: 0.5, baseFrequency: 200, octaves: 4 }
         }).toDestination();
+
+        bassLFO.current = new Tone.LFO({
+            frequency: "4n",
+            min: -24,
+            max: 0,
+            amplitude: 1
+        }).start();
+
 
         channels.current = {
             melody: new Tone.Channel(volumes.melody).connect(Tone.getDestination()),
@@ -133,6 +143,22 @@ export default function Home() {
             setIsRecording(false);
         }
     };
+
+    const handlePulsateToggle = () => {
+        setIsBassPulsating(prev => !prev);
+    }
+
+    useEffect(() => {
+        if (bassLFO.current && bassSynth.current) {
+            if(isBassPulsating) {
+                bassLFO.current.connect(bassSynth.current.volume);
+            } else {
+                bassLFO.current.disconnect(bassSynth.current.volume);
+                // Reset volume to avoid it getting stuck at LFO value
+                bassSynth.current.volume.value = 0; 
+            }
+        }
+    }, [isBassPulsating]);
     
     useEffect(() => {
         const Tone = require('tone');
@@ -149,6 +175,9 @@ export default function Home() {
     useEffect(() => {
         const Tone = require('tone');
         Tone.Transport.bpm.value = tempo;
+        if (bassLFO.current) {
+            bassLFO.current.frequency.value = Tone.Transport.bpm.value / 60 * 2; // Sync with quarter notes
+        }
     }, [tempo]);
 
     useEffect(() => {
@@ -169,15 +198,18 @@ export default function Home() {
             const dbVolume = minDb + data.volume * (maxDb - minDb);
 
             synth.triggerAttack(data.frequency);
+            
             if(type === 'melody' && melodySynth.current) {
                 melodySynth.current.volume.rampTo(dbVolume, 0.1);
             } else if (type === 'bass' && bassSynth.current) {
-                bassSynth.current.volume.rampTo(dbVolume, 0.1);
+                 if (!isBassPulsating) {
+                    bassSynth.current.volume.rampTo(dbVolume, 0.1);
+                }
             }
         } else {
             synth.triggerRelease();
         }
-    }, [isPlaying]);
+    }, [isPlaying, isBassPulsating]);
 
     return (
         <div className="flex flex-col h-screen bg-background font-headline p-4 md:p-6 lg:p-8">
@@ -213,6 +245,8 @@ export default function Home() {
                         onInteraction={(data) => handleThereminInteraction('bass', data)}
                         frequencyRange={[55, 220]} // A1 to A3
                         color="hsl(var(--accent))"
+                        isPulsating={isBassPulsating}
+                        onPulsateToggle={handlePulsateToggle}
                     />
                     <ThereminPad
                         title="Melody (Right Hand)"

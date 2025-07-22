@@ -3,6 +3,8 @@
 import type { PointerEvent } from 'react';
 import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ThereminPadProps {
@@ -10,9 +12,11 @@ interface ThereminPadProps {
     onInteraction: (params: { frequency: number; volume: number } | null) => void;
     frequencyRange: [number, number];
     color: string;
+    isPulsating?: boolean;
+    onPulsateToggle?: () => void;
 }
 
-export function ThereminPad({ title, onInteraction, frequencyRange, color }: ThereminPadProps) {
+export function ThereminPad({ title, onInteraction, frequencyRange, color, isPulsating, onPulsateToggle }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
     const [isActive, setIsActive] = useState(false);
     const [orbPosition, setOrbPosition] = useState<{ x: number; y: number } | null>(null);
@@ -73,8 +77,20 @@ export function ThereminPad({ title, onInteraction, frequencyRange, color }: The
     
     return (
         <Card className="flex flex-col h-full bg-card/50 border-2 border-transparent hover:border-primary transition-all duration-300">
-            <CardHeader className="flex-shrink-0">
+            <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between">
                 <CardTitle className="text-2xl font-bold" style={{ color }}>{title}</CardTitle>
+                {onPulsateToggle && (
+                     <Button
+                        variant={isPulsating ? 'default' : 'outline'}
+                        size="icon"
+                        onClick={onPulsateToggle}
+                        className={cn('transition-all', isPulsating && 'animate-pulse-accent')}
+                        style={{ '--accent': 'hsl(var(--accent))' } as React.CSSProperties}
+
+                     >
+                         <Zap className="w-5 h-5" />
+                     </Button>
+                )}
             </CardHeader>
             <CardContent className="flex-grow p-0">
                 <div
