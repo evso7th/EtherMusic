@@ -83,8 +83,8 @@ export function ThereminPad({
         event.currentTarget.setPointerCapture(event.pointerId);
         const interactionData = calculateInteraction(event);
         if (interactionData) {
-            if (!isLatchOn) {
-                setOrbPosition({ x: interactionData.x, y: interactionData.y });
+            if (!isLatchOn || (isLatchOn && !isLatched)) {
+                 setOrbPosition({ x: interactionData.x, y: interactionData.y });
             }
             onInteraction({ frequency: interactionData.frequency, volume: interactionData.volume });
         }
@@ -95,21 +95,31 @@ export function ThereminPad({
         event.currentTarget.releasePointerCapture(event.pointerId);
         if (!isLatchOn) {
             setOrbPosition(null);
+            onInteraction(null);
         }
         onPointerUp(lastFrequency.current);
         lastFrequency.current = null;
     };
 
     const handlePointerLeave = (event: PointerEvent<HTMLDivElement>) => {
-        if (isActive && !isLatchOn) {
-            handlePointerUp(event);
+        if (isActive) {
+             if (!isLatchOn) {
+                setIsActive(false);
+                event.currentTarget.releasePointerCapture(event.pointerId);
+                setOrbPosition(null);
+                onInteraction(null);
+                onPointerUp(lastFrequency.current);
+                lastFrequency.current = null;
+            }
         }
     };
     
     return (
         <Card className={cn(
             "flex flex-col h-full bg-card/50 border-2 border-transparent hover:border-primary transition-all duration-300",
-            isLatched && "border-accent ring-4 ring-accent/50"
+            (isActive || isLatched) && title.includes('Bass') && "border-accent ring-4 ring-accent/50",
+            (isActive) && title.includes('Melody') && "border-primary ring-4 ring-primary/50"
+
         )}>
             <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between p-4">
                 <CardTitle className="text-xl font-bold" style={{ color }}>{title}</CardTitle>

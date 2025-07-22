@@ -237,13 +237,14 @@ export default function Home() {
     
     useEffect(() => {
         const Tone = require('tone');
-        if(drumSequence.current) {
+        if (drumSequence.current) {
+            drumSequence.current.stop();
+            drumSequence.current.clear();
             drumSequence.current.events = activePattern.sequence;
         }
-        if (activePattern.name === 'Off' && isPlaying) {
-             drumSequence.current?.stop();
-        } else if (isPlaying) {
-             drumSequence.current?.start(Tone.Transport.now());
+
+        if (isPlaying && activePattern.name !== 'Off') {
+            drumSequence.current?.start(0);
         }
     }, [activePattern, isPlaying]);
 
@@ -285,22 +286,17 @@ export default function Home() {
             const dbVolume = minDb + data.volume * (maxDb - minDb);
             
             if (synth instanceof (require('tone')).PluckSynth) {
-                synth.triggerAttack(data.frequency);
-            } else if (synth instanceof (require('tone')).PolySynth){
-                // For PolySynth, we can control individual notes
+                 synth.triggerAttack(data.frequency);
+            } else if (synth instanceof (require('tone')).PolySynth || synth instanceof (require('tone')).AMSynth) {
                 synth.set({ "volume": dbVolume });
                 synth.triggerAttack(data.frequency);
-            } else {
-                 // Fallback for other synth types
-                synth.triggerAttack(data.frequency);
-            }
-            
-            // This volume ramp is now handled more granularly above,
-            // but we keep a general volume control on the synth itself for non-polyphonic synths
-            if(type === 'bass' && bassSynth.current) {
+            } else if (synth instanceof (require('tone')).MonoSynth) {
+                 synth.triggerAttack(data.frequency);
                  if (!isBassPulsating) {
-                    bassSynth.current.volume.rampTo(dbVolume, 0.1);
+                    synth.volume.rampTo(dbVolume, 0.1);
                 }
+            } else {
+                synth.triggerAttack(data.frequency);
             }
         } else {
              if (type === 'bass' && bassSynth.current) {
@@ -331,7 +327,7 @@ export default function Home() {
         }
 
         if (type === 'melody' && melodySynth.current && frequency) {
-            if (melodySynth.current instanceof (require('tone')).PolySynth) {
+            if (melodySynth.current instanceof (require('tone')).PolySynth || melodySynth.current instanceof (require('tone')).AMSynth) {
                 melodySynth.current.triggerRelease(frequency);
             }
         } else if (type === 'bass' && bassSynth.current) {
