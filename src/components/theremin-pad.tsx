@@ -81,7 +81,7 @@ export function ThereminPad({ title, onInteraction, frequencyRange, color }: The
                         <div
                             className={cn(
                                 'absolute rounded-full w-12 h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none',
-                                title === 'Melody' ? 'animate-pulse-primary' : 'animate-pulse-accent'
+                                title.includes('Melody') ? 'animate-pulse-primary' : 'animate-pulse-accent'
                             )}
                             style={{
                                 left: orbPosition.x,

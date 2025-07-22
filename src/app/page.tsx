@@ -164,14 +164,18 @@ export default function Home() {
         if (!synth || !isPlaying) return;
 
         if (data) {
-            const linearVolume = (data.volume - 0) / (1 - 0); // Assuming volume is 0 to 1
-            const dbVolume = 20 * Math.log10(linearVolume);
-            
+            // Volume is already scaled from 0 to 1 in the component
+            // Tone.js uses decibels. A linear volume of 0 to 1 can be mapped to a dB range.
+            // 0 -> -Infinity dB, 1 -> 0 dB. Let's map it to a more usable range like -48dB to 0dB.
+            const minDb = -48;
+            const maxDb = 0;
+            const dbVolume = minDb + data.volume * (maxDb - minDb);
+
             synth.triggerAttack(data.frequency);
-            if(type === 'melody') {
-                melodySynth.current?.volume.rampTo(dbVolume, 0.1);
-            } else {
-                bassSynth.current?.volume.rampTo(dbVolume, 0.1);
+            if(type === 'melody' && melodySynth.current) {
+                melodySynth.current.volume.rampTo(dbVolume, 0.1);
+            } else if (type === 'bass' && bassSynth.current) {
+                bassSynth.current.volume.rampTo(dbVolume, 0.1);
             }
         } else {
             synth.triggerRelease();
@@ -212,17 +216,17 @@ export default function Home() {
                     </header>
                     <main className="flex-grow flex flex-col gap-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-grow">
-                            <ThereminPad
-                                title="Melody"
-                                onInteraction={(data) => handleThereminInteraction('melody', data)}
-                                frequencyRange={[220, 880]} // A3 to A5
-                                color="hsl(var(--primary))"
-                            />
-                            <ThereminPad
-                                title="Bass"
+                             <ThereminPad
+                                title="Bass (Left Hand)"
                                 onInteraction={(data) => handleThereminInteraction('bass', data)}
                                 frequencyRange={[55, 220]} // A1 to A3
                                 color="hsl(var(--accent))"
+                            />
+                            <ThereminPad
+                                title="Melody (Right Hand)"
+                                onInteraction={(data) => handleThereminInteraction('melody', data)}
+                                frequencyRange={[220, 880]} // A3 to A5
+                                color="hsl(var(--primary))"
                             />
                         </div>
                         <BeatBoxControls
