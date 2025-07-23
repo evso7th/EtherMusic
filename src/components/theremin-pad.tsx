@@ -2,7 +2,7 @@
 "use client";
 
 import type { PointerEvent } from 'react';
-import { useState, useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -14,25 +14,24 @@ import type { MelodyInstrument } from '@/app/page';
 
 interface ThereminPadProps {
     title: string;
-    onInteraction: (params: { frequency: number; volume: number } | null) => void;
-    onPointerUp: (frequency: number | null) => void;
+    type: 'melody' | 'bass';
+    onInteraction: (type: 'melody' | 'bass', params: { frequency: number; volume: number } | null) => void;
+    onPointerUp: (type: 'melody' | 'bass', frequency: number | null) => void;
     frequencyRange: [number, number];
     color: string;
-    // Pulsation props
     isPulsating?: boolean;
     onPulsateToggle?: () => void;
-    // Instrument props
     instruments?: MelodyInstrument[];
     activeInstrument?: MelodyInstrument;
     onInstrumentChange?: (instrument: MelodyInstrument) => void;
-    // Latch props
     isLatchOn?: boolean;
     onLatchToggle?: (checked: boolean) => void;
     isLatched?: boolean;
 }
 
 export function ThereminPad({ 
-    title, 
+    title,
+    type, 
     onInteraction, 
     onPointerUp, 
     frequencyRange, 
@@ -47,8 +46,8 @@ export function ThereminPad({
     isLatched
 }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
-    const [isActive, setIsActive] = useState(false);
-    const [orbPosition, setOrbPosition] = useState<{ x: number; y: number } | null>(null);
+    const orbRef = useRef<HTMLDivElement>(null);
+    const isActive = useRef(false);
     const lastFrequency = useRef<number | null>(null);
 
     const calculateInteraction = (event: PointerEvent<HTMLDivElement>) => {
@@ -61,7 +60,9 @@ export function ThereminPad({
         const normalizedY = Math.min(Math.max(y / rect.height, 0), 1);
 
         const [minFreq, maxFreq] = frequencyRange;
-        const frequency = minFreq * Math.pow(maxFreq / minFreq, normalizedX);
+        const logMin = Math.log(minFreq);
+        const logMax = Math.log(maxFreq);
+        const frequency = Math.exp(logMin + (logMax - logMin) * normalizedX);
         
         const volume = 1 - normalizedY;
         
@@ -69,55 +70,64 @@ export function ThereminPad({
         return { x, y, frequency, volume };
     }
 
+    const showOrb = (x: number, y: number) => {
+        if (orbRef.current) {
+            orbRef.current.style.transform = `translate(${x}px, ${y}px)`;
+            orbRef.current.style.opacity = '1';
+        }
+    }
+
+    const hideOrb = () => {
+        if (orbRef.current) {
+            orbRef.current.style.opacity = '0';
+        }
+    }
+
     const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
-        if (!isActive || (isLatchOn && isLatched)) return;
+        if (!isActive.current || (isLatchOn && isLatched)) return;
         const interactionData = calculateInteraction(event);
         if (interactionData) {
-            setOrbPosition({ x: interactionData.x, y: interactionData.y });
-            onInteraction({ frequency: interactionData.frequency, volume: interactionData.volume });
+            showOrb(interactionData.x, interactionData.y);
+            onInteraction(type, { frequency: interactionData.frequency, volume: interactionData.volume });
         }
     };
 
     const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-        setIsActive(true);
+        isActive.current = true;
         event.currentTarget.setPointerCapture(event.pointerId);
         const interactionData = calculateInteraction(event);
         if (interactionData) {
             if (!isLatchOn || (isLatchOn && !isLatched)) {
-                 setOrbPosition({ x: interactionData.x, y: interactionData.y });
+                showOrb(interactionData.x, interactionData.y);
             }
-            onInteraction({ frequency: interactionData.frequency, volume: interactionData.volume });
+            onInteraction(type, { frequency: interactionData.frequency, volume: interactionData.volume });
         }
     };
 
     const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
-        setIsActive(false);
+        isActive.current = false;
         event.currentTarget.releasePointerCapture(event.pointerId);
         if (!isLatchOn) {
-            setOrbPosition(null);
+            hideOrb();
         }
-        onPointerUp(lastFrequency.current);
+        onPointerUp(type, lastFrequency.current);
+        onInteraction(type, null); // Signal that interaction has stopped
         lastFrequency.current = null;
     };
-
-    const handlePointerLeave = (event: PointerEvent<HTMLDivElement>) => {
-        if (isActive) {
-             if (!isLatchOn) {
-                setIsActive(false);
-                event.currentTarget.releasePointerCapture(event.pointerId);
-                setOrbPosition(null);
-                onPointerUp(lastFrequency.current);
-                lastFrequency.current = null;
-            }
-        }
-    };
     
+    // Hide orb if latched is turned off
+    useEffect(() => {
+        if (!isLatched && !isActive.current) {
+            hideOrb();
+        }
+    }, [isLatched]);
+
+
     return (
         <Card className={cn(
             "flex flex-col h-full bg-card/50 border-2 border-transparent hover:border-primary transition-all duration-300",
-            (isActive || isLatched) && title.includes('Bass') && "border-accent ring-4 ring-accent/50",
-            (isActive) && title.includes('Melody') && "border-primary ring-4 ring-primary/50"
-
+            (isActive.current || isLatched) && type === 'bass' && "border-accent ring-4 ring-accent/50",
+            (isActive.current) && type === 'melody' && "border-primary ring-4 ring-primary/50"
         )}>
             <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between p-4">
                 <CardTitle className="text-xl font-bold" style={{ color }}>{title}</CardTitle>
@@ -161,7 +171,7 @@ export function ThereminPad({
                     onPointerDown={handlePointerDown}
                     onPointerUp={handlePointerUp}
                     onPointerMove={handlePointerMove}
-                    onPointerLeave={handlePointerLeave}
+                    onPointerLeave={handlePointerUp} // Use same logic as up to stop sound
                     style={{
                         backgroundColor: 'hsl(var(--muted) / 0.2)',
                         backgroundSize: '4rem 4rem',
@@ -171,22 +181,20 @@ export function ThereminPad({
                         `,
                     }}
                 >
-                    {(isActive || isLatched) && orbPosition && (
-                        <div
-                            className={cn(
-                                'absolute rounded-full w-12 h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none',
-                                title.includes('Melody') ? 'animate-pulse-primary' : (isPulsating || isLatched) ? 'animate-pulse-accent' : ''
-                            )}
-                            style={{
-                                left: orbPosition.x,
-                                top: orbPosition.y,
-                                backgroundColor: color,
-                                animationDuration: '1s',
-                            }}
-                        />
-                    )}
+                    <div
+                        ref={orbRef}
+                        className={cn(
+                            'absolute top-0 left-0 rounded-full w-12 h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-0',
+                            title.includes('Melody') ? 'animate-pulse-primary' : (isPulsating || isLatched) ? 'animate-pulse-accent' : ''
+                        )}
+                        style={{
+                            backgroundColor: color,
+                            animationDuration: '1s',
+                        }}
+                    />
                 </div>
             </CardContent>
         </Card>
     );
 }
+
