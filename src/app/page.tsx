@@ -19,9 +19,10 @@ type BeatPattern = {
 
 
 const beatPatterns: BeatPattern[] = [
-    { name: 'Rock', sequence: ['C1', null, 'C2', 'D2', 'C1', null, 'C2', null] },
-    { name: 'House', sequence: ['C1', 'D2', 'C2', 'D2', 'C1', 'D2', 'C2', 'D2'] },
-    { name: 'Hip Hop', sequence: ['C1', null, 'C2', null, 'C1', 'D2', 'C1', 'C2'] },
+    { name: 'Rock', sequence: ['C1', null, 'G1', null, 'C1', 'D2', 'G1', null] },
+    { name: 'House', sequence: ['C1', 'D2', 'C1', 'D2', 'G1', 'D2', 'C1', 'D2'] },
+    { name: 'Hip Hop', sequence: ['C1', null, 'D2', 'G1', null, 'C1', null, 'G1'] },
+    { name: 'Reggae', sequence: [null, 'D2', 'G1', 'C1', null, 'D2', 'G1', null] },
     { name: 'Off', sequence: [] },
 ];
 
@@ -39,7 +40,7 @@ export default function Home() {
     // Audio state
     const [tempo, setTempo] = useState(120);
     const [volumes, setVolumes] = useState({ melody: -6, bass: -12, drums: -6 });
-    const [activePattern, setActivePattern] = useState<BeatPattern>(beatPatterns[3]);
+    const [activePattern, setActivePattern] = useState<BeatPattern>(beatPatterns[4]);
     const [melodyInstrument, setMelodyInstrument] = useState<MelodyInstrument>('synth');
 
     // Bass specific state
@@ -94,7 +95,7 @@ export default function Home() {
         
         drumSequence.current = new Tone.Sequence((time, note) => {
             if (note === 'C1') drumSynths.current?.kick.triggerAttackRelease('C1', '8n', time);
-            if (note === 'C2') drumSynths.current?.snare.triggerAttackRelease('16n', time);
+            if (note === 'G1') drumSynths.current?.snare.triggerAttackRelease('16n', time);
             if (note === 'D2') drumSynths.current?.hat.triggerAttackRelease('16n', time);
         }, [], '8n').start(0);
 
@@ -229,7 +230,7 @@ export default function Home() {
     }, [isBassPulsating, isBassLatchOn, latchedBassNote]);
     
     useEffect(() => {
-        if (!isReady || !isPlaying) return;
+        if (!isReady) return;
         const Tone = require('tone');
 
         if (drumSequence.current) {
@@ -238,11 +239,11 @@ export default function Home() {
 
         drumSequence.current = new Tone.Sequence((time, note) => {
             if (note === 'C1') drumSynths.current?.kick.triggerAttackRelease('C1', '8n', time);
-            if (note === 'C2') drumSynths.current?.snare.triggerAttackRelease('16n', time);
+            if (note === 'G1') drumSynths.current?.snare.triggerAttackRelease('16n', time);
             if (note === 'D2') drumSynths.current?.hat.triggerAttackRelease('16n', time);
         }, activePattern.sequence, '8n');
 
-        if (activePattern.name !== 'Off') {
+        if (isPlaying && activePattern.name !== 'Off') {
             drumSequence.current.start(0);
         }
     }, [activePattern, isPlaying, isReady]);
@@ -438,3 +439,6 @@ export default function Home() {
     
 
 
+
+
+    
