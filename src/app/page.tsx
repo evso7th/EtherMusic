@@ -12,6 +12,7 @@ import { PlaybackControls } from '@/components/playback-controls';
 import { SlidersHorizontal } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { OrbitalAnimation } from '@/components/orbital-animation';
+import { Starfield } from '@/components/starfield';
 
 type BeatPattern = {
     name: string;
@@ -238,7 +239,7 @@ export default function Home() {
             drumSequence.current.dispose();
         }
 
-        drumSequence.current = new Tone.Sequence((time, note) => {
+        drumSequence.current = new Tone.Sequence((time: any, note: any) => {
             if (note === 'C1') drumSynths.current?.kick.triggerAttackRelease('C1', '8n', time);
             if (note === 'G1') drumSynths.current?.snare.triggerAttackRelease('16n', time);
             if (note === 'D2') drumSynths.current?.hat.triggerAttackRelease('16n', time);
@@ -351,6 +352,7 @@ export default function Home() {
     
     return (
         <div className="flex flex-col h-screen font-headline p-4 md:p-6 lg:p-8 overflow-hidden">
+            <Starfield />
             <div className="flex-shrink-0 z-10">
                 <header className="flex items-center justify-between mb-4">
                     <h1 className="text-3xl md:text-4xl font-bold text-primary">EtherMusic</h1>
@@ -446,4 +448,5 @@ export default function Home() {
 
 
     
+
 
