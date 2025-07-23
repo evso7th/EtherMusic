@@ -49,7 +49,7 @@ export default function Home() {
 
     // Tone.js refs
     const audioInitialized = useRef(false);
-    const melodySynth = useRef<Tone.AMSynth | null>(null);
+    const melodySynth = useRef<Tone.PolySynth | null>(null);
     const bassSynth = useRef<Tone.MonoSynth | null>(null);
     const drumSynths = useRef<{ kick: Tone.MembraneSynth, snare: Tone.NoiseSynth, hat: Tone.MetalSynth } | null>(null);
     const channels = useRef<{ melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel } | null>(null);
@@ -57,7 +57,6 @@ export default function Home() {
     const recorder = useRef<Tone.Recorder | null>(null);
     const bassLFO = useRef<Tone.LFO | null>(null);
     const bassVCA = useRef<Tone.Volume | null>(null);
-    const backgroundAudioRef = useRef<HTMLAudioElement>(null);
     
     const initializeAudio = useCallback(async () => {
         if (audioInitialized.current) return;
@@ -71,12 +70,11 @@ export default function Home() {
             drums: new Tone.Channel(volumes.drums).toDestination(),
         };
 
-        melodySynth.current = new Tone.AMSynth({
+        melodySynth.current = new Tone.PolySynth(Tone.AMSynth, {
             harmonicity: 1.5,
             envelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 0.2 },
             modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.3, release: 0.1 }
         }).connect(channels.current.melody);
-        melodySynth.current.volume.value = -Infinity; // Start silent
 
 
         bassVCA.current = new Tone.Volume(0).connect(channels.current.bass);
@@ -102,14 +100,14 @@ export default function Home() {
             if (note === 'C1') drumSynths.current?.kick.triggerAttackRelease('C1', '8n', time);
             if (note === 'C2') drumSynths.current?.snare.triggerAttackRelease('16n', time);
             if (note === 'D2') drumSynths.current?.hat.triggerAttackRelease('16n', time);
-        }, activePattern.sequence, '8n');
+        }, [], '8n').start(0);
 
         recorder.current = new Tone.Recorder();
         Tone.getDestination().connect(recorder.current);
         
         Tone.Transport.bpm.value = tempo;
         setIsReady(true);
-    }, [volumes.melody, volumes.bass, volumes.drums, activePattern.sequence, tempo]);
+    }, [volumes.melody, volumes.bass, volumes.drums, tempo]);
     
     useEffect(() => {
         if (!isReady || !melodySynth.current) return;
@@ -154,9 +152,6 @@ export default function Home() {
     const handleStartApp = async () => {
         const Tone = await import('tone');
         await Tone.start();
-        if (backgroundAudioRef.current) {
-            backgroundAudioRef.current.pause();
-        }
         await initializeAudio();
         setIsAppStarted(true);
         setIsPlaying(true);
@@ -182,7 +177,7 @@ export default function Home() {
         if (!isReady) return;
 
         Tone.Transport.stop();
-        melodySynth.current?.triggerRelease();
+        melodySynth.current?.releaseAll();
         bassSynth.current?.triggerRelease();
         setIsPlaying(false);
         if (latchedBassNote) {
@@ -238,18 +233,21 @@ export default function Home() {
     }, [isBassPulsating, isBassLatchOn, latchedBassNote]);
     
     useEffect(() => {
-        if (!drumSequence.current || !isReady) return;
+        if (!isReady) return;
         const Tone = require('tone');
         
-        drumSequence.current.stop();
-        drumSequence.current.clear();
-        activePattern.sequence.forEach(event => {
-            if (event) drumSequence.current.add(0, event);
-        });
-        drumSequence.current.events = activePattern.sequence;
-        
+        if (drumSequence.current) {
+            drumSequence.current.dispose();
+        }
+
+        drumSequence.current = new Tone.Sequence((time, note) => {
+            if (note === 'C1') drumSynths.current?.kick.triggerAttackRelease('C1', '8n', time);
+            if (note === 'C2') drumSynths.current?.snare.triggerAttackRelease('16n', time);
+            if (note === 'D2') drumSynths.current?.hat.triggerAttackRelease('16n', time);
+        }, activePattern.sequence, '8n');
+
         if (isPlaying && activePattern.name !== 'Off') {
-            drumSequence.current.start(Tone.now());
+            drumSequence.current.start(0);
         }
     }, [activePattern, isPlaying, isReady]);
 
@@ -321,6 +319,8 @@ export default function Home() {
                 
                 if (state === 'down') {
                     synth.triggerAttack(data.frequency);
+                } else if (state === 'move') {
+                    synth.setNote(data.frequency);
                 }
                 
                 if (!isBassPulsating) {
@@ -340,24 +340,18 @@ export default function Home() {
                 
                 if (state === 'down') {
                     synth.triggerAttack(data.frequency);
+                } else if (state === 'move') {
+                    synth.setNote(data.frequency);
                 }
                 
-                synth.frequency.rampTo(data.frequency, 0.1);
-                synth.volume.rampTo(dbVolume, 0.1);
+                synth.set({ volume: dbVolume });
     
             } else if (state === 'up') {
-                synth.triggerRelease();
-                synth.volume.rampTo(-Infinity, 0.5);
+                synth.releaseAll();
             }
         }
     }, [isPlaying, isBassLatchOn, latchedBassNote, isBassPulsating]);
     
-    useEffect(() => {
-        if (backgroundAudioRef.current) {
-            backgroundAudioRef.current.volume = 0.2;
-        }
-    }, []);
-
     return (
         <div className="flex flex-col h-screen bg-background font-headline p-4 md:p-6 lg:p-8">
             <header className="flex items-center justify-between mb-4 flex-shrink-0">
@@ -423,7 +417,6 @@ export default function Home() {
             </main>
             {!isAppStarted && (
                  <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50">
-                    <audio ref={backgroundAudioRef} src="/assets/sounds/ethermusic_start.webm" autoPlay loop playsInline />
                     <Button size="lg" onClick={handleStartApp} disabled={!isReady && isAppStarted}>
                         {!isReady && !isAppStarted ? 'Loading Audio...' : 'Click to Start EtherMusic'}
                     </Button>
@@ -440,4 +433,6 @@ export default function Home() {
         </div>
     );
 }
+    
+
     
