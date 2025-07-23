@@ -5,13 +5,13 @@
   left: 0;
   right: 0;
   bottom: 0;
-  perspective: 400px;
+  perspective: 800px;
   overflow: hidden;
 }
 
 .plane {
-  width: 120px;
-  height: 120px;
+  width: 240px;
+  height: 240px;
   transform-style: preserve-3d;
   position: absolute;
   top: 0;
@@ -24,13 +24,13 @@
 }
 
 .circle {
-  width: 120px;
-  height: 120px;
+  width: 240px;
+  height: 240px;
   position: absolute;
   transform-style: preserve-3d;
   border-radius: 100%;
   box-sizing: border-box;
-  box-shadow: 0 0 60px hsl(var(--primary)), inset 0 0 60px hsl(var(--primary));
+  box-shadow: 0 0 120px hsl(var(--primary)), inset 0 0 120px hsl(var(--primary));
 }
 
 .circle::before,
@@ -48,15 +48,15 @@
   border-radius: 100%;
   background: hsl(var(--primary));
   box-sizing: border-box;
-  box-shadow: 0 0 60px 2px hsl(var(--primary));
+  box-shadow: 0 0 120px 4px hsl(var(--primary));
 }
 
 .circle::before {
-  transform: translateZ(-90px);
+  transform: translateZ(-180px);
 }
 
 .circle::after {
-  transform: translateZ(90px);
+  transform: translateZ(180px);
 }
 
 .circle:nth-child(1) {
