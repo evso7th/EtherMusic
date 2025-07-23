@@ -337,15 +337,11 @@ export default function Home() {
                 const minDb = -48;
                 const maxDb = -6;
                 const dbVolume = minDb + data.volume * (maxDb - minDb);
-                
-                if (state === 'down') {
-                    synth.triggerAttack(data.frequency);
-                } else if (state === 'move') {
-                    synth.setNote(data.frequency);
+                synth.volume.value = dbVolume;
+
+                if (state === 'down' || state === 'move') {
+                    synth.triggerAttackRelease(data.frequency, '8n');
                 }
-                
-                synth.set({ volume: dbVolume });
-    
             } else if (state === 'up') {
                 synth.releaseAll();
             }
