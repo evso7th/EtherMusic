@@ -12,7 +12,7 @@ import { PlaybackControls } from '@/components/playback-controls';
 import { SlidersHorizontal } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { OrbitalAnimation } from '@/components/orbital-animation';
-import { Starfield } from '@/components/starfield';
+import { WebGLBackground } from '@/components/webgl-background';
 
 type BeatPattern = {
     name: string;
@@ -352,7 +352,7 @@ export default function Home() {
     
     return (
         <div className="flex flex-col h-screen font-headline p-4 md:p-6 lg:p-8 overflow-hidden">
-            <Starfield />
+            <WebGLBackground />
             <div className="flex-shrink-0 z-10">
                 <header className="flex items-center justify-between mb-4">
                     <h1 className="text-3xl md:text-4xl font-bold text-primary">EtherMusic</h1>
@@ -418,7 +418,7 @@ export default function Home() {
                 </div>
             </main>
             {!isAppStarted && (
-                 <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50">
+                 <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-50">
                     <OrbitalAnimation />
                     <Button size="lg" onClick={handleStartApp} disabled={!isReady && isAppStarted} className="z-10">
                         {!isReady && !isAppStarted ? 'Loading Audio...' : 'Click to Start EtherMusic'}
@@ -426,7 +426,7 @@ export default function Home() {
                 </div>
             )}
              {!isReady && isAppStarted && (
-                 <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50">
+                 <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-50">
                      <div className="text-center text-white">
                         <p className="text-xl mb-4">Loading audio engine...</p>
                          <div className='preloader'>
@@ -460,6 +460,7 @@ export default function Home() {
 
 
     
+
 
 
 
