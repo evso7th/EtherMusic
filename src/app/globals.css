@@ -83,6 +83,36 @@
   }
 }
 
+@keyframes rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+
+.preloader {
+  position: relative;
+  margin: 75px auto;
+  width: 150px;
+  height: 150px;
+  display: block;
+  overflow: hidden;
+}
+.preloader div {
+  height: 100%;
+}
+.preloader, .preloader div {
+  border-radius: 50%;
+  padding: 8px;
+  border: 2px solid transparent;
+  animation: rotate linear 3.5s infinite;
+  border-top-color: hsl(var(--primary));
+  border-bottom-color: hsl(var(--accent));
+}
+
 @keyframes pulse-primary {
   0% {
     box-shadow: 0 0 0 0 hsl(var(--primary) / 0.7);
@@ -103,6 +133,6 @@
     box-shadow: 0 0 0 20px hsl(var(--accent) / 0);
   }
   100% {
-    box-shadow: 0 0 0 0 hsl(var(--accent) / 0);
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
   }
 }

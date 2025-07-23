@@ -429,7 +429,19 @@ export default function Home() {
                  <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50">
                      <div className="text-center text-white">
                         <p className="text-xl mb-4">Loading audio engine...</p>
-                        <div className="w-24 h-24 border-4 border-dashed rounded-full animate-spin border-primary mx-auto"></div>
+                         <div className='preloader'>
+                            <div>
+                                <div>
+                                    <div>
+                                        <div>
+                                            <div>
+                                                <div></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
@@ -448,5 +460,6 @@ export default function Home() {
 
 
     
+
 
 
