@@ -434,12 +434,14 @@ export default function Home() {
                 <div className="absolute inset-0 bg-background flex flex-col items-center justify-center z-50 p-4">
                     <OrbitalAnimation />
                     <div className="z-10 text-center flex-grow flex flex-col items-center justify-center">
-                        <h1 className="text-6xl md:text-8xl font-bold text-primary">EtherMusic</h1>
-                        <p className="text-lg md:text-2xl text-white/80 font-light mt-2 tracking-wider">
-                           Neuro Meditation Sound Processor
-                        </p>
-                        <Button size="lg" onClick={handleStartApp} disabled={!isReady && isAppStarted} className="mt-8">
-                            {!isReady && !isAppStarted ? 'Loading Audio...' : 'Click to Start EtherMusic'}
+                        <div className="mb-16">
+                            <h1 className="text-6xl md:text-8xl font-bold text-primary">EtherMusic</h1>
+                            <p className="text-lg md:text-2xl text-white/80 font-light mt-2 tracking-wider">
+                               Neuro Meditation Sound Processor
+                            </p>
+                        </div>
+                        <Button size="lg" onClick={handleStartApp} disabled={!isReady && isAppStarted} className="mt-16">
+                            {!isReady && !isAppStarted ? 'Loading Audio...' : 'Start your own neuro meditation'}
                         </Button>
                     </div>
                      <footer className="z-10 text-xs text-white/50 pb-4">
