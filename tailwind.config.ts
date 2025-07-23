@@ -1,3 +1,4 @@
+
 import type {Config} from 'tailwindcss';
 
 export default {
@@ -96,12 +97,18 @@ export default {
           '0%, 100%': { boxShadow: '0 0 0 0 hsl(var(--accent) / 0.7)' },
           '70%': { boxShadow: '0 0 0 20px hsl(var(--accent) / 0)' },
         },
+        'gradient-animation': {
+          '0%': { 'background-position': '0% 50%' },
+          '50%': { 'background-position': '100% 50%' },
+          '100%': { 'background-position': '0% 50%' },
+        }
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         'pulse-primary': 'pulse-primary 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'pulse-accent': 'pulse-accent 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'gradient': 'gradient-animation 15s ease infinite',
       },
     },
   },
