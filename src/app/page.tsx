@@ -12,6 +12,8 @@ import { PlaybackControls } from '@/components/playback-controls';
 import { SlidersHorizontal } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { OrbitalAnimation } from '@/components/orbital-animation';
+import { useIsMobile } from '@/hooks/use-mobile';
+
 
 type BeatPattern = {
     name: string;
@@ -33,6 +35,7 @@ const melodyInstruments: MelodyInstrument[] = ['synth', 'organ', 'theremin', 'gl
 
 export default function Home() {
     const { toast } = useToast();
+    const isMobile = useIsMobile();
     const [isAppStarted, setIsAppStarted] = useState(false);
     const [isReady, setIsReady] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -148,6 +151,20 @@ export default function Home() {
     }, [melodyInstrument, isReady]);
 
     const handleStartApp = async () => {
+        if (isMobile) {
+            try {
+                if (document.documentElement.requestFullscreen) {
+                    await document.documentElement.requestFullscreen();
+                } else if ((document.documentElement as any).webkitRequestFullscreen) { /* Safari */
+                    await (document.documentElement as any).webkitRequestFullscreen();
+                } else if ((document.documentElement as any).msRequestFullscreen) { /* IE11 */
+                    await (document.documentElement as any).msRequestFullscreen();
+                }
+            } catch (err) {
+                 console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+            }
+        }
+        
         const Tone = await import('tone');
         await Tone.start();
         await initializeAudio();
@@ -331,17 +348,11 @@ export default function Home() {
             const synth = melodySynth.current;
             if (!synth) return;
     
-            if (data && state !== 'up') {
-                 // Map linear volume (0-1) to dB
+            if (data && state !== 'up' && data.frequency) {
                 const velocity = data.volume; 
-
                 if (state === 'down') {
                     synth.triggerAttack(data.frequency, undefined, velocity);
-                } else if (state === 'move') {
-                    // This is complex with PolySynth. For now, we don't adjust pitch mid-note
-                    // to avoid retriggering, which can sound jarring.
                 }
-
             } else if (state === 'up') {
                 if (data?.frequency) {
                     synth.triggerRelease(data.frequency);
@@ -351,11 +362,11 @@ export default function Home() {
     }, [isPlaying, isBassLatchOn, latchedBassNote, isBassPulsating]);
     
     return (
-        <div className="relative flex flex-col h-screen p-4 md:p-6 lg:p-8">
-            <div className="fixed inset-0 z-0">
+        <div className="relative flex flex-col h-screen overflow-hidden">
+            <div className="fixed inset-0 -z-10">
                 <OrbitalAnimation />
             </div>
-            <div className="relative z-10 flex flex-col h-full">
+            <div className="relative z-10 flex flex-col h-full p-4 md:p-6 lg:p-8">
                 <header className="flex-shrink-0 flex items-center justify-between mb-4">
                     <h1 className="text-2xl md:text-4xl font-bold text-primary">EtherMusic</h1>
                     <div className="flex items-center gap-1 md:gap-2">
@@ -428,7 +439,7 @@ export default function Home() {
                 </div>
             )}
             {!isReady && isAppStarted && (
-                <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-50">
+                <div className="absolute inset-0 bg-background flex items-center justify-center z-50">
                     <div className="text-center text-white">
                         <p className="text-xl mb-4">Loading audio engine...</p>
                         <div className='preloader'>
