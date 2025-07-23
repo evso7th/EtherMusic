@@ -348,15 +348,12 @@ export default function Home() {
             const synth = melodySynth.current;
             if (!synth) return;
     
-            if (data && state !== 'up' && data.frequency) {
+            if (data && state === 'down' && data.frequency) {
                 const velocity = data.volume; 
-                if (state === 'down') {
-                    synth.triggerAttack(data.frequency, undefined, velocity);
-                }
-            } else if (state === 'up') {
-                if (data?.frequency) {
-                    synth.triggerRelease(data.frequency);
-                }
+                synth.triggerAttack(data.frequency, undefined, velocity);
+
+            } else if (data && state === 'up') {
+                synth.triggerRelease(data.frequency);
             }
         }
     }, [isPlaying, isBassLatchOn, latchedBassNote, isBassPulsating]);
@@ -434,11 +431,20 @@ export default function Home() {
                 </main>
             </div>
             {!isAppStarted && (
-                <div className="absolute inset-0 bg-background flex items-center justify-center z-50">
+                <div className="absolute inset-0 bg-background flex flex-col items-center justify-center z-50 p-4">
                     <OrbitalAnimation />
-                    <Button size="lg" onClick={handleStartApp} disabled={!isReady && isAppStarted} className="z-10">
-                        {!isReady && !isAppStarted ? 'Loading Audio...' : 'Click to Start EtherMusic'}
-                    </Button>
+                    <div className="z-10 text-center flex-grow flex flex-col items-center justify-center">
+                        <h1 className="text-6xl md:text-8xl font-bold text-primary">EtherMusic</h1>
+                        <p className="text-lg md:text-2xl text-white/80 font-light mt-2 tracking-wider">
+                           Neuro Meditation Sound Processor
+                        </p>
+                        <Button size="lg" onClick={handleStartApp} disabled={!isReady && isAppStarted} className="mt-8">
+                            {!isReady && !isAppStarted ? 'Loading Audio...' : 'Click to Start EtherMusic'}
+                        </Button>
+                    </div>
+                     <footer className="z-10 text-xs text-white/50 pb-4">
+                        Based on theremin technology (c) 2025, EVS
+                    </footer>
                 </div>
             )}
             {!isReady && isAppStarted && (
