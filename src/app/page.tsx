@@ -35,7 +35,7 @@ export default function Home() {
     
     // Audio state
     const [tempo, setTempo] = useState(120);
-    const [volumes, setVolumes] = useState({ melody: -6, bass: -6, drums: -6 });
+    const [volumes, setVolumes] = useState({ melody: -6, bass: -12, drums: -6 });
     const [activePattern, setActivePattern] = useState<BeatPattern>(beatPatterns[3]);
     const [melodyInstrument, setMelodyInstrument] = useState<MelodyInstrument>('synth');
 
