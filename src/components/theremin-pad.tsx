@@ -2,7 +2,7 @@
 "use client";
 
 import type { PointerEvent } from 'react';
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -45,7 +45,7 @@ export function ThereminPad({
 }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
     const orbRef = useRef<HTMLDivElement>(null);
-    const isActive = useRef(false);
+    const isPointerDown = useRef(false);
 
     const calculateInteraction = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (!padRef.current) return null;
@@ -63,65 +63,45 @@ export function ThereminPad({
         
         const volume = 1 - normalizedY;
         
-        return { x, y, frequency, volume };
-    }, [frequencyRange]);
-
-    const showOrb = useCallback((x: number, y: number) => {
         if (orbRef.current) {
             orbRef.current.style.transform = `translate(${x}px, ${y}px)`;
-            orbRef.current.style.opacity = '1';
         }
-    }, []);
 
-    const hideOrb = useCallback(() => {
-        if (orbRef.current) {
-            orbRef.current.style.opacity = '0';
-        }
-    }, []);
+        return { frequency, volume };
+    }, [frequencyRange]);
+
 
     const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
-        if (!isActive.current) return;
+        if (!isPointerDown.current) return;
         const interactionData = calculateInteraction(event);
         if (interactionData) {
-            showOrb(interactionData.x, interactionData.y);
-            onInteraction(type, { frequency: interactionData.frequency, volume: interactionData.volume }, 'move');
+            onInteraction(type, interactionData, 'move');
         }
-    }, [calculateInteraction, showOrb, onInteraction, type]);
+    }, [calculateInteraction, onInteraction, type]);
 
     const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
-        isActive.current = true;
+        isPointerDown.current = true;
         (event.target as HTMLElement).setPointerCapture(event.pointerId);
+        if (orbRef.current) orbRef.current.style.opacity = '1';
+        
         const interactionData = calculateInteraction(event);
         if (interactionData) {
-            showOrb(interactionData.x, interactionData.y);
-            onInteraction(type, { frequency: interactionData.frequency, volume: interactionData.volume }, 'down');
+            onInteraction(type, interactionData, 'down');
         }
-    }, [calculateInteraction, showOrb, onInteraction, type]);
+    }, [calculateInteraction, onInteraction, type]);
 
     const handlePointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
-        if (!isActive.current) return;
-        isActive.current = false;
+        if (!isPointerDown.current) return;
+        isPointerDown.current = false;
         (event.target as HTMLElement).releasePointerCapture(event.pointerId);
-        hideOrb();
+        if (orbRef.current) orbRef.current.style.opacity = '0';
         onInteraction(type, null, 'up');
-    }, [hideOrb, onInteraction, type]);
+    }, [onInteraction, type]);
     
-    useEffect(() => {
-         if (isLatched) {
-            // In latch mode, we don't want the orb to disappear when the pointer is up
-            // and we might need to show it if it's not already visible.
-            // This logic can be more complex depending on exact requirements for latch mode visuals.
-        } else if (!isActive.current) {
-            hideOrb();
-        }
-    }, [isLatched, hideOrb]);
-
-
     return (
         <Card className={cn(
             "flex flex-col h-full bg-card/50 border-2 border-transparent transition-all duration-300",
             (isLatched) && type === 'bass' && "border-accent ring-4 ring-accent/50",
-            (isActive.current) && type === 'melody' && "border-primary ring-4 ring-primary/50"
         )}>
             <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between p-4">
                 <CardTitle className="text-xl font-bold" style={{ color }}>{title}</CardTitle>
@@ -179,7 +159,8 @@ export function ThereminPad({
                         ref={orbRef}
                         className={cn(
                             'absolute top-0 left-0 rounded-full w-12 h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-0',
-                            title.includes('Melody') ? 'animate-pulse-primary' : (isPulsating || isLatched) ? 'animate-pulse-accent' : ''
+                             (isPointerDown.current || isLatched) && 'opacity-100',
+                             title.includes('Melody') ? 'animate-pulse-primary' : (isPulsating || isLatched) ? 'animate-pulse-accent' : ''
                         )}
                         style={{
                             backgroundColor: color,

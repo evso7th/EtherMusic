@@ -49,7 +49,7 @@ export default function Home() {
 
     // Tone.js refs
     const audioInitialized = useRef(false);
-    const melodySynth = useRef<Tone.PolySynth | null>(null);
+    const melodySynth = useRef<Tone.AMSynth | null>(null);
     const bassSynth = useRef<Tone.MonoSynth | null>(null);
     const drumSynths = useRef<{ kick: Tone.MembraneSynth, snare: Tone.NoiseSynth, hat: Tone.MetalSynth } | null>(null);
     const channels = useRef<{ melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel } | null>(null);
@@ -70,7 +70,7 @@ export default function Home() {
             drums: new Tone.Channel(volumes.drums).toDestination(),
         };
 
-        melodySynth.current = new Tone.PolySynth(Tone.AMSynth, {
+        melodySynth.current = new Tone.AMSynth({
             harmonicity: 1.5,
             envelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 0.2 },
             modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.3, release: 0.1 }
@@ -87,7 +87,7 @@ export default function Home() {
         bassLFO.current = new Tone.LFO({
             frequency: "4n",
             min: 0,
-            max: -24, // Modulates from full volume to -24db
+            max: -24,
         }).start();
 
         drumSynths.current = {
@@ -177,7 +177,7 @@ export default function Home() {
         if (!isReady) return;
 
         Tone.Transport.stop();
-        melodySynth.current?.releaseAll();
+        melodySynth.current?.triggerRelease();
         bassSynth.current?.triggerRelease();
         setIsPlaying(false);
         if (latchedBassNote) {
@@ -233,9 +233,9 @@ export default function Home() {
     }, [isBassPulsating, isBassLatchOn, latchedBassNote]);
     
     useEffect(() => {
-        if (!isReady) return;
+        if (!isReady || !isPlaying) return;
         const Tone = require('tone');
-        
+
         if (drumSequence.current) {
             drumSequence.current.dispose();
         }
@@ -246,7 +246,7 @@ export default function Home() {
             if (note === 'D2') drumSynths.current?.hat.triggerAttackRelease('16n', time);
         }, activePattern.sequence, '8n');
 
-        if (isPlaying && activePattern.name !== 'Off') {
+        if (activePattern.name !== 'Off') {
             drumSequence.current.start(0);
         }
     }, [activePattern, isPlaying, isReady]);
@@ -337,13 +337,16 @@ export default function Home() {
                 const minDb = -48;
                 const maxDb = -6;
                 const dbVolume = minDb + data.volume * (maxDb - minDb);
-                synth.volume.value = dbVolume;
 
-                if (state === 'down' || state === 'move') {
-                    synth.triggerAttackRelease(data.frequency, '8n');
+                if (state === 'down') {
+                    synth.triggerAttack(data.frequency);
+                    synth.volume.rampTo(dbVolume, 0.05);
+                } else if (state === 'move') {
+                    synth.frequency.rampTo(data.frequency, 0.05);
+                    synth.volume.rampTo(dbVolume, 0.05);
                 }
             } else if (state === 'up') {
-                synth.releaseAll();
+                synth.triggerRelease();
             }
         }
     }, [isPlaying, isBassLatchOn, latchedBassNote, isBassPulsating]);
@@ -429,6 +432,8 @@ export default function Home() {
         </div>
     );
 }
+    
+
     
 
     
