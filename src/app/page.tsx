@@ -70,11 +70,7 @@ export default function Home() {
             drums: new Tone.Channel(volumes.drums).toDestination(),
         };
 
-        melodySynth.current = new Tone.AMSynth({
-            harmonicity: 1.5,
-            envelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 0.2 },
-            modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.3, release: 0.1 }
-        }).connect(channels.current.melody);
+        melodySynth.current = new Tone.AMSynth().connect(channels.current.melody);
 
 
         bassVCA.current = new Tone.Volume(0).connect(channels.current.bass);
@@ -117,36 +113,36 @@ export default function Home() {
         switch (melodyInstrument) {
             case 'organ':
                 newOptions = {
-                    oscillator: { type: 'fatsine' },
-                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 0.3 }
+                    harmonicity: 3,
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 0.3 },
+                    modulationEnvelope: { attack: 0.01, decay: 0.5, sustain: 0.2, release: 0.1 }
                 };
-                melodySynth.current.set(newOptions);
                 break;
             case 'theremin':
                 newOptions = {
-                    oscillator: { type: "sine" },
-                    envelope: { attack: 0.1, decay: 0.1, sustain: 0.8, release: 0.5 }
+                    harmonicity: 1, // Pure tone
+                    envelope: { attack: 0.1, decay: 0, sustain: 1, release: 0.1 },
+                    modulationEnvelope: { attack: 0.1, decay: 0, sustain: 1, release: 0.1 }
                 };
-                 melodySynth.current.set(newOptions);
                 break;
             case 'glass':
                 newOptions = {
-                    harmonicity: 1.2,
-                    modulationIndex: 10,
-                    envelope: { attack: 0.3, decay: 0, sustain: 1, release: 0.8 },
-                    modulationEnvelope: { attack: 0.5, decay: 0.2, sustain: 0.8, release: 0.5 }
+                    harmonicity: 1.5,
+                    envelope: { attack: 0.01, decay: 0.5, sustain: 0.2, release: 0.8 },
+                    modulationEnvelope: { attack: 0.2, decay: 0.8, sustain: 0.5, release: 0.5 }
                 };
-                melodySynth.current.set(newOptions);
                 break;
             case 'synth':
             default:
-                 melodySynth.current.set({
+                newOptions = {
                     harmonicity: 1.5,
-                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 0.2 },
+                    envelope: { attack: 0.05, decay: 0.3, sustain: 0.6, release: 0.4 },
                     modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.3, release: 0.1 }
-                });
+                };
                 break;
         }
+        melodySynth.current.set(newOptions);
+
     }, [melodyInstrument, isReady]);
 
     const handleStartApp = async () => {
