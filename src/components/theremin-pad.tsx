@@ -82,7 +82,7 @@ export function ThereminPad({
         if (!padRef.current) return null;
         const orb = document.createElement('div');
         orb.className = cn(
-            'absolute top-0 left-0 rounded-full w-12 h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-100',
+            'absolute top-0 left-0 rounded-full w-8 h-8 md:w-12 md:h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-100',
             'animate-pulse-primary'
         );
         orb.style.backgroundColor = color;
@@ -187,12 +187,12 @@ export function ThereminPad({
             "flex flex-col h-full bg-card/50 border-2 border-transparent transition-all duration-300",
             (isLatched) && type === 'bass' && "border-accent ring-4 ring-accent/50",
         )}>
-            <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between p-4">
-                <CardTitle className="text-xl font-bold" style={{ color }}>{title}</CardTitle>
-                <div className="flex items-center gap-4">
+            <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between p-2 md:p-4">
+                <CardTitle className="text-lg md:text-xl font-bold" style={{ color }}>{title}</CardTitle>
+                <div className="flex items-center gap-2 md:gap-4">
                     {instruments && activeInstrument && onInstrumentChange && (
                         <Select value={activeInstrument} onValueChange={onInstrumentChange}>
-                            <SelectTrigger className="w-[120px] capitalize">
+                            <SelectTrigger className="w-[90px] md:w-[120px] capitalize h-8 md:h-10 text-xs md:text-sm">
                                 <SelectValue placeholder="Instrument" />
                             </SelectTrigger>
                             <SelectContent>
@@ -203,9 +203,9 @@ export function ThereminPad({
                         </Select>
                     )}
                      {onLatchToggle && (
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-1 md:space-x-2">
                             <Switch id="latch-mode" checked={isLatchOn} onCheckedChange={onLatchToggle} />
-                            <Label htmlFor="latch-mode" className="flex items-center gap-1"><Anchor className="w-4 h-4" /> Latch</Label>
+                            <Label htmlFor="latch-mode" className="flex items-center gap-1 text-xs md:text-sm"><Anchor className="w-3 h-3 md:w-4 md:h-4" /> Latch</Label>
                         </div>
                     )}
                     {onPulsateToggle && (
@@ -213,11 +213,11 @@ export function ThereminPad({
                             variant={(isPulsating || isLatched) ? 'default' : 'outline'}
                             size="icon"
                             onClick={onPulsateToggle}
-                            className={cn('transition-all', (isPulsating || isLatched) && 'animate-pulse-accent')}
+                            className={cn('transition-all w-8 h-8 md:w-10 md:h-10', (isPulsating || isLatched) && 'animate-pulse-accent')}
                             style={{ '--accent': 'hsl(var(--accent))' } as React.CSSProperties}
 
                          >
-                             <Zap className="w-5 h-5" />
+                             <Zap className="w-4 h-4 md:w-5 md:h-5" />
                          </Button>
                     )}
                 </div>
@@ -232,7 +232,7 @@ export function ThereminPad({
                     onPointerLeave={handlePointerUpOrLeave}
                     style={{
                         backgroundColor: 'hsl(var(--muted) / 0.2)',
-                        backgroundSize: '4rem 4rem',
+                        backgroundSize: '2rem 2rem md:4rem 4rem',
                         backgroundImage: `
                             linear-gradient(to right, hsl(var(--border) / 0.25) 1px, transparent 1px),
                             linear-gradient(to bottom, hsl(var(--border) / 0.25) 1px, transparent 1px)
@@ -242,7 +242,7 @@ export function ThereminPad({
                     {type === 'bass' && <div
                         ref={bassOrbRef}
                         className={cn(
-                            'absolute top-0 left-0 rounded-full w-12 h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-0',
+                            'absolute top-0 left-0 rounded-full w-8 h-8 md:w-12 md:h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-0',
                              (isPointerDown.current || isLatched) && 'opacity-100',
                              (isPulsating || isLatched) ? 'animate-pulse-accent' : ''
                         )}
@@ -256,3 +256,5 @@ export function ThereminPad({
         </Card>
     );
 }
+
+    

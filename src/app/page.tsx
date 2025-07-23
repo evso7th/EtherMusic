@@ -357,8 +357,8 @@ export default function Home() {
             </div>
             <div className="relative z-10 flex flex-col h-full">
                 <header className="flex-shrink-0 flex items-center justify-between mb-4">
-                    <h1 className="text-3xl md:text-4xl font-bold text-primary">EtherMusic</h1>
-                    <div className="flex items-center gap-2">
+                    <h1 className="text-2xl md:text-4xl font-bold text-primary">EtherMusic</h1>
+                    <div className="flex items-center gap-1 md:gap-2">
                         <PlaybackControls
                             isPlaying={isPlaying}
                             isRecording={isRecording}
@@ -369,8 +369,8 @@ export default function Home() {
                         />
                         <Dialog>
                             <DialogTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                    <SlidersHorizontal />
+                                <Button variant="ghost" size="icon" className="w-8 h-8 md:w-10 md:h-10">
+                                    <SlidersHorizontal className="w-4 h-4 md:w-5 md:h-5"/>
                                 </Button>
                             </DialogTrigger>
                             <DialogContent>
@@ -382,8 +382,8 @@ export default function Home() {
                         </Dialog>
                     </div>
                 </header>
-                <main className="flex-grow flex flex-col gap-6">
-                    <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-6 h-[calc(80vh-4rem)]">
+                <main className="flex-grow flex flex-col gap-4">
+                    <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4">
                         <ThereminPad
                             title="Bass"
                             onInteraction={handleThereminInteraction}
@@ -408,7 +408,7 @@ export default function Home() {
                             onInstrumentChange={setMelodyInstrument}
                         />
                     </div>
-                    <div className="h-[calc(20vh-2rem)] flex flex-col">
+                    <div className="flex-shrink-0">
                         <BeatBoxControls
                             patterns={beatPatterns}
                             activePattern={activePattern}
@@ -448,3 +448,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
