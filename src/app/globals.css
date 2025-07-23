@@ -80,24 +80,8 @@
   }
   body {
     @apply bg-background text-foreground;
-    background: 
-      radial-gradient(circle at bottom, hsl(var(--foreground)), transparent 80%),    
-      linear-gradient(to top, hsl(var(--accent) / 0.5) 0%, transparent 70%),    
-      linear-gradient(to bottom, transparent, hsl(var(--foreground) / 0.2) 70%),
-      hsl(var(--background));
-    animation: bg-animation 20s infinite;
   }
 }
-
-@keyframes bg-animation {
-  0%, 100% {
-    background-color: hsl(var(--primary));
-  }
-  50% {
-    background-color: hsl(var(--accent));
-  }
-}
-
 
 @keyframes rotate {
   0% {
