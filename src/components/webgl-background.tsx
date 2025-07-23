@@ -48,7 +48,7 @@ const shader = {
     float fbm(vec2 p) {
         float value = 0.0;
         float amplitude = 0.5;
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < 8; i++) { // Increased iterations for more detail
             value += amplitude * noise(p);
             p *= 2.0;
             amplitude *= 0.5;
@@ -66,26 +66,31 @@ const shader = {
     void main() {
       vec2 st = (gl_FragCoord.xy * 2.0 - u_resolution.xy) / min(u_resolution.x, u_resolution.y);
       
-      float t = u_time * 0.1;
+      float t = u_time * 0.05; // Slower time for a more majestic feel
       
-      vec2 displacement = vec2(fbm(st + t), fbm(st - t));
-      st += displacement * 0.1;
+      // More complex warping
+      vec2 q = vec2(fbm(st + t), fbm(st + vec2(1.2, 2.8) + t));
+      vec2 r = vec2(fbm(st + q * 0.8 + vec2(5.2, 1.3) + t), fbm(st + q * 0.6 + vec2(8.3, 4.2) + t));
+      st += r * 0.2;
 
-      st = rotate(st, t * 0.5);
+      // Rotations for swirling effect
+      st = rotate(st, t * 0.3);
 
       float d = length(st);
       
-      // More complex shape
-      float pattern = fbm(st * 3.0 + t);
-      pattern = 1.0 / (pattern + pow(d, 3.0));
+      // Shape generation with more peaks and valleys
+      float pattern = fbm(st * 2.5 - r.x * 0.3 + t);
+      pattern += sin(st.x * 10.0 + t * 2.0) * 0.1; // Add sine waves for ripples
+      pattern += cos(st.y * 10.0 + t * 2.0) * 0.1;
+      pattern = 1.0 / (pattern + pow(d, 2.5)); // Sharper falloff
 
-      vec3 color = palette(length(st) + t * 0.2);
+      vec3 color = palette(d * 0.5 + t * 0.1);
 
-      // Additive blending for glow
-      color += vec3(pattern * 0.3);
+      // Additive blending for a brighter core
+      color += vec3(pattern * 0.5);
 
       // Vignette to create soft edges and handle 10% margin
-      float vignette = smoothstep(1.0, 0.6, d); // 0.8 gives about 10% margin
+      float vignette = smoothstep(1.0, 0.6, d);
       color *= vignette;
       
       // Final color with alpha for transparency
