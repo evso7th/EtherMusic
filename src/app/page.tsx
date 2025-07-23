@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -163,7 +164,7 @@ export default function Home() {
     const handleStartApp = async () => {
         const Tone = await import('tone');
         await Tone.start();
-        if (backgroundAudioRef.current) {
+        if (backgroundAudioRef.current && !backgroundAudioRef.current.paused) {
             backgroundAudioRef.current.pause();
         }
         await initializeAudio();
@@ -179,6 +180,7 @@ export default function Home() {
             Tone.Transport.pause();
             setIsPlaying(false);
         } else {
+            await Tone.start();
             Tone.Transport.start();
             setIsPlaying(true);
         }
@@ -248,7 +250,7 @@ export default function Home() {
             drumSequence.current.clear();
             drumSequence.current.events = activePattern.sequence;
             if (isPlaying && activePattern.name !== 'Off') {
-                drumSequence.current.start(0);
+                drumSequence.current.start(Tone.now());
             }
         }
     }, [activePattern, isPlaying]);
@@ -275,9 +277,9 @@ export default function Home() {
         const synth = type === 'melody' ? melodySynth.current : bassSynth.current;
 
         if (type === 'bass' && isBassLatchOn) {
-            if (data && !latchedBassNote) {
+             if (data && !latchedBassNote) {
                 setLatchedBassNote(data);
-            } else {
+            } else if (latchedBassNote) {
                 setLatchedBassNote(null);
                 bassSynth.current?.triggerRelease();
             }
@@ -290,8 +292,8 @@ export default function Home() {
             const dbVolume = minDb + data.volume * (maxDb - minDb);
             
             if (type === 'melody') {
-                melodySynth.current.set({ volume: dbVolume });
-                melodySynth.current.triggerAttack(data.frequency);
+                 melodySynth.current.volume.rampTo(dbVolume, 0.1);
+                 melodySynth.current.triggerAttack(data.frequency);
             } else { // bass
                  bassSynth.current.triggerAttack(data.frequency);
                  bassVCA.current.volume.rampTo(dbVolume, 0.1);
