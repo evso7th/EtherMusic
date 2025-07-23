@@ -2,7 +2,7 @@
 "use client";
 
 import type { PointerEvent } from 'react';
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -15,7 +15,7 @@ import type { MelodyInstrument } from '@/app/page';
 interface ThereminPadProps {
     title: string;
     type: 'melody' | 'bass';
-    onInteraction: (type: 'melody' | 'bass', params: { frequency: number; volume: number } | null, state: 'down' | 'move' | 'up') => void;
+    onInteraction: (type: 'melody' | 'bass', params: { frequency: number; volume: number } | null, state: 'down' | 'move' | 'up', pointerId?: number) => void;
     frequencyRange: [number, number];
     color: string;
     isPulsating?: boolean;
@@ -27,6 +27,12 @@ interface ThereminPadProps {
     onLatchToggle?: (checked: boolean) => void;
     isLatched?: boolean;
     latchedNotePosition?: { frequency: number; volume: number } | null;
+}
+
+interface PointerState {
+    id: number;
+    orb: HTMLDivElement;
+    frequency: number;
 }
 
 export function ThereminPad({ 
@@ -46,7 +52,10 @@ export function ThereminPad({
     latchedNotePosition,
 }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
-    const orbRef = useRef<HTMLDivElement>(null);
+    const [activePointers, setActivePointers] = useState<Map<number, PointerState>>(new Map());
+    
+    // For bass theremin which is monophonic
+    const bassOrbRef = useRef<HTMLDivElement>(null);
     const isPointerDown = useRef(false);
 
     const calculateInteraction = useCallback((event: PointerEvent<HTMLDivElement>) => {
@@ -65,46 +74,107 @@ export function ThereminPad({
         
         const volume = 1 - normalizedY;
         
-        if (orbRef.current) {
-            orbRef.current.style.transform = `translate(${x}px, ${y}px)`;
-        }
-
-        return { frequency, volume };
+        return { x, y, frequency, volume };
     }, [frequencyRange]);
 
 
-    const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
-        if (!isPointerDown.current) return;
-        const interactionData = calculateInteraction(event);
-        if (interactionData) {
-            onInteraction(type, interactionData, 'move');
-        }
-    }, [calculateInteraction, onInteraction, type]);
+    const createOrb = (x: number, y: number) => {
+        if (!padRef.current) return null;
+        const orb = document.createElement('div');
+        orb.className = cn(
+            'absolute top-0 left-0 rounded-full w-12 h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-100',
+            type === 'melody' ? 'animate-pulse-primary' : ''
+        );
+        orb.style.backgroundColor = color;
+        orb.style.animationDuration = '1s';
+        orb.style.transform = `translate(${x}px, ${y}px)`;
+        padRef.current.appendChild(orb);
+        return orb;
+    };
+
 
     const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
-        isPointerDown.current = true;
         (event.target as HTMLElement).setPointerCapture(event.pointerId);
-        if (orbRef.current && !isLatched) orbRef.current.style.opacity = '1';
-        
         const interactionData = calculateInteraction(event);
-        if (interactionData) {
-            onInteraction(type, interactionData, 'down');
-        }
-    }, [calculateInteraction, onInteraction, type, isLatched]);
+        if (!interactionData) return;
+        
+        onInteraction(type, interactionData, 'down', event.pointerId);
 
-    const handlePointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
-        if (!isPointerDown.current) return;
-        isPointerDown.current = false;
+        if (type === 'melody') {
+            const orb = createOrb(interactionData.x, interactionData.y);
+            if(orb) {
+                setActivePointers(prev => {
+                    const newPointers = new Map(prev);
+                    newPointers.set(event.pointerId, { id: event.pointerId, orb, frequency: interactionData.frequency });
+                    return newPointers;
+                });
+            }
+        } else {
+            isPointerDown.current = true;
+            if (bassOrbRef.current && !isLatched) {
+                bassOrbRef.current.style.opacity = '1';
+                bassOrbRef.current.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
+            }
+        }
+    }, [calculateInteraction, onInteraction, type, isLatched, color]);
+
+    const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
+        const interactionData = calculateInteraction(event);
+        if (!interactionData) return;
+        
+        onInteraction(type, interactionData, 'move', event.pointerId);
+
+        if (type === 'melody') {
+            setActivePointers(prev => {
+                const newPointers = new Map(prev);
+                const pointer = newPointers.get(event.pointerId);
+                if (pointer && pointer.orb) {
+                    pointer.orb.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
+                    // Note: Frequency update on move is not handled by PolySynth easily.
+                    // New notes are triggered on down events.
+                }
+                return newPointers;
+            });
+        } else {
+            if (isPointerDown.current) {
+                 if (bassOrbRef.current) {
+                    bassOrbRef.current.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
+                 }
+            }
+        }
+
+    }, [calculateInteraction, onInteraction, type]);
+
+    const handlePointerUpOrLeave = useCallback((event: PointerEvent<HTMLDivElement>) => {
         (event.target as HTMLElement).releasePointerCapture(event.pointerId);
-        if (orbRef.current && !isLatched) orbRef.current.style.opacity = '0';
-        onInteraction(type, null, 'up');
-    }, [onInteraction, type, isLatched]);
+        
+        if (type === 'melody') {
+            const pointer = activePointers.get(event.pointerId);
+            if (pointer) {
+                onInteraction(type, { frequency: pointer.frequency, volume: 0}, 'up', event.pointerId);
+                pointer.orb.remove();
+                setActivePointers(prev => {
+                    const newPointers = new Map(prev);
+                    newPointers.delete(event.pointerId);
+                    return newPointers;
+                });
+            }
+        } else {
+            if (isPointerDown.current) {
+                isPointerDown.current = false;
+                if (bassOrbRef.current && !isLatched) {
+                    bassOrbRef.current.style.opacity = '0';
+                }
+                onInteraction(type, null, 'up', event.pointerId);
+            }
+        }
+    }, [onInteraction, type, isLatched, activePointers]);
     
     useEffect(() => {
-        if (!padRef.current || !orbRef.current) return;
+        if (type === 'bass' && !padRef.current || !bassOrbRef.current) return;
 
         if (latchedNotePosition) {
-            const rect = padRef.current.getBoundingClientRect();
+            const rect = padRef.current!.getBoundingClientRect();
             const { frequency, volume } = latchedNotePosition;
             const [minFreq, maxFreq] = frequencyRange;
 
@@ -116,14 +186,14 @@ export function ThereminPad({
             const x = normalizedX * rect.width;
             const y = normalizedY * rect.height;
             
-            orbRef.current.style.transform = `translate(${x}px, ${y}px)`;
-            orbRef.current.style.opacity = '1';
+            bassOrbRef.current!.style.transform = `translate(${x}px, ${y}px)`;
+            bassOrbRef.current!.style.opacity = '1';
         } else {
              if (!isPointerDown.current) {
-                orbRef.current.style.opacity = '0';
+                if(bassOrbRef.current) bassOrbRef.current.style.opacity = '0';
              }
         }
-    }, [latchedNotePosition, frequencyRange]);
+    }, [latchedNotePosition, frequencyRange, type]);
 
     return (
         <Card className={cn(
@@ -170,9 +240,9 @@ export function ThereminPad({
                     ref={padRef}
                     className="w-full h-full relative overflow-hidden cursor-crosshair touch-none"
                     onPointerDown={handlePointerDown}
-                    onPointerUp={handlePointerUp}
+                    onPointerUp={handlePointerUpOrLeave}
                     onPointerMove={handlePointerMove}
-                    onPointerLeave={handlePointerUp}
+                    onPointerLeave={handlePointerUpOrLeave}
                     style={{
                         backgroundColor: 'hsl(var(--muted) / 0.2)',
                         backgroundSize: '4rem 4rem',
@@ -182,18 +252,18 @@ export function ThereminPad({
                         `,
                     }}
                 >
-                    <div
-                        ref={orbRef}
+                    {type === 'bass' && <div
+                        ref={bassOrbRef}
                         className={cn(
                             'absolute top-0 left-0 rounded-full w-12 h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-0',
                              (isPointerDown.current || isLatched) && 'opacity-100',
-                             title.includes('Melody') ? 'animate-pulse-primary' : (isPulsating || isLatched) ? 'animate-pulse-accent' : ''
+                             (isPulsating || isLatched) ? 'animate-pulse-accent' : ''
                         )}
                         style={{
                             backgroundColor: color,
                             animationDuration: '1s',
                         }}
-                    />
+                    />}
                 </div>
             </CardContent>
         </Card>

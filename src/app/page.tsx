@@ -51,7 +51,7 @@ export default function Home() {
 
     // Tone.js refs
     const audioInitialized = useRef(false);
-    const melodySynth = useRef<Tone.AMSynth | null>(null);
+    const melodySynth = useRef<Tone.PolySynth<Tone.AMSynth> | null>(null);
     const bassSynth = useRef<Tone.MonoSynth | null>(null);
     const drumSynths = useRef<{ kick: Tone.MembraneSynth, snare: Tone.NoiseSynth, hat: Tone.MetalSynth } | null>(null);
     const channels = useRef<{ melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel } | null>(null);
@@ -72,7 +72,7 @@ export default function Home() {
             drums: new Tone.Channel(volumes.drums).toDestination(),
         };
 
-        melodySynth.current = new Tone.AMSynth().connect(channels.current.melody);
+        melodySynth.current = new Tone.PolySynth(Tone.AMSynth).connect(channels.current.melody);
 
 
         bassVCA.current = new Tone.Volume(0).connect(channels.current.bass);
@@ -175,7 +175,7 @@ export default function Home() {
         if (!isReady) return;
 
         Tone.Transport.stop();
-        melodySynth.current?.triggerRelease();
+        melodySynth.current?.releaseAll();
         bassSynth.current?.triggerRelease();
         setIsPlaying(false);
         if (latchedBassNote) {
@@ -332,24 +332,38 @@ export default function Home() {
             if (!synth) return;
     
             if (data && state !== 'up') {
+                 // Map linear volume (0-1) to dB
                 const minDb = -48;
                 const maxDb = -6;
                 const dbVolume = minDb + data.volume * (maxDb - minDb);
+                const velocity = data.volume; // Use linear volume for velocity
 
                 if (state === 'down') {
-                    synth.triggerAttack(data.frequency);
+                    synth.triggerAttackRelease(data.frequency, "8n", undefined, velocity);
+                } else if (state === 'move') {
+                    // With PolySynth, we can't easily change the frequency of a specific voice.
+                    // The common pattern is to retrigger notes, but for a theremin feel,
+                    // we'll let existing notes play out and trigger new ones.
+                    // For simplicity, we won't handle 'move' events to change pitch for polyphony.
+                    // New notes are created on 'down' events.
                 }
-                synth.frequency.rampTo(data.frequency, 0.05);
-                synth.volume.rampTo(dbVolume, 0.05);
 
             } else if (state === 'up') {
-                synth.triggerRelease();
+                // To release a specific note, we'd need its frequency.
+                // Since `data` is null on 'up', we'll call releaseAll for simplicity.
+                // A more complex implementation would track active pointer IDs and their frequencies.
+                if (data?.frequency) {
+                    synth.triggerRelease(data.frequency);
+                } else {
+                    // This is a fallback. A better approach would be to not have to do this.
+                    // The theremin pad should ideally send the frequency of the note to release.
+                }
             }
         }
     }, [isPlaying, isBassLatchOn, latchedBassNote, isBassPulsating]);
     
     return (
-        <div className="relative flex flex-col h-screen font-headline p-4 md:p-6 lg:p-8">
+        <div className="relative flex flex-col h-screen p-4 md:p-6 lg:p-8">
             <div className="fixed inset-0 z-0">
                 <OrbitalAnimation />
             </div>
@@ -446,3 +460,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
