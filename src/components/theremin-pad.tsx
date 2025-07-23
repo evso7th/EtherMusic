@@ -187,12 +187,12 @@ export function ThereminPad({
             "flex flex-col h-full bg-card/50 border-2 border-transparent transition-all duration-300",
             (isLatched) && type === 'bass' && "border-accent ring-4 ring-accent/50",
         )}>
-            <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between p-2 md:p-3">
-                <CardTitle className="text-base md:text-lg font-bold" style={{ color }}>{title}</CardTitle>
-                <div className="flex items-center gap-2 md:gap-4">
+            <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between p-2">
+                <CardTitle className="text-base font-bold" style={{ color }}>{title}</CardTitle>
+                <div className="flex items-center gap-2">
                     {instruments && activeInstrument && onInstrumentChange && (
                         <Select value={activeInstrument} onValueChange={onInstrumentChange}>
-                            <SelectTrigger className="w-[90px] md:w-[120px] capitalize h-8 md:h-9 text-xs md:text-sm">
+                            <SelectTrigger className="w-[90px] capitalize h-8 text-xs">
                                 <SelectValue placeholder="Instrument" />
                             </SelectTrigger>
                             <SelectContent>
@@ -203,9 +203,9 @@ export function ThereminPad({
                         </Select>
                     )}
                      {onLatchToggle && (
-                        <div className="flex items-center space-x-1 md:space-x-2">
+                        <div className="flex items-center space-x-1">
                             <Switch id="latch-mode" checked={isLatchOn} onCheckedChange={onLatchToggle} />
-                            <Label htmlFor="latch-mode" className="flex items-center gap-1 text-xs md:text-sm"><Anchor className="w-3 h-3 md:w-4 md:h-4" /> Latch</Label>
+                            <Label htmlFor="latch-mode" className="flex items-center gap-1 text-xs"><Anchor className="w-3 h-3" /> Latch</Label>
                         </div>
                     )}
                     {onPulsateToggle && (
@@ -213,11 +213,11 @@ export function ThereminPad({
                             variant={(isPulsating || isLatched) ? 'default' : 'outline'}
                             size="icon"
                             onClick={onPulsateToggle}
-                            className={cn('transition-all w-8 h-8 md:w-9 md:h-9', (isPulsating || isLatched) && 'animate-pulse-accent')}
+                            className={cn('transition-all w-8 h-8', (isPulsating || isLatched) && 'animate-pulse-accent')}
                             style={{ '--accent': 'hsl(var(--accent))' } as React.CSSProperties}
 
                          >
-                             <Zap className="w-4 h-4 md:w-5 md:h-5" />
+                             <Zap className="w-4 h-4" />
                          </Button>
                     )}
                 </div>
@@ -256,3 +256,5 @@ export function ThereminPad({
         </Card>
     );
 }
+
+    
