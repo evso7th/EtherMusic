@@ -400,7 +400,6 @@ export default function Home() {
             </main>
             {!isAppStarted && (
                  <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50">
-                    <audio ref={backgroundAudioRef} src="/assets/sounds/ethermusic_start.webm" autoPlay loop playsInline />
                     <Button size="lg" onClick={handleStartApp}>Click to Start EtherMusic</Button>
                 </div>
             )}
@@ -415,6 +414,8 @@ export default function Home() {
         </div>
     );
 }
+    
+
     
 
     
