@@ -5,6 +5,10 @@ import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { MixerControls } from '@/components/mixer-controls';
+import { SlidersHorizontal } from 'lucide-react';
+
 
 type BeatPattern = {
     name: string;
@@ -17,6 +21,8 @@ interface BeatBoxControlsProps {
     onPatternChange: (pattern: BeatPattern) => void;
     tempo: number;
     onTempoChange: (tempo: number) => void;
+    volumes: { melody: number; bass: number; drums: number };
+    onVolumeChange: (volumes: { melody: number; bass: number; drums: number; }) => void;
 }
 
 export function BeatBoxControls({
@@ -25,6 +31,8 @@ export function BeatBoxControls({
     onPatternChange,
     tempo,
     onTempoChange,
+    volumes,
+    onVolumeChange,
 }: BeatBoxControlsProps) {
     return (
         <Card className="bg-card/50">
@@ -59,6 +67,21 @@ export function BeatBoxControls({
                       />
                       <span className="text-sm md:text-lg font-mono w-14 md:w-16 text-center p-1 md:p-2 rounded-md bg-muted">{tempo}</span>
                     </div>
+                </div>
+                 <div className="flex-shrink-0">
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="icon" className="w-9 h-9 md:w-10 md:h-10">
+                                <SlidersHorizontal className="w-4 h-4 md:w-5 md:h-5"/>
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Mixer</DialogTitle>
+                            </DialogHeader>
+                            <MixerControls volumes={volumes} onVolumeChange={onVolumeChange} />
+                        </DialogContent>
+                    </Dialog>
                 </div>
             </CardContent>
         </Card>

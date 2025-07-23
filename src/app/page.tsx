@@ -391,19 +391,6 @@ export default function Home() {
                             onStop={handleStop}
                             isReady={isReady}
                         />
-                        <Dialog>
-                            <DialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="w-8 h-8 md:w-10 md:h-10">
-                                    <SlidersHorizontal className="w-4 h-4 md:w-5 md:h-5"/>
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Mixer</DialogTitle>
-                                </DialogHeader>
-                                <MixerControls volumes={volumes} onVolumeChange={setVolumes} />
-                            </DialogContent>
-                        </Dialog>
                     </div>
                 </header>
                 <main className="flex-grow flex flex-col gap-4">
@@ -439,6 +426,8 @@ export default function Home() {
                             onPatternChange={setActivePattern}
                             tempo={tempo}
                             onTempoChange={setTempo}
+                            volumes={volumes}
+                            onVolumeChange={setVolumes}
                         />
                     </div>
                 </main>
