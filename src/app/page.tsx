@@ -113,9 +113,9 @@ export default function Home() {
         switch (melodyInstrument) {
             case 'organ':
                 newOptions = {
-                    harmonicity: 3,
-                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 0.3 },
-                    modulationEnvelope: { attack: 0.01, decay: 0.5, sustain: 0.2, release: 0.1 }
+                    harmonicity: 5,
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 0.5 },
+                    modulationEnvelope: { attack: 0.2, decay: 0.5, sustain: 0.2, release: 0.1 }
                 };
                 break;
             case 'theremin':
@@ -435,3 +435,4 @@ export default function Home() {
     
 
     
+
