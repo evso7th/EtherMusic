@@ -13,6 +13,8 @@ import { SlidersHorizontal } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { OrbitalAnimation } from '@/components/orbital-animation';
 import { WebGLBackground } from '@/components/webgl-background';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { MainOrbitalAnimation } from '@/components/main-orbital-animation';
 
 type BeatPattern = {
     name: string;
@@ -60,6 +62,13 @@ export default function Home() {
     const recorder = useRef<Tone.Recorder | null>(null);
     const bassLFO = useRef<Tone.LFO | null>(null);
     const bassVCA = useRef<Tone.Volume | null>(null);
+
+    const isMobile = useIsMobile();
+    const [isClient, setIsClient] = useState(false);
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
     
     const initializeAudio = useCallback(async () => {
         if (audioInitialized.current) return;
@@ -318,10 +327,10 @@ export default function Home() {
                 
                 if (state === 'down') {
                     synth.triggerAttack(data.frequency);
-                } else if (state === 'move') {
-                    synth.setNote(data.frequency);
                 }
                 
+                synth.frequency.rampTo(data.frequency, 0.05);
+
                 if (!isBassPulsating) {
                     vca.volume.rampTo(dbVolume, 0.1);
                 }
@@ -339,11 +348,10 @@ export default function Home() {
 
                 if (state === 'down') {
                     synth.triggerAttack(data.frequency);
-                    synth.volume.rampTo(dbVolume, 0.05);
-                } else if (state === 'move') {
-                    synth.frequency.rampTo(data.frequency, 0.05);
-                    synth.volume.rampTo(dbVolume, 0.05);
                 }
+                synth.frequency.rampTo(data.frequency, 0.05);
+                synth.volume.rampTo(dbVolume, 0.05);
+
             } else if (state === 'up') {
                 synth.triggerRelease();
             }
@@ -352,7 +360,7 @@ export default function Home() {
     
     return (
         <div className="flex flex-col h-screen font-headline p-4 md:p-6 lg:p-8 overflow-hidden">
-            <WebGLBackground />
+            {isClient && (isMobile ? <MainOrbitalAnimation /> : <WebGLBackground />)}
             <div className="flex-shrink-0 z-10">
                 <header className="flex items-center justify-between mb-4">
                     <h1 className="text-3xl md:text-4xl font-bold text-primary">EtherMusic</h1>
@@ -460,6 +468,7 @@ export default function Home() {
 
 
     
+
 
 
 
