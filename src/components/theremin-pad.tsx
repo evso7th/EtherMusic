@@ -15,7 +15,7 @@ import type { MelodyInstrument } from '@/app/page';
 interface ThereminPadProps {
     title: string;
     type: 'melody' | 'bass';
-    onInteraction: (type: 'melody' | 'bass', params: { frequency: number; volume: number } | null, state: 'down' | 'move' | 'up', pointerId?: number) => void;
+    onInteraction: (type: 'melody' | 'bass', params: { frequency: number; volume: number } | null, state: 'down' | 'move' | 'up') => void;
     frequencyRange: [number, number];
     color: string;
     isPulsating?: boolean;
@@ -52,7 +52,7 @@ export function ThereminPad({
     latchedNotePosition,
 }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
-    const [activePointers, setActivePointers] = useState<Map<number, PointerState>>(new Map());
+    const activePointers = useRef<Map<number, PointerState>>(new Map());
     
     // For bass theremin which is monophonic
     const bassOrbRef = useRef<HTMLDivElement>(null);
@@ -83,7 +83,7 @@ export function ThereminPad({
         const orb = document.createElement('div');
         orb.className = cn(
             'absolute top-0 left-0 rounded-full w-12 h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-100',
-            type === 'melody' ? 'animate-pulse-primary' : ''
+            'animate-pulse-primary'
         );
         orb.style.backgroundColor = color;
         orb.style.animationDuration = '1s';
@@ -98,16 +98,13 @@ export function ThereminPad({
         const interactionData = calculateInteraction(event);
         if (!interactionData) return;
         
-        onInteraction(type, interactionData, 'down', event.pointerId);
+        onInteraction(type, interactionData, 'down');
 
         if (type === 'melody') {
             const orb = createOrb(interactionData.x, interactionData.y);
             if(orb) {
-                setActivePointers(prev => {
-                    const newPointers = new Map(prev);
-                    newPointers.set(event.pointerId, { id: event.pointerId, orb, frequency: interactionData.frequency });
-                    return newPointers;
-                });
+                const newPointer = { id: event.pointerId, orb, frequency: interactionData.frequency };
+                activePointers.current.set(event.pointerId, newPointer);
             }
         } else {
             isPointerDown.current = true;
@@ -122,19 +119,13 @@ export function ThereminPad({
         const interactionData = calculateInteraction(event);
         if (!interactionData) return;
         
-        onInteraction(type, interactionData, 'move', event.pointerId);
+        onInteraction(type, interactionData, 'move');
 
         if (type === 'melody') {
-            setActivePointers(prev => {
-                const newPointers = new Map(prev);
-                const pointer = newPointers.get(event.pointerId);
-                if (pointer && pointer.orb) {
-                    pointer.orb.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
-                    // Note: Frequency update on move is not handled by PolySynth easily.
-                    // New notes are triggered on down events.
-                }
-                return newPointers;
-            });
+            const pointer = activePointers.current.get(event.pointerId);
+            if (pointer && pointer.orb) {
+                pointer.orb.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
+            }
         } else {
             if (isPointerDown.current) {
                  if (bassOrbRef.current) {
@@ -149,15 +140,11 @@ export function ThereminPad({
         (event.target as HTMLElement).releasePointerCapture(event.pointerId);
         
         if (type === 'melody') {
-            const pointer = activePointers.get(event.pointerId);
+            const pointer = activePointers.current.get(event.pointerId);
             if (pointer) {
-                onInteraction(type, { frequency: pointer.frequency, volume: 0}, 'up', event.pointerId);
+                onInteraction(type, { frequency: pointer.frequency, volume: 0}, 'up');
                 pointer.orb.remove();
-                setActivePointers(prev => {
-                    const newPointers = new Map(prev);
-                    newPointers.delete(event.pointerId);
-                    return newPointers;
-                });
+                activePointers.current.delete(event.pointerId);
             }
         } else {
             if (isPointerDown.current) {
@@ -165,10 +152,10 @@ export function ThereminPad({
                 if (bassOrbRef.current && !isLatched) {
                     bassOrbRef.current.style.opacity = '0';
                 }
-                onInteraction(type, null, 'up', event.pointerId);
+                onInteraction(type, null, 'up');
             }
         }
-    }, [onInteraction, type, isLatched, activePointers]);
+    }, [onInteraction, type, isLatched]);
     
     useEffect(() => {
         if (type === 'bass' && !padRef.current || !bassOrbRef.current) return;
@@ -269,5 +256,3 @@ export function ThereminPad({
         </Card>
     );
 }
-
-    

@@ -333,30 +333,18 @@ export default function Home() {
     
             if (data && state !== 'up') {
                  // Map linear volume (0-1) to dB
-                const minDb = -48;
-                const maxDb = -6;
-                const dbVolume = minDb + data.volume * (maxDb - minDb);
-                const velocity = data.volume; // Use linear volume for velocity
+                const velocity = data.volume; 
 
                 if (state === 'down') {
-                    synth.triggerAttackRelease(data.frequency, "8n", undefined, velocity);
+                    synth.triggerAttack(data.frequency, undefined, velocity);
                 } else if (state === 'move') {
-                    // With PolySynth, we can't easily change the frequency of a specific voice.
-                    // The common pattern is to retrigger notes, but for a theremin feel,
-                    // we'll let existing notes play out and trigger new ones.
-                    // For simplicity, we won't handle 'move' events to change pitch for polyphony.
-                    // New notes are created on 'down' events.
+                    // This is complex with PolySynth. For now, we don't adjust pitch mid-note
+                    // to avoid retriggering, which can sound jarring.
                 }
 
             } else if (state === 'up') {
-                // To release a specific note, we'd need its frequency.
-                // Since `data` is null on 'up', we'll call releaseAll for simplicity.
-                // A more complex implementation would track active pointer IDs and their frequencies.
                 if (data?.frequency) {
                     synth.triggerRelease(data.frequency);
-                } else {
-                    // This is a fallback. A better approach would be to not have to do this.
-                    // The theremin pad should ideally send the frequency of the note to release.
                 }
             }
         }
@@ -460,5 +448,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
