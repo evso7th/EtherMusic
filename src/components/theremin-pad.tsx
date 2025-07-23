@@ -15,8 +15,7 @@ import type { MelodyInstrument } from '@/app/page';
 interface ThereminPadProps {
     title: string;
     type: 'melody' | 'bass';
-    onInteraction: (type: 'melody' | 'bass', params: { frequency: number; volume: number } | null) => void;
-    onPointerUp: (type: 'melody' | 'bass', frequency: number | null) => void;
+    onInteraction: (type: 'melody' | 'bass', params: { frequency: number; volume: number } | null, state: 'down' | 'move' | 'up') => void;
     frequencyRange: [number, number];
     color: string;
     isPulsating?: boolean;
@@ -33,7 +32,6 @@ export function ThereminPad({
     title,
     type, 
     onInteraction, 
-    onPointerUp, 
     frequencyRange, 
     color, 
     isPulsating, 
@@ -48,7 +46,6 @@ export function ThereminPad({
     const padRef = useRef<HTMLDivElement>(null);
     const orbRef = useRef<HTMLDivElement>(null);
     const isActive = useRef(false);
-    const lastFrequency = useRef<number | null>(null);
 
     const calculateInteraction = (event: PointerEvent<HTMLDivElement>) => {
         if (!padRef.current) return null;
@@ -66,7 +63,6 @@ export function ThereminPad({
         
         const volume = 1 - normalizedY;
         
-        lastFrequency.current = frequency;
         return { x, y, frequency, volume };
     }
 
@@ -88,7 +84,7 @@ export function ThereminPad({
         const interactionData = calculateInteraction(event);
         if (interactionData) {
             showOrb(interactionData.x, interactionData.y);
-            onInteraction(type, { frequency: interactionData.frequency, volume: interactionData.volume });
+            onInteraction(type, { frequency: interactionData.frequency, volume: interactionData.volume }, 'move');
         }
     };
 
@@ -100,22 +96,20 @@ export function ThereminPad({
             if (!isLatchOn || (isLatchOn && !isLatched)) {
                 showOrb(interactionData.x, interactionData.y);
             }
-            onInteraction(type, { frequency: interactionData.frequency, volume: interactionData.volume });
+            onInteraction(type, { frequency: interactionData.frequency, volume: interactionData.volume }, 'down');
         }
     };
 
     const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
+        if (!isActive.current) return;
         isActive.current = false;
         event.currentTarget.releasePointerCapture(event.pointerId);
         if (!isLatchOn) {
             hideOrb();
         }
-        onPointerUp(type, lastFrequency.current);
-        onInteraction(type, null); // Signal that interaction has stopped
-        lastFrequency.current = null;
+        onInteraction(type, null, 'up');
     };
     
-    // Hide orb if latched is turned off
     useEffect(() => {
         if (!isLatched && !isActive.current) {
             hideOrb();
@@ -171,7 +165,7 @@ export function ThereminPad({
                     onPointerDown={handlePointerDown}
                     onPointerUp={handlePointerUp}
                     onPointerMove={handlePointerMove}
-                    onPointerLeave={handlePointerUp} // Use same logic as up to stop sound
+                    onPointerLeave={handlePointerUp}
                     style={{
                         backgroundColor: 'hsl(var(--muted) / 0.2)',
                         backgroundSize: '4rem 4rem',
@@ -197,4 +191,3 @@ export function ThereminPad({
         </Card>
     );
 }
-

@@ -49,7 +49,7 @@ export default function Home() {
 
     // Tone.js refs
     const audioInitialized = useRef(false);
-    const melodySynth = useRef<Tone.PolySynth | null>(null);
+    const melodySynth = useRef<Tone.AMSynth | null>(null);
     const bassSynth = useRef<Tone.MonoSynth | null>(null);
     const drumSynths = useRef<{ kick: Tone.MembraneSynth, snare: Tone.NoiseSynth, hat: Tone.MetalSynth } | null>(null);
     const channels = useRef<{ melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel } | null>(null);
@@ -57,6 +57,7 @@ export default function Home() {
     const recorder = useRef<Tone.Recorder | null>(null);
     const bassLFO = useRef<Tone.LFO | null>(null);
     const bassVCA = useRef<Tone.Volume | null>(null);
+    const backgroundAudioRef = useRef<HTMLAudioElement>(null);
     
     const initializeAudio = useCallback(async () => {
         if (audioInitialized.current) return;
@@ -70,11 +71,12 @@ export default function Home() {
             drums: new Tone.Channel(volumes.drums).toDestination(),
         };
 
-        melodySynth.current = new Tone.PolySynth(Tone.AMSynth, {
+        melodySynth.current = new Tone.AMSynth({
             harmonicity: 1.5,
             envelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 0.2 },
             modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.3, release: 0.1 }
         }).connect(channels.current.melody);
+        melodySynth.current.volume.value = -Infinity; // Start silent
 
 
         bassVCA.current = new Tone.Volume(0).connect(channels.current.bass);
@@ -107,7 +109,7 @@ export default function Home() {
         
         Tone.Transport.bpm.value = tempo;
         setIsReady(true);
-    }, []); // Keep dependencies empty to run only once
+    }, [volumes.melody, volumes.bass, volumes.drums, activePattern.sequence, tempo]);
     
     useEffect(() => {
         if (!isReady || !melodySynth.current) return;
@@ -140,12 +142,11 @@ export default function Home() {
                 break;
             case 'synth':
             default:
-                newOptions = {
+                 melodySynth.current.set({
                     harmonicity: 1.5,
                     envelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 0.2 },
                     modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.3, release: 0.1 }
-                };
-                melodySynth.current.set(newOptions);
+                });
                 break;
         }
     }, [melodyInstrument, isReady]);
@@ -153,6 +154,9 @@ export default function Home() {
     const handleStartApp = async () => {
         const Tone = await import('tone');
         await Tone.start();
+        if (backgroundAudioRef.current) {
+            backgroundAudioRef.current.pause();
+        }
         await initializeAudio();
         setIsAppStarted(true);
         setIsPlaying(true);
@@ -178,7 +182,7 @@ export default function Home() {
         if (!isReady) return;
 
         Tone.Transport.stop();
-        melodySynth.current?.releaseAll();
+        melodySynth.current?.triggerRelease();
         bassSynth.current?.triggerRelease();
         setIsPlaying(false);
         if (latchedBassNote) {
@@ -213,11 +217,13 @@ export default function Home() {
     const handleLatchToggle = (checked: boolean) => {
         setIsBassLatchOn(checked);
         if (!checked && latchedBassNote) {
-            setLatchedBassNote(null); // This will trigger the useEffect below
+            setLatchedBassNote(null);
+             if (bassSynth.current) {
+                bassSynth.current.triggerRelease();
+            }
         }
     }
 
-    // Effect for managing LFO connection
     useEffect(() => {
         if (!bassLFO.current || !bassVCA.current) return;
 
@@ -225,17 +231,21 @@ export default function Home() {
         if (isPulsationActive) {
             bassLFO.current.connect(bassVCA.current.volume);
         } else {
-            bassLFO.current.disconnect(); // Disconnect from all
+            bassLFO.current.disconnect(bassVCA.current.volume);
+            bassVCA.current.volume.cancelScheduledValues();
+            bassVCA.current.volume.rampTo(0, 0.1); 
         }
     }, [isBassPulsating, isBassLatchOn, latchedBassNote]);
     
-    // Effect for managing drum sequence
     useEffect(() => {
         if (!drumSequence.current || !isReady) return;
         const Tone = require('tone');
         
         drumSequence.current.stop();
         drumSequence.current.clear();
+        activePattern.sequence.forEach(event => {
+            if (event) drumSequence.current.add(0, event);
+        });
         drumSequence.current.events = activePattern.sequence;
         
         if (isPlaying && activePattern.name !== 'Off') {
@@ -243,18 +253,15 @@ export default function Home() {
         }
     }, [activePattern, isPlaying, isReady]);
 
-    // Effect for managing tempo
     useEffect(() => {
         if (!isReady) return;
         const Tone = require('tone');
         Tone.Transport.bpm.value = tempo;
         if (bassLFO.current) {
-            // Update LFO frequency to match new tempo (e.g., 2 pulses per beat)
             bassLFO.current.frequency.value = Tone.Transport.bpm.value / 60 * 2;
         }
     }, [tempo, isReady]);
 
-    // Effect for managing volumes
     useEffect(() => {
         if (channels.current && isReady) {
             channels.current.melody.volume.value = volumes.melody;
@@ -263,7 +270,6 @@ export default function Home() {
         }
     }, [volumes, isReady]);
     
-    // This effect handles the latched bass note logic
     useEffect(() => {
         if (!bassSynth.current || !bassVCA.current || !isPlaying) {
              if (bassSynth.current?.state === "started") {
@@ -274,13 +280,13 @@ export default function Home() {
 
         if (latchedBassNote) {
             const minDb = -48;
-            const maxDb = -6;
+            const maxDb = 0;
             const dbVolume = minDb + latchedBassNote.volume * (maxDb - minDb);
 
             bassSynth.current.triggerAttack(latchedBassNote.frequency);
-            if (!isBassPulsating) { // If pulsating, LFO handles volume
+             if (!isBassPulsating) {
                  bassVCA.current.volume.rampTo(dbVolume, 0.1);
-            }
+             }
         } else {
             if (bassSynth.current.state === "started") {
                bassSynth.current.triggerRelease();
@@ -289,55 +295,68 @@ export default function Home() {
     }, [latchedBassNote, isPlaying, isBassPulsating]);
 
 
-    // This handler is now simplified, only dealing with state for latched notes
-    const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number } | null) => {
+    const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isPlaying || !audioInitialized.current) return;
-
-        if (type === 'bass' && isBassLatchOn) {
-             if (data && !latchedBassNote) {
-                setLatchedBassNote(data);
-            } else if (data && latchedBassNote) { // Check for data to ensure it's a new click
-                setLatchedBassNote(null);
-            }
-            return; // No further processing for latched bass here
-        }
-
-        const synth = type === 'melody' ? melodySynth.current : bassSynth.current;
-        if (!synth) return;
-
-        if (data) {
-            const minDb = -48;
-            const maxDb = type === 'melody' ? -6 : -6;
-            const dbVolume = minDb + data.volume * (maxDb - minDb);
-
-            if (type === 'melody' && melodySynth.current) {
-                 melodySynth.current.triggerAttack(data.frequency);
-                 melodySynth.current.volume.rampTo(dbVolume, 0.1);
-            } else if (type === 'bass' && bassSynth.current && bassVCA.current) {
-                 bassSynth.current.triggerAttack(data.frequency);
-                 bassVCA.current.volume.rampTo(dbVolume, 0.1);
-            }
-        } else {
-             if (type === 'melody' && melodySynth.current) {
-                // Release all notes on pointer up for melody
-                melodySynth.current.releaseAll();
-            } else if (type === 'bass' && bassSynth.current && !isBassLatchOn) {
-                bassSynth.current.triggerRelease();
-            }
-        }
-    }, [isPlaying, isBassLatchOn, latchedBassNote]);
     
-
-    const handleThereminPointerUp = (type: 'melody' | 'bass', frequency: number | null) => {
-        if (!isPlaying || (type === 'bass' && isBassLatchOn)) return;
-
-        if (type === 'melody' && melodySynth.current && frequency) {
-            melodySynth.current.triggerRelease([frequency]);
-        } else if (type === 'bass' && bassSynth.current) {
-            bassSynth.current.triggerRelease();
+        if (type === 'bass') {
+            if (isBassLatchOn) {
+                if (state === 'down') {
+                    if (latchedBassNote) {
+                        setLatchedBassNote(null);
+                    } else if(data) {
+                        setLatchedBassNote(data);
+                    }
+                }
+                return; 
+            }
+    
+            const synth = bassSynth.current;
+            const vca = bassVCA.current;
+            if (!synth || !vca) return;
+    
+            if (data && state !== 'up') {
+                const minDb = -48;
+                const maxDb = 0;
+                const dbVolume = minDb + data.volume * (maxDb - minDb);
+                
+                if (state === 'down') {
+                    synth.triggerAttack(data.frequency);
+                }
+                
+                if (!isBassPulsating) {
+                    vca.volume.rampTo(dbVolume, 0.1);
+                }
+            } else if (state === 'up') {
+                synth.triggerRelease();
+            }
+        } else if (type === 'melody') {
+            const synth = melodySynth.current;
+            if (!synth) return;
+    
+            if (data && state !== 'up') {
+                const minDb = -48;
+                const maxDb = -6;
+                const dbVolume = minDb + data.volume * (maxDb - minDb);
+                
+                if (state === 'down') {
+                    synth.triggerAttack(data.frequency);
+                }
+                
+                synth.frequency.rampTo(data.frequency, 0.1);
+                synth.volume.rampTo(dbVolume, 0.1);
+    
+            } else if (state === 'up') {
+                synth.triggerRelease();
+                synth.volume.rampTo(-Infinity, 0.5);
+            }
         }
-    };
-
+    }, [isPlaying, isBassLatchOn, latchedBassNote, isBassPulsating]);
+    
+    useEffect(() => {
+        if (backgroundAudioRef.current) {
+            backgroundAudioRef.current.volume = 0.2;
+        }
+    }, []);
 
     return (
         <div className="flex flex-col h-screen bg-background font-headline p-4 md:p-6 lg:p-8">
@@ -372,7 +391,6 @@ export default function Home() {
                     <ThereminPad
                         title="Bass"
                         onInteraction={handleThereminInteraction}
-                        onPointerUp={(freq) => handleThereminPointerUp('bass', freq)}
                         type="bass"
                         frequencyRange={[55, 220]} // A1 to A3
                         color="hsl(var(--accent))"
@@ -385,7 +403,6 @@ export default function Home() {
                     <ThereminPad
                         title="Melody"
                         onInteraction={handleThereminInteraction}
-                        onPointerUp={(freq) => handleThereminPointerUp('melody', freq)}
                         type="melody"
                         frequencyRange={[220, 880]} // A3 to A5
                         color="hsl(var(--primary))"
@@ -406,8 +423,9 @@ export default function Home() {
             </main>
             {!isAppStarted && (
                  <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50">
+                    <audio ref={backgroundAudioRef} src="/assets/sounds/ethermusic_start.webm" autoPlay loop playsInline />
                     <Button size="lg" onClick={handleStartApp} disabled={!isReady && isAppStarted}>
-                        {!isReady && isAppStarted ? 'Loading Audio...' : 'Click to Start EtherMusic'}
+                        {!isReady && !isAppStarted ? 'Loading Audio...' : 'Click to Start EtherMusic'}
                     </Button>
                 </div>
             )}
