@@ -187,12 +187,12 @@ export function ThereminPad({
             "flex flex-col h-full bg-card/50 border-2 border-transparent transition-all duration-300",
             (isLatched) && type === 'bass' && "border-accent ring-4 ring-accent/50",
         )}>
-            <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between p-2 md:p-4">
-                <CardTitle className="text-lg md:text-xl font-bold" style={{ color }}>{title}</CardTitle>
+            <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between p-2 md:p-3">
+                <CardTitle className="text-base md:text-lg font-bold" style={{ color }}>{title}</CardTitle>
                 <div className="flex items-center gap-2 md:gap-4">
                     {instruments && activeInstrument && onInstrumentChange && (
                         <Select value={activeInstrument} onValueChange={onInstrumentChange}>
-                            <SelectTrigger className="w-[90px] md:w-[120px] capitalize h-8 md:h-10 text-xs md:text-sm">
+                            <SelectTrigger className="w-[90px] md:w-[120px] capitalize h-8 md:h-9 text-xs md:text-sm">
                                 <SelectValue placeholder="Instrument" />
                             </SelectTrigger>
                             <SelectContent>
@@ -213,7 +213,7 @@ export function ThereminPad({
                             variant={(isPulsating || isLatched) ? 'default' : 'outline'}
                             size="icon"
                             onClick={onPulsateToggle}
-                            className={cn('transition-all w-8 h-8 md:w-10 md:h-10', (isPulsating || isLatched) && 'animate-pulse-accent')}
+                            className={cn('transition-all w-8 h-8 md:w-9 md:h-9', (isPulsating || isLatched) && 'animate-pulse-accent')}
                             style={{ '--accent': 'hsl(var(--accent))' } as React.CSSProperties}
 
                          >
@@ -256,5 +256,3 @@ export function ThereminPad({
         </Card>
     );
 }
-
-    
