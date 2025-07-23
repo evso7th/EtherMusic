@@ -363,12 +363,15 @@ export default function Home() {
     
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
-            <div className="fixed inset-0 -z-10">
+            <div className="fixed inset-0 z-0">
                 <OrbitalAnimation />
             </div>
             <div className="relative z-10 flex flex-col h-full p-4 md:p-6 lg:p-8">
                 <header className="flex-shrink-0 flex items-center justify-between mb-4">
-                    <h1 className="text-2xl md:text-4xl font-bold text-primary">EtherMusic</h1>
+                    <div>
+                        <h1 className="text-2xl md:text-4xl font-bold text-primary">EtherMusic</h1>
+                        <p className="text-sm text-white/80 font-light -mt-1 tracking-wider">Neuro Meditation Processor</p>
+                    </div>
                     <div className="flex items-center gap-1 md:gap-2">
                         <PlaybackControls
                             isPlaying={isPlaying}
@@ -459,5 +462,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
