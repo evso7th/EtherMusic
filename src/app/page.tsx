@@ -11,6 +11,7 @@ import { MixerControls } from '@/components/mixer-controls';
 import { PlaybackControls } from '@/components/playback-controls';
 import { SlidersHorizontal } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { OrbitalAnimation } from '@/components/orbital-animation';
 
 type BeatPattern = {
     name: string;
@@ -19,10 +20,10 @@ type BeatPattern = {
 
 
 const beatPatterns: BeatPattern[] = [
-    { name: 'Rock', sequence: ['C1', null, 'G1', null, 'C1', 'D2', 'G1', null] },
-    { name: 'House', sequence: ['C1', 'D2', 'C1', 'D2', 'G1', 'D2', 'C1', 'D2'] },
-    { name: 'Hip Hop', sequence: ['C1', null, 'D2', 'G1', null, 'C1', null, 'G1'] },
-    { name: 'Reggae', sequence: [null, 'D2', 'G1', 'C1', null, 'D2', 'G1', null] },
+    { name: 'Rock', sequence: ['C1', null, 'G1', null, 'C1', null, 'G1', 'D2'] },
+    { name: 'House', sequence: ['C1', 'D2', 'C1', 'D2', 'G1', 'D2', 'G1', 'D2'] },
+    { name: 'Hip Hop', sequence: ['C1', null, 'G1', 'D2', 'C1', null, 'G1', null] },
+    { name: 'Reggae', sequence: [null, 'C1', 'D2', 'G1', null, 'C1', 'D2', null] },
     { name: 'Off', sequence: [] },
 ];
 
@@ -416,7 +417,8 @@ export default function Home() {
             </main>
             {!isAppStarted && (
                  <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50">
-                    <Button size="lg" onClick={handleStartApp} disabled={!isReady && isAppStarted}>
+                    <OrbitalAnimation />
+                    <Button size="lg" onClick={handleStartApp} disabled={!isReady && isAppStarted} className="z-10">
                         {!isReady && !isAppStarted ? 'Loading Audio...' : 'Click to Start EtherMusic'}
                     </Button>
                 </div>
@@ -444,3 +446,4 @@ export default function Home() {
 
 
     
+

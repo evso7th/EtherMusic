@@ -1,0 +1,85 @@
+
+.view {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  perspective: 400px;
+  overflow: hidden;
+}
+
+.plane {
+  width: 120px;
+  height: 120px;
+  transform-style: preserve-3d;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: auto;
+  transform: rotateX(60deg) rotateZ(-30deg);
+  animation: rotate 20s infinite linear;
+}
+
+.circle {
+  width: 120px;
+  height: 120px;
+  position: absolute;
+  transform-style: preserve-3d;
+  border-radius: 100%;
+  box-sizing: border-box;
+  box-shadow: 0 0 60px hsl(var(--primary)), inset 0 0 60px hsl(var(--primary));
+}
+
+.circle::before,
+.circle::after {
+  content: '';
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: auto;
+  width: 10%;
+  height: 10%;
+  border-radius: 100%;
+  background: hsl(var(--primary));
+  box-sizing: border-box;
+  box-shadow: 0 0 60px 2px hsl(var(--primary));
+}
+
+.circle::before {
+  transform: translateZ(-90px);
+}
+
+.circle::after {
+  transform: translateZ(90px);
+}
+
+.circle:nth-child(1) {
+  transform: rotateZ(calc(1 / 5 * 360deg)) rotateX(63.435deg);
+}
+.circle:nth-child(2) {
+  transform: rotateZ(calc(2 / 5 * 360deg)) rotateX(63.435deg);
+}
+.circle:nth-child(3) {
+  transform: rotateZ(calc(3 / 5 * 360deg)) rotateX(63.435deg);
+}
+.circle:nth-child(4) {
+  transform: rotateZ(calc(4 / 5 * 360deg)) rotateX(63.435deg);
+}
+.circle:nth-child(5) {
+  transform: rotateZ(calc(5 / 5 * 360deg)) rotateX(63.435deg);
+}
+
+@keyframes rotate {
+  0% {
+    transform: rotateX(60deg) rotateZ(-30deg) rotateY(0deg);
+  }
+  100% {
+    transform: rotateX(60deg) rotateZ(-30deg) rotateY(360deg);
+  }
+}
