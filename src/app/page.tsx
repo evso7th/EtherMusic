@@ -12,7 +12,6 @@ import { PlaybackControls } from '@/components/playback-controls';
 import { SlidersHorizontal } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { OrbitalAnimation } from '@/components/orbital-animation';
-import { AnimatedBackground } from '@/components/animated-background';
 
 type BeatPattern = {
     name: string;
@@ -350,100 +349,97 @@ export default function Home() {
     }, [isPlaying, isBassLatchOn, latchedBassNote, isBassPulsating]);
     
     return (
-        <>
-            <AnimatedBackground />
-            <div className="relative flex flex-col h-screen font-headline p-4 md:p-6 lg:p-8 z-10">
-                <div className="flex-shrink-0">
-                    <header className="flex items-center justify-between mb-4">
-                        <h1 className="text-3xl md:text-4xl font-bold text-primary">EtherMusic</h1>
-                        <div className="flex items-center gap-2">
-                            <PlaybackControls
-                                isPlaying={isPlaying}
-                                isRecording={isRecording}
-                                onPlayPause={handlePlayPause}
-                                onRecord={handleRecord}
-                                onStop={handleStop}
-                                isReady={isReady}
-                            />
-                            <Dialog>
-                                <DialogTrigger asChild>
-                                    <Button variant="ghost" size="icon">
-                                        <SlidersHorizontal />
-                                    </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                    <DialogHeader>
-                                        <DialogTitle>Mixer</DialogTitle>
-                                    </DialogHeader>
-                                    <MixerControls volumes={volumes} onVolumeChange={setVolumes} />
-                                </DialogContent>
-                            </Dialog>
-                        </div>
-                    </header>
+        <div className="flex flex-col h-screen font-headline p-4 md:p-6 lg:p-8">
+            <div className="flex-shrink-0">
+                <header className="flex items-center justify-between mb-4">
+                    <h1 className="text-3xl md:text-4xl font-bold text-primary">EtherMusic</h1>
+                    <div className="flex items-center gap-2">
+                        <PlaybackControls
+                            isPlaying={isPlaying}
+                            isRecording={isRecording}
+                            onPlayPause={handlePlayPause}
+                            onRecord={handleRecord}
+                            onStop={handleStop}
+                            isReady={isReady}
+                        />
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                    <SlidersHorizontal />
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Mixer</DialogTitle>
+                                </DialogHeader>
+                                <MixerControls volumes={volumes} onVolumeChange={setVolumes} />
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+                </header>
+            </div>
+            <main className="flex-grow flex flex-col gap-6">
+                <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-6 h-[calc(80vh-4rem)]">
+                    <ThereminPad
+                        title="Bass"
+                        onInteraction={handleThereminInteraction}
+                        type="bass"
+                        frequencyRange={[55, 220]} // A1 to A3
+                        color="hsl(var(--accent))"
+                        isPulsating={isBassPulsating}
+                        onPulsateToggle={handlePulsateToggle}
+                        isLatchOn={isBassLatchOn}
+                        onLatchToggle={handleLatchToggle}
+                        isLatched={!!latchedBassNote}
+                        latchedNotePosition={latchedBassNote}
+                    />
+                    <ThereminPad
+                        title="Melody"
+                        onInteraction={handleThereminInteraction}
+                        type="melody"
+                        frequencyRange={[220, 880]} // A3 to A5
+                        color="hsl(var(--primary))"
+                        instruments={melodyInstruments}
+                        activeInstrument={melodyInstrument}
+                        onInstrumentChange={setMelodyInstrument}
+                    />
                 </div>
-                <main className="flex-grow flex flex-col gap-6">
-                    <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-6 h-[calc(80vh-4rem)]">
-                        <ThereminPad
-                            title="Bass"
-                            onInteraction={handleThereminInteraction}
-                            type="bass"
-                            frequencyRange={[55, 220]} // A1 to A3
-                            color="hsl(var(--accent))"
-                            isPulsating={isBassPulsating}
-                            onPulsateToggle={handlePulsateToggle}
-                            isLatchOn={isBassLatchOn}
-                            onLatchToggle={handleLatchToggle}
-                            isLatched={!!latchedBassNote}
-                            latchedNotePosition={latchedBassNote}
-                        />
-                        <ThereminPad
-                            title="Melody"
-                            onInteraction={handleThereminInteraction}
-                            type="melody"
-                            frequencyRange={[220, 880]} // A3 to A5
-                            color="hsl(var(--primary))"
-                            instruments={melodyInstruments}
-                            activeInstrument={melodyInstrument}
-                            onInstrumentChange={setMelodyInstrument}
-                        />
-                    </div>
-                    <div className="h-[calc(20vh-2rem)] flex flex-col">
-                        <BeatBoxControls
-                            patterns={beatPatterns}
-                            activePattern={activePattern}
-                            onPatternChange={setActivePattern}
-                            tempo={tempo}
-                            onTempoChange={setTempo}
-                        />
-                    </div>
-                </main>
-                {!isAppStarted && (
-                    <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-50">
-                        <OrbitalAnimation />
-                        <Button size="lg" onClick={handleStartApp} disabled={!isReady && isAppStarted} className="z-10">
-                            {!isReady && !isAppStarted ? 'Loading Audio...' : 'Click to Start EtherMusic'}
-                        </Button>
-                    </div>
-                )}
-                {!isReady && isAppStarted && (
-                    <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-50">
-                        <div className="text-center text-white">
-                            <p className="text-xl mb-4">Loading audio engine...</p>
-                            <div className='preloader'>
+                <div className="h-[calc(20vh-2rem)] flex flex-col">
+                    <BeatBoxControls
+                        patterns={beatPatterns}
+                        activePattern={activePattern}
+                        onPatternChange={setActivePattern}
+                        tempo={tempo}
+                        onTempoChange={setTempo}
+                    />
+                </div>
+            </main>
+            {!isAppStarted && (
+                <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-50">
+                    <OrbitalAnimation />
+                    <Button size="lg" onClick={handleStartApp} disabled={!isReady && isAppStarted} className="z-10">
+                        {!isReady && !isAppStarted ? 'Loading Audio...' : 'Click to Start EtherMusic'}
+                    </Button>
+                </div>
+            )}
+            {!isReady && isAppStarted && (
+                <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-50">
+                    <div className="text-center text-white">
+                        <p className="text-xl mb-4">Loading audio engine...</p>
+                        <div className='preloader'>
+                            <div>
                                 <div>
                                     <div>
                                         <div>
-                                            <div>
-                                                <div></div>
-                                            </div>
+                                            <div></div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                )}
-            </div>
-        </>
+                </div>
+            )}
+        </div>
     );
 }
