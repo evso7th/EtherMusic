@@ -12,9 +12,7 @@ import { PlaybackControls } from '@/components/playback-controls';
 import { SlidersHorizontal } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { OrbitalAnimation } from '@/components/orbital-animation';
-import { WebGLBackground } from '@/components/webgl-background';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { MainOrbitalAnimation } from '@/components/main-orbital-animation';
+import { AnimatedBackground } from '@/components/animated-background';
 
 type BeatPattern = {
     name: string;
@@ -62,13 +60,6 @@ export default function Home() {
     const recorder = useRef<Tone.Recorder | null>(null);
     const bassLFO = useRef<Tone.LFO | null>(null);
     const bassVCA = useRef<Tone.Volume | null>(null);
-
-    const isMobile = useIsMobile();
-    const [isClient, setIsClient] = useState(false);
-
-    useEffect(() => {
-        setIsClient(true);
-    }, []);
     
     const initializeAudio = useCallback(async () => {
         if (audioInitialized.current) return;
@@ -360,7 +351,7 @@ export default function Home() {
     
     return (
         <div className="flex flex-col h-screen font-headline p-4 md:p-6 lg:p-8 overflow-hidden">
-            {isClient && (isMobile ? <MainOrbitalAnimation /> : <WebGLBackground />)}
+            <AnimatedBackground />
             <div className="flex-shrink-0 z-10">
                 <header className="flex items-center justify-between mb-4">
                     <h1 className="text-3xl md:text-4xl font-bold text-primary">EtherMusic</h1>
@@ -457,19 +448,3 @@ export default function Home() {
     );
 }
     
-
-    
-
-    
-
-    
-
-
-
-
-    
-
-
-
-
-
