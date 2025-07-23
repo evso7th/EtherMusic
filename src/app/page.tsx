@@ -350,7 +350,7 @@ export default function Home() {
     }, [isPlaying, isBassLatchOn, latchedBassNote, isBassPulsating]);
     
     return (
-        <div className="flex flex-col h-screen font-headline p-4 md:p-6 lg:p-8 overflow-hidden">
+        <div className="relative flex flex-col h-screen font-headline p-4 md:p-6 lg:p-8 overflow-hidden">
             <AnimatedBackground />
             <div className="flex-shrink-0 z-10">
                 <header className="flex items-center justify-between mb-4">
