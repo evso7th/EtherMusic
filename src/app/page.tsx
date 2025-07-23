@@ -352,7 +352,7 @@ export default function Home() {
                 const velocity = data.volume; 
                 synth.triggerAttack(data.frequency, undefined, velocity);
 
-            } else if (data && state === 'up') {
+            } else if (state === 'up' && data?.frequency) {
                 synth.triggerRelease(data.frequency);
             }
         }
@@ -440,7 +440,7 @@ export default function Home() {
                                Neuro Meditation Sound Processor
                             </p>
                         </div>
-                        <Button size="lg" onClick={handleStartApp} disabled={!isReady} className="mt-16">
+                        <Button size="lg" onClick={handleStartApp} className="mt-16">
                             Start your own neuro meditation
                         </Button>
                     </div>
