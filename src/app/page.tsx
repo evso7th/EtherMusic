@@ -62,7 +62,20 @@ export default function Home() {
     const recorder = useRef<Tone.Recorder | null>(null);
     const bassLFO = useRef<Tone.LFO | null>(null);
     const bassVCA = useRef<Tone.Volume | null>(null);
+    const backgroundAudioRef = useRef<HTMLAudioElement>(null);
     
+    useEffect(() => {
+        if (backgroundAudioRef.current) {
+            if (!isAppStarted) {
+                backgroundAudioRef.current.volume = 0.3;
+                backgroundAudioRef.current.play().catch(error => console.error("Autoplay failed", error));
+            } else {
+                backgroundAudioRef.current.pause();
+                backgroundAudioRef.current.currentTime = 0;
+            }
+        }
+    }, [isAppStarted]);
+
     const initializeAudio = useCallback(async () => {
         if (audioInitialized.current) return;
         audioInitialized.current = true;
@@ -433,6 +446,7 @@ export default function Home() {
             {!isAppStarted && (
                 <div className="absolute inset-0 bg-background flex flex-col items-center justify-center z-50 p-4">
                     <OrbitalAnimation />
+                    <audio ref={backgroundAudioRef} src="/assets/sounds/ethermusic_start.mp3" loop />
                     <div className="z-10 text-center flex-grow flex flex-col items-center justify-center">
                         <div className="mb-16">
                             <h1 className="text-6xl md:text-8xl font-bold text-primary">EtherMusic</h1>
