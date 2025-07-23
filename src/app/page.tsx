@@ -440,8 +440,8 @@ export default function Home() {
                                Neuro Meditation Sound Processor
                             </p>
                         </div>
-                        <Button size="lg" onClick={handleStartApp} disabled={!isReady && isAppStarted} className="mt-16">
-                            {!isReady && !isAppStarted ? 'Loading Audio...' : 'Start your own neuro meditation'}
+                        <Button size="lg" onClick={handleStartApp} disabled={!isReady} className="mt-16">
+                            Start your own neuro meditation
                         </Button>
                     </div>
                      <footer className="z-10 text-xs text-white/50 pb-4">
@@ -470,5 +470,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
