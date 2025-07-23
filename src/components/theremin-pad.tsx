@@ -2,7 +2,7 @@
 "use client";
 
 import type { PointerEvent } from 'react';
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -26,6 +26,7 @@ interface ThereminPadProps {
     isLatchOn?: boolean;
     onLatchToggle?: (checked: boolean) => void;
     isLatched?: boolean;
+    latchedNotePosition?: { frequency: number; volume: number } | null;
 }
 
 export function ThereminPad({ 
@@ -41,7 +42,8 @@ export function ThereminPad({
     onInstrumentChange,
     isLatchOn,
     onLatchToggle,
-    isLatched
+    isLatched,
+    latchedNotePosition,
 }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
     const orbRef = useRef<HTMLDivElement>(null);
@@ -82,22 +84,47 @@ export function ThereminPad({
     const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
         isPointerDown.current = true;
         (event.target as HTMLElement).setPointerCapture(event.pointerId);
-        if (orbRef.current) orbRef.current.style.opacity = '1';
+        if (orbRef.current && !isLatched) orbRef.current.style.opacity = '1';
         
         const interactionData = calculateInteraction(event);
         if (interactionData) {
             onInteraction(type, interactionData, 'down');
         }
-    }, [calculateInteraction, onInteraction, type]);
+    }, [calculateInteraction, onInteraction, type, isLatched]);
 
     const handlePointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (!isPointerDown.current) return;
         isPointerDown.current = false;
         (event.target as HTMLElement).releasePointerCapture(event.pointerId);
-        if (orbRef.current) orbRef.current.style.opacity = '0';
+        if (orbRef.current && !isLatched) orbRef.current.style.opacity = '0';
         onInteraction(type, null, 'up');
-    }, [onInteraction, type]);
+    }, [onInteraction, type, isLatched]);
     
+    useEffect(() => {
+        if (!padRef.current || !orbRef.current) return;
+
+        if (latchedNotePosition) {
+            const rect = padRef.current.getBoundingClientRect();
+            const { frequency, volume } = latchedNotePosition;
+            const [minFreq, maxFreq] = frequencyRange;
+
+            const logMin = Math.log(minFreq);
+            const logMax = Math.log(maxFreq);
+            const normalizedX = (Math.log(frequency) - logMin) / (logMax - logMin);
+            const normalizedY = 1 - volume;
+
+            const x = normalizedX * rect.width;
+            const y = normalizedY * rect.height;
+            
+            orbRef.current.style.transform = `translate(${x}px, ${y}px)`;
+            orbRef.current.style.opacity = '1';
+        } else {
+             if (!isPointerDown.current) {
+                orbRef.current.style.opacity = '0';
+             }
+        }
+    }, [latchedNotePosition, frequencyRange]);
+
     return (
         <Card className={cn(
             "flex flex-col h-full bg-card/50 border-2 border-transparent transition-all duration-300",

@@ -388,6 +388,7 @@ export default function Home() {
                         isLatchOn={isBassLatchOn}
                         onLatchToggle={handleLatchToggle}
                         isLatched={!!latchedBassNote}
+                        latchedNotePosition={latchedBassNote}
                     />
                     <ThereminPad
                         title="Melody"
@@ -435,4 +436,5 @@ export default function Home() {
     
 
     
+
 
