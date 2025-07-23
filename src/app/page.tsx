@@ -352,7 +352,7 @@ export default function Home() {
     return (
         <>
             <AnimatedBackground />
-            <div className="relative flex flex-col h-screen font-headline p-4 md:p-6 lg:p-8 overflow-hidden z-10">
+            <div className="relative flex flex-col h-screen font-headline p-4 md:p-6 lg:p-8 z-10">
                 <div className="flex-shrink-0">
                     <header className="flex items-center justify-between mb-4">
                         <h1 className="text-3xl md:text-4xl font-bold text-primary">EtherMusic</h1>
