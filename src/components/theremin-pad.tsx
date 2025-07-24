@@ -114,12 +114,12 @@ export function ThereminPad({
         (event.target as HTMLElement).setPointerCapture(event.pointerId);
         const interactionData = calculateInteraction(event);
         if (!interactionData) return;
-        
+
         onInteraction(type, interactionData, 'down');
 
-        if (isPolyphonic && !(type === 'bass' && isLatchOn)) {
+        if (isPolyphonic && type !== 'bass') {
             const orb = createOrb(interactionData.x, interactionData.y);
-            if(orb) {
+            if (orb) {
                 const newPointer = { id: event.pointerId, orb, frequency: interactionData.frequency };
                 activePointers.current.set(event.pointerId, newPointer);
             }
@@ -155,7 +155,7 @@ export function ThereminPad({
              const interactionData = calculateInteraction(event);
              onInteraction(type, interactionData, 'up');
         }
-         // Ensure capture is released
+        
         if ((event.target as HTMLElement).hasPointerCapture(event.pointerId)) {
             (event.target as HTMLElement).releasePointerCapture(event.pointerId);
         }
@@ -165,7 +165,7 @@ export function ThereminPad({
     useEffect(() => {
         if (type !== 'bass' || !isLatchOn || !latchedNotes || !padRef.current) {
             // Cleanup unrelated orbs if needed
-            if (type !== 'bass' || !isLatchOn) {
+            if (!isLatchOn && type === 'bass') {
                  activePointers.current.forEach(p => p.orb?.remove());
                  activePointers.current.clear();
             }
@@ -333,5 +333,4 @@ export function ThereminPad({
         </Card>
     );
 }
-
-    
+ 
