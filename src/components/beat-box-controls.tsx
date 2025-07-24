@@ -7,10 +7,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { MixerControls } from '@/components/mixer-controls';
-import { SlidersHorizontal, Drum, Zap, Bot } from 'lucide-react';
+import { SlidersHorizontal, Drum, Zap, Bot, Wand2 } from 'lucide-react';
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
+import type { AutopilotStyle } from '@/app/page';
 
 
 type BeatPattern = {
@@ -40,6 +41,9 @@ interface BeatBoxControlsProps {
     onEffectChange: (effects: BeatBoxControlsProps['effects']) => void;
     isAutopilotOn: boolean;
     onAutopilotToggle: () => void;
+    autopilotStyles: AutopilotStyle[];
+    activeAutopilotStyle: AutopilotStyle;
+    onAutopilotStyleChange: (style: AutopilotStyle) => void;
 }
 
 export function BeatBoxControls({
@@ -54,14 +58,18 @@ export function BeatBoxControls({
     effects,
     onEffectChange,
     isAutopilotOn,
-    onAutopilotToggle
+    onAutopilotToggle,
+    autopilotStyles,
+    activeAutopilotStyle,
+    onAutopilotStyleChange,
 }: BeatBoxControlsProps) {
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isTempoOpen, setIsTempoOpen] = useState(false);
+    const [isStyleOpen, setIsStyleOpen] = useState(false);
 
     return (
         <Card className="bg-card/50">
-            <CardContent className="p-2 md:p-4 flex justify-around items-center gap-2">
+            <CardContent className="p-2 md:p-4 flex justify-around items-center gap-1 md:gap-2">
                 <Dialog open={isBeatsOpen} onOpenChange={setIsBeatsOpen}>
                     <DialogTrigger asChild>
                         <Button variant="outline" className="flex-1">
@@ -129,6 +137,37 @@ export function BeatBoxControls({
                     <span className="hidden sm:inline">Autopilot</span>
                 </Button>
 
+                {isAutopilotOn && (
+                     <Dialog open={isStyleOpen} onOpenChange={setIsStyleOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" className="flex-1">
+                                <Wand2 className="w-4 h-4 md:mr-2" />
+                                <span className="hidden sm:inline">Style</span>
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Autopilot Style</DialogTitle>
+                            </DialogHeader>
+                            <div className="grid grid-cols-2 gap-2 py-4">
+                                {autopilotStyles.map((style) => (
+                                    <Button
+                                        key={style}
+                                        variant={activeAutopilotStyle === style ? 'default' : 'outline'}
+                                        onClick={() => {
+                                            onAutopilotStyleChange(style);
+                                            setIsStyleOpen(false);
+                                        }}
+                                    >
+                                        {style}
+                                    </Button>
+                                ))}
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+                )}
+
+
                 <Dialog>
                     <DialogTrigger asChild>
                         <Button variant="outline" className="flex-1 px-2 md:px-4">
@@ -154,5 +193,3 @@ export function BeatBoxControls({
         </Card>
     );
 }
-
-    

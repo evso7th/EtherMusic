@@ -45,6 +45,10 @@ export const musicKeys: MusicKey[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G',
 export type MusicScale = 'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentatonic';
 export const musicScales: MusicScale[] = ['Major', 'Minor', 'Major Pentatonic', 'Minor Pentatonic'];
 
+export type AutopilotStyle = 'Ambient' | 'House' | 'Wind';
+export const autopilotStyles: AutopilotStyle[] = ['Ambient', 'House', 'Wind'];
+
+
 const getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]): number[] => {
     const Tone = require('tone');
 
@@ -101,6 +105,7 @@ export default function Home() {
 
     // Autopilot state
     const [isAutopilotOn, setIsAutopilotOn] = useState(false);
+    const [autopilotStyle, setAutopilotStyle] = useState<AutopilotStyle>('Ambient');
 
     // Tone.js refs
     const audioInitialized = useRef(false);
@@ -198,7 +203,7 @@ export default function Home() {
         
         Tone.Transport.bpm.value = activeTempo.bpm;
         setIsReady(true);
-    }, []);
+    }, [activeTempo.bpm, effects.bass.delay, effects.bass.reverb, effects.drums.delay, effects.drums.reverb, effects.melody.delay, effects.melody.reverb, volumes.bass, volumes.drums, volumes.melody]);
     
     // Update allowed frequencies when key or scale changes
     useEffect(() => {
@@ -377,32 +382,60 @@ export default function Home() {
         const melodyPart = autopilot.current.melody;
 
         if (isAutopilotOn && isPlaying && bassPart && melodyPart && allowedFrequencies.bass.length > 0 && allowedFrequencies.melody.length > 0) {
-            // Generate a new bass pattern
             bassPart.clear();
+            melodyPart.clear();
+
+            // --- Bass Pattern Generation ---
             const bassPattern: { time: string, freq: number, dur: string, vel: number }[] = [];
-            const numBassNotes = 4 + Math.floor(Math.random() * 5); // 4-8 notes
-            for (let i = 0; i < numBassNotes; i++) {
-                const time = `${Math.floor(i / 2)}:${(i % 2) * 2}:0`; // Place on 1st and 3rd beat of each measure
-                const freq = allowedFrequencies.bass[Math.floor(Math.random() * allowedFrequencies.bass.length)];
-                bassPattern.push({ time, freq, dur: '2n', vel: 0.3 + Math.random() * 0.2 });
+            if (autopilotStyle === 'Ambient') {
+                 for (let i = 0; i < 2; i++) {
+                    const time = `${i}:0:0`;
+                    const freq = allowedFrequencies.bass[Math.floor(Math.random() * allowedFrequencies.bass.length)];
+                    bassPattern.push({ time, freq, dur: '1m', vel: 0.2 + Math.random() * 0.1 });
+                }
+            } else if (autopilotStyle === 'House') {
+                for (let i = 0; i < 8; i++) {
+                    const time = `0:${Math.floor(i/2)}:${(i%2)*2}`;
+                    const freq = allowedFrequencies.bass[Math.floor(Math.random() * 2)]; // Keep it simple
+                    bassPattern.push({ time, freq, dur: '8n', vel: 0.3 + Math.random() * 0.2 });
+                }
+            } else if (autopilotStyle === 'Wind') {
+                // No bass for wind
             }
             bassPattern.forEach(note => bassPart.add(note.time, note));
-            bassPart.start(0);
 
-            // Generate a new melody pattern
-            melodyPart.clear();
+
+            // --- Melody Pattern Generation ---
             const melodyPattern: { time: string, freq: number, dur: string, vel: number }[] = [];
-            const numMelodyNotes = 5 + Math.floor(Math.random() * 8); // 5-12 notes
-            for (let i = 0; i < numMelodyNotes; i++) {
-                const measure = Math.floor(Math.random() * 4);
-                const beat = Math.floor(Math.random() * 4);
-                const sixteenth = Math.floor(Math.random() * 4);
-                const time = `${measure}:${beat}:${sixteenth}`;
-                const freq = allowedFrequencies.melody[Math.floor(Math.random() * allowedFrequencies.melody.length)];
-                const dur = ['8n', '16n'][Math.floor(Math.random()*2)];
-                 melodyPattern.push({ time, freq, dur, vel: 0.5 + Math.random() * 0.3 });
+            if (autopilotStyle === 'Ambient') {
+                const numMelodyNotes = 2 + Math.floor(Math.random() * 3); // 2-4 notes
+                for (let i = 0; i < numMelodyNotes; i++) {
+                    const time = `${Math.floor(Math.random() * 4)}:${Math.floor(Math.random() * 4)}:0`;
+                    const freq = allowedFrequencies.melody[Math.floor(Math.random() * allowedFrequencies.melody.length)];
+                    melodyPattern.push({ time, freq, dur: '2n', vel: 0.4 + Math.random() * 0.2 });
+                }
+            } else if (autopilotStyle === 'House') {
+                 const numMelodyNotes = 5 + Math.floor(Math.random() * 8); // 5-12 notes
+                for (let i = 0; i < numMelodyNotes; i++) {
+                    const measure = Math.floor(Math.random() * 4);
+                    const beat = Math.floor(Math.random() * 4);
+                    const sixteenth = Math.floor(Math.random() * 4);
+                    const time = `${measure}:${beat}:${sixteenth}`;
+                    const freq = allowedFrequencies.melody[Math.floor(Math.random() * allowedFrequencies.melody.length)];
+                    const dur = ['8n', '16n'][Math.floor(Math.random()*2)];
+                    melodyPattern.push({ time, freq, dur, vel: 0.5 + Math.random() * 0.3 });
+                }
+            } else if (autopilotStyle === 'Wind') {
+                const numMelodyNotes = 10 + Math.floor(Math.random() * 10); // 10-19 notes
+                for (let i = 0; i < numMelodyNotes; i++) {
+                    const time = `${Math.floor(Math.random() * 4)}:${Math.floor(Math.random() * 4)}:${Math.floor(Math.random() * 4)}`;
+                    const freq = allowedFrequencies.melody[Math.floor(Math.random() * allowedFrequencies.melody.length)];
+                    melodyPattern.push({ time, freq, dur: '4n', vel: 0.1 + Math.random() * 0.2 });
+                }
             }
             melodyPattern.forEach(note => melodyPart.add(note.time, note));
+
+            bassPart.start(0);
             melodyPart.start(0);
 
         } else if (bassPart && melodyPart) {
@@ -410,7 +443,7 @@ export default function Home() {
             melodyPart.stop(0).clear();
         }
 
-    }, [isAutopilotOn, isPlaying, allowedFrequencies]);
+    }, [isAutopilotOn, isPlaying, allowedFrequencies, autopilotStyle]);
 
 
     useEffect(() => {
@@ -504,18 +537,15 @@ export default function Home() {
                 if (data && quantizedFreq && activeNotes.current.has(data.pointerId)) {
                     const activeNote = activeNotes.current.get(data.pointerId);
                     if (activeNote && activeNote.freq !== quantizedFreq) {
-                        // More reliable: stop old note, start new one
                         synth.triggerRelease([activeNote.freq]);
                         synth.triggerAttack(quantizedFreq, undefined, velocity);
                         activeNotes.current.set(data.pointerId, { type, freq: quantizedFreq });
                     }
-                    // Adjust volume of all notes for simplicity
-                    const newVolume = -48 + (velocity * 48); // Map velocity [0,1] to dB [-48, 0]
-                    synth.set({ volume: newVolume });
+                    synth.set({ volume: -48 + (velocity * 48) });
                 }
                 break;
             case 'up':
-                if (data && activeNotes.current.has(data.pointerId)) {
+                 if (data && activeNotes.current.has(data.pointerId)) {
                     const activeNote = activeNotes.current.get(data.pointerId);
                     if (activeNote) {
                         synth.triggerRelease([activeNote.freq]);
@@ -523,7 +553,6 @@ export default function Home() {
                     activeNotes.current.delete(data.pointerId);
                 }
                 
-                // Safety net: if no pointers are down for this synth type, release all its notes
                 let hasActiveNotesForType = false;
                 activeNotes.current.forEach(note => {
                     if (note.type === type) {
@@ -656,6 +685,9 @@ export default function Home() {
                             onEffectChange={setEffects}
                             isAutopilotOn={isAutopilotOn}
                             onAutopilotToggle={handleAutopilotToggle}
+                            autopilotStyles={autopilotStyles}
+                            activeAutopilotStyle={autopilotStyle}
+                            onAutopilotStyleChange={setAutopilotStyle}
                         />
                     </div>
                 </main>
