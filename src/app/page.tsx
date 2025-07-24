@@ -21,10 +21,10 @@ type BeatPattern = {
 
 
 const beatPatterns: BeatPattern[] = [
-    { name: 'Rock', sequence: ['C1', null, 'D1', null, 'C1', null, 'D1', 'E1'] },
-    { name: 'House', sequence: ['C1', 'C1', 'D1', 'C1', 'C1', 'C1', 'D1', 'C1'] },
-    { name: 'Hip Hop', sequence: ['C1', null, 'D1', 'C1', null, 'C1', 'D1', null] },
-    { name: 'Reggae', sequence: [null, 'C1', 'D1', 'E1', null, 'C1', 'D1', null] },
+    { name: 'Rock', sequence: ['C1', 'D1', 'C1', 'D1', 'C1', 'D1', 'C1', 'D1'] },
+    { name: 'House', sequence: ['C1', null, 'D1', 'C1', 'C1', null, 'D1', 'C1'] },
+    { name: 'Hip Hop', sequence: ['C1', null, 'C1', 'D1', null, 'C1', null, 'D1'] },
+    { name: 'Reggae', sequence: [null, 'C1', 'D1', null, 'E1', 'C1', 'D1', null] },
     { name: 'Off', sequence: [] },
 ];
 
@@ -181,6 +181,7 @@ export default function Home() {
             },
             onload: () => {
                 console.log('Drum samples loaded');
+                setIsReady(true);
             },
             onerror: (error) => console.error("Error loading drum samples:", error),
         }).connect(channels.current.drums);
@@ -208,7 +209,7 @@ export default function Home() {
         Tone.getDestination().connect(recorder.current);
         
         Tone.Transport.bpm.value = activeTempo.bpm;
-        setIsReady(true);
+        
     }, [volumes.melody, volumes.bass, volumes.drums, effects.melody.reverb, effects.melody.delay, effects.bass.reverb, effects.bass.delay, effects.drums.reverb, effects.drums.delay, activeTempo.bpm]);
     
     // Update allowed frequencies when key or scale changes
@@ -743,5 +744,7 @@ export default function Home() {
 
 
 
+
+    
 
     
