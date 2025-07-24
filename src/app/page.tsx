@@ -53,14 +53,15 @@ const getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]
             scaleNotes = Tone.Scale.get(`${key} ${scale.toLowerCase()}`).notes;
         }
     } catch (e) {
-        console.error("Could not get scale", e);
-        // Fallback to a major scale on error
-        scaleNotes = Tone.Scale.get(`${key} major`).notes;
+        console.error("Could not get scale, falling back to major scale. Error:", e);
+        // Fallback for older Tone.js versions or unforeseen errors
+        const baseNote = Tone.Frequency(key + "3");
+        scaleNotes = [0, 2, 4, 5, 7, 9, 11].map(interval => baseNote.transpose(interval).toNote());
     }
     
     let allFrequencies: number[] = [];
     octaves.forEach(octave => {
-         const octaveNotes = scaleNotes.map(note => `${note}${octave}`);
+         const octaveNotes = scaleNotes.map(note => `${note.replace(/[0-9]/g, '')}${octave}`);
          allFrequencies = [...allFrequencies, ...octaveNotes.map(n => Tone.Frequency(n).toFrequency())];
     });
 
@@ -109,6 +110,16 @@ export default function Home() {
         if (audioInitialized.current) return;
         
         const Tone = await import('tone');
+        
+        // Polyfill Tone.Scale.get if it doesn't exist
+        if (!Tone.Scale.get) {
+            Tone.Scale.get = (name: string) => {
+                const [tonic, type] = name.split(" ");
+                const notes = Tone.Mode.get(type).intervals.map((interval: string) => Tone.Frequency(tonic).transpose(interval).toNote());
+                return { notes };
+            }
+        }
+
         await Tone.start();
         audioInitialized.current = true;
         
@@ -537,3 +548,6 @@ export default function Home() {
 
     
 
+
+
+    
