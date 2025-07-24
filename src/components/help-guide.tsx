@@ -24,6 +24,10 @@ Welcome to EtherMusic! This is a simple guide to get you started on making cool 
 
 It's a virtual music box, a "Neuro Meditation Sound Processor." Think of it as an instrument that anyone can play, regardless of musical ability. You don't need to learn notes or chords. Just move your fingers and listen to what happens.
 
+Our application is at the intersection of a creative tool, a meditation aid, and a digital wellness gadget. It is not for professional musicians, but for a wide audience that appreciates ambient music, mindfulness, and is looking for new forms of self-expression and relaxation.
+
+This is truly a tool for those who carry music in their souls but, for various reasons, cannot express it through traditional instruments. It gives everyone the opportunity to feel like a composer.
+
 ## The Big Pads (Theremins)
 
 There are two large, glowing pads. They are your main instruments.
