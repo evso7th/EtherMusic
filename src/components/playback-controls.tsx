@@ -17,6 +17,9 @@ interface PlaybackControlsProps {
 export function PlaybackControls({ isPlaying, isRecording, onPlayPause, onRecord, onStop, isReady }: PlaybackControlsProps) {
     return (
         <div className="flex items-center gap-1 md:gap-2">
+             <Button onClick={onStop} size="icon" variant="outline" className="w-10 h-10 rounded-full" aria-label="Stop" disabled={!isReady}>
+                <StopCircle className="w-5 h-5 md:w-6 md:h-6" />
+            </Button>
             <Button onClick={onPlayPause} size="icon" className="w-10 h-10 rounded-full" aria-label={isPlaying ? "Pause" : "Play"} disabled={!isReady}>
                 {isPlaying ? <Pause className="w-5 h-5 md:w-6 md:h-6" /> : <Play className="w-5 h-5 md:w-6 md:h-6 ml-1" />}
             </Button>
@@ -31,7 +34,7 @@ export function PlaybackControls({ isPlaying, isRecording, onPlayPause, onRecord
                 aria-label={isRecording ? "Stop Recording" : "Record"} 
                 disabled={!isReady}
             >
-                {isRecording ? <StopCircle className="w-5 h-5 md:w-6 md:h-6" /> : <Mic className="w-5 h-5 md:w-6 md:h-6" />}
+                 <Mic className="w-5 h-5 md:w-6 md:h-6" />
             </Button>
         </div>
     );

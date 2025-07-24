@@ -34,7 +34,6 @@ interface ThereminPadProps {
     onPulsateToggle?: () => void;
     isLatchOn?: boolean;
     onLatchToggle?: (checked: boolean) => void;
-    isLatched?: boolean;
     latchedNotes?: Map<number, { x: number; y: number; frequency: number; volume: number }>;
 }
 
@@ -67,7 +66,6 @@ export function ThereminPad({
     onScaleChange,
     isLatchOn,
     onLatchToggle,
-    isLatched,
     latchedNotes,
 }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
@@ -116,7 +114,7 @@ export function ThereminPad({
 
         onInteraction(type, interactionData, 'down');
 
-        if (isPolyphonic && (!isLatchOn || type !== 'bass')) {
+        if (isPolyphonic && (type === 'melody' || !isLatchOn)) {
             const orb = createOrb(interactionData.x, interactionData.y);
             if (orb) {
                 activePointers.current.set(event.pointerId, { id: event.pointerId, orb });
@@ -168,31 +166,27 @@ export function ThereminPad({
 
         if (!latchedNotes || !padRef.current) return;
 
-        const latchedIds = new Set(Array.from(latchedNotes.keys()));
+        const currentOrbIds = new Set(activePointers.current.keys());
+        const latchedNoteIds = new Set(latchedNotes.keys());
 
         // Remove orbs for notes that are no longer latched
-        activePointers.current.forEach((pointer, id) => {
-            if (!latchedIds.has(id)) {
-                if (pointer.orb) pointer.orb.remove();
+        for (const id of currentOrbIds) {
+            if (!latchedNoteIds.has(id)) {
+                const pointer = activePointers.current.get(id);
+                pointer?.orb?.remove();
                 activePointers.current.delete(id);
             }
-        });
+        }
 
-        // Add or update orbs for latched notes
-        latchedNotes.forEach((note, id) => {
-            let pointer = activePointers.current.get(id);
-            if (!pointer) {
+        // Add orbs for new latched notes
+        for (const [id, note] of latchedNotes.entries()) {
+            if (!currentOrbIds.has(id)) {
                 const orb = createOrb(note.x, note.y);
                 if (orb) {
-                    pointer = { id, orb };
-                    activePointers.current.set(id, pointer);
+                    activePointers.current.set(id, { id, orb });
                 }
-            } else {
-                 if (pointer.orb) {
-                    pointer.orb.style.transform = `translate(${note.x}px, ${note.y}px)`;
-                 }
             }
-        });
+        }
 
     }, [latchedNotes, isLatchOn, type, createOrb]);
 
@@ -267,10 +261,10 @@ export function ThereminPad({
             )}
             {onPulsateToggle && (
                  <Button
-                    variant={(isPulsating || (isLatched && isLatchOn)) ? 'default' : 'outline'}
+                    variant={(isPulsating || (latchedNotes && latchedNotes.size > 0 && isLatchOn)) ? 'default' : 'outline'}
                     size="icon"
                     onClick={onPulsateToggle}
-                    className={cn('transition-all w-8 h-8', (isPulsating || (isLatched && isLatchOn)) && 'animate-pulse-accent')}
+                    className={cn('transition-all w-8 h-8', (isPulsating || (latchedNotes && latchedNotes.size > 0 && isLatchOn)) && 'animate-pulse-accent')}
                     style={{ '--accent': 'hsl(var(--accent))' } as React.CSSProperties}
 
                  >
@@ -283,7 +277,7 @@ export function ThereminPad({
     return (
         <Card className={cn(
             "flex flex-col h-full bg-card/50 border-2 border-transparent transition-all duration-300",
-            (isLatched && isLatchOn) && type === 'bass' && "border-accent ring-4 ring-accent/50",
+            (latchedNotes && latchedNotes.size > 0 && isLatchOn) && type === 'bass' && "border-accent ring-4 ring-accent/50",
         )}>
             <CardHeader className="flex-shrink-0 flex flex-row items-center justify-end p-2">
                 <div className="flex items-center gap-2">
@@ -315,6 +309,3 @@ export function ThereminPad({
         </Card>
     );
 }
- 
-
-    

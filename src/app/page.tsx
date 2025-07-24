@@ -98,7 +98,7 @@ export default function Home() {
     const bassGain = useRef<Tone.Gain | null>(null);
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
     const activeMelodyNotes = useRef<Map<number, number>>(new Map());
-    const activeBassNotes = useRef<Map<number, { freq: number; id: number }>>(new Map());
+    const activeBassNotes = useRef<Map<number, number>>(new Map());
     
     const initializeAudio = useCallback(async () => {
         if (audioInitialized.current) return;
@@ -221,17 +221,27 @@ export default function Home() {
         Tone.Transport.start();
     }
     
-    const handlePlayPause = async () => {
+   const handlePlayPause = async () => {
         const Tone = await import('tone');
-        if (!isReady) return;
-        
-        if (Tone.Transport.state === 'started') {
-            Tone.Transport.pause();
-            setIsPlaying(false);
-        } else {
+        if (!isReady || !bassSynth.current) return;
+
+        const willBePlaying = Tone.Transport.state !== 'started';
+        setIsPlaying(willBePlaying);
+
+        if (willBePlaying) {
             await Tone.start();
             Tone.Transport.start();
-            setIsPlaying(true);
+            // Retrigger latched notes
+            latchedBassNotes.forEach(note => {
+                bassSynth.current!.triggerAttack(note.frequency, undefined, note.volume);
+            });
+        } else {
+            Tone.Transport.pause();
+            // Release all latched notes
+             const allLatchedFrequencies = Array.from(latchedBassNotes.values()).map(n => n.frequency);
+             if (allLatchedFrequencies.length > 0) {
+                bassSynth.current!.triggerRelease(allLatchedFrequencies);
+             }
         }
     };
 
@@ -346,19 +356,19 @@ export default function Home() {
 
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!audioInitialized.current) return;
-    
+
         const synth = type === 'melody' ? melodySynth.current : bassSynth.current;
         if (!synth) return;
-    
+
         const quantizedFreq = data ? getClosestFrequency(data.frequency) : 0;
         const velocity = data ? data.volume : 0;
-    
+
         if (type === 'bass' && isBassLatchOn) {
             if (state === 'down' && data) {
                 setLatchedBassNotes(prev => {
                     const newNotes = new Map(prev);
                     const existingEntry = Array.from(newNotes.entries()).find(
-                        ([_, note]) => Math.abs(note.frequency - quantizedFreq) < 5 // Tolerance for finding existing note
+                        ([_, note]) => Math.abs(note.frequency - quantizedFreq) < 5
                     );
 
                     if (existingEntry) {
@@ -367,67 +377,47 @@ export default function Home() {
                         newNotes.delete(keyToToggle);
                     } else if (newNotes.size < 4) {
                         newNotes.set(data.pointerId, { x: data.x, y: data.y, frequency: quantizedFreq, volume: data.volume });
-                        synth.triggerAttack(quantizedFreq, undefined, velocity);
+                        if (isPlaying) {
+                            synth.triggerAttack(quantizedFreq, undefined, velocity);
+                        }
                     }
                     return newNotes;
                 });
             }
-             // For latch mode, we don't do anything on 'move' or 'up' for now
-            return;
+            return; 
         }
 
         const activeNotes = type === 'melody' ? activeMelodyNotes.current : activeBassNotes.current;
-    
+
         switch (state) {
             case 'down':
                 if (quantizedFreq && data) {
                     synth.triggerAttack(quantizedFreq, undefined, velocity);
-                    if (type === 'melody') {
-                        activeMelodyNotes.current.set(data.pointerId, quantizedFreq);
-                    } else {
-                         activeBassNotes.current.set(data.pointerId, { freq: quantizedFreq, id: data.pointerId });
-                    }
+                    activeNotes.set(data.pointerId, quantizedFreq);
                 }
                 break;
             case 'move':
                 if (quantizedFreq && data && activeNotes.has(data.pointerId)) {
-                    if (type === 'melody') {
-                         const currentFreq = activeMelodyNotes.current.get(data.pointerId);
-                         if (currentFreq && synth.get(currentFreq)) {
-                            (synth.get(currentFreq) as any).frequency.set({ value: quantizedFreq });
-                            (synth.get(currentFreq) as any).volume.set({ value: -24 + (velocity * 24) });
-                             activeMelodyNotes.current.set(data.pointerId, quantizedFreq);
-                         }
-                    } else {
-                        const noteInfo = activeBassNotes.current.get(data.pointerId);
-                        if (noteInfo && synth.get(noteInfo.freq)) {
-                            (synth.get(noteInfo.freq) as any).frequency.set({ value: quantizedFreq });
-                            (synth.get(noteInfo.freq) as any).volume.set({ value: -24 + (velocity * 24) });
-                             activeBassNotes.current.set(data.pointerId, { freq: quantizedFreq, id: data.pointerId });
-                        }
+                    const currentFreq = activeNotes.get(data.pointerId);
+                    if (currentFreq && synth.get(currentFreq)) {
+                       (synth.get(currentFreq) as any).frequency.set({ value: quantizedFreq });
+                       (synth.get(currentFreq) as any).volume.set({ value: -24 + (velocity * 24) });
+                        activeNotes.set(data.pointerId, quantizedFreq);
                     }
                 }
                 break;
             case 'up':
-                 if (data && activeNotes.has(data.pointerId)) {
-                    let freqToRelease: number | undefined;
-                    if (type === 'melody') {
-                        freqToRelease = activeMelodyNotes.current.get(data.pointerId);
-                        if(freqToRelease) synth.triggerRelease(freqToRelease);
-                        activeMelodyNotes.current.delete(data.pointerId);
-
-                    } else {
-                        const noteInfo = activeBassNotes.current.get(data.pointerId);
-                        if(noteInfo) synth.triggerRelease(noteInfo.freq);
-                        activeBassNotes.current.delete(data.pointerId);
-                    }
-                 } else { // Fallback for safety
+                if (data && activeNotes.has(data.pointerId)) {
+                    const freqToRelease = activeNotes.get(data.pointerId);
+                    if (freqToRelease) synth.triggerRelease(freqToRelease);
+                    activeNotes.delete(data.pointerId);
+                } else if (type !== 'bass' || !isBassLatchOn) {
                     synth.releaseAll();
                     activeNotes.clear();
-                 }
+                }
                 break;
         }
-    }, [isBassLatchOn, latchedBassNotes, allowedFrequencies]);
+    }, [isBassLatchOn, latchedBassNotes, allowedFrequencies, isPlaying]);
     
     const handleStartScreenInteraction = () => {
         if (backgroundAudioRef.current && backgroundAudioRef.current.paused) {
@@ -513,7 +503,6 @@ export default function Home() {
                             onPulsateToggle={handlePulsateToggle}
                             isLatchOn={isBassLatchOn}
                             onLatchToggle={handleLatchToggle}
-                            isLatched={latchedBassNotes.size > 0}
                             latchedNotes={latchedBassNotes}
                             isPolyphonic
                         />
@@ -550,4 +539,3 @@ export default function Home() {
         </div>
     );
 }
-
