@@ -4,15 +4,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type * as Tone from 'tone';
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ThereminPad } from '@/components/theremin-pad';
 import { BeatBoxControls } from '@/components/beat-box-controls';
-import { MixerControls } from '@/components/mixer-controls';
-import { PlaybackControls } from '@/components/playback-controls';
-import { SlidersHorizontal } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { OrbitalAnimation } from '@/components/orbital-animation';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { PlaybackControls } from '@/components/playback-controls';
 
 
 type BeatPattern = {
@@ -64,20 +61,12 @@ export default function Home() {
     const bassVCA = useRef<Tone.Volume | null>(null);
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
     
-    useEffect(() => {
-        if (backgroundAudioRef.current) {
-            if (isAppStarted && !backgroundAudioRef.current.paused) {
-                 backgroundAudioRef.current.pause();
-                 backgroundAudioRef.current.currentTime = 0;
-            }
-        }
-    }, [isAppStarted]);
-
     const initializeAudio = useCallback(async () => {
         if (audioInitialized.current) return;
-        audioInitialized.current = true;
         
         const Tone = await import('tone');
+        await Tone.start();
+        audioInitialized.current = true;
         
         channels.current = {
             melody: new Tone.Channel(volumes.melody).toDestination(),
@@ -119,6 +108,10 @@ export default function Home() {
         Tone.Transport.bpm.value = tempo;
         setIsReady(true);
     }, [volumes.melody, volumes.bass, volumes.drums, tempo]);
+
+    useEffect(() => {
+        initializeAudio();
+    }, [initializeAudio]);
     
     useEffect(() => {
         if (!isReady || !melodySynth.current) return;
@@ -161,6 +154,8 @@ export default function Home() {
     }, [melodyInstrument, isReady]);
 
     const handleStartApp = async () => {
+        if (!isReady) return;
+        
         if (isMobile) {
             try {
                 if (document.documentElement.requestFullscreen) {
@@ -175,14 +170,12 @@ export default function Home() {
             }
         }
         
-        if (backgroundAudioRef.current) {
-            backgroundAudioRef.current.volume = 0.3;
-            backgroundAudioRef.current.play().catch(error => console.error("Error playing background audio:", error));
+        if (backgroundAudioRef.current && !backgroundAudioRef.current.paused) {
+             backgroundAudioRef.current.pause();
+             backgroundAudioRef.current.currentTime = 0;
         }
 
         const Tone = await import('tone');
-        await Tone.start();
-        await initializeAudio();
         setIsAppStarted(true);
         setIsPlaying(true);
         Tone.Transport.start();
@@ -373,6 +366,52 @@ export default function Home() {
         }
     }, [isPlaying, isBassLatchOn, latchedBassNote, isBassPulsating]);
     
+    const handleStartScreenInteraction = () => {
+        if (backgroundAudioRef.current && backgroundAudioRef.current.paused) {
+            backgroundAudioRef.current.volume = 0.3;
+            backgroundAudioRef.current.play().catch(error => console.error("Error playing background audio:", error));
+        }
+    };
+
+    if (!isReady) {
+        return (
+            <div className="absolute inset-0 bg-background flex items-center justify-center z-50">
+                <div className="text-center text-white">
+                    <p className="text-xl mb-4">Loading audio engine...</p>
+                    <div className='preloader'>
+                        <div><div><div><div><div></div></div></div></div></div>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    if (!isAppStarted) {
+        return (
+            <div 
+                className="absolute inset-0 bg-background flex flex-col items-center justify-center z-50 p-4"
+                onClick={handleStartScreenInteraction}
+            >
+                <OrbitalAnimation />
+                <audio ref={backgroundAudioRef} src="/assets/sounds/ethermusic_start.mp3" loop />
+                <div className="z-10 text-center flex-grow flex flex-col items-center justify-center">
+                    <div className="mb-16">
+                        <h1 className="text-6xl md:text-8xl font-bold text-primary">EtherMusic</h1>
+                        <p className="text-lg md:text-2xl text-white/80 font-light mt-2 tracking-wider">
+                           Neuro Meditation Sound Processor
+                        </p>
+                    </div>
+                    <Button size="lg" onClick={handleStartApp} className="mt-16">
+                        Start your own neuro meditation
+                    </Button>
+                </div>
+                 <footer className="z-10 text-xs text-white/50 pb-4">
+                    Based on theremin technology (c) 2025, EVS
+                </footer>
+            </div>
+        )
+    }
+
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
             <div className="fixed inset-0 z-0">
@@ -434,44 +473,6 @@ export default function Home() {
                     </div>
                 </main>
             </div>
-            {!isAppStarted && (
-                <div className="absolute inset-0 bg-background flex flex-col items-center justify-center z-50 p-4">
-                    <OrbitalAnimation />
-                    <audio ref={backgroundAudioRef} src="/assets/sounds/ethermusic_start.mp3" loop />
-                    <div className="z-10 text-center flex-grow flex flex-col items-center justify-center">
-                        <div className="mb-16">
-                            <h1 className="text-6xl md:text-8xl font-bold text-primary">EtherMusic</h1>
-                            <p className="text-lg md:text-2xl text-white/80 font-light mt-2 tracking-wider">
-                               Neuro Meditation Sound Processor
-                            </p>
-                        </div>
-                        <Button size="lg" onClick={handleStartApp} className="mt-16">
-                            Start your own neuro meditation
-                        </Button>
-                    </div>
-                     <footer className="z-10 text-xs text-white/50 pb-4">
-                        Based on theremin technology (c) 2025, EVS
-                    </footer>
-                </div>
-            )}
-            {!isReady && isAppStarted && (
-                <div className="absolute inset-0 bg-background flex items-center justify-center z-50">
-                    <div className="text-center text-white">
-                        <p className="text-xl mb-4">Loading audio engine...</p>
-                        <div className='preloader'>
-                            <div>
-                                <div>
-                                    <div>
-                                        <div>
-                                            <div></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
