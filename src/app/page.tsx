@@ -83,13 +83,16 @@ export default function Home() {
     // --- New Harmony State ---
     const [musicKey, setMusicKey] = useState<MusicKey>('C');
     const [musicScale, setMusicScale] = useState<MusicScale>('Major Pentatonic');
-    const [allowedFrequencies, setAllowedFrequencies] = useState<number[]>([]);
+    const [allowedFrequencies, setAllowedFrequencies] = useState<{bass: number[], melody: number[]}>({ bass: [], melody: [] });
 
 
     // Bass specific state
     const [isBassPulsating, setIsBassPulsating] = useState(false);
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
     const [latchedBassNotes, setLatchedBassNotes] = useState<Map<number, { x: number; y: number; frequency: number; volume: number }>>(new Map());
+
+    // Autopilot state
+    const [isAutopilotOn, setIsAutopilotOn] = useState(false);
 
     // Tone.js refs
     const audioInitialized = useRef(false);
@@ -104,6 +107,7 @@ export default function Home() {
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
     const activeMelodyNotes = useRef<Map<number, number>>(new Map());
     const fx = useRef<{ reverb: Tone.Reverb, delay: Tone.FeedbackDelay } | null>(null);
+    const autopilot = useRef<{bass: Tone.Part | null, melody: Tone.Part | null}>({ bass: null, melody: null });
     
     const initializeAudio = useCallback(async () => {
         if (audioInitialized.current) return;
@@ -168,6 +172,19 @@ export default function Home() {
             if (note === 'D2') drumSynths.current?.hat.triggerAttackRelease('16n', time);
         }, [], '8n').start(0);
 
+        autopilot.current.bass = new Tone.Part((time, note) => {
+            bassSynth.current?.triggerAttackRelease(note.freq, note.dur, time, note.vel);
+        }, []).start(0);
+        autopilot.current.bass.loop = true;
+        autopilot.current.bass.loopEnd = '2m';
+
+        autopilot.current.melody = new Tone.Part((time, note) => {
+             melodySynth.current?.triggerAttackRelease(note.freq, note.dur, time, note.vel);
+        }, []).start(0);
+        autopilot.current.melody.loop = true;
+        autopilot.current.melody.loopEnd = '4m';
+
+
         recorder.current = new Tone.Recorder();
         Tone.getDestination().connect(recorder.current);
         
@@ -180,7 +197,7 @@ export default function Home() {
         if (!isReady) return;
         const melodyFreqs = getScaleFrequencies(musicKey, musicScale, [3, 4, 5]);
         const bassFreqs = getScaleFrequencies(musicKey, musicScale, [1, 2]);
-        setAllowedFrequencies([...bassFreqs, ...melodyFreqs]);
+        setAllowedFrequencies({bass: bassFreqs, melody: melodyFreqs});
     }, [musicKey, musicScale, isReady]);
 
     useEffect(() => {
@@ -264,8 +281,11 @@ export default function Home() {
             }
         } else {
             Tone.Transport.pause();
-            if (isBassLatchOn) {
+            if (isBassLatchOn || isAutopilotOn) {
                  bassSynth.current.releaseAll();
+            }
+            if (isAutopilotOn) {
+                melodySynth.current?.releaseAll();
             }
         }
     };
@@ -312,6 +332,9 @@ export default function Home() {
             setLatchedBassNotes(new Map());
         }
     }
+     const handleAutopilotToggle = () => {
+        setIsAutopilotOn(prev => !prev);
+    };
 
     useEffect(() => {
         if (!bassLFO.current || !bassGain.current) return;
@@ -329,7 +352,7 @@ export default function Home() {
         }
     }, [isBassPulsating, isPlaying]);
     
-    // Original working drum machine logic
+    // Drum machine logic
     useEffect(() => {
         if (!isReady || !drumSequence.current) return;
         
@@ -339,6 +362,48 @@ export default function Home() {
         }
     
     }, [activePattern, isReady]);
+
+    // Autopilot logic
+    useEffect(() => {
+        const bassPart = autopilot.current.bass;
+        const melodyPart = autopilot.current.melody;
+
+        if (isAutopilotOn && isPlaying && bassPart && melodyPart && allowedFrequencies.bass.length > 0 && allowedFrequencies.melody.length > 0) {
+            // Generate a new bass pattern
+            bassPart.clear();
+            const bassPattern: { time: string, freq: number, dur: string, vel: number }[] = [];
+            const numBassNotes = 4 + Math.floor(Math.random() * 5); // 4-8 notes
+            for (let i = 0; i < numBassNotes; i++) {
+                const time = `${Math.floor(i / 2)}:${(i % 2) * 2}:0`; // Place on 1st and 3rd beat of each measure
+                const freq = allowedFrequencies.bass[Math.floor(Math.random() * allowedFrequencies.bass.length)];
+                bassPattern.push({ time, freq, dur: '2n', vel: 0.3 + Math.random() * 0.2 });
+            }
+            bassPattern.forEach(note => bassPart.add(note.time, note));
+            bassPart.start(0);
+
+            // Generate a new melody pattern
+            melodyPart.clear();
+            const melodyPattern: { time: string, freq: number, dur: string, vel: number }[] = [];
+            const numMelodyNotes = 5 + Math.floor(Math.random() * 8); // 5-12 notes
+            for (let i = 0; i < numMelodyNotes; i++) {
+                const measure = Math.floor(Math.random() * 4);
+                const beat = Math.floor(Math.random() * 4);
+                const sixteenth = Math.floor(Math.random() * 4);
+                const time = `${measure}:${beat}:${sixteenth}`;
+                const freq = allowedFrequencies.melody[Math.floor(Math.random() * allowedFrequencies.melody.length)];
+                const dur = ['8n', '16n'][Math.floor(Math.random()*2)];
+                 melodyPattern.push({ time, freq, dur, vel: 0.5 + Math.random() * 0.3 });
+            }
+            melodyPattern.forEach(note => melodyPart.add(note.time, note));
+            melodyPart.start(0);
+
+        } else if (bassPart && melodyPart) {
+            bassPart.stop(0).clear();
+            melodyPart.stop(0).clear();
+        }
+
+    }, [isAutopilotOn, isPlaying, allowedFrequencies]);
+
 
     useEffect(() => {
         if (!isReady) return;
@@ -369,9 +434,10 @@ export default function Home() {
     }, [effects, isReady]);
 
 
-    const getClosestFrequency = (targetFreq: number) => {
-        if (allowedFrequencies.length === 0) return targetFreq;
-        return allowedFrequencies.reduce((prev, curr) => {
+    const getClosestFrequency = (targetFreq: number, type: 'bass' | 'melody') => {
+        const freqs = type === 'bass' ? allowedFrequencies.bass : allowedFrequencies.melody;
+        if (freqs.length === 0) return targetFreq;
+        return freqs.reduce((prev, curr) => {
             return (Math.abs(curr - targetFreq) < Math.abs(prev - targetFreq) ? curr : prev);
         });
     };
@@ -382,7 +448,7 @@ export default function Home() {
         const synth = type === 'melody' ? melodySynth.current : bassSynth.current;
         if (!synth) return;
 
-        const quantizedFreq = data ? getClosestFrequency(data.frequency) : 0;
+        const quantizedFreq = data ? getClosestFrequency(data.frequency, type) : 0;
         const velocity = data ? data.volume : 0;
         
         if (type === 'bass' && isBassLatchOn) {
@@ -507,7 +573,7 @@ export default function Home() {
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
             <div className="fixed inset-0 z-0">
-                 <OrbitalAnimation isPlaying={isPlaying} tempo={tempo} />
+                 <OrbitalAnimation isPlaying={isPlaying} />
             </div>
             <div className="relative z-10 flex flex-col h-full p-4 md:p-6 lg:p-8">
                 <header className="flex-shrink-0 flex items-center justify-between mb-4">
@@ -568,6 +634,8 @@ export default function Home() {
                             onVolumeChange={setVolumes}
                             effects={effects}
                             onEffectChange={setEffects}
+                            isAutopilotOn={isAutopilotOn}
+                            onAutopilotToggle={handleAutopilotToggle}
                         />
                     </div>
                 </main>
@@ -575,3 +643,5 @@ export default function Home() {
         </div>
     );
 }
+
+    

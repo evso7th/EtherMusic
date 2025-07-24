@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { MixerControls } from '@/components/mixer-controls';
-import { SlidersHorizontal, Drum, Zap, HelpCircle } from 'lucide-react';
+import { SlidersHorizontal, Drum, Zap, Bot } from 'lucide-react';
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
@@ -32,6 +32,8 @@ interface BeatBoxControlsProps {
         drums: { reverb: number, delay: number };
     };
     onEffectChange: (effects: BeatBoxControlsProps['effects']) => void;
+    isAutopilotOn: boolean;
+    onAutopilotToggle: () => void;
 }
 
 export function BeatBoxControls({
@@ -44,6 +46,8 @@ export function BeatBoxControls({
     onVolumeChange,
     effects,
     onEffectChange,
+    isAutopilotOn,
+    onAutopilotToggle
 }: BeatBoxControlsProps) {
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isTempoOpen, setIsTempoOpen] = useState(false);
@@ -109,6 +113,15 @@ export function BeatBoxControls({
                         </div>
                     </DialogContent>
                 </Dialog>
+                
+                <Button
+                    variant={isAutopilotOn ? 'default' : 'outline'}
+                    onClick={onAutopilotToggle}
+                    className="flex-1"
+                >
+                    <Bot className="w-4 h-4 md:mr-2" />
+                    <span className="hidden sm:inline">Autopilot</span>
+                </Button>
 
                 <Dialog>
                     <DialogTrigger asChild>
@@ -135,3 +148,5 @@ export function BeatBoxControls({
         </Card>
     );
 }
+
+    
