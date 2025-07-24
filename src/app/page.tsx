@@ -111,7 +111,7 @@ export default function Home() {
 
     useEffect(() => {
         initializeAudio();
-    }, [initializeAudio]);
+    }, []);
     
     useEffect(() => {
         if (!isReady || !melodySynth.current) return;
