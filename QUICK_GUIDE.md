@@ -12,7 +12,7 @@ This is truly a tool for those who carry music in their souls but, for various r
 
 ## The Big Pads (Theremins)
 
-There are two large, glowing pads. They are your main instruments.
+There are two large, glowing pads with their names, `Bass Pad` and `Melody Pad`, written on the background. They are your main instruments.
 
 *   **How to Play:** Touch a pad with your finger (or click with a mouse).
 *   **Left to Right:** Controls the **pitch** (the note you hear).
@@ -22,13 +22,16 @@ There are two large, glowing pads. They are your main instruments.
 
 *   This is for your main tune.
 *   You can play multiple notes at the same time (polyphonic).
-*   **Change Instrument:** Use the dropdown menu at the top of the pad to switch between sounds like `synth`, `organ`, `theremin`, or `glass`. You can change any of these instruments on the fly, even during playback!
+*   **Change Settings:** Use the `Settings` button at the top of the pad to open a panel where you can change the **Instrument** (`synth`, `organ`, `theremin`, `glass`), **Music Key**, and **Music Scale**. You can change any of these on the fly, even during playback!
 
 ### Bass Pad (Left, Blue)
 
-*   This is for your bass line. It only plays one note at a time.
-*   **Pulsate (`Zap` Icon):** Makes the sound throb in time with the beat. It's great for rhythmic bass.
-*   **Latch (`Anchor` Icon):** "Holds" a note for you. Tap the switch to turn Latch mode on. Then, tap on the pad to start a note, and tap again to stop it. No need to hold your finger down.
+*   This is for your bass line. It's polyphonic, meaning you can play up to four notes at the same time to create chords.
+*   **Pulsate (`Zap` Icon):** Makes the sound throb in time with the beat. It affects all sounding bass notes and is great for rhythmic bass lines or pads.
+*   **Latch (`Anchor` Icon):** "Holds" notes for you. Tap the switch to turn Latch mode on.
+    *   **To add a note:** Tap on the pad to start a note. A glowing orb will appear.
+    *   **To remove a note:** Tap on an existing orb or in the same spot again to stop that specific note.
+    *   You can have up to four notes latched at once.
 
 ## Bottom Control Bar
 

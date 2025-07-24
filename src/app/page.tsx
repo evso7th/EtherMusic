@@ -402,11 +402,6 @@ export default function Home() {
                 if (quantizedFreq && data && activeNotes.has(data.pointerId)) {
                     const currentFreq = activeNotes.get(data.pointerId);
                     if (currentFreq) {
-                         // This is tricky with PolySynth, get doesn't return a voice to modify directly
-                        // Re-triggering is one way, but not ideal. Let's try to set the note.
-                        // Tone.js doesn't have a simple "setFrequency" on a voice in a polysynth.
-                        // A common approach is release and re-trigger, but that can sound clicky.
-                        // Let's try a different approach if available, or stick to re-trigger.
                         synth.set({ note: { frequency: quantizedFreq }, volume: -24 + (velocity * 24) });
                         if (currentFreq !== quantizedFreq) {
                            activeNotes.set(data.pointerId, quantizedFreq);
@@ -447,7 +442,7 @@ export default function Home() {
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
                         <h1 className="text-5xl md:text-8xl lg:text-5xl xl:text-8xl font-bold text-primary sm:text-6xl" style={{fontSize: '48px'}}>EtherMusic</h1>
-                        <p className="text-lg md:text-2xl text-white/80 font-light mt-2 tracking-wider">
+                        <p className="text-base md:text-xl text-white/80 font-light mt-2 tracking-wider">
                            Neuro Meditation Sound Processor
                         </p>
                     </div>
