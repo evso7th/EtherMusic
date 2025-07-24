@@ -39,34 +39,33 @@ export const musicScales: MusicScale[] = ['Major', 'Minor', 'Major Pentatonic', 
 
 const getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]): number[] => {
     const Tone = require('tone');
+
+    const scaleName = scale.toLowerCase().replace(' ', '_');
     
     let notes: string[] = [];
 
     // This is a more robust way to get scale notes in recent Tone.js versions
-    const getNotesForScale = (tonic: string, scaleName: string) => {
-        const scaleType = scaleName.toLowerCase().replace(' ', '_');
-        try {
-            // Direct lookup for standard scales
-            return Tone.Scale.get(`${tonic} ${scaleType}`).notes;
-        } catch (e) {
-             // Manual creation for pentatonics
-            const isMinor = scaleName.includes('Minor');
-            const sourceScale = isMinor ? Tone.Scale.get(`${tonic} minor`).notes : Tone.Scale.get(`${tonic} major`).notes;
+    try {
+        if (scale.includes('Pentatonic')) {
+            const isMinor = scale.includes('Minor');
+            const sourceScale = isMinor ? Tone.Midi(key + '3').toScale('minor') : Tone.Midi(key + '3').toScale('major');
+            let pentatonicNotes: string[];
 
-            if (scaleName.includes('Pentatonic')) {
-                 if (isMinor) {
-                    // Minor pentatonic: 1, 3, 4, 5, 7
-                    return sourceScale.filter((_: string, i: number) => ![1, 5].includes(i % 7));
-                 } else {
-                    // Major pentatonic: 1, 2, 3, 5, 6
-                    return sourceScale.filter((_: string, i: number) => ![3, 6].includes(i % 7));
-                 }
+            if (isMinor) {
+                 // Minor pentatonic: 1, 3, 4, 5, 7
+                 pentatonicNotes = sourceScale.notes.filter((_: string, i: number) => ![1, 5].includes(i % 7));
+            } else {
+                 // Major pentatonic: 1, 2, 3, 5, 6
+                 pentatonicNotes = sourceScale.notes.filter((_: string, i: number) => ![3, 6].includes(i % 7));
             }
-            return []; // Fallback for unknown scales
+            notes = pentatonicNotes;
+        } else {
+            notes = Tone.Midi(key + '3').toScale(scaleName).notes;
         }
-    };
-    
-    notes = getNotesForScale(`${key}3`, scale);
+    } catch (e) {
+        console.error("Could not get scale", e);
+        return [];
+    }
     
     let allFrequencies: number[] = [];
     octaves.forEach(octave => {
@@ -545,5 +544,7 @@ export default function Home() {
         </div>
     );
 }
+
+    
 
     
