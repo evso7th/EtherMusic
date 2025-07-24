@@ -98,6 +98,7 @@ export default function Home() {
     const bassGain = useRef<Tone.Gain | null>(null);
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
     const activeMelodyNotes = useRef<Map<number, number>>(new Map());
+    const activeBassNotes = useRef<Map<number, number>>(new Map());
     
     const initializeAudio = useCallback(async () => {
         if (audioInitialized.current) return;
@@ -116,7 +117,7 @@ export default function Home() {
         melodySynth.current = new Tone.PolySynth(Tone.Synth).connect(channels.current.melody);
 
         bassGain.current = new Tone.Gain(1).connect(channels.current.bass);
-        bassSynth.current = new Tone.PolySynth(Tone.Synth, {
+        bassSynth.current = new Tone.PolySynth(4, Tone.Synth, {
             oscillator: { type: 'fatsawtooth' },
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
         }).connect(bassGain.current);
@@ -241,6 +242,7 @@ export default function Home() {
         melodySynth.current?.releaseAll();
         bassSynth.current?.releaseAll();
         activeMelodyNotes.current.clear();
+        activeBassNotes.current.clear();
         setIsPlaying(false);
         if (latchedBassNotes.size > 0) {
             setLatchedBassNotes(new Map());
@@ -335,10 +337,9 @@ export default function Home() {
         
         if (bassSynth.current?.voices) {
             bassSynth.current.voices.forEach(voice => {
-                if (!activeLatchedFrequencies.has(voice.frequency.value)) {
-                    // This check is a bit simplistic as voice might not be released yet.
-                    // A better system would track voices by ID.
-                }
+                // This logic is complex because voice.active is not a reliable indicator
+                // of whether a note is truly finished playing due to release times.
+                // The current implementation manages note on/off explicitly.
             });
         }
 
@@ -371,66 +372,56 @@ export default function Home() {
             if (state === 'down' && data) {
                 setLatchedBassNotes(prev => {
                     const newNotes = new Map(prev);
-                    const existingNote = Array.from(newNotes.values()).find(n => n.frequency === quantizedFreq);
-                    
-                    if (existingNote) {
-                        // Note exists, release it
-                        bassSynth.current?.triggerRelease(quantizedFreq);
-                        const keyToDelete = Array.from(newNotes.keys()).find(k => newNotes.get(k)?.frequency === quantizedFreq);
-                        if (keyToDelete) {
-                            newNotes.delete(keyToDelete);
-                        }
-                    } else {
+                    // Check if a note with a very similar frequency already exists, to allow toggling it off
+                    const existingEntry = Array.from(newNotes.entries()).find(
+                        ([_, note]) => Math.abs(note.frequency - quantizedFreq) < 1
+                    );
+
+                    if (existingEntry) {
+                        const [keyToToggle] = existingEntry;
+                        // Note exists, release it and remove from map
+                        synth.triggerRelease(newNotes.get(keyToToggle)!.frequency);
+                        newNotes.delete(keyToToggle);
+                    } else if (newNotes.size < 4) { // Only add if we have capacity
                         // New note, add it
                         newNotes.set(data.pointerId, { frequency: quantizedFreq, volume: data.volume });
-                        bassSynth.current?.triggerAttack(quantizedFreq, undefined, velocity);
+                        synth.triggerAttack(quantizedFreq, undefined, velocity);
                     }
                     return newNotes;
                 });
             }
-            return;
+            return; // Don't process move/up for latched bass
         }
+
+        const activeNotes = type === 'melody' ? activeMelodyNotes.current : activeBassNotes.current;
     
         switch (state) {
             case 'down':
-                if (quantizedFreq) {
+                if (quantizedFreq && data) {
                     synth.triggerAttack(quantizedFreq, undefined, velocity);
-                    if (type === 'melody') {
-                        activeMelodyNotes.current.set(data.pointerId, quantizedFreq);
-                    }
+                    activeNotes.set(data.pointerId, quantizedFreq);
                 }
                 break;
             case 'move':
-                if (quantizedFreq && data) {
-                    if (type === 'melody') {
-                         const currentFreq = activeMelodyNotes.current.get(data.pointerId);
-                         if (currentFreq) {
-                            synth.set({ note: { frequency: quantizedFreq, velocity } });
-                            if (currentFreq !== quantizedFreq) {
-                                activeMelodyNotes.current.set(data.pointerId, quantizedFreq);
-                            }
-                         }
-                    } else { // Bass
-                        synth.set({ note: { frequency: quantizedFreq, velocity } });
+                if (quantizedFreq && data && activeNotes.has(data.pointerId)) {
+                    const currentFreq = activeNotes.get(data.pointerId);
+                    if (currentFreq) {
+                       synth.set({ note: { frequency: quantizedFreq, velocity } });
+                       if (currentFreq !== quantizedFreq) {
+                           activeNotes.set(data.pointerId, quantizedFreq);
+                       }
                     }
                 }
                 break;
             case 'up':
-                if (type === 'melody' && data) {
-                    const freqToRelease = activeMelodyNotes.current.get(data.pointerId);
-                    if (freqToRelease) {
-                        synth.triggerRelease(freqToRelease);
-                        activeMelodyNotes.current.delete(data.pointerId);
-                    }
-                } else if (quantizedFreq) {
-                    synth.triggerRelease(quantizedFreq);
-                } else {
-                    // Fallback for safety
-                    synth.releaseAll();
-                    if (type === 'melody') {
-                        activeMelodyNotes.current.clear();
-                    }
-                }
+                 const freqToRelease = activeNotes.get(data!.pointerId);
+                 if (freqToRelease) {
+                     synth.triggerRelease(freqToRelease);
+                     activeNotes.delete(data!.pointerId);
+                 } else {
+                     // Fallback for safety if a note is missed somehow
+                     if (quantizedFreq) synth.triggerRelease(quantizedFreq);
+                 }
                 break;
         }
     }, [isPlaying, isBassLatchOn, latchedBassNotes, allowedFrequencies]);

@@ -112,14 +112,14 @@ export function ThereminPad({
         
         onInteraction(type, interactionData, 'down');
 
-        if (isPolyphonic) {
+        if (isPolyphonic && (type === 'melody' || !isLatchOn)) {
             const orb = createOrb(interactionData.x, interactionData.y);
             if(orb) {
                 const newPointer = { id: event.pointerId, orb, frequency: interactionData.frequency };
                 activePointers.current.set(event.pointerId, newPointer);
             }
         }
-    }, [calculateInteraction, onInteraction, type, color, isPolyphonic]);
+    }, [calculateInteraction, onInteraction, type, color, isPolyphonic, isLatchOn]);
 
     const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
         const interactionData = calculateInteraction(event);
@@ -289,3 +289,5 @@ export function ThereminPad({
         </Card>
     );
 }
+
+    
