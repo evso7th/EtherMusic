@@ -140,7 +140,7 @@ export default function Home() {
             if (note === 'C1') drumSynths.current?.kick.triggerAttackRelease('C1', '8n', time);
             if (note === 'G1') drumSynths.current?.snare.triggerAttackRelease('16n', time);
             if (note === 'D2') drumSynths.current?.hat.triggerAttackRelease('16n', time);
-        }, [], '8n');
+        }, [], '8n').start(0);
 
         recorder.current = new Tone.Recorder();
         Tone.getDestination().connect(recorder.current);
@@ -221,7 +221,7 @@ export default function Home() {
         Tone.Transport.start();
     }
     
-   const handlePlayPause = async () => {
+    const handlePlayPause = async () => {
         const Tone = await import('tone');
         if (!isReady || !bassSynth.current) return;
 
@@ -305,16 +305,12 @@ export default function Home() {
     useEffect(() => {
         if (!isReady || !drumSequence.current) return;
         
-        drumSequence.current.stop();
         drumSequence.current.clear();
         if (activePattern.sequence.length > 0) {
             (drumSequence.current as any).events = activePattern.sequence;
         }
     
-        if (isPlaying && activePattern.name !== 'Off') {
-            drumSequence.current.start(0);
-        }
-    }, [activePattern, isPlaying, isReady]);
+    }, [activePattern, isReady]);
 
     useEffect(() => {
         if (!isReady) return;
@@ -540,7 +536,5 @@ export default function Home() {
         </div>
     );
 }
-
-    
 
     
