@@ -22,7 +22,7 @@ Welcome to EtherMusic! This is a simple guide to get you started on making cool 
 
 ## What is This?
 
-It's a virtual music box. You have two main touch pads (Theremins) for creating melodies and a beatbox for rhythm.
+It's a virtual music box, a "Neuro Meditation Sound Processor." Think of it as an instrument that anyone can play, regardless of musical ability. You don't need to learn notes or chords. Just move your fingers and listen to what happens.
 
 ## The Big Pads (Theremins)
 
