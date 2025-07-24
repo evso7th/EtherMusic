@@ -15,7 +15,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 
 interface ThereminPadProps {
     type: 'melody' | 'bass';
-    onInteraction: (type: 'melody' | 'bass', params: { frequency: number; volume: number; pointerId: number } | null, state: 'down' | 'move' | 'up') => void;
+    onInteraction: (type: 'melody' | 'bass', params: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => void;
     frequencyRange: [number, number];
     color: string;
     isPolyphonic?: boolean;
@@ -41,7 +41,6 @@ interface ThereminPadProps {
 interface PointerState {
     id: number;
     orb: HTMLDivElement;
-    frequency: number;
 }
 
 const padTitles = {
@@ -120,8 +119,7 @@ export function ThereminPad({
         if (isPolyphonic && (!isLatchOn || type !== 'bass')) {
             const orb = createOrb(interactionData.x, interactionData.y);
             if (orb) {
-                const newPointer = { id: event.pointerId, orb, frequency: interactionData.frequency };
-                activePointers.current.set(event.pointerId, newPointer);
+                activePointers.current.set(event.pointerId, { id: event.pointerId, orb });
             }
         }
     }, [calculateInteraction, onInteraction, type, isPolyphonic, isLatchOn, createOrb]);
@@ -161,18 +159,17 @@ export function ThereminPad({
     
     useEffect(() => {
         if (type !== 'bass' || !isLatchOn) {
-            // Clean up bass orbs if latch is turned off
-            if(type === 'bass') {
-                activePointers.current.forEach(p => p.orb?.remove());
-                activePointers.current.clear();
+            if (type === 'bass') {
+                 activePointers.current.forEach(p => p.orb?.remove());
+                 activePointers.current.clear();
             }
             return;
         }
-    
+
         if (!latchedNotes || !padRef.current) return;
-        
-        const latchedIds = new Set(latchedNotes.keys());
-        
+
+        const latchedIds = new Set(Array.from(latchedNotes.keys()));
+
         // Remove orbs for notes that are no longer latched
         activePointers.current.forEach((pointer, id) => {
             if (!latchedIds.has(id)) {
@@ -187,7 +184,7 @@ export function ThereminPad({
             if (!pointer) {
                 const orb = createOrb(note.x, note.y);
                 if (orb) {
-                    pointer = { id, orb, frequency: note.frequency };
+                    pointer = { id, orb };
                     activePointers.current.set(id, pointer);
                 }
             } else {
@@ -319,3 +316,5 @@ export function ThereminPad({
     );
 }
  
+
+    
