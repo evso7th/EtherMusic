@@ -190,7 +190,7 @@ export default function Home() {
             if (drumSamplers.current?.loaded && note && drumSamplers.current.has(note)) {
                  drumSamplers.current.player(note).start(time);
             }
-        }, [], '8n').start(0);
+        }, [], '8n');
 
         autopilot.current.bass = new Tone.Part((time, note) => {
             bassSynth.current?.triggerAttackRelease(note.freq, note.dur, time, note.vel);
@@ -210,7 +210,7 @@ export default function Home() {
         
         Tone.Transport.bpm.value = activeTempo.bpm;
         
-    }, [volumes.melody, volumes.bass, volumes.drums, effects.melody.reverb, effects.melody.delay, effects.bass.reverb, effects.bass.delay, effects.drums.reverb, effects.drums.delay, activeTempo.bpm]);
+    }, []); // Removed dependencies to ensure it runs only once
     
     // Update allowed frequencies when key or scale changes
     useEffect(() => {
@@ -282,6 +282,7 @@ export default function Home() {
         const Tone = await import('tone');
         setIsPlaying(true);
         Tone.Transport.start();
+        drumSequence.current?.start(0);
     }
     
     const handlePlayPause = async () => {
@@ -294,6 +295,7 @@ export default function Home() {
         if (willBePlaying) {
             await Tone.start();
             Tone.Transport.start();
+            drumSequence.current?.start(0);
             if (isBassLatchOn) {
                 latchedBassNotes.forEach(note => {
                     bassSynth.current!.triggerAttack(note.frequency, undefined, note.volume);
@@ -301,6 +303,7 @@ export default function Home() {
             }
         } else {
             Tone.Transport.pause();
+            drumSequence.current?.stop();
             if (isBassLatchOn || isAutopilotOn) {
                  bassSynth.current.releaseAll();
             }
@@ -315,6 +318,7 @@ export default function Home() {
         if (!isReady) return;
 
         Tone.Transport.stop();
+        drumSequence.current?.stop(0).clear();
         melodySynth.current?.releaseAll();
         bassSynth.current?.releaseAll();
         activeNotes.current.clear();
@@ -376,17 +380,13 @@ export default function Home() {
     useEffect(() => {
         if (!isReady || !drumSequence.current) return;
     
-        drumSequence.current.stop(0).clear();
-    
-        if (activePattern.sequence.length > 0) {
-            activePattern.sequence.forEach((note, i) => {
-                if (note) {
-                    drumSequence.current?.add(i, note);
-                }
-            });
-            drumSequence.current.start(0);
-        }
-    
+        drumSequence.current.clear();
+        activePattern.sequence.forEach((note, i) => {
+            if (note) {
+                drumSequence.current?.at(i, note);
+            }
+        });
+
     }, [activePattern, isReady]);
 
     // Autopilot logic
@@ -736,15 +736,3 @@ export default function Home() {
         </div>
     );
 }
-
-
-    
-
-    
-
-
-
-
-    
-
-    
