@@ -11,6 +11,7 @@ import { OrbitalAnimation } from '@/components/orbital-animation';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PlaybackControls } from '@/components/playback-controls';
 import { ArrowRight } from 'lucide-react';
+import { HelpGuide } from '@/components/help-guide';
 
 
 type BeatPattern = {
@@ -423,7 +424,7 @@ export default function Home() {
                         <p className="text-sm text-white/80 font-light -mt-1 tracking-wider">Neuro Meditation Processor</p>
                     </div>
                     <div className="flex items-center gap-1 md:gap-2">
-                        <PlaybackControls
+                         <PlaybackControls
                             isPlaying={isPlaying}
                             isRecording={isRecording}
                             onPlayPause={handlePlayPause}
@@ -431,6 +432,7 @@ export default function Home() {
                             onStop={handleStop}
                             isReady={isReady}
                         />
+                        <HelpGuide />
                     </div>
                 </header>
                 <main className="flex-grow flex flex-col gap-4 overflow-hidden">
@@ -475,7 +477,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
-
-    

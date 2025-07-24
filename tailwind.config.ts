@@ -10,6 +10,32 @@ export default {
   ],
   theme: {
     extend: {
+      typography: (theme: (arg0: string) => any) => ({
+        DEFAULT: {
+          css: {
+            h1: {
+              color: theme('colors.primary.DEFAULT'),
+            },
+            h2: {
+               color: theme('colors.primary.DEFAULT'),
+               borderBottom: `1px solid ${theme('colors.border')}`,
+               paddingBottom: '0.5rem',
+            },
+             h3: {
+               color: theme('colors.accent.DEFAULT'),
+            },
+            strong: {
+              color: theme('colors.foreground'),
+            },
+            code: {
+              backgroundColor: theme('colors.muted.DEFAULT'),
+              color: theme('colors.accent.DEFAULT'),
+              padding: '0.2rem 0.4rem',
+              borderRadius: '0.25rem',
+            },
+          },
+        },
+      }),
       fontFamily: {
         body: ['Space Grotesk', 'sans-serif'],
         headline: ['Space Grotesk', 'sans-serif'],
@@ -106,5 +132,8 @@ export default {
       },
     },
   },
-  plugins: [require('tailwindcss-animate')],
+  plugins: [
+    require('tailwindcss-animate'),
+    require('@tailwindcss/typography'),
+  ],
 } satisfies Config;

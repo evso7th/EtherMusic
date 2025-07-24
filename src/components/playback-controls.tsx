@@ -15,18 +15,16 @@ interface PlaybackControlsProps {
 
 export function PlaybackControls({ isPlaying, isRecording, onPlayPause, onRecord, onStop, isReady }: PlaybackControlsProps) {
     return (
-        <div className="flex items-center gap-1 md:gap-2 ml-4 md:ml-0">
-            <Button onClick={onPlayPause} size="icon" className="w-10 h-10 rounded-md md:w-12 md:h-12 md:rounded-full" aria-label={isPlaying ? "Pause" : "Play"} disabled={!isReady}>
+        <div className="flex items-center gap-1 md:gap-2">
+            <Button onClick={onPlayPause} size="icon" className="w-10 h-10 rounded-full" aria-label={isPlaying ? "Pause" : "Play"} disabled={!isReady}>
                 {isPlaying ? <Pause className="w-5 h-5 md:w-6 md:h-6" /> : <Play className="w-5 h-5 md:w-6 md:h-6 ml-1" />}
             </Button>
-            <Button onClick={onStop} size="icon" variant="outline" className="w-10 h-10 rounded-md md:w-12 md:h-12 md:rounded-full" aria-label="Stop" disabled={!isReady}>
+            <Button onClick={onStop} size="icon" variant="outline" className="w-10 h-10 rounded-full" aria-label="Stop" disabled={!isReady}>
                 <Square className="w-5 h-5 md:w-6 md:h-6" />
             </Button>
-            <Button onClick={onRecord} variant="outline" size="icon" className={`w-10 h-10 rounded-md md:w-12 md:h-12 md:rounded-full transition-colors ${isRecording ? 'bg-red-500/80 text-white border-red-500 hover:bg-red-600' : ''}`} aria-label={isRecording ? "Stop Recording" : "Record"} disabled={!isReady}>
+            <Button onClick={onRecord} variant="outline" size="icon" className={`w-10 h-10 rounded-full transition-colors ${isRecording ? 'bg-red-500/80 text-white border-red-500 hover:bg-red-600' : ''}`} aria-label={isRecording ? "Stop Recording" : "Record"} disabled={!isReady}>
                 {isRecording ? <StopCircle className="w-5 h-5 md:w-6 md:h-6" /> : <Mic className="w-5 h-5 md:w-6 md:h-6" />}
             </Button>
         </div>
     );
 }
-
-    
