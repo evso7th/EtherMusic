@@ -2,18 +2,18 @@
 "use client";
 
 import type { PointerEvent } from 'react';
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Zap, Anchor } from 'lucide-react';
+import { Zap, Anchor, Music, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { MelodyInstrument, MusicKey, MusicScale } from '@/app/page';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 interface ThereminPadProps {
-    title: string;
     type: 'melody' | 'bass';
     onInteraction: (type: 'melody' | 'bass', params: { frequency: number; volume: number; pointerId: number } | null, state: 'down' | 'move' | 'up') => void;
     frequencyRange: [number, number];
@@ -44,8 +44,12 @@ interface PointerState {
     frequency: number;
 }
 
+const padTitles = {
+    melody: "Melody Pad",
+    bass: "Bass Pad"
+}
+
 export function ThereminPad({ 
-    title,
     type, 
     onInteraction, 
     frequencyRange, 
@@ -69,6 +73,7 @@ export function ThereminPad({
 }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
     const activePointers = useRef<Map<number, PointerState>>(new Map());
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     
     const calculateInteraction = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (!padRef.current) return null;
@@ -112,11 +117,13 @@ export function ThereminPad({
         
         onInteraction(type, interactionData, 'down');
 
-        if (isPolyphonic && (type === 'melody' || (type === 'bass' && !isLatchOn))) {
-            const orb = createOrb(interactionData.x, interactionData.y);
-            if(orb) {
-                const newPointer = { id: event.pointerId, orb, frequency: interactionData.frequency };
-                activePointers.current.set(event.pointerId, newPointer);
+        if (isPolyphonic) {
+             if (type === 'melody' || (type === 'bass' && !isLatchOn)) {
+                const orb = createOrb(interactionData.x, interactionData.y);
+                if(orb) {
+                    const newPointer = { id: event.pointerId, orb, frequency: interactionData.frequency };
+                    activePointers.current.set(event.pointerId, newPointer);
+                }
             }
         }
     }, [calculateInteraction, onInteraction, type, color, isPolyphonic, isLatchOn]);
@@ -141,14 +148,12 @@ export function ThereminPad({
         
         const pointer = activePointers.current.get(event.pointerId);
         if (pointer) {
-             // For non-latched notes, we always send an 'up' interaction
             if (!(type === 'bass' && isLatchOn)) {
                 onInteraction(type, { frequency: pointer.frequency, volume: 0, pointerId: event.pointerId}, 'up');
+                pointer.orb.remove();
+                activePointers.current.delete(event.pointerId);
             }
-            pointer.orb.remove();
-            activePointers.current.delete(event.pointerId);
         } else if (type !== 'bass' || !isLatchOn) {
-            // This handles cases where a pointer might exist without an orb (edge cases)
              const interactionData = calculateInteraction(event);
              if (interactionData) {
                 onInteraction(type, interactionData, 'up');
@@ -160,9 +165,7 @@ export function ThereminPad({
         if (type !== 'bass' || !isLatchOn || !latchedNotes || !padRef.current) return;
         
         const latchedIds = new Set(latchedNotes.keys());
-        const currentOrbIds = new Set(activePointers.current.keys());
-
-        // Remove orbs for notes that are no longer latched
+        
         activePointers.current.forEach((pointer, id) => {
             if (!latchedIds.has(id)) {
                 pointer.orb.remove();
@@ -170,7 +173,6 @@ export function ThereminPad({
             }
         });
 
-        // Add or update orbs for latched notes
         latchedNotes.forEach((note, id) => {
             const rect = padRef.current?.getBoundingClientRect();
             if (!rect) return;
@@ -204,40 +206,63 @@ export function ThereminPad({
 
 
     const renderMelodyControls = () => (
-        <>
-            {musicKeys && activeKey && onKeyChange && (
-                 <Select value={activeKey} onValueChange={onKeyChange}>
-                    <SelectTrigger className="w-[60px] h-8 text-xs">
-                        <SelectValue placeholder="Key" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {musicKeys.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}
-                    </SelectContent>
-                </Select>
-            )}
-            {musicScales && activeScale && onScaleChange && (
-                 <Select value={activeScale} onValueChange={onScaleChange}>
-                    <SelectTrigger className="w-[120px] h-8 text-xs">
-                        <SelectValue placeholder="Scale" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {musicScales.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                    </SelectContent>
-                </Select>
-            )}
-            {instruments && activeInstrument && onInstrumentChange && (
-                <Select value={activeInstrument} onValueChange={onInstrumentChange}>
-                    <SelectTrigger className="w-[90px] capitalize h-8 text-xs">
-                        <SelectValue placeholder="Instrument" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {instruments.map(inst => (
-                            <SelectItem key={inst} value={inst} className="capitalize">{inst}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            )}
-        </>
+        <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+            <SheetTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8">
+                    <SlidersHorizontal className="w-4 h-4 mr-0 sm:mr-2" />
+                    <span className="hidden sm:inline">Settings</span>
+                </Button>
+            </SheetTrigger>
+            <SheetContent>
+                <SheetHeader>
+                    <SheetTitle>Melody Settings</SheetTitle>
+                </SheetHeader>
+                <div className="py-4 space-y-6">
+                    {musicKeys && activeKey && onKeyChange && (
+                        <div className="space-y-2">
+                             <Label>Music Key</Label>
+                             <Select value={activeKey} onValueChange={onKeyChange}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Key" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {musicKeys.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+                    {musicScales && activeScale && onScaleChange && (
+                        <div className="space-y-2">
+                             <Label>Music Scale</Label>
+                             <Select value={activeScale} onValueChange={onScaleChange}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Scale" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {musicScales.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+                    {instruments && activeInstrument && onInstrumentChange && (
+                        <div className="space-y-2">
+                            <Label>Instrument</Label>
+                            <Select value={activeInstrument} onValueChange={onInstrumentChange}>
+                                <SelectTrigger className="capitalize">
+                                    <SelectValue placeholder="Instrument" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {instruments.map(inst => (
+                                        <SelectItem key={inst} value={inst} className="capitalize">{inst}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+                     <Button onClick={() => setIsSettingsOpen(false)} className="w-full">Done</Button>
+                </div>
+            </SheetContent>
+        </Sheet>
     );
 
     const renderBassControls = () => (
@@ -283,7 +308,7 @@ export function ThereminPad({
                     onPointerLeave={handlePointerUpOrLeave}
                     style={{
                         backgroundColor: 'hsl(var(--muted) / 0.2)',
-                        backgroundSize: '2rem 2rem md:4rem 4rem',
+                        backgroundSize: '2rem 2rem',
                         backgroundImage: `
                             linear-gradient(to right, hsl(var(--border) / 0.25) 1px, transparent 1px),
                             linear-gradient(to bottom, hsl(var(--border) / 0.25) 1px, transparent 1px)
@@ -291,10 +316,12 @@ export function ThereminPad({
                     }}
                 >
                     <div className="absolute inset-0 flex items-center justify-center text-5xl md:text-7xl font-bold text-foreground/10 pointer-events-none uppercase tracking-widest">
-                        {title}
+                        {padTitles[type]}
                     </div>
                 </div>
             </CardContent>
         </Card>
     );
 }
+
+    

@@ -332,28 +332,19 @@ export default function Home() {
     }, [volumes, isReady]);
     
     useEffect(() => {
-        if (!bassSynth.current || !isPlaying) return;
-        
-        // This effect ensures that latched notes are re-triggered if necessary,
-        // and that released notes are handled correctly. It's complex because
-        // we're managing state outside of Tone.js's typical event-driven model.
+        if (!bassSynth.current || !isPlaying || !bassSynth.current.voices) return;
 
-        const currentlyPlaying = new Set(Array.from(latchedBassNotes.values()).map(n => n.frequency));
+        const activeLatchedFrequencies = new Set(Array.from(latchedBassNotes.values()).map(n => n.frequency));
         
-        if (bassSynth.current.voices) {
-            bassSynth.current.voices.forEach((voice: any) => {
-                const freq = voice.frequency.value;
-                if (!currentlyPlaying.has(freq) && voice.active) {
-                    // This voice should be released
-                    // This is an indirect way, a more direct mapping of ID to voice would be better
-                }
-            });
-        }
+        bassSynth.current.voices.forEach(voice => {
+            if (!activeLatchedFrequencies.has(voice.frequency.value)) {
+                // This check is a bit simplistic as voice might not be released yet.
+                // A better system would track voices by ID.
+            }
+        });
         
-        // Trigger notes that are newly latched
         latchedBassNotes.forEach((note) => {
              const velocity = note.volume;
-             // We check if the note is already active to avoid re-triggering, though Tone.js handles this gracefully.
              bassSynth.current?.triggerAttack(note.frequency, undefined, velocity);
         });
 
@@ -380,7 +371,6 @@ export default function Home() {
             if (state === 'down' && data) {
                 setLatchedBassNotes(prev => {
                     const newNotes = new Map(prev);
-                    // Check if a note with a very similar frequency already exists to toggle it off
                     const existingEntry = Array.from(newNotes.entries()).find(
                         ([_, note]) => Math.abs(note.frequency - quantizedFreq) < 1
                     );
@@ -389,14 +379,14 @@ export default function Home() {
                         const [keyToToggle] = existingEntry;
                         synth.triggerRelease(newNotes.get(keyToToggle)!.frequency);
                         newNotes.delete(keyToToggle);
-                    } else if (newNotes.size < 4) { // Limit to 4 latched notes
+                    } else if (newNotes.size < 4) {
                         newNotes.set(data.pointerId, { frequency: quantizedFreq, volume: data.volume });
                         synth.triggerAttack(quantizedFreq, undefined, velocity);
                     }
                     return newNotes;
                 });
             }
-            return; // Don't process move/up for latched bass
+            return;
         }
 
         const activeNotes = type === 'melody' ? activeMelodyNotes.current : activeBassNotes.current;
@@ -412,20 +402,25 @@ export default function Home() {
                 if (quantizedFreq && data && activeNotes.has(data.pointerId)) {
                     const currentFreq = activeNotes.get(data.pointerId);
                     if (currentFreq) {
-                        synth.set({ note: { frequency: quantizedFreq, velocity } });
-                       if (currentFreq !== quantizedFreq) {
+                         // This is tricky with PolySynth, get doesn't return a voice to modify directly
+                        // Re-triggering is one way, but not ideal. Let's try to set the note.
+                        // Tone.js doesn't have a simple "setFrequency" on a voice in a polysynth.
+                        // A common approach is release and re-trigger, but that can sound clicky.
+                        // Let's try a different approach if available, or stick to re-trigger.
+                        synth.set({ note: { frequency: quantizedFreq }, volume: -24 + (velocity * 24) });
+                        if (currentFreq !== quantizedFreq) {
                            activeNotes.set(data.pointerId, quantizedFreq);
-                       }
+                        }
                     }
                 }
                 break;
             case 'up':
-                 const freqToRelease = activeNotes.get(data!.pointerId);
-                 if (freqToRelease) {
-                     synth.triggerRelease(freqToRelease);
-                     activeNotes.delete(data!.pointerId);
-                 } else if (quantizedFreq) {
-                     synth.triggerRelease(quantizedFreq);
+                 if (data && activeNotes.has(data.pointerId)) {
+                    const freqToRelease = activeNotes.get(data.pointerId);
+                    if (freqToRelease) {
+                        synth.triggerRelease(freqToRelease);
+                        activeNotes.delete(data.pointerId);
+                    }
                  }
                 break;
         }
@@ -507,7 +502,6 @@ export default function Home() {
                 <main className="flex-grow flex flex-col gap-4 overflow-hidden">
                     <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4">
                         <ThereminPad
-                            title="Bass"
                             onInteraction={handleThereminInteraction}
                             type="bass"
                             frequencyRange={[55, 440]} // A1 to A4
@@ -521,7 +515,6 @@ export default function Home() {
                             isPolyphonic
                         />
                         <ThereminPad
-                            title="Melody"
                             onInteraction={handleThereminInteraction}
                             type="melody"
                             frequencyRange={[220, 1760]} // A3 to A6
@@ -554,3 +547,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
