@@ -108,10 +108,6 @@ export default function Home() {
         Tone.Transport.bpm.value = tempo;
         setIsReady(true);
     }, [volumes.melody, volumes.bass, volumes.drums, tempo]);
-
-    useEffect(() => {
-        initializeAudio();
-    }, []);
     
     useEffect(() => {
         if (!isReady || !melodySynth.current) return;
@@ -154,7 +150,8 @@ export default function Home() {
     }, [melodyInstrument, isReady]);
 
     const handleStartApp = async () => {
-        if (!isReady) return;
+        setIsAppStarted(true);
+        await initializeAudio();
         
         if (isMobile) {
             try {
@@ -176,7 +173,6 @@ export default function Home() {
         }
 
         const Tone = await import('tone');
-        setIsAppStarted(true);
         setIsPlaying(true);
         Tone.Transport.start();
     }
@@ -373,7 +369,7 @@ export default function Home() {
         }
     };
 
-    if (!isReady) {
+    if (isAppStarted && !isReady) {
         return (
             <div className="absolute inset-0 bg-background flex items-center justify-center z-50">
                 <div className="text-center text-white">
@@ -476,3 +472,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
