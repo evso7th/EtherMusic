@@ -231,7 +231,7 @@ export default function Home() {
         if (willBePlaying) {
             await Tone.start();
             Tone.Transport.start();
-            // Retrigger latched notes
+            // Retrigger latched notes that were stopped by pause
             if (isBassLatchOn) {
                 latchedBassNotes.forEach(note => {
                     bassSynth.current!.triggerAttack(note.frequency, undefined, note.volume);
@@ -239,13 +239,8 @@ export default function Home() {
             }
         } else {
             Tone.Transport.pause();
-            // Release all latched notes when pausing
-             if (isBassLatchOn) {
-                 const allLatchedFrequencies = Array.from(latchedBassNotes.values()).map(n => n.frequency);
-                 if (allLatchedFrequencies.length > 0) {
-                    bassSynth.current!.triggerRelease(allLatchedFrequencies);
-                 }
-             }
+            // Release all synth voices to ensure everything stops
+            bassSynth.current.releaseAll();
         }
     };
 
@@ -373,24 +368,25 @@ export default function Home() {
             if (state === 'down' && data) {
                 setLatchedBassNotes(prev => {
                     const newNotes = new Map(prev);
-                    
-                    const NOTE_PROXIMITY_THRESHOLD = 5; // Hz threshold to consider notes the same
+                    const NOTE_PROXIMITY_THRESHOLD = 20; // Pixel threshold
                     let existingEntryKey;
+                    
                     for (const [key, note] of newNotes.entries()) {
-                        if (Math.abs(note.frequency - quantizedFreq) < NOTE_PROXIMITY_THRESHOLD) {
+                         const distance = Math.sqrt(Math.pow(note.x - data.x, 2) + Math.pow(note.y - data.y, 2));
+                         if (distance < NOTE_PROXIMITY_THRESHOLD) {
                             existingEntryKey = key;
                             break;
-                        }
+                         }
                     }
 
                     if (existingEntryKey !== undefined) {
                         const noteToRelease = newNotes.get(existingEntryKey);
                         if (noteToRelease) {
-                            synth.triggerRelease(noteToRelease.frequency);
+                            synth.triggerRelease([noteToRelease.frequency]);
                         }
                         newNotes.delete(existingEntryKey);
                     } else if (newNotes.size < 4) {
-                        const newKey = Date.now(); // Use a unique key for each note
+                        const newKey = Date.now();
                         newNotes.set(newKey, { x: data.x, y: data.y, frequency: quantizedFreq, volume: data.volume });
                         if (isPlaying) {
                             synth.triggerAttack(quantizedFreq, undefined, velocity);
