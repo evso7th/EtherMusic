@@ -46,7 +46,7 @@ There are two large, glowing pads. They are your main instruments.
 
 ## Bottom Control Bar
 
-Here you control the rhythm section.
+Here you control the rhythm section. You can change any of these settings on the fly, even during playback!
 
 *   **Beats:** Tap this to open a menu and choose a pre-made drum pattern (\`Rock\`, \`House\`, etc.). Select \`Off\` to have no drums.
 *   **Tempo:** Tap this to open a slider that changes the speed of the beat (BPM - Beats Per Minute).
