@@ -136,14 +136,14 @@ export default function Home() {
             drums: new Tone.Channel(volumes.drums).toDestination(),
         };
 
-        channels.current.melody.connect(fx.current.reverb).connect(channels.current.melody);
-        channels.current.melody.connect(fx.current.delay).connect(channels.current.melody);
+        fx.current.reverb.connect(channels.current.melody);
+        fx.current.delay.connect(channels.current.melody);
 
-        channels.current.bass.connect(fx.current.reverb).connect(channels.current.bass);
-        channels.current.bass.connect(fx.current.delay).connect(channels.current.bass);
+        fx.current.reverb.connect(channels.current.bass);
+        fx.current.delay.connect(channels.current.bass);
 
-        channels.current.drums.connect(fx.current.reverb).connect(channels.current.drums);
-        channels.current.drums.connect(fx.current.delay).connect(channels.current.drums);
+        fx.current.reverb.connect(channels.current.drums);
+        fx.current.delay.connect(channels.current.drums);
 
 
         melodySynth.current = new Tone.PolySynth(Tone.Synth).connect(channels.current.melody);
@@ -192,7 +192,7 @@ export default function Home() {
         
         Tone.Transport.bpm.value = activeTempo.bpm;
         setIsReady(true);
-    }, [volumes.melody, volumes.bass, volumes.drums, activeTempo.bpm, effects]);
+    }, [volumes.melody, volumes.bass, volumes.drums, activeTempo.bpm]);
     
     // Update allowed frequencies when key or scale changes
     useEffect(() => {
@@ -426,12 +426,18 @@ export default function Home() {
 
     useEffect(() => {
         if (channels.current && isReady && fx.current) {
-            channels.current.melody.send('reverb', effects.melody.reverb);
-            channels.current.melody.send('delay', effects.melody.delay);
-            channels.current.bass.send('reverb', effects.bass.reverb);
-            channels.current.bass.send('delay', effects.bass.delay);
-            channels.current.drums.send('reverb', effects.drums.reverb);
-            channels.current.drums.send('delay', effects.drums.delay);
+            if (channels.current.melody.send) {
+                channels.current.melody.send('reverb', effects.melody.reverb);
+                channels.current.melody.send('delay', effects.melody.delay);
+            }
+            if (channels.current.bass.send) {
+                channels.current.bass.send('reverb', effects.bass.reverb);
+                channels.current.bass.send('delay', effects.bass.delay);
+            }
+            if (channels.current.drums.send) {
+                channels.current.drums.send('reverb', effects.drums.reverb);
+                channels.current.drums.send('delay', effects.drums.delay);
+            }
         }
     }, [effects, isReady]);
 
@@ -575,7 +581,7 @@ export default function Home() {
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
             <div className="fixed inset-0 z-0">
-                 <OrbitalAnimation isPlaying={isPlaying && isBassPulsating} tempo={activeTempo.bpm} />
+                 <OrbitalAnimation isPlaying={isPlaying} tempo={activeTempo.bpm} />
             </div>
             <div className="relative z-10 flex flex-col h-full p-4 md:p-6 lg:p-8">
                 <header className="flex-shrink-0 flex items-center justify-between mb-4">
@@ -646,7 +652,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
-
-    
