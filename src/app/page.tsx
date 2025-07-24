@@ -307,22 +307,18 @@ export default function Home() {
     useEffect(() => {
         if (!isReady) return;
         const Tone = require('tone');
-
+    
         if (drumSequence.current) {
             drumSequence.current.clear();
-            activePattern.sequence.forEach((note, i) => {
-                if (note) {
-                    drumSequence.current?.add(i, note);
-                }
-            });
-        } else {
-             drumSequence.current = new Tone.Sequence((time: any, note: any) => {
-                if (note === 'C1') drumSynths.current?.kick.triggerAttackRelease('C1', '8n', time);
-                if (note === 'G1') drumSynths.current?.snare.triggerAttackRelease('16n', time);
-                if (note === 'D2') drumSynths.current?.hat.triggerAttackRelease('16n', time);
-            }, activePattern.sequence, '8n');
+            drumSequence.current.dispose();
         }
-
+    
+        drumSequence.current = new Tone.Sequence((time: any, note: any) => {
+            if (note === 'C1') drumSynths.current?.kick.triggerAttackRelease('C1', '8n', time);
+            if (note === 'G1') drumSynths.current?.snare.triggerAttackRelease('16n', time);
+            if (note === 'D2') drumSynths.current?.hat.triggerAttackRelease('16n', time);
+        }, activePattern.sequence, '8n');
+    
         if (isPlaying && activePattern.name !== 'Off') {
             drumSequence.current.start(0);
         } else {
