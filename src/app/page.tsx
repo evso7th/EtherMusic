@@ -351,7 +351,7 @@ export default function Home() {
             if (state === 'down' && data) {
                 setLatchedBassNotes(prev => {
                     const newNotes = new Map(prev);
-                    const NOTE_PROXIMITY_THRESHOLD = 30;
+                    const NOTE_PROXIMITY_THRESHOLD = 35; 
                     let existingEntryKey;
                     
                     for (const [key, note] of newNotes.entries()) {
@@ -394,20 +394,16 @@ export default function Home() {
                 break;
             case 'move':
                  if (quantizedFreq && data && activeNotes.has(data.pointerId)) {
-                    const currentFreq = activeNotes.get(data.pointerId);
-                    if (currentFreq && typeof (synth as any).get === 'function') {
-                        const voice = (synth as any).get(currentFreq);
-                        if (voice && voice.frequency && voice.volume) {
-                           voice.frequency.rampTo(quantizedFreq, 0.05);
-                           const newVolume = -48 + (velocity * 48); // Scale volume from 0-1 to -48-0 dB
-                           voice.volume.rampTo(newVolume, 0.05);
-                           if (currentFreq !== quantizedFreq) {
-                               activeNotes.delete(data.pointerId);
-                               activeNotes.set(data.pointerId, quantizedFreq);
-                           }
-                        }
+                    const newVolume = -48 + (velocity * 48); // Scale volume from 0-1 to -48-0 dB
+                    synth.set({
+                        frequency: quantizedFreq,
+                        volume: newVolume,
+                    });
+                    // Update the frequency in our active notes map
+                    if (activeNotes.get(data.pointerId) !== quantizedFreq) {
+                        activeNotes.set(data.pointerId, quantizedFreq);
                     }
-                }
+                 }
                 break;
             case 'up':
                 if (data && activeNotes.has(data.pointerId)) {
