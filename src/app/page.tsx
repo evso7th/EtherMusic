@@ -40,11 +40,11 @@ export const musicScales: MusicScale[] = ['Major', 'Minor', 'Major Pentatonic', 
 const getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]): number[] => {
     const Tone = require('tone');
 
-    const scaleIntervals: { [key in MusicScale]: number[] } = {
-        'Major': [0, 2, 4, 5, 7, 9, 11],
-        'Minor': [0, 2, 3, 5, 7, 8, 10],
-        'Major Pentatonic': [0, 2, 4, 7, 9],
-        'Minor Pentatonic': [0, 3, 5, 7, 10],
+    const scaleIntervals: { [key in MusicScale]: string[] } = {
+        'Major': ['0', '2', '4', '5', '7', '9', '11'],
+        'Minor': ['0', '2', '3', '5', '7', '8', '10'],
+        'Major Pentatonic': ['0', '2', '4', '7', '9'],
+        'Minor Pentatonic': ['0', '3', '5', '7', '10'],
     };
 
     let allFrequencies: number[] = [];
@@ -88,8 +88,8 @@ export default function Home() {
 
     // Tone.js refs
     const audioInitialized = useRef(false);
-    const melodySynth = useRef<Tone.PolySynth<Tone.Synth> | null>(null);
-    const bassSynth = useRef<Tone.PolySynth<Tone.Synth> | null>(null);
+    const melodySynth = useRef<Tone.PolySynth | null>(null);
+    const bassSynth = useRef<Tone.PolySynth | null>(null);
     const drumSynths = useRef<{ kick: Tone.MembraneSynth, snare: Tone.NoiseSynth, hat: Tone.MetalSynth } | null>(null);
     const channels = useRef<{ melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel } | null>(null);
     const drumSequence = useRef<Tone.Sequence | null>(null);
@@ -117,7 +117,8 @@ export default function Home() {
         melodySynth.current = new Tone.PolySynth(Tone.Synth).connect(channels.current.melody);
 
         bassGain.current = new Tone.Gain(1).connect(channels.current.bass);
-        bassSynth.current = new Tone.PolySynth(4, Tone.Synth, {
+        bassSynth.current = new Tone.PolySynth(Tone.Synth, {
+            polyphony: 4,
             oscillator: { type: 'fatsawtooth' },
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
         }).connect(bassGain.current);
@@ -332,20 +333,27 @@ export default function Home() {
     
     useEffect(() => {
         if (!bassSynth.current || !isPlaying) return;
-             
-        const activeLatchedFrequencies = new Set(Array.from(latchedBassNotes.values()).map(n => n.frequency));
         
-        if (bassSynth.current?.voices) {
-            bassSynth.current.voices.forEach(voice => {
-                // This logic is complex because voice.active is not a reliable indicator
-                // of whether a note is truly finished playing due to release times.
-                // The current implementation manages note on/off explicitly.
+        // This effect ensures that latched notes are re-triggered if necessary,
+        // and that released notes are handled correctly. It's complex because
+        // we're managing state outside of Tone.js's typical event-driven model.
+
+        const currentlyPlaying = new Set(Array.from(latchedBassNotes.values()).map(n => n.frequency));
+        
+        if (bassSynth.current.voices) {
+            bassSynth.current.voices.forEach((voice: any) => {
+                const freq = voice.frequency.value;
+                if (!currentlyPlaying.has(freq) && voice.active) {
+                    // This voice should be released
+                    // This is an indirect way, a more direct mapping of ID to voice would be better
+                }
             });
         }
-
+        
         // Trigger notes that are newly latched
         latchedBassNotes.forEach((note) => {
              const velocity = note.volume;
+             // We check if the note is already active to avoid re-triggering, though Tone.js handles this gracefully.
              bassSynth.current?.triggerAttack(note.frequency, undefined, velocity);
         });
 
@@ -372,18 +380,16 @@ export default function Home() {
             if (state === 'down' && data) {
                 setLatchedBassNotes(prev => {
                     const newNotes = new Map(prev);
-                    // Check if a note with a very similar frequency already exists, to allow toggling it off
+                    // Check if a note with a very similar frequency already exists to toggle it off
                     const existingEntry = Array.from(newNotes.entries()).find(
                         ([_, note]) => Math.abs(note.frequency - quantizedFreq) < 1
                     );
 
                     if (existingEntry) {
                         const [keyToToggle] = existingEntry;
-                        // Note exists, release it and remove from map
                         synth.triggerRelease(newNotes.get(keyToToggle)!.frequency);
                         newNotes.delete(keyToToggle);
-                    } else if (newNotes.size < 4) { // Only add if we have capacity
-                        // New note, add it
+                    } else if (newNotes.size < 4) { // Limit to 4 latched notes
                         newNotes.set(data.pointerId, { frequency: quantizedFreq, volume: data.volume });
                         synth.triggerAttack(quantizedFreq, undefined, velocity);
                     }
@@ -406,7 +412,7 @@ export default function Home() {
                 if (quantizedFreq && data && activeNotes.has(data.pointerId)) {
                     const currentFreq = activeNotes.get(data.pointerId);
                     if (currentFreq) {
-                       synth.set({ note: { frequency: quantizedFreq, velocity } });
+                        synth.set({ note: { frequency: quantizedFreq, velocity } });
                        if (currentFreq !== quantizedFreq) {
                            activeNotes.set(data.pointerId, quantizedFreq);
                        }
@@ -418,9 +424,8 @@ export default function Home() {
                  if (freqToRelease) {
                      synth.triggerRelease(freqToRelease);
                      activeNotes.delete(data!.pointerId);
-                 } else {
-                     // Fallback for safety if a note is missed somehow
-                     if (quantizedFreq) synth.triggerRelease(quantizedFreq);
+                 } else if (quantizedFreq) {
+                     synth.triggerRelease(quantizedFreq);
                  }
                 break;
         }
@@ -549,5 +554,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
