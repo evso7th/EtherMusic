@@ -98,7 +98,6 @@ export default function Home() {
     const bassGain = useRef<Tone.Gain | null>(null);
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
     const activeMelodyNotes = useRef<Map<number, number>>(new Map());
-    const activeBassNotes = useRef<Map<number, number>>(new Map());
     
     const initializeAudio = useCallback(async () => {
         if (audioInitialized.current) return;
@@ -238,7 +237,9 @@ export default function Home() {
             }
         } else {
             Tone.Transport.pause();
-            bassSynth.current.releaseAll();
+            if (isBassLatchOn) {
+                 bassSynth.current.releaseAll();
+            }
         }
     };
 
@@ -250,7 +251,6 @@ export default function Home() {
         melodySynth.current?.releaseAll();
         bassSynth.current?.releaseAll();
         activeMelodyNotes.current.clear();
-        activeBassNotes.current.clear();
         setLatchedBassNotes(new Map());
         setIsPlaying(false);
     };
@@ -288,9 +288,9 @@ export default function Home() {
 
     useEffect(() => {
         if (!bassLFO.current || !bassGain.current) return;
-
-        const isPulsationActive = isBassPulsating && isPlaying;
         
+        const isPulsationActive = isBassPulsating && isPlaying;
+
         if (isPulsationActive) {
             bassLFO.current.connect(bassGain.current.gain);
         } else {
@@ -351,7 +351,7 @@ export default function Home() {
             if (state === 'down' && data) {
                 setLatchedBassNotes(prev => {
                     const newNotes = new Map(prev);
-                    const NOTE_PROXIMITY_THRESHOLD = 20; // Pixel threshold
+                    const NOTE_PROXIMITY_THRESHOLD = 30;
                     let existingEntryKey;
                     
                     for (const [key, note] of newNotes.entries()) {
@@ -381,8 +381,7 @@ export default function Home() {
             return; 
         }
 
-
-        const activeNotes = type === 'melody' ? activeMelodyNotes.current : activeBassNotes.current;
+        const activeNotes = activeMelodyNotes.current;
 
         switch (state) {
             case 'down':
@@ -396,11 +395,17 @@ export default function Home() {
             case 'move':
                  if (quantizedFreq && data && activeNotes.has(data.pointerId)) {
                     const currentFreq = activeNotes.get(data.pointerId);
-                    const voice = currentFreq ? synth.get(currentFreq) as any : undefined;
-                    if (voice && voice.frequency && voice.volume) {
-                       voice.frequency.rampTo(quantizedFreq, 0.05);
-                       voice.volume.rampTo(-24 + (velocity * 24), 0.05);
-                       activeNotes.set(data.pointerId, quantizedFreq);
+                    if (currentFreq && typeof (synth as any).get === 'function') {
+                        const voice = (synth as any).get(currentFreq);
+                        if (voice && voice.frequency && voice.volume) {
+                           voice.frequency.rampTo(quantizedFreq, 0.05);
+                           const newVolume = -48 + (velocity * 48); // Scale volume from 0-1 to -48-0 dB
+                           voice.volume.rampTo(newVolume, 0.05);
+                           if (currentFreq !== quantizedFreq) {
+                               activeNotes.delete(data.pointerId);
+                               activeNotes.set(data.pointerId, quantizedFreq);
+                           }
+                        }
                     }
                 }
                 break;
@@ -415,7 +420,7 @@ export default function Home() {
                 }
                 break;
         }
-    }, [isBassLatchOn, isPlaying, latchedBassNotes, allowedFrequencies, getClosestFrequency]);
+    }, [isBassLatchOn, isPlaying, latchedBassNotes, allowedFrequencies]);
     
     const handleStartScreenInteraction = () => {
         if (backgroundAudioRef.current && backgroundAudioRef.current.paused) {
