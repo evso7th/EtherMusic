@@ -23,8 +23,8 @@
   animation: rotate 20s infinite linear;
 }
 
-.pulsating .circle {
-  animation: pulse var(--pulse-duration) infinite ease-in-out;
+.pulsating {
+  animation: rotate 20s infinite linear, pulse var(--pulse-duration) infinite ease-in-out;
 }
 
 .circle {
@@ -90,11 +90,9 @@
 
 @keyframes pulse {
   0%, 100% {
-    transform: scale3d(1, 1, 1);
-    box-shadow: 0 0 120px hsl(var(--primary)), inset 0 0 120px hsl(var(--primary));
+    transform: rotateX(60deg) rotateZ(-30deg) scale(1);
   }
   50% {
-    transform: scale3d(1.05, 1.05, 1.05);
-    box-shadow: 0 0 180px hsl(var(--accent)), inset 0 0 180px hsl(var(--accent));
+    transform: rotateX(60deg) rotateZ(-30deg) scale(1.05);
   }
 }
