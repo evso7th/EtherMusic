@@ -84,7 +84,7 @@ export default function Home() {
     // Bass specific state
     const [isBassPulsating, setIsBassPulsating] = useState(false);
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
-    const [latchedBassNotes, setLatchedBassNotes] = useState<Map<number, { frequency: number; volume: number }>>(new Map());
+    const [latchedBassNotes, setLatchedBassNotes] = useState<Map<number, { x: number; y: number; frequency: number; volume: number }>>(new Map());
 
     // Tone.js refs
     const audioInitialized = useRef(false);
@@ -98,7 +98,7 @@ export default function Home() {
     const bassGain = useRef<Tone.Gain | null>(null);
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
     const activeMelodyNotes = useRef<Map<number, number>>(new Map());
-    const activeBassNotes = useRef<Map<number, number>>(new Map());
+    const activeBassNotes = useRef<Map<number, { freq: number; id: number }>>(new Map());
     
     const initializeAudio = useCallback(async () => {
         if (audioInitialized.current) return;
@@ -244,10 +244,8 @@ export default function Home() {
         bassSynth.current?.releaseAll();
         activeMelodyNotes.current.clear();
         activeBassNotes.current.clear();
+        setLatchedBassNotes(new Map());
         setIsPlaying(false);
-        if (latchedBassNotes.size > 0) {
-            setLatchedBassNotes(new Map());
-        }
     };
 
     const handleRecord = () => {
@@ -330,16 +328,6 @@ export default function Home() {
             channels.current.drums.volume.value = volumes.drums;
         }
     }, [volumes, isReady]);
-    
-    useEffect(() => {
-        if (!bassSynth.current || !isPlaying) return;
-        
-        latchedBassNotes.forEach((note) => {
-             const velocity = note.volume;
-             bassSynth.current?.triggerAttack(note.frequency, undefined, velocity);
-        });
-
-    }, [latchedBassNotes, isPlaying]);
 
 
     const getClosestFrequency = (targetFreq: number) => {
@@ -349,7 +337,7 @@ export default function Home() {
         });
     };
 
-    const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number } | null, state: 'down' | 'move' | 'up') => {
+    const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isPlaying || !audioInitialized.current) return;
     
         const synth = type === 'melody' ? melodySynth.current : bassSynth.current;
@@ -363,7 +351,7 @@ export default function Home() {
                 setLatchedBassNotes(prev => {
                     const newNotes = new Map(prev);
                     const existingEntry = Array.from(newNotes.entries()).find(
-                        ([_, note]) => Math.abs(note.frequency - quantizedFreq) < 1
+                        ([_, note]) => Math.abs(note.frequency - quantizedFreq) < 5 // Tolerance for finding existing note
                     );
 
                     if (existingEntry) {
@@ -371,12 +359,13 @@ export default function Home() {
                         synth.triggerRelease(newNotes.get(keyToToggle)!.frequency);
                         newNotes.delete(keyToToggle);
                     } else if (newNotes.size < 4) {
-                        newNotes.set(data.pointerId, { frequency: quantizedFreq, volume: data.volume });
+                        newNotes.set(data.pointerId, { x: data.x, y: data.y, frequency: quantizedFreq, volume: data.volume });
                         synth.triggerAttack(quantizedFreq, undefined, velocity);
                     }
                     return newNotes;
                 });
             }
+             // For latch mode, we don't do anything on 'move' or 'up' for now
             return;
         }
 
@@ -386,27 +375,44 @@ export default function Home() {
             case 'down':
                 if (quantizedFreq && data) {
                     synth.triggerAttack(quantizedFreq, undefined, velocity);
-                    activeNotes.set(data.pointerId, quantizedFreq);
+                    if (type === 'melody') {
+                        activeMelodyNotes.current.set(data.pointerId, quantizedFreq);
+                    } else {
+                         activeBassNotes.current.set(data.pointerId, { freq: quantizedFreq, id: data.pointerId });
+                    }
                 }
                 break;
             case 'move':
                 if (quantizedFreq && data && activeNotes.has(data.pointerId)) {
-                    const currentFreq = activeNotes.get(data.pointerId);
-                    if (currentFreq) {
-                        synth.set({ frequency: quantizedFreq });
-                        synth.set({ volume: -24 + (velocity * 24) });
-                        if (currentFreq !== quantizedFreq) {
-                           activeNotes.set(data.pointerId, quantizedFreq);
+                    if (type === 'melody') {
+                         const currentFreq = activeMelodyNotes.current.get(data.pointerId);
+                         if (currentFreq && synth.get(currentFreq)) {
+                            (synth.get(currentFreq) as any).frequency.set({ value: quantizedFreq });
+                            (synth.get(currentFreq) as any).volume.set({ value: -24 + (velocity * 24) });
+                             activeMelodyNotes.current.set(data.pointerId, quantizedFreq);
+                         }
+                    } else {
+                        const noteInfo = activeBassNotes.current.get(data.pointerId);
+                        if (noteInfo && synth.get(noteInfo.freq)) {
+                            (synth.get(noteInfo.freq) as any).frequency.set({ value: quantizedFreq });
+                            (synth.get(noteInfo.freq) as any).volume.set({ value: -24 + (velocity * 24) });
+                             activeBassNotes.current.set(data.pointerId, { freq: quantizedFreq, id: data.pointerId });
                         }
                     }
                 }
                 break;
             case 'up':
                  if (data && activeNotes.has(data.pointerId)) {
-                    const freqToRelease = activeNotes.get(data.pointerId);
-                    if (freqToRelease) {
-                        synth.triggerRelease(freqToRelease);
-                        activeNotes.delete(data.pointerId);
+                    let freqToRelease: number | undefined;
+                    if (type === 'melody') {
+                        freqToRelease = activeMelodyNotes.current.get(data.pointerId);
+                        if(freqToRelease) synth.triggerRelease(freqToRelease);
+                        activeMelodyNotes.current.delete(data.pointerId);
+
+                    } else {
+                        const noteInfo = activeBassNotes.current.get(data.pointerId);
+                        if(noteInfo) synth.triggerRelease(noteInfo.freq);
+                        activeBassNotes.current.delete(data.pointerId);
                     }
                  } else { // Fallback for safety
                     synth.releaseAll();
@@ -537,5 +543,3 @@ export default function Home() {
         </div>
     );
 }
-
-    

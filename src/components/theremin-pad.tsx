@@ -35,7 +35,7 @@ interface ThereminPadProps {
     isLatchOn?: boolean;
     onLatchToggle?: (checked: boolean) => void;
     isLatched?: boolean;
-    latchedNotes?: Map<number, { frequency: number; volume: number }>;
+    latchedNotes?: Map<number, { x: number; y: number; frequency: number; volume: number }>;
 }
 
 interface PointerState {
@@ -117,7 +117,7 @@ export function ThereminPad({
 
         onInteraction(type, interactionData, 'down');
 
-        if (isPolyphonic && type !== 'bass') {
+        if (isPolyphonic && (!isLatchOn || type !== 'bass')) {
             const orb = createOrb(interactionData.x, interactionData.y);
             if (orb) {
                 const newPointer = { id: event.pointerId, orb, frequency: interactionData.frequency };
@@ -129,31 +129,28 @@ export function ThereminPad({
     const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (!(event.buttons > 0)) return;
         
-        const pointerState = activePointers.current.get(event.pointerId);
-        if (!pointerState) return;
-
         const interactionData = calculateInteraction(event);
         if (!interactionData) return;
-        
-        onInteraction(type, interactionData, 'move');
 
-        if (pointerState.orb) {
+        onInteraction(type, interactionData, 'move');
+        
+        const pointerState = activePointers.current.get(event.pointerId);
+        if (pointerState && pointerState.orb) {
             pointerState.orb.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
         }
 
     }, [calculateInteraction, onInteraction, type]);
 
     const handlePointerUpOrLeave = useCallback((event: PointerEvent<HTMLDivElement>) => {
+        const interactionData = calculateInteraction(event);
+        onInteraction(type, interactionData, 'up');
+
         if (activePointers.current.has(event.pointerId)) {
             const pointer = activePointers.current.get(event.pointerId)!;
-             onInteraction(type, { frequency: pointer.frequency, volume: 0, pointerId: event.pointerId}, 'up');
             if (pointer.orb) {
                  pointer.orb.remove();
             }
             activePointers.current.delete(event.pointerId);
-        } else {
-             const interactionData = calculateInteraction(event);
-             onInteraction(type, interactionData, 'up');
         }
         
         if ((event.target as HTMLElement).hasPointerCapture(event.pointerId)) {
@@ -163,14 +160,16 @@ export function ThereminPad({
     }, [onInteraction, type, calculateInteraction]);
     
     useEffect(() => {
-        if (type !== 'bass' || !isLatchOn || !latchedNotes || !padRef.current) {
-            // Cleanup unrelated orbs if needed
-            if (!isLatchOn && type === 'bass') {
-                 activePointers.current.forEach(p => p.orb?.remove());
-                 activePointers.current.clear();
+        if (type !== 'bass' || !isLatchOn) {
+            // Clean up bass orbs if latch is turned off
+            if(type === 'bass') {
+                activePointers.current.forEach(p => p.orb?.remove());
+                activePointers.current.clear();
             }
             return;
         }
+    
+        if (!latchedNotes || !padRef.current) return;
         
         const latchedIds = new Set(latchedNotes.keys());
         
@@ -184,35 +183,21 @@ export function ThereminPad({
 
         // Add or update orbs for latched notes
         latchedNotes.forEach((note, id) => {
-            const rect = padRef.current?.getBoundingClientRect();
-            if (!rect) return;
-
-            const { frequency, volume } = note;
-            const [minFreq, maxFreq] = frequencyRange;
-
-            const logMin = Math.log(minFreq);
-            const logMax = Math.log(maxFreq);
-            const normalizedX = (Math.log(frequency) - logMin) / (logMax - logMin);
-            const normalizedY = 1 - volume;
-
-            const x = normalizedX * rect.width;
-            const y = normalizedY * rect.height;
-
             let pointer = activePointers.current.get(id);
             if (!pointer) {
-                const orb = createOrb(x, y);
+                const orb = createOrb(note.x, note.y);
                 if (orb) {
-                    pointer = { id, orb, frequency };
+                    pointer = { id, orb, frequency: note.frequency };
                     activePointers.current.set(id, pointer);
                 }
             } else {
                  if (pointer.orb) {
-                    pointer.orb.style.transform = `translate(${x}px, ${y}px)`;
+                    pointer.orb.style.transform = `translate(${note.x}px, ${note.y}px)`;
                  }
             }
         });
 
-    }, [latchedNotes, isLatchOn, frequencyRange, type, createOrb]);
+    }, [latchedNotes, isLatchOn, type, createOrb]);
 
 
     const renderMelodyControls = () => (
