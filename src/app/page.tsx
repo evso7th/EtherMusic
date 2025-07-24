@@ -51,9 +51,9 @@ const getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]
     const intervals = scaleIntervals[scale];
 
     octaves.forEach(octave => {
-        const baseNote = Tone.Frequency(`${key}${octave}`);
         intervals.forEach(interval => {
-            allFrequencies.push(baseNote.transpose(interval).toFrequency());
+            const note = Tone.Frequency(key + octave).transpose(interval);
+            allFrequencies.push(note.toFrequency());
         });
     });
 
@@ -398,6 +398,16 @@ export default function Home() {
                 const velocity = data.volume; 
                 synth.triggerAttack(quantizedFreq, undefined, velocity);
 
+            } else if (data && state === 'move' && data.frequency) {
+                 if (synth.activeVoices > 0) {
+                    const quantizedFreq = getClosestFrequency(data.frequency);
+                    const velocity = data.volume;
+                    // We can't directly change frequency of a voice in PolySynth, so we approximate
+                    // by setting the frequency of all voices. A better approach for true theremin
+                    // might be to manage voices manually or use a different synth.
+                    // For now, this will work for monophonic playing on the melody pad.
+                    synth.set({ frequency: quantizedFreq, volume: -12 + (velocity * 12) });
+                }
             } else if (state === 'up' && data?.frequency) {
                  const quantizedFreq = getClosestFrequency(data.frequency);
                 synth.triggerRelease(quantizedFreq);
@@ -526,13 +536,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
-
-    
-
-
-
-    
-
-    
