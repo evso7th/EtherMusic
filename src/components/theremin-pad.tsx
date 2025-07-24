@@ -2,7 +2,7 @@
 "use client";
 
 import type { PointerEvent } from 'react';
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -46,6 +46,20 @@ const padTitles = {
     melody: "Melody Pad",
     bass: "Bass Pad"
 }
+
+const Orb = ({ x, y, color }: { x: number, y: number, color: string }) => (
+    <div
+        className={cn(
+            'absolute top-0 left-0 rounded-full w-8 h-8 md:w-12 md:h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-100',
+            'animate-pulse-primary'
+        )}
+        style={{
+            backgroundColor: color,
+            animationDuration: '1s',
+            transform: `translate(${x}px, ${y}px)`,
+        }}
+    />
+);
 
 export function ThereminPad({ 
     type, 
@@ -114,13 +128,13 @@ export function ThereminPad({
 
         onInteraction(type, interactionData, 'down');
 
-        if (isPolyphonic && (type === 'melody' || !isLatchOn)) {
+        if (type === 'melody') {
             const orb = createOrb(interactionData.x, interactionData.y);
             if (orb) {
                 activePointers.current.set(event.pointerId, { id: event.pointerId, orb });
             }
         }
-    }, [calculateInteraction, onInteraction, type, isPolyphonic, isLatchOn, createOrb]);
+    }, [calculateInteraction, onInteraction, type, createOrb]);
 
     const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (!(event.buttons > 0)) return;
@@ -130,11 +144,12 @@ export function ThereminPad({
 
         onInteraction(type, interactionData, 'move');
         
-        const pointerState = activePointers.current.get(event.pointerId);
-        if (pointerState && pointerState.orb) {
-            pointerState.orb.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
+        if (type === 'melody') {
+            const pointerState = activePointers.current.get(event.pointerId);
+            if (pointerState && pointerState.orb) {
+                pointerState.orb.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
+            }
         }
-
     }, [calculateInteraction, onInteraction, type]);
 
     const handlePointerUpOrLeave = useCallback((event: PointerEvent<HTMLDivElement>) => {
@@ -155,42 +170,6 @@ export function ThereminPad({
 
     }, [onInteraction, type, calculateInteraction]);
     
-    useEffect(() => {
-        if (type !== 'bass' || !isLatchOn) {
-            if (type === 'bass') {
-                 activePointers.current.forEach(p => p.orb?.remove());
-                 activePointers.current.clear();
-            }
-            return;
-        }
-
-        if (!latchedNotes || !padRef.current) return;
-
-        const currentOrbIds = new Set(activePointers.current.keys());
-        const latchedNoteIds = new Set(latchedNotes.keys());
-
-        // Remove orbs for notes that are no longer latched
-        for (const id of currentOrbIds) {
-            if (!latchedNoteIds.has(id)) {
-                const pointer = activePointers.current.get(id);
-                pointer?.orb?.remove();
-                activePointers.current.delete(id);
-            }
-        }
-
-        // Add orbs for new latched notes
-        for (const [id, note] of latchedNotes.entries()) {
-            if (!currentOrbIds.has(id)) {
-                const orb = createOrb(note.x, note.y);
-                if (orb) {
-                    activePointers.current.set(id, { id, orb });
-                }
-            }
-        }
-
-    }, [latchedNotes, isLatchOn, type, createOrb]);
-
-
     const renderMelodyControls = () => (
         <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
             <SheetTrigger asChild>
@@ -304,6 +283,11 @@ export function ThereminPad({
                     <div className="absolute inset-0 flex items-center justify-center text-5xl md:text-7xl font-bold text-foreground/10 pointer-events-none uppercase tracking-widest">
                         {padTitles[type]}
                     </div>
+                     {type === 'bass' && isLatchOn && latchedNotes &&
+                        Array.from(latchedNotes.values()).map((note, index) => (
+                            <Orb key={index} x={note.x} y={note.y} color={color} />
+                        ))
+                    }
                 </div>
             </CardContent>
         </Card>

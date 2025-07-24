@@ -232,15 +232,19 @@ export default function Home() {
             await Tone.start();
             Tone.Transport.start();
             // Retrigger latched notes
-            latchedBassNotes.forEach(note => {
-                bassSynth.current!.triggerAttack(note.frequency, undefined, note.volume);
-            });
+            if (isBassLatchOn) {
+                latchedBassNotes.forEach(note => {
+                    bassSynth.current!.triggerAttack(note.frequency, undefined, note.volume);
+                });
+            }
         } else {
             Tone.Transport.pause();
-            // Release all latched notes
-             const allLatchedFrequencies = Array.from(latchedBassNotes.values()).map(n => n.frequency);
-             if (allLatchedFrequencies.length > 0) {
-                bassSynth.current!.triggerRelease(allLatchedFrequencies);
+            // Release all latched notes when pausing
+             if (isBassLatchOn) {
+                 const allLatchedFrequencies = Array.from(latchedBassNotes.values()).map(n => n.frequency);
+                 if (allLatchedFrequencies.length > 0) {
+                    bassSynth.current!.triggerRelease(allLatchedFrequencies);
+                 }
              }
         }
     };
@@ -292,12 +296,15 @@ export default function Home() {
     useEffect(() => {
         if (!bassLFO.current || !bassGain.current) return;
 
+        // Pulsation is active if the global pulsate is on, OR if latch mode is on and there are latched notes.
         const isPulsationActive = isBassPulsating || (isBassLatchOn && latchedBassNotes.size > 0);
         
         if (isPulsationActive && isPlaying) {
             bassLFO.current.connect(bassGain.current.gain);
         } else {
-            bassLFO.current.disconnect(bassGain.current.gain);
+            if (bassLFO.current.state === 'started') {
+                 bassLFO.current.disconnect(bassGain.current.gain);
+            }
             bassGain.current.gain.cancelScheduledValues();
             bassGain.current.gain.rampTo(1, 0.1); 
         }
@@ -367,14 +374,16 @@ export default function Home() {
             if (state === 'down' && data) {
                 setLatchedBassNotes(prev => {
                     const newNotes = new Map(prev);
-                    const existingEntry = Array.from(newNotes.entries()).find(
+                    const existingEntryKey = Array.from(newNotes.entries()).find(
                         ([_, note]) => Math.abs(note.frequency - quantizedFreq) < 5
-                    );
+                    )?.[0];
 
-                    if (existingEntry) {
-                        const [keyToToggle] = existingEntry;
-                        synth.triggerRelease(newNotes.get(keyToToggle)!.frequency);
-                        newNotes.delete(keyToToggle);
+                    if (existingEntryKey !== undefined) {
+                        const noteToRelease = newNotes.get(existingEntryKey);
+                        if (noteToRelease) {
+                            synth.triggerRelease(noteToRelease.frequency);
+                        }
+                        newNotes.delete(existingEntryKey);
                     } else if (newNotes.size < 4) {
                         newNotes.set(data.pointerId, { x: data.x, y: data.y, frequency: quantizedFreq, volume: data.volume });
                         if (isPlaying) {
@@ -403,8 +412,6 @@ export default function Home() {
                     if (voice) {
                        voice.frequency.rampTo(quantizedFreq, 0.05);
                        voice.volume.rampTo(-24 + (velocity * 24), 0.05);
-                       // Update the frequency in the active notes map
-                       // This is important if we release the note while it's changing
                        activeNotes.set(data.pointerId, quantizedFreq);
                     }
                 }
@@ -414,7 +421,7 @@ export default function Home() {
                     const freqToRelease = activeNotes.get(data.pointerId);
                     if (freqToRelease) synth.triggerRelease(freqToRelease);
                     activeNotes.delete(data.pointerId);
-                } else if (!isBassLatchOn) { // Only release all if not in latch mode
+                } else {
                     synth.releaseAll();
                     activeNotes.clear();
                 }
