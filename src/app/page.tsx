@@ -140,7 +140,7 @@ export default function Home() {
             if (note === 'C1') drumSynths.current?.kick.triggerAttackRelease('C1', '8n', time);
             if (note === 'G1') drumSynths.current?.snare.triggerAttackRelease('16n', time);
             if (note === 'D2') drumSynths.current?.hat.triggerAttackRelease('16n', time);
-        }, [], '8n').start(0);
+        }, [], '8n');
 
         recorder.current = new Tone.Recorder();
         Tone.getDestination().connect(recorder.current);
@@ -283,32 +283,39 @@ export default function Home() {
         if (!bassLFO.current || !bassGain.current) return;
 
         const isPulsationActive = isBassPulsating || (isBassLatchOn && latchedBassNotes.size > 0);
-
-        if (isPulsationActive) {
+        
+        if (isPulsationActive && isPlaying) {
             bassLFO.current.connect(bassGain.current.gain);
         } else {
             bassLFO.current.disconnect(bassGain.current.gain);
             bassGain.current.gain.cancelScheduledValues();
             bassGain.current.gain.rampTo(1, 0.1); 
         }
-    }, [isBassPulsating, isBassLatchOn, latchedBassNotes]);
+    }, [isBassPulsating, isBassLatchOn, latchedBassNotes, isPlaying]);
     
     useEffect(() => {
         if (!isReady) return;
         const Tone = require('tone');
 
         if (drumSequence.current) {
-            drumSequence.current.dispose();
+            drumSequence.current.clear();
+            activePattern.sequence.forEach((note, i) => {
+                if (note) {
+                    drumSequence.current?.add(i, note);
+                }
+            });
+        } else {
+             drumSequence.current = new Tone.Sequence((time: any, note: any) => {
+                if (note === 'C1') drumSynths.current?.kick.triggerAttackRelease('C1', '8n', time);
+                if (note === 'G1') drumSynths.current?.snare.triggerAttackRelease('16n', time);
+                if (note === 'D2') drumSynths.current?.hat.triggerAttackRelease('16n', time);
+            }, activePattern.sequence, '8n');
         }
-
-        drumSequence.current = new Tone.Sequence((time: any, note: any) => {
-            if (note === 'C1') drumSynths.current?.kick.triggerAttackRelease('C1', '8n', time);
-            if (note === 'G1') drumSynths.current?.snare.triggerAttackRelease('16n', time);
-            if (note === 'D2') drumSynths.current?.hat.triggerAttackRelease('16n', time);
-        }, activePattern.sequence, '8n');
 
         if (isPlaying && activePattern.name !== 'Off') {
             drumSequence.current.start(0);
+        } else {
+            drumSequence.current.stop();
         }
     }, [activePattern, isPlaying, isReady]);
 
@@ -338,7 +345,7 @@ export default function Home() {
     };
 
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
-        if (!isPlaying || !audioInitialized.current) return;
+        if (!audioInitialized.current) return;
     
         const synth = type === 'melody' ? melodySynth.current : bassSynth.current;
         if (!synth) return;
@@ -420,7 +427,7 @@ export default function Home() {
                  }
                 break;
         }
-    }, [isPlaying, isBassLatchOn, latchedBassNotes, allowedFrequencies]);
+    }, [isBassLatchOn, latchedBassNotes, allowedFrequencies]);
     
     const handleStartScreenInteraction = () => {
         if (backgroundAudioRef.current && backgroundAudioRef.current.paused) {
