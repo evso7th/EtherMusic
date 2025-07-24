@@ -231,7 +231,6 @@ export default function Home() {
         if (willBePlaying) {
             await Tone.start();
             Tone.Transport.start();
-            // Retrigger latched notes that were stopped by pause
             if (isBassLatchOn) {
                 latchedBassNotes.forEach(note => {
                     bassSynth.current!.triggerAttack(note.frequency, undefined, note.volume);
@@ -239,7 +238,6 @@ export default function Home() {
             }
         } else {
             Tone.Transport.pause();
-            // Release all synth voices to ensure everything stops
             bassSynth.current.releaseAll();
         }
     };
@@ -307,6 +305,7 @@ export default function Home() {
     useEffect(() => {
         if (!isReady || !drumSequence.current) return;
         
+        drumSequence.current.stop();
         drumSequence.current.clear();
         if (activePattern.sequence.length > 0) {
             (drumSequence.current as any).events = activePattern.sequence;
@@ -314,8 +313,6 @@ export default function Home() {
     
         if (isPlaying && activePattern.name !== 'Off') {
             drumSequence.current.start(0);
-        } else {
-            drumSequence.current.stop();
         }
     }, [activePattern, isPlaying, isReady]);
 
@@ -421,7 +418,7 @@ export default function Home() {
                 }
                 break;
         }
-    }, [isBassLatchOn, latchedBassNotes, allowedFrequencies, isPlaying]);
+    }, [isBassLatchOn, latchedBassNotes, allowedFrequencies, isPlaying, getClosestFrequency]);
     
     const handleStartScreenInteraction = () => {
         if (backgroundAudioRef.current && backgroundAudioRef.current.paused) {
