@@ -2,7 +2,7 @@
 "use client";
 
 import type { PointerEvent } from 'react';
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -128,11 +128,9 @@ export function ThereminPad({
 
         onInteraction(type, interactionData, 'down');
 
-        if (type === 'melody') {
-            const orb = createOrb(interactionData.x, interactionData.y);
-            if (orb) {
-                activePointers.current.set(event.pointerId, { id: event.pointerId, orb });
-            }
+        const orb = createOrb(interactionData.x, interactionData.y);
+        if (orb) {
+            activePointers.current.set(event.pointerId, { id: event.pointerId, orb });
         }
     }, [calculateInteraction, onInteraction, type, createOrb]);
 
@@ -144,11 +142,9 @@ export function ThereminPad({
 
         onInteraction(type, interactionData, 'move');
         
-        if (type === 'melody') {
-            const pointerState = activePointers.current.get(event.pointerId);
-            if (pointerState && pointerState.orb) {
-                pointerState.orb.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
-            }
+        const pointerState = activePointers.current.get(event.pointerId);
+        if (pointerState && pointerState.orb) {
+            pointerState.orb.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
         }
     }, [calculateInteraction, onInteraction, type]);
 
@@ -267,10 +263,10 @@ export function ThereminPad({
                 <div
                     ref={padRef}
                     className="w-full h-full relative overflow-hidden cursor-crosshair touch-none"
-                    onPointerDown={handlePointerDown}
-                    onPointerUp={handlePointerUpOrLeave}
-                    onPointerMove={handlePointerMove}
-                    onPointerLeave={handlePointerUpOrLeave}
+                    onPointerDown={type === 'bass' && isLatchOn ? handlePointerDown : handlePointerDown}
+                    onPointerUp={type === 'bass' && isLatchOn ? undefined : handlePointerUpOrLeave}
+                    onPointerMove={type === 'bass' && isLatchOn ? undefined : handlePointerMove}
+                    onPointerLeave={type === 'bass' && isLatchOn ? undefined : handlePointerUpOrLeave}
                     style={{
                         backgroundColor: 'hsl(var(--muted) / 0.2)',
                         backgroundSize: '2rem 2rem',
