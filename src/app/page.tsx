@@ -40,29 +40,21 @@ export const musicScales: MusicScale[] = ['Major', 'Minor', 'Major Pentatonic', 
 const getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]): number[] => {
     const Tone = require('tone');
 
-    let scaleNotes: string[];
+    const scaleIntervals: { [key in MusicScale]: number[] } = {
+        'Major': [0, 2, 4, 5, 7, 9, 11],
+        'Minor': [0, 2, 3, 5, 7, 8, 10],
+        'Major Pentatonic': [0, 2, 4, 7, 9],
+        'Minor Pentatonic': [0, 3, 5, 7, 10],
+    };
 
-    try {
-        if (scale === 'Major Pentatonic') {
-            const majorScale = Tone.Scale.get(`${key} major`).notes;
-            scaleNotes = majorScale.filter((_: string, i: number) => ![3, 6].includes(i % 7));
-        } else if (scale === 'Minor Pentatonic') {
-            const minorScale = Tone.Scale.get(`${key} minor`).notes;
-            scaleNotes = minorScale.filter((_: string, i: number) => ![1, 5].includes(i % 7));
-        } else {
-            scaleNotes = Tone.Scale.get(`${key} ${scale.toLowerCase()}`).notes;
-        }
-    } catch (e) {
-        console.error("Could not get scale, falling back to major scale. Error:", e);
-        // Fallback for older Tone.js versions or unforeseen errors
-        const baseNote = Tone.Frequency(key + "3");
-        scaleNotes = [0, 2, 4, 5, 7, 9, 11].map(interval => baseNote.transpose(interval).toNote());
-    }
-    
     let allFrequencies: number[] = [];
+    const intervals = scaleIntervals[scale];
+
     octaves.forEach(octave => {
-         const octaveNotes = scaleNotes.map(note => `${note.replace(/[0-9]/g, '')}${octave}`);
-         allFrequencies = [...allFrequencies, ...octaveNotes.map(n => Tone.Frequency(n).toFrequency())];
+        const baseNote = Tone.Frequency(`${key}${octave}`);
+        intervals.forEach(interval => {
+            allFrequencies.push(baseNote.transpose(interval).toFrequency());
+        });
     });
 
     return allFrequencies.sort((a,b) => a - b);
@@ -110,15 +102,6 @@ export default function Home() {
         if (audioInitialized.current) return;
         
         const Tone = await import('tone');
-        
-        // Polyfill Tone.Scale.get if it doesn't exist
-        if (!Tone.Scale.get) {
-            Tone.Scale.get = (name: string) => {
-                const [tonic, type] = name.split(" ");
-                const notes = Tone.Mode.get(type).intervals.map((interval: string) => Tone.Frequency(tonic).transpose(interval).toNote());
-                return { notes };
-            }
-        }
 
         await Tone.start();
         audioInitialized.current = true;
@@ -549,5 +532,7 @@ export default function Home() {
     
 
 
+
+    
 
     
