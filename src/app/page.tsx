@@ -563,7 +563,7 @@ export default function Home() {
                         synth.triggerAttack(quantizedFreq, undefined, velocity);
                         activeNotes.current.set(data.pointerId, { type, freq: quantizedFreq });
                     } else if (synth.get().hasOwnProperty('volume')) {
-                        (synth.get() as any).volume.value = -48 + (velocity * 48);
+                        synth.set({ volume: -48 + (velocity * 48) });
                     }
                 }
                 break;
@@ -719,3 +719,5 @@ export default function Home() {
     );
 }
 
+
+    
