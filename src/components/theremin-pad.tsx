@@ -2,7 +2,7 @@
 "use client";
 
 import type { PointerEvent } from 'react';
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -37,10 +37,6 @@ interface ThereminPadProps {
     latchedNotes?: Map<number, { x: number; y: number; frequency: number; volume: number }>;
 }
 
-interface PointerState {
-    id: number;
-    orb: HTMLDivElement;
-}
 
 const padTitles = {
     melody: "Melody Pad",
@@ -83,7 +79,7 @@ export function ThereminPad({
     latchedNotes,
 }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
-    const activePointers = useRef<Map<number, PointerState>>(new Map());
+    const activePointers = useRef<Map<number, HTMLDivElement>>(new Map());
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     
     const calculateInteraction = useCallback((event: PointerEvent<HTMLDivElement>) => {
@@ -128,11 +124,13 @@ export function ThereminPad({
 
         onInteraction(type, interactionData, 'down');
 
-        const orb = createOrb(interactionData.x, interactionData.y);
-        if (orb) {
-            activePointers.current.set(event.pointerId, { id: event.pointerId, orb });
+        if (type === 'melody' || !isLatchOn) {
+            const orb = createOrb(interactionData.x, interactionData.y);
+            if (orb) {
+                activePointers.current.set(event.pointerId, orb);
+            }
         }
-    }, [calculateInteraction, onInteraction, type, createOrb]);
+    }, [calculateInteraction, onInteraction, type, createOrb, isLatchOn]);
 
     const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (!(event.buttons > 0)) return;
@@ -142,9 +140,9 @@ export function ThereminPad({
 
         onInteraction(type, interactionData, 'move');
         
-        const pointerState = activePointers.current.get(event.pointerId);
-        if (pointerState && pointerState.orb) {
-            pointerState.orb.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
+        const orb = activePointers.current.get(event.pointerId);
+        if (orb) {
+            orb.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
         }
     }, [calculateInteraction, onInteraction, type]);
 
@@ -153,10 +151,8 @@ export function ThereminPad({
         onInteraction(type, interactionData, 'up');
 
         if (activePointers.current.has(event.pointerId)) {
-            const pointer = activePointers.current.get(event.pointerId)!;
-            if (pointer.orb) {
-                 pointer.orb.remove();
-            }
+            const orb = activePointers.current.get(event.pointerId)!;
+            orb.remove();
             activePointers.current.delete(event.pointerId);
         }
         
@@ -249,6 +245,13 @@ export function ThereminPad({
         </>
     );
 
+    const handleInteractionForLatch = (event: PointerEvent<HTMLDivElement>) => {
+        const interactionData = calculateInteraction(event);
+        if (interactionData) {
+            onInteraction(type, interactionData, 'down');
+        }
+    };
+
     return (
         <Card className={cn(
             "flex flex-col h-full bg-card/50 border-2 border-transparent transition-all duration-300",
@@ -263,9 +266,9 @@ export function ThereminPad({
                 <div
                     ref={padRef}
                     className="w-full h-full relative overflow-hidden cursor-crosshair touch-none"
-                    onPointerDown={type === 'bass' && isLatchOn ? handlePointerDown : handlePointerDown}
-                    onPointerUp={type === 'bass' && isLatchOn ? undefined : handlePointerUpOrLeave}
+                    onPointerDown={type === 'bass' && isLatchOn ? handleInteractionForLatch : handlePointerDown}
                     onPointerMove={type === 'bass' && isLatchOn ? undefined : handlePointerMove}
+                    onPointerUp={type === 'bass' && isLatchOn ? undefined : handlePointerUpOrLeave}
                     onPointerLeave={type === 'bass' && isLatchOn ? undefined : handlePointerUpOrLeave}
                     style={{
                         backgroundColor: 'hsl(var(--muted) / 0.2)',

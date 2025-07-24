@@ -296,10 +296,9 @@ export default function Home() {
     useEffect(() => {
         if (!bassLFO.current || !bassGain.current) return;
 
-        // Pulsation is active if the global pulsate is on, OR if latch mode is on and there are latched notes.
-        const isPulsationActive = isBassPulsating || (isBassLatchOn && latchedBassNotes.size > 0);
+        const isPulsationActive = (isBassPulsating || (isBassLatchOn && latchedBassNotes.size > 0)) && isPlaying;
         
-        if (isPulsationActive && isPlaying) {
+        if (isPulsationActive) {
             bassLFO.current.connect(bassGain.current.gain);
         } else {
             if (bassLFO.current.state === 'started') {
@@ -374,9 +373,15 @@ export default function Home() {
             if (state === 'down' && data) {
                 setLatchedBassNotes(prev => {
                     const newNotes = new Map(prev);
-                    const existingEntryKey = Array.from(newNotes.entries()).find(
-                        ([_, note]) => Math.abs(note.frequency - quantizedFreq) < 5
-                    )?.[0];
+                    
+                    const NOTE_PROXIMITY_THRESHOLD = 5; // Hz threshold to consider notes the same
+                    let existingEntryKey;
+                    for (const [key, note] of newNotes.entries()) {
+                        if (Math.abs(note.frequency - quantizedFreq) < NOTE_PROXIMITY_THRESHOLD) {
+                            existingEntryKey = key;
+                            break;
+                        }
+                    }
 
                     if (existingEntryKey !== undefined) {
                         const noteToRelease = newNotes.get(existingEntryKey);
@@ -385,7 +390,8 @@ export default function Home() {
                         }
                         newNotes.delete(existingEntryKey);
                     } else if (newNotes.size < 4) {
-                        newNotes.set(data.pointerId, { x: data.x, y: data.y, frequency: quantizedFreq, volume: data.volume });
+                        const newKey = Date.now(); // Use a unique key for each note
+                        newNotes.set(newKey, { x: data.x, y: data.y, frequency: quantizedFreq, volume: data.volume });
                         if (isPlaying) {
                             synth.triggerAttack(quantizedFreq, undefined, velocity);
                         }
@@ -396,13 +402,16 @@ export default function Home() {
             return; 
         }
 
+
         const activeNotes = type === 'melody' ? activeMelodyNotes.current : activeBassNotes.current;
 
         switch (state) {
             case 'down':
-                if (quantizedFreq && data) {
-                    synth.triggerAttack(quantizedFreq, undefined, velocity);
-                    activeNotes.set(data.pointerId, quantizedFreq);
+                 if (quantizedFreq && data) {
+                    if (!activeNotes.has(data.pointerId)) {
+                        synth.triggerAttack(quantizedFreq, undefined, velocity);
+                        activeNotes.set(data.pointerId, quantizedFreq);
+                    }
                 }
                 break;
             case 'move':
