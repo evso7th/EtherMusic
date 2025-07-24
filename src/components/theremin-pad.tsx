@@ -117,24 +117,23 @@ export function ThereminPad({
         
         onInteraction(type, interactionData, 'down');
 
-        if (isPolyphonic) {
-             if (type === 'melody' || (type === 'bass' && !isLatchOn)) {
-                const orb = createOrb(interactionData.x, interactionData.y);
-                if(orb) {
-                    const newPointer = { id: event.pointerId, orb, frequency: interactionData.frequency };
-                    activePointers.current.set(event.pointerId, newPointer);
-                }
+        if (isPolyphonic && !(type === 'bass' && isLatchOn)) {
+            const orb = createOrb(interactionData.x, interactionData.y);
+            if(orb) {
+                const newPointer = { id: event.pointerId, orb, frequency: interactionData.frequency };
+                activePointers.current.set(event.pointerId, newPointer);
             }
         }
     }, [calculateInteraction, onInteraction, type, color, isPolyphonic, isLatchOn]);
 
     const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (!(event.buttons > 0)) return;
-        const interactionData = calculateInteraction(event);
-        if (!interactionData) return;
         
         if (!activePointers.current.has(event.pointerId)) return;
 
+        const interactionData = calculateInteraction(event);
+        if (!interactionData) return;
+        
         onInteraction(type, interactionData, 'move');
 
         const pointer = activePointers.current.get(event.pointerId);
@@ -147,22 +146,19 @@ export function ThereminPad({
     const handlePointerUpOrLeave = useCallback((event: PointerEvent<HTMLDivElement>) => {
         (event.target as HTMLElement).releasePointerCapture(event.pointerId);
         
-        const interactionData = calculateInteraction(event);
         const pointer = activePointers.current.get(event.pointerId);
-
         if (pointer) {
-             if (!(type === 'bass' && isLatchOn)) {
-                onInteraction(type, { frequency: pointer.frequency, volume: 0, pointerId: event.pointerId}, 'up');
-                if (pointer.orb) {
-                    pointer.orb.remove();
-                }
-                activePointers.current.delete(event.pointerId);
-             }
+            onInteraction(type, { frequency: pointer.frequency, volume: 0, pointerId: event.pointerId}, 'up');
+            if (pointer.orb) {
+                pointer.orb.remove();
+            }
+            activePointers.current.delete(event.pointerId);
         } else {
              // Fallback for cases where pointer might not be in map, but we still need to send an 'up' event
+             const interactionData = calculateInteraction(event);
              onInteraction(type, interactionData, 'up');
         }
-    }, [onInteraction, type, isLatchOn, calculateInteraction]);
+    }, [onInteraction, type, calculateInteraction]);
     
     useEffect(() => {
         if (type !== 'bass' || !isLatchOn || !latchedNotes || !padRef.current) return;
@@ -328,5 +324,3 @@ export function ThereminPad({
         </Card>
     );
 }
-
-    
