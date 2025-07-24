@@ -3,6 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Play, Pause, Mic, StopCircle, Square } from 'lucide-react';
+import { cn } from "@/lib/utils";
 
 interface PlaybackControlsProps {
     isPlaying: boolean;
@@ -22,7 +23,17 @@ export function PlaybackControls({ isPlaying, isRecording, onPlayPause, onRecord
             <Button onClick={onStop} size="icon" variant="outline" className="w-10 h-10 rounded-full" aria-label="Stop" disabled={!isReady}>
                 <Square className="w-5 h-5 md:w-6 md:h-6" />
             </Button>
-            <Button onClick={onRecord} variant="outline" size="icon" className={`w-10 h-10 rounded-full transition-colors ${isRecording ? 'bg-red-500/80 text-white border-red-500 hover:bg-red-600' : ''}`} aria-label={isRecording ? "Stop Recording" : "Record"} disabled={!isReady}>
+            <Button 
+                onClick={onRecord} 
+                variant={isRecording ? 'default' : 'outline'} 
+                size="icon" 
+                className={cn(
+                    'w-10 h-10 rounded-full transition-colors',
+                    isRecording && 'animate-pulse-primary'
+                )}
+                aria-label={isRecording ? "Stop Recording" : "Record"} 
+                disabled={!isReady}
+            >
                 {isRecording ? <StopCircle className="w-5 h-5 md:w-6 md:h-6" /> : <Mic className="w-5 h-5 md:w-6 md:h-6" />}
             </Button>
         </div>
