@@ -95,7 +95,7 @@ export function ThereminPad({
     }, [frequencyRange]);
 
 
-    const createOrb = (x: number, y: number) => {
+    const createOrb = useCallback((x: number, y: number) => {
         if (!padRef.current) return null;
         const orb = document.createElement('div');
         orb.className = cn(
@@ -107,7 +107,7 @@ export function ThereminPad({
         orb.style.transform = `translate(${x}px, ${y}px)`;
         padRef.current.appendChild(orb);
         return orb;
-    };
+    }, [color]);
 
 
     const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
@@ -124,44 +124,53 @@ export function ThereminPad({
                 activePointers.current.set(event.pointerId, newPointer);
             }
         }
-    }, [calculateInteraction, onInteraction, type, color, isPolyphonic, isLatchOn]);
+    }, [calculateInteraction, onInteraction, type, isPolyphonic, isLatchOn, createOrb]);
 
     const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (!(event.buttons > 0)) return;
         
-        if (!activePointers.current.has(event.pointerId)) return;
+        const pointerState = activePointers.current.get(event.pointerId);
+        if (!pointerState) return;
 
         const interactionData = calculateInteraction(event);
         if (!interactionData) return;
         
         onInteraction(type, interactionData, 'move');
 
-        const pointer = activePointers.current.get(event.pointerId);
-        if (pointer && pointer.orb) {
-            pointer.orb.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
+        if (pointerState.orb) {
+            pointerState.orb.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
         }
 
     }, [calculateInteraction, onInteraction, type]);
 
     const handlePointerUpOrLeave = useCallback((event: PointerEvent<HTMLDivElement>) => {
-        (event.target as HTMLElement).releasePointerCapture(event.pointerId);
-        
-        const pointer = activePointers.current.get(event.pointerId);
-        if (pointer) {
-            onInteraction(type, { frequency: pointer.frequency, volume: 0, pointerId: event.pointerId}, 'up');
+        if (activePointers.current.has(event.pointerId)) {
+            const pointer = activePointers.current.get(event.pointerId)!;
+             onInteraction(type, { frequency: pointer.frequency, volume: 0, pointerId: event.pointerId}, 'up');
             if (pointer.orb) {
-                pointer.orb.remove();
+                 pointer.orb.remove();
             }
             activePointers.current.delete(event.pointerId);
         } else {
-             // Fallback for cases where pointer might not be in map, but we still need to send an 'up' event
              const interactionData = calculateInteraction(event);
              onInteraction(type, interactionData, 'up');
         }
+         // Ensure capture is released
+        if ((event.target as HTMLElement).hasPointerCapture(event.pointerId)) {
+            (event.target as HTMLElement).releasePointerCapture(event.pointerId);
+        }
+
     }, [onInteraction, type, calculateInteraction]);
     
     useEffect(() => {
-        if (type !== 'bass' || !isLatchOn || !latchedNotes || !padRef.current) return;
+        if (type !== 'bass' || !isLatchOn || !latchedNotes || !padRef.current) {
+            // Cleanup unrelated orbs if needed
+            if (type !== 'bass' || !isLatchOn) {
+                 activePointers.current.forEach(p => p.orb?.remove());
+                 activePointers.current.clear();
+            }
+            return;
+        }
         
         const latchedIds = new Set(latchedNotes.keys());
         
@@ -203,7 +212,7 @@ export function ThereminPad({
             }
         });
 
-    }, [latchedNotes, isLatchOn, frequencyRange, type, color]);
+    }, [latchedNotes, isLatchOn, frequencyRange, type, createOrb]);
 
 
     const renderMelodyControls = () => (
@@ -324,3 +333,5 @@ export function ThereminPad({
         </Card>
     );
 }
+
+    
