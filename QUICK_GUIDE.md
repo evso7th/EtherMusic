@@ -1,4 +1,4 @@
-# EtherMusic Quick Guide for Dummies
+# EtherMusic Quick Guide
 
 Welcome to EtherMusic! This is a simple guide to get you started on making cool sounds.
 
@@ -40,4 +40,4 @@ Here you control the rhythm section.
 *   **Stop:** Stops all sounds immediately.
 *   **Record (`Mic` Icon):** Press it to start recording your session. Press it again to stop. Your recording will be downloaded automatically as a `.webm` file.
 
-That's it! Now go make some noise.
+Enjoy the process and let the music you create reflect your inner state.
