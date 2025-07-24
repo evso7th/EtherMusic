@@ -362,7 +362,7 @@ export default function Home() {
 
         const quantizedFreq = data ? getClosestFrequency(data.frequency) : 0;
         const velocity = data ? data.volume : 0;
-
+        
         if (type === 'bass' && isBassLatchOn) {
             if (state === 'down' && data) {
                 setLatchedBassNotes(prev => {
@@ -397,12 +397,15 @@ export default function Home() {
                 }
                 break;
             case 'move':
-                if (quantizedFreq && data && activeNotes.has(data.pointerId)) {
+                 if (quantizedFreq && data && activeNotes.has(data.pointerId)) {
                     const currentFreq = activeNotes.get(data.pointerId);
-                    if (currentFreq && synth.get(currentFreq)) {
-                       (synth.get(currentFreq) as any).frequency.set({ value: quantizedFreq });
-                       (synth.get(currentFreq) as any).volume.set({ value: -24 + (velocity * 24) });
-                        activeNotes.set(data.pointerId, quantizedFreq);
+                    const voice = currentFreq ? synth.get(currentFreq) as any : undefined;
+                    if (voice) {
+                       voice.frequency.rampTo(quantizedFreq, 0.05);
+                       voice.volume.rampTo(-24 + (velocity * 24), 0.05);
+                       // Update the frequency in the active notes map
+                       // This is important if we release the note while it's changing
+                       activeNotes.set(data.pointerId, quantizedFreq);
                     }
                 }
                 break;
@@ -411,7 +414,7 @@ export default function Home() {
                     const freqToRelease = activeNotes.get(data.pointerId);
                     if (freqToRelease) synth.triggerRelease(freqToRelease);
                     activeNotes.delete(data.pointerId);
-                } else if (type !== 'bass' || !isBassLatchOn) {
+                } else if (!isBassLatchOn) { // Only release all if not in latch mode
                     synth.releaseAll();
                     activeNotes.clear();
                 }
