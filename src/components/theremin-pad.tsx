@@ -139,7 +139,7 @@ export function ThereminPad({
 
         const pointer = activePointers.current.get(event.pointerId);
         if (pointer && pointer.orb) {
-            pointer.orb.style.transform = `translate(${interactionData.x}px, ${y}px)`;
+            pointer.orb.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
         }
 
     }, [calculateInteraction, onInteraction, type]);
