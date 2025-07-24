@@ -112,7 +112,7 @@ export function ThereminPad({
         
         onInteraction(type, interactionData, 'down');
 
-        if (isPolyphonic && (type === 'melody' || !isLatchOn)) {
+        if (isPolyphonic && (type === 'melody' || (type === 'bass' && !isLatchOn))) {
             const orb = createOrb(interactionData.x, interactionData.y);
             if(orb) {
                 const newPointer = { id: event.pointerId, orb, frequency: interactionData.frequency };
@@ -141,16 +141,26 @@ export function ThereminPad({
         
         const pointer = activePointers.current.get(event.pointerId);
         if (pointer) {
-            onInteraction(type, { frequency: pointer.frequency, volume: 0, pointerId: event.pointerId}, 'up');
+             // For non-latched notes, we always send an 'up' interaction
+            if (!(type === 'bass' && isLatchOn)) {
+                onInteraction(type, { frequency: pointer.frequency, volume: 0, pointerId: event.pointerId}, 'up');
+            }
             pointer.orb.remove();
             activePointers.current.delete(event.pointerId);
+        } else if (type !== 'bass' || !isLatchOn) {
+            // This handles cases where a pointer might exist without an orb (edge cases)
+             const interactionData = calculateInteraction(event);
+             if (interactionData) {
+                onInteraction(type, interactionData, 'up');
+             }
         }
-    }, [onInteraction, type]);
+    }, [onInteraction, type, isLatchOn, calculateInteraction]);
     
     useEffect(() => {
-        if (type !== 'bass' || !isLatchOn || !latchedNotes) return;
+        if (type !== 'bass' || !isLatchOn || !latchedNotes || !padRef.current) return;
         
         const latchedIds = new Set(latchedNotes.keys());
+        const currentOrbIds = new Set(activePointers.current.keys());
 
         // Remove orbs for notes that are no longer latched
         activePointers.current.forEach((pointer, id) => {
@@ -183,13 +193,12 @@ export function ThereminPad({
                     pointer = { id, orb, frequency };
                     activePointers.current.set(id, pointer);
                 }
-            }
-            if (pointer?.orb) {
-                pointer.orb.style.transform = `translate(${x}px, ${y}px)`;
-                pointer.orb.style.opacity = '1';
+            } else {
+                 if (pointer.orb) {
+                    pointer.orb.style.transform = `translate(${x}px, ${y}px)`;
+                 }
             }
         });
-
 
     }, [latchedNotes, isLatchOn, frequencyRange, type, color]);
 
@@ -282,12 +291,10 @@ export function ThereminPad({
                     }}
                 >
                     <div className="absolute inset-0 flex items-center justify-center text-5xl md:text-7xl font-bold text-foreground/10 pointer-events-none uppercase tracking-widest">
-                        {title} Pad
+                        {title}
                     </div>
                 </div>
             </CardContent>
         </Card>
     );
 }
-
-    
