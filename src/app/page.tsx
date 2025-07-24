@@ -113,7 +113,7 @@ export default function Home() {
     const bassLFO = useRef<Tone.LFO | null>(null);
     const bassGain = useRef<Tone.Gain | null>(null);
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
-    const activeMelodyNotes = useRef<Map<number, number>>(new Map());
+    const activeNotes = useRef(new Map<number, {type: 'melody' | 'bass', freq: number}>());
     const fx = useRef<{ reverb: Tone.Reverb, delay: Tone.FeedbackDelay } | null>(null);
     const autopilot = useRef<{bass: Tone.Part | null, melody: Tone.Part | null}>({ bass: null, melody: null });
     
@@ -136,20 +136,20 @@ export default function Home() {
             drums: new Tone.Channel(volumes.drums).toDestination(),
         };
 
-        channels.current.melody.send("reverb", -60);
-        channels.current.melody.send("delay", -60);
         channels.current.melody.connect(fx.current.reverb);
         channels.current.melody.connect(fx.current.delay);
+        channels.current.melody.send("reverb", effects.melody.reverb);
+        channels.current.melody.send("delay", effects.melody.delay);
         
-        channels.current.bass.send("reverb", -60);
-        channels.current.bass.send("delay", -60);
         channels.current.bass.connect(fx.current.reverb);
         channels.current.bass.connect(fx.current.delay);
+        channels.current.bass.send("reverb", effects.bass.reverb);
+        channels.current.bass.send("delay", effects.bass.delay);
         
-        channels.current.drums.send("reverb", -60);
-        channels.current.drums.send("delay", -60);
         channels.current.drums.connect(fx.current.reverb);
         channels.current.drums.connect(fx.current.delay);
+        channels.current.drums.send("reverb", effects.drums.reverb);
+        channels.current.drums.send("delay", effects.drums.delay);
 
 
         melodySynth.current = new Tone.PolySynth(Tone.Synth).connect(channels.current.melody);
@@ -198,7 +198,7 @@ export default function Home() {
         
         Tone.Transport.bpm.value = activeTempo.bpm;
         setIsReady(true);
-    }, [volumes.melody, volumes.bass, volumes.drums, activeTempo.bpm]);
+    }, []);
     
     // Update allowed frequencies when key or scale changes
     useEffect(() => {
@@ -305,7 +305,7 @@ export default function Home() {
         Tone.Transport.stop();
         melodySynth.current?.releaseAll();
         bassSynth.current?.releaseAll();
-        activeMelodyNotes.current.clear();
+        activeNotes.current.clear();
         setLatchedBassNotes(new Map());
         setIsPlaying(false);
     };
@@ -432,18 +432,12 @@ export default function Home() {
 
     useEffect(() => {
         if (channels.current && isReady) {
-            if (channels.current.melody.send) {
-                channels.current.melody.send('reverb', effects.melody.reverb);
-                channels.current.melody.send('delay', effects.melody.delay);
-            }
-            if (channels.current.bass.send) {
-                channels.current.bass.send('reverb', effects.bass.reverb);
-                channels.current.bass.send('delay', effects.bass.delay);
-            }
-            if (channels.current.drums.send) {
-                channels.current.drums.send('reverb', effects.drums.reverb);
-                channels.current.drums.send('delay', effects.drums.delay);
-            }
+            channels.current.melody.send?.('reverb', effects.melody.reverb);
+            channels.current.melody.send?.('delay', effects.melody.delay);
+            channels.current.bass.send?.('reverb', effects.bass.reverb);
+            channels.current.bass.send?.('delay', effects.bass.delay);
+            channels.current.drums.send?.('reverb', effects.drums.reverb);
+            channels.current.drums.send?.('delay', effects.drums.delay);
         }
     }, [effects, isReady]);
 
@@ -499,35 +493,46 @@ export default function Home() {
             return; 
         }
 
-        const activeNotes = activeMelodyNotes.current;
-
         switch (state) {
             case 'down':
-                 if (quantizedFreq && data) {
-                    if (!activeNotes.has(data.pointerId)) {
-                        synth.triggerAttack(quantizedFreq, undefined, velocity);
-                        activeNotes.set(data.pointerId, quantizedFreq);
-                    }
+                if (data && quantizedFreq) {
+                    synth.triggerAttack(quantizedFreq, undefined, velocity);
+                    activeNotes.current.set(data.pointerId, { type, freq: quantizedFreq });
                 }
                 break;
             case 'move':
-                if (data && activeNotes.has(data.pointerId)) {
-                    const activeFreq = activeNotes.get(data.pointerId);
-                    // Using rampTo for smooth transitions
-                    if (activeFreq && quantizedFreq !== activeFreq) {
-                        synth.set({ frequency: quantizedFreq });
-                        activeNotes.set(data.pointerId, quantizedFreq);
+                if (data && quantizedFreq && activeNotes.current.has(data.pointerId)) {
+                    const activeNote = activeNotes.current.get(data.pointerId);
+                    if (activeNote && activeNote.freq !== quantizedFreq) {
+                        // More reliable: stop old note, start new one
+                        synth.triggerRelease([activeNote.freq]);
+                        synth.triggerAttack(quantizedFreq, undefined, velocity);
+                        activeNotes.current.set(data.pointerId, { type, freq: quantizedFreq });
                     }
-                    // Adjust volume smoothly
+                    // Adjust volume of all notes for simplicity
                     const newVolume = -48 + (velocity * 48); // Map velocity [0,1] to dB [-48, 0]
                     synth.set({ volume: newVolume });
                 }
                 break;
             case 'up':
-                 if (data && activeNotes.has(data.pointerId)) {
-                    const freqToRelease = activeNotes.get(data.pointerId);
-                    if (freqToRelease) synth.triggerRelease([freqToRelease]);
-                    activeNotes.delete(data.pointerId);
+                if (data && activeNotes.current.has(data.pointerId)) {
+                    const activeNote = activeNotes.current.get(data.pointerId);
+                    if (activeNote) {
+                        synth.triggerRelease([activeNote.freq]);
+                    }
+                    activeNotes.current.delete(data.pointerId);
+                }
+                
+                // Safety net: if no pointers are down for this synth type, release all its notes
+                let hasActiveNotesForType = false;
+                activeNotes.current.forEach(note => {
+                    if (note.type === type) {
+                        hasActiveNotesForType = true;
+                    }
+                });
+
+                if (!hasActiveNotesForType) {
+                    synth.releaseAll();
                 }
                 break;
         }
