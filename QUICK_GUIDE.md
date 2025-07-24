@@ -22,7 +22,7 @@ There are two large, glowing pads. They are your main instruments.
 
 *   This is for your main tune.
 *   You can play multiple notes at the same time (polyphonic).
-*   **Change Instrument:** Use the dropdown menu at the top of the pad to switch between sounds like `synth`, `organ`, `theremin`, or `glass`.
+*   **Change Instrument:** Use the dropdown menu at the top of the pad to switch between sounds like `synth`, `organ`, `theremin`, or `glass`. You can change any of these instruments on the fly, even during playback!
 
 ### Bass Pad (Left, Blue)
 
