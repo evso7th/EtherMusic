@@ -218,7 +218,6 @@ export default function Home() {
                 const anchor = document.createElement("a");
                 anchor.download = "ethermusic_recording.webm";
                 anchor.href = url;
-                URL.revokeObjectURL(url);
                 anchor.click();
                 toast({ title: "Recording Stopped", description: "Your recording has been downloaded." });
             });
@@ -479,3 +478,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
