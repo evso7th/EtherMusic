@@ -21,9 +21,9 @@ type BeatPattern = {
 
 
 const beatPatterns: BeatPattern[] = [
-    { name: 'Rock', sequence: ['C1', null, 'D1', null, 'C1', 'C1', 'D1', null] },
-    { name: 'House', sequence: ['C1', 'E1', 'C1', 'E1', 'D1', 'E1', 'C1', 'E1'] },
-    { name: 'Hip Hop', sequence: ['C1', null, 'E1', null, 'C1', 'D1', 'E1', null] },
+    { name: 'Rock', sequence: ['C1', null, 'D1', null, 'C1', null, 'D1', null] },
+    { name: 'House', sequence: ['C1', 'C1', 'D1', 'C1', 'C1', 'C1', 'D1', 'C1'] },
+    { name: 'Hip Hop', sequence: ['C1', null, 'D1', null, null, 'C1', null, 'D1'] },
     { name: 'Reggae', sequence: [null, 'C1', 'D1', 'E1', null, 'C1', 'D1', null] },
     { name: 'Off', sequence: [] },
 ];
@@ -175,9 +175,9 @@ export default function Home() {
 
         drumSamplers.current = new Tone.Players({
             urls: {
-                C1: "/assets/sounds/kick.mp3",
-                D1: "/assets/sounds/snare.mp3",
-                E1: "/assets/sounds/hat.mp3",
+                C1: "/assets/sounds/kick%20drum.wav",
+                D1: "/assets/sounds/snare.wav",
+                E1: "/assets/sounds/closed%20hi%20hat%20accented.wav",
             },
             onload: () => {
                 console.log('Drum samples loaded');
@@ -186,7 +186,7 @@ export default function Home() {
         }).connect(channels.current.drums);
         
         drumSequence.current = new Tone.Sequence((time, note) => {
-            if (drumSamplers.current?.loaded && drumSamplers.current.has(note)) {
+            if (drumSamplers.current?.loaded && note && drumSamplers.current.has(note)) {
                  drumSamplers.current.player(note).start(time);
             }
         }, [], '8n').start(0);
@@ -209,7 +209,7 @@ export default function Home() {
         
         Tone.Transport.bpm.value = activeTempo.bpm;
         setIsReady(true);
-    }, []);
+    }, [volumes, effects]);
     
     // Update allowed frequencies when key or scale changes
     useEffect(() => {
@@ -375,14 +375,14 @@ export default function Home() {
     useEffect(() => {
         if (!isReady || !drumSequence.current) return;
         
-        drumSequence.current.stop(0).clear();
+        drumSequence.current.clear();
         if (activePattern.sequence.length > 0) {
+            drumSequence.current.events = []; // Clear previous events
             activePattern.sequence.forEach((note, i) => {
                 if (note) {
                     drumSequence.current?.add(i, note);
                 }
             });
-            drumSequence.current.start(0);
         }
     
     }, [activePattern, isReady]);
@@ -735,3 +735,4 @@ export default function Home() {
     
 
     
+
