@@ -302,6 +302,7 @@ export default function Home() {
         }
     }, [isBassPulsating, isPlaying]);
     
+    // Original working drum machine logic
     useEffect(() => {
         if (!isReady || !drumSequence.current) return;
         
@@ -406,7 +407,7 @@ export default function Home() {
             case 'up':
                 if (data && activeNotes.has(data.pointerId)) {
                     const freqToRelease = activeNotes.get(data.pointerId);
-                    if (freqToRelease) synth.triggerRelease(freqToRelease);
+                    if (freqToRelease) synth.triggerRelease([freqToRelease]);
                     activeNotes.delete(data.pointerId);
                 } else {
                     synth.releaseAll();
@@ -414,7 +415,7 @@ export default function Home() {
                 }
                 break;
         }
-    }, [isBassLatchOn, latchedBassNotes, allowedFrequencies, isPlaying, getClosestFrequency]);
+    }, [isBassLatchOn, isPlaying, latchedBassNotes, allowedFrequencies, getClosestFrequency]);
     
     const handleStartScreenInteraction = () => {
         if (backgroundAudioRef.current && backgroundAudioRef.current.paused) {
