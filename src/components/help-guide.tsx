@@ -64,15 +64,21 @@ Enjoy the process and let the music you create reflect your inner state.
 interface HelpGuideProps {
     buttonVariant?: "outline" | "link" | "default" | "destructive" | "secondary" | "ghost" | null | undefined;
     buttonClassName?: string;
+    showText?: boolean;
 }
 
-export function HelpGuide({ buttonVariant = "outline", buttonClassName }: HelpGuideProps) {
+export function HelpGuide({ buttonVariant = "outline", buttonClassName, showText = true }: HelpGuideProps) {
     return (
         <Dialog>
             <DialogTrigger asChild>
-                <Button variant={buttonVariant} size="icon" className={cn("w-10 h-10 rounded-full", buttonClassName)}>
+                <Button variant={buttonVariant} size="icon" className={cn("w-10 h-10", buttonClassName)}>
                     <HelpCircle className="w-5 h-5" />
-                    <span className="sr-only sm:not-sr-only sm:ml-2 hidden sm:inline">Help</span>
+                    <span className={cn(
+                        "sr-only",
+                        showText && "sm:not-sr-only sm:ml-2 sm:inline"
+                    )}>
+                        Help
+                    </span>
                 </Button>
             </DialogTrigger>
             <DialogContent className="max-w-[90vw] md:max-w-xl lg:max-w-2xl">

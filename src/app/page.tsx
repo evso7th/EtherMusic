@@ -378,7 +378,7 @@ export default function Home() {
                 onClick={handleStartScreenInteraction}
             >
                 <div className="absolute top-4 right-4 z-20">
-                    <HelpGuide />
+                    <HelpGuide showText={false} buttonVariant="outline" buttonClassName="rounded-full" />
                 </div>
                 <OrbitalAnimation />
                 <audio ref={backgroundAudioRef} src="/assets/sounds/ethermusic_start.mp3" loop />
