@@ -39,16 +39,21 @@ export const musicScales: MusicScale[] = ['Major', 'Minor', 'Major Pentatonic', 
 
 const getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]): number[] => {
     const Tone = require('tone');
-    const scaleType = scale.toLowerCase().replace(' ', '-');
+    const { Scale } = require('tone');
+    const scaleName = scale.toLowerCase().replace(' ', '_');
+    
     let notes: string[] = [];
+    
     try {
-        notes = Tone.Scale.get(`${key}3 ${scaleType}`).notes;
-    } catch(e) {
-        // Fallback for pentatonic which isn't in Tone.Scale
+       notes = Scale.get(`${key}3 ${scaleName}`).notes;
+    } catch (e) {
+        // Fallback for pentatonic which isn't in Tone.Scale by default
         if (scale === 'Major Pentatonic') {
-            notes = Tone.Scale.get(`${key}3 major`).notes.filter((_:string, i:number) => ![3, 6].includes(i % 7));
+            const majorNotes = Scale.get(`${key}3 major`).notes;
+            notes = majorNotes.filter((_: string, i: number) => ![3, 6].includes(i % 7));
         } else if (scale === 'Minor Pentatonic') {
-            notes = Tone.Scale.get(`${key}3 minor`).notes.filter((_:string, i:number) => ![1, 5].includes(i % 7));
+            const minorNotes = Scale.get(`${key}3 minor`).notes;
+            notes = minorNotes.filter((_: string, i: number) => ![1, 5].includes(i % 7));
         }
     }
     
@@ -58,7 +63,7 @@ const getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]
          allFrequencies = [...allFrequencies, ...octaveNotes.map(n => Tone.Frequency(n).toFrequency())];
     });
 
-    return allFrequencies;
+    return allFrequencies.sort((a,b) => a - b);
 };
 
 
@@ -89,7 +94,7 @@ export default function Home() {
 
     // Tone.js refs
     const audioInitialized = useRef(false);
-    const melodySynth = useRef<Tone.PolySynth<Tone.AMSynth> | null>(null);
+    const melodySynth = useRef<Tone.PolySynth<Tone.Synth> | null>(null);
     const bassSynth = useRef<Tone.MonoSynth | null>(null);
     const drumSynths = useRef<{ kick: Tone.MembraneSynth, snare: Tone.NoiseSynth, hat: Tone.MetalSynth } | null>(null);
     const channels = useRef<{ melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel } | null>(null);
@@ -112,7 +117,7 @@ export default function Home() {
             drums: new Tone.Channel(volumes.drums).toDestination(),
         };
 
-        melodySynth.current = new Tone.PolySynth(Tone.AMSynth).connect(channels.current.melody);
+        melodySynth.current = new Tone.PolySynth(Tone.Synth).connect(channels.current.melody);
 
 
         bassVCA.current = new Tone.Volume(0).connect(channels.current.bass);
@@ -160,37 +165,29 @@ export default function Home() {
         let newOptions;
 
         switch (melodyInstrument) {
-             case 'organ':
+            case 'organ':
                 newOptions = {
-                    harmonicity: 3,
+                    oscillator: { type: 'fatsawtooth', count: 3, partials: [0, 2, 3, 4] },
                     envelope: { attack: 0.1, decay: 0.5, sustain: 0.3, release: 1.2 },
-                    modulation: { type: "sine" },
-                    modulationEnvelope: { attack: 0.5, decay: 0.2, sustain: 0.8, release: 0.5 }
                 };
                 break;
             case 'theremin':
                 newOptions = {
-                    harmonicity: 1, 
-                    envelope: { attack: 0.2, decay: 0, sustain: 1, release: 0.2 },
-                    modulation: { type: "sine" },
-                    modulationEnvelope: { attack: 0.3, decay: 0.2, sustain: 0.5, release: 0.1 }
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.1, decay: 0.2, sustain: 1, release: 0.2 },
                 };
                 break;
             case 'glass':
                 newOptions = {
-                    harmonicity: 2.5,
-                    envelope: { attack: 0.01, decay: 1.5, sustain: 0.1, release: 2 },
-                    modulation: {type: 'sine'},
-                    modulationEnvelope: { attack: 0.2, decay: 1, sustain: 0.5, release: 1 }
+                     oscillator: { type: 'fmsine', harmonicity: 1.2, modulationIndex: 3.5, },
+                     envelope: { attack: 0.01, decay: 1.5, sustain: 0.1, release: 2 },
                 };
                 break;
             case 'synth':
             default:
                  newOptions = {
-                    harmonicity: 0.5, 
-                    envelope: { attack: 0.1, decay: 0.8, sustain: 0.2, release: 1.0 },
-                    modulation: { type: "sawtooth"},
-                    modulationEnvelope: { attack: 0.5, decay: 0.2, sustain: 0.8, release: 0.5 }
+                    oscillator: { type: 'triangle8' },
+                    envelope: { attack: 0.05, decay: 0.8, sustain: 0.2, release: 1.0 },
                 };
                 break;
         }
@@ -267,8 +264,6 @@ export default function Home() {
                 anchor.href = url;
                 anchor.click();
                 toast({ title: "Recording Stopped", description: "Your recording has been downloaded." });
-                 // URL.revokeObjectURL(url) should not be called immediately.
-                 // The browser needs time to initiate the download.
             });
             setIsRecording(false);
         }
@@ -338,14 +333,9 @@ export default function Home() {
     }, [volumes, isReady]);
     
     useEffect(() => {
-        if (!bassSynth.current || !bassVCA.current || !isPlaying) {
-             if (bassSynth.current?.state === "started") {
-                bassSynth.current.triggerRelease();
-             }
-            return;
-        };
-
-        if (latchedBassNote) {
+        if (!bassSynth.current || !bassVCA.current) return;
+             
+        if (latchedBassNote && isPlaying) {
             const minDb = -48;
             const maxDb = 0;
             const dbVolume = minDb + latchedBassNote.volume * (maxDb - minDb);
@@ -434,13 +424,13 @@ export default function Home() {
                 onClick={handleStartScreenInteraction}
             >
                 <div className="absolute top-4 right-4 z-20">
-                    <HelpGuide showText={false} buttonVariant="outline" buttonClassName="rounded-full" />
+                    <HelpGuide showText={false} buttonVariant="outline" buttonClassName="rounded-full w-10 h-10" />
                 </div>
                 <OrbitalAnimation />
                 <audio ref={backgroundAudioRef} src="/assets/sounds/ethermusic_start.mp3" loop />
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
-                        <h1 className="text-5xl md:text-8xl lg:text-5xl font-bold text-primary">EtherMusic</h1>
+                        <h1 className="text-5xl md:text-8xl lg:text-5xl xl:text-8xl font-bold text-primary sm:text-6xl" style={{fontSize: '48px'}}>EtherMusic</h1>
                         <p className="text-lg md:text-2xl text-white/80 font-light mt-2 tracking-wider">
                            Neuro Meditation Sound Processor
                         </p>
@@ -541,9 +531,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
-
-    
-
-    
