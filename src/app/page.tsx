@@ -377,11 +377,14 @@ export default function Home() {
                 className="absolute inset-0 bg-background flex flex-col items-center justify-center z-50 p-4"
                 onClick={handleStartScreenInteraction}
             >
+                <div className="absolute top-4 right-4 z-20">
+                    <HelpGuide />
+                </div>
                 <OrbitalAnimation />
                 <audio ref={backgroundAudioRef} src="/assets/sounds/ethermusic_start.mp3" loop />
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
-                        <h1 className="text-5xl md:text-8xl font-bold text-primary">EtherMusic</h1>
+                        <h1 className="text-6xl md:text-8xl font-bold text-primary">EtherMusic</h1>
                         <p className="text-lg md:text-2xl text-white/80 font-light mt-2 tracking-wider">
                            Neuro Meditation Sound Processor
                         </p>
@@ -432,7 +435,6 @@ export default function Home() {
                             onStop={handleStop}
                             isReady={isReady}
                         />
-                        <HelpGuide />
                     </div>
                 </header>
                 <main className="flex-grow flex flex-col gap-4 overflow-hidden">

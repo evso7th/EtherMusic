@@ -7,9 +7,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { MixerControls } from '@/components/mixer-controls';
-import { SlidersHorizontal, Drum, Zap } from 'lucide-react';
+import { SlidersHorizontal, Drum, Zap, HelpCircle } from 'lucide-react';
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { HelpGuide } from "./help-guide";
 
 
 type BeatPattern = {
@@ -46,7 +47,7 @@ export function BeatBoxControls({
                     <DialogTrigger asChild>
                         <Button variant="outline" className="flex-1">
                             <Drum className="w-4 h-4 md:mr-2" />
-                            <span className="hidden md:inline">Beats</span>
+                            <span className="hidden sm:inline">Beats</span>
                         </Button>
                     </DialogTrigger>
                     <DialogContent>
@@ -74,7 +75,7 @@ export function BeatBoxControls({
                     <DialogTrigger asChild>
                          <Button variant="outline" className="flex-1">
                             <Zap className="w-4 h-4 md:mr-2" />
-                            <span className="hidden md:inline">Tempo</span>
+                            <span className="hidden sm:inline">Tempo</span>
                         </Button>
                     </DialogTrigger>
                     <DialogContent>
@@ -105,7 +106,7 @@ export function BeatBoxControls({
                     <DialogTrigger asChild>
                         <Button variant="outline" className="flex-1 px-2 md:px-4">
                             <SlidersHorizontal className="w-4 h-4 md:mr-2"/>
-                             <span className="hidden md:inline">Mixer</span>
+                             <span className="hidden sm:inline">Mixer</span>
                         </Button>
                     </DialogTrigger>
                     <DialogContent>
@@ -115,6 +116,8 @@ export function BeatBoxControls({
                         <MixerControls volumes={volumes} onVolumeChange={onVolumeChange} />
                     </DialogContent>
                 </Dialog>
+
+                <HelpGuide buttonVariant="outline" buttonClassName="flex-1" />
             </CardContent>
         </Card>
     );

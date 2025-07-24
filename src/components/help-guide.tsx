@@ -12,6 +12,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { HelpCircle } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
+import { cn } from "@/lib/utils";
 
 
 const guideContent = `
@@ -60,12 +61,18 @@ Here you control the rhythm section.
 That's it! Now go make some noise.
 `;
 
-export function HelpGuide() {
+interface HelpGuideProps {
+    buttonVariant?: "outline" | "link" | "default" | "destructive" | "secondary" | "ghost" | null | undefined;
+    buttonClassName?: string;
+}
+
+export function HelpGuide({ buttonVariant = "outline", buttonClassName }: HelpGuideProps) {
     return (
         <Dialog>
             <DialogTrigger asChild>
-                <Button variant="outline" size="icon" className="w-10 h-10 rounded-full">
+                <Button variant={buttonVariant} size="icon" className={cn("w-10 h-10 rounded-full", buttonClassName)}>
                     <HelpCircle className="w-5 h-5" />
+                    <span className="sr-only sm:not-sr-only sm:ml-2 hidden sm:inline">Help</span>
                 </Button>
             </DialogTrigger>
             <DialogContent className="max-w-[90vw] md:max-w-xl lg:max-w-2xl">
