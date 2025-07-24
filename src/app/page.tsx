@@ -393,7 +393,8 @@ export default function Home() {
                 if (quantizedFreq && data && activeNotes.has(data.pointerId)) {
                     const currentFreq = activeNotes.get(data.pointerId);
                     if (currentFreq) {
-                        synth.set({ note: { frequency: quantizedFreq }, volume: -24 + (velocity * 24) });
+                        synth.set({ frequency: quantizedFreq });
+                        synth.set({ volume: -24 + (velocity * 24) });
                         if (currentFreq !== quantizedFreq) {
                            activeNotes.set(data.pointerId, quantizedFreq);
                         }
@@ -407,6 +408,9 @@ export default function Home() {
                         synth.triggerRelease(freqToRelease);
                         activeNotes.delete(data.pointerId);
                     }
+                 } else { // Fallback for safety
+                    synth.releaseAll();
+                    activeNotes.clear();
                  }
                 break;
         }
@@ -433,7 +437,7 @@ export default function Home() {
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
                         <h1 className="text-5xl md:text-8xl lg:text-5xl xl:text-8xl font-bold text-primary sm:text-6xl" style={{fontSize: '48px'}}>EtherMusic</h1>
-                        <p className="text-sm md:text-base text-white/80 font-light mt-2 tracking-wide">
+                        <p className="text-sm md:text-base text-white/80 font-light mt-2 tracking-wide" style={{fontSize: '14px'}}>
                            Neuro Meditation Sound Processor
                         </p>
                     </div>

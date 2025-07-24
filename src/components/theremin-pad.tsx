@@ -147,21 +147,20 @@ export function ThereminPad({
     const handlePointerUpOrLeave = useCallback((event: PointerEvent<HTMLDivElement>) => {
         (event.target as HTMLElement).releasePointerCapture(event.pointerId);
         
-        const interactionData = calculateInteraction(event); // Get data for up event
+        const interactionData = calculateInteraction(event);
         const pointer = activePointers.current.get(event.pointerId);
 
         if (pointer) {
-            if (!(type === 'bass' && isLatchOn)) {
-                // Pass pointer data for release, ensuring correct note is released
+             if (!(type === 'bass' && isLatchOn)) {
                 onInteraction(type, { frequency: pointer.frequency, volume: 0, pointerId: event.pointerId}, 'up');
-                pointer.orb.remove();
+                if (pointer.orb) {
+                    pointer.orb.remove();
+                }
                 activePointers.current.delete(event.pointerId);
-            }
-        } else if (type !== 'bass' || !isLatchOn) {
-            // Fallback for cases where pointer might not be in map
-             if (interactionData) {
-                onInteraction(type, interactionData, 'up');
              }
+        } else {
+             // Fallback for cases where pointer might not be in map, but we still need to send an 'up' event
+             onInteraction(type, interactionData, 'up');
         }
     }, [onInteraction, type, isLatchOn, calculateInteraction]);
     
@@ -173,7 +172,7 @@ export function ThereminPad({
         // Remove orbs for notes that are no longer latched
         activePointers.current.forEach((pointer, id) => {
             if (!latchedIds.has(id)) {
-                pointer.orb.remove();
+                if (pointer.orb) pointer.orb.remove();
                 activePointers.current.delete(id);
             }
         });
