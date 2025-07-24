@@ -40,36 +40,27 @@ export const musicScales: MusicScale[] = ['Major', 'Minor', 'Major Pentatonic', 
 const getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]): number[] => {
     const Tone = require('tone');
 
-    const scaleName = scale.toLowerCase().replace(' ', '_');
-    
-    let notes: string[] = [];
+    let scaleNotes: string[];
 
-    // This is a more robust way to get scale notes in recent Tone.js versions
     try {
-        if (scale.includes('Pentatonic')) {
-            const isMinor = scale.includes('Minor');
-            const sourceScale = isMinor ? Tone.Midi(key + '3').toScale('minor') : Tone.Midi(key + '3').toScale('major');
-            let pentatonicNotes: string[];
-
-            if (isMinor) {
-                 // Minor pentatonic: 1, 3, 4, 5, 7
-                 pentatonicNotes = sourceScale.notes.filter((_: string, i: number) => ![1, 5].includes(i % 7));
-            } else {
-                 // Major pentatonic: 1, 2, 3, 5, 6
-                 pentatonicNotes = sourceScale.notes.filter((_: string, i: number) => ![3, 6].includes(i % 7));
-            }
-            notes = pentatonicNotes;
+        if (scale === 'Major Pentatonic') {
+            const majorScale = Tone.Scale.get(`${key} major`).notes;
+            scaleNotes = majorScale.filter((_: string, i: number) => ![3, 6].includes(i % 7));
+        } else if (scale === 'Minor Pentatonic') {
+            const minorScale = Tone.Scale.get(`${key} minor`).notes;
+            scaleNotes = minorScale.filter((_: string, i: number) => ![1, 5].includes(i % 7));
         } else {
-            notes = Tone.Midi(key + '3').toScale(scaleName).notes;
+            scaleNotes = Tone.Scale.get(`${key} ${scale.toLowerCase()}`).notes;
         }
     } catch (e) {
         console.error("Could not get scale", e);
-        return [];
+        // Fallback to a major scale on error
+        scaleNotes = Tone.Scale.get(`${key} major`).notes;
     }
     
     let allFrequencies: number[] = [];
     octaves.forEach(octave => {
-         const octaveNotes = notes.map(note => `${note.replace(/[0-9]/, '')}${octave}`);
+         const octaveNotes = scaleNotes.map(note => `${note}${octave}`);
          allFrequencies = [...allFrequencies, ...octaveNotes.map(n => Tone.Frequency(n).toFrequency())];
     });
 
