@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { OrbitalAnimation } from '@/components/orbital-animation';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PlaybackControls } from '@/components/playback-controls';
+import { ArrowRight } from 'lucide-react';
 
 
 type BeatPattern = {
@@ -390,15 +391,16 @@ export default function Home() {
             >
                 <OrbitalAnimation />
                 <audio ref={backgroundAudioRef} src="/assets/sounds/ethermusic_start.mp3" loop />
-                <div className="z-10 text-center flex-grow flex flex-col items-center justify-center">
-                    <div className="mb-16">
+                <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
+                    <div>
                         <h1 className="text-6xl md:text-8xl font-bold text-primary">EtherMusic</h1>
                         <p className="text-lg md:text-2xl text-white/80 font-light mt-2 tracking-wider">
                            Neuro Meditation Sound Processor
                         </p>
                     </div>
-                    <Button size="lg" onClick={handleStartApp} className="mt-16">
-                        Start your own neuro meditation
+                    <Button size="lg" onClick={handleStartApp}>
+                        Start Meditation
+                        <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                 </div>
                  <footer className="z-10 text-xs text-white/50 pb-4">
@@ -472,7 +474,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
-
-    
