@@ -79,11 +79,11 @@ export default function Home() {
     
     // Audio state
     const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
-    const [volumes, setVolumes] = useState({ melody: -6, bass: -12, drums: -6 });
+    const [volumes, setVolumes] = useState({ melody: -6, bass: -6, drums: -6 });
     const [effects, setEffects] = useState({
-        melody: { reverb: -Infinity, delay: -Infinity },
-        bass: { reverb: -Infinity, delay: -Infinity },
-        drums: { reverb: -Infinity, delay: -Infinity },
+        melody: { reverb: -60, delay: -60 },
+        bass: { reverb: -60, delay: -60 },
+        drums: { reverb: -60, delay: -60 },
     });
     const [activePattern, setActivePattern] = useState<BeatPattern>(beatPatterns[4]);
     const [melodyInstrument, setMelodyInstrument] = useState<MelodyInstrument>('synth');
@@ -136,14 +136,20 @@ export default function Home() {
             drums: new Tone.Channel(volumes.drums).toDestination(),
         };
 
-        fx.current.reverb.connect(channels.current.melody);
-        fx.current.delay.connect(channels.current.melody);
-
-        fx.current.reverb.connect(channels.current.bass);
-        fx.current.delay.connect(channels.current.bass);
-
-        fx.current.reverb.connect(channels.current.drums);
-        fx.current.delay.connect(channels.current.drums);
+        channels.current.melody.send("reverb", -60);
+        channels.current.melody.send("delay", -60);
+        channels.current.melody.connect(fx.current.reverb);
+        channels.current.melody.connect(fx.current.delay);
+        
+        channels.current.bass.send("reverb", -60);
+        channels.current.bass.send("delay", -60);
+        channels.current.bass.connect(fx.current.reverb);
+        channels.current.bass.connect(fx.current.delay);
+        
+        channels.current.drums.send("reverb", -60);
+        channels.current.drums.send("delay", -60);
+        channels.current.drums.connect(fx.current.reverb);
+        channels.current.drums.connect(fx.current.delay);
 
 
         melodySynth.current = new Tone.PolySynth(Tone.Synth).connect(channels.current.melody);
@@ -425,7 +431,7 @@ export default function Home() {
     }, [volumes, isReady]);
 
     useEffect(() => {
-        if (channels.current && isReady && fx.current) {
+        if (channels.current && isReady) {
             if (channels.current.melody.send) {
                 channels.current.melody.send('reverb', effects.melody.reverb);
                 channels.current.melody.send('delay', effects.melody.delay);
