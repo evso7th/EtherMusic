@@ -305,19 +305,15 @@ export default function Home() {
     }, [isBassPulsating, isPlaying]);
     
     useEffect(() => {
-        if (!isReady) return;
+        if (!isReady || !drumSequence.current) return;
         const Tone = require('tone');
     
-        if (drumSequence.current) {
-            drumSequence.current.clear();
-            drumSequence.current.dispose();
-        }
-    
-        drumSequence.current = new Tone.Sequence((time: any, note: any) => {
-            if (note === 'C1') drumSynths.current?.kick.triggerAttackRelease('C1', '8n', time);
-            if (note === 'G1') drumSynths.current?.snare.triggerAttackRelease('16n', time);
-            if (note === 'D2') drumSynths.current?.hat.triggerAttackRelease('16n', time);
-        }, activePattern.sequence, '8n');
+        drumSequence.current.clear();
+        activePattern.sequence.forEach((note) => {
+             if (note) {
+                drumSequence.current?.add(0, note)
+             }
+        })
     
         if (isPlaying && activePattern.name !== 'Off') {
             drumSequence.current.start(0);
@@ -410,7 +406,7 @@ export default function Home() {
                  if (quantizedFreq && data && activeNotes.has(data.pointerId)) {
                     const currentFreq = activeNotes.get(data.pointerId);
                     const voice = currentFreq ? synth.get(currentFreq) as any : undefined;
-                    if (voice) {
+                    if (voice && voice.frequency && voice.volume) {
                        voice.frequency.rampTo(quantizedFreq, 0.05);
                        voice.volume.rampTo(-24 + (velocity * 24), 0.05);
                        activeNotes.set(data.pointerId, quantizedFreq);
@@ -428,7 +424,7 @@ export default function Home() {
                 }
                 break;
         }
-    }, [isBassLatchOn, latchedBassNotes, allowedFrequencies, isPlaying]);
+    }, [isBassLatchOn, latchedBassNotes, allowedFrequencies, isPlaying, isBassPulsating]);
     
     const handleStartScreenInteraction = () => {
         if (backgroundAudioRef.current && backgroundAudioRef.current.paused) {
