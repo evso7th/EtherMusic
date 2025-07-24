@@ -119,31 +119,35 @@ export default function Home() {
         switch (melodyInstrument) {
             case 'organ':
                 newOptions = {
-                    harmonicity: 5,
-                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 0.5 },
-                    modulationEnvelope: { attack: 0.2, decay: 0.5, sustain: 0.2, release: 0.1 }
+                    harmonicity: 3,
+                    envelope: { attack: 0.1, decay: 0.5, sustain: 0.3, release: 1.2 },
+                    modulation: { type: "sine" },
+                    modulationEnvelope: { attack: 0.5, decay: 0, sustain: 1, release: 0.5 }
                 };
                 break;
             case 'theremin':
                 newOptions = {
-                    harmonicity: 1, // Pure tone
-                    envelope: { attack: 0.1, decay: 0, sustain: 1, release: 0.1 },
-                    modulationEnvelope: { attack: 0.1, decay: 0, sustain: 1, release: 0.1 }
+                    harmonicity: 1, 
+                    envelope: { attack: 0.2, decay: 0, sustain: 1, release: 0.2 },
+                    modulation: { type: "sine" },
+                    modulationEnvelope: { attack: 0.3, decay: 0.2, sustain: 0.5, release: 0.1 }
                 };
                 break;
             case 'glass':
                 newOptions = {
-                    harmonicity: 1.5,
-                    envelope: { attack: 0.01, decay: 0.5, sustain: 0.2, release: 0.8 },
-                    modulationEnvelope: { attack: 0.2, decay: 0.8, sustain: 0.5, release: 0.5 }
+                    harmonicity: 2.5,
+                    envelope: { attack: 0.01, decay: 1.5, sustain: 0.1, release: 2 },
+                    modulation: {type: 'triangle'},
+                    modulationEnvelope: { attack: 0.2, decay: 1, sustain: 0.5, release: 1 }
                 };
                 break;
             case 'synth':
             default:
-                newOptions = {
-                    harmonicity: 1.5,
-                    envelope: { attack: 0.05, decay: 0.3, sustain: 0.6, release: 0.4 },
-                    modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.3, release: 0.1 }
+                 newOptions = {
+                    harmonicity: 0.5, // Warmer, less metallic
+                    envelope: { attack: 0.1, decay: 0.8, sustain: 0.2, release: 1.0 },
+                    modulation: { type: "sawtooth"},
+                    modulationEnvelope: { attack: 0.5, decay: 0.2, sustain: 0.8, release: 0.5 }
                 };
                 break;
         }
@@ -220,6 +224,9 @@ export default function Home() {
                 anchor.href = url;
                 anchor.click();
                 toast({ title: "Recording Stopped", description: "Your recording has been downloaded." });
+                 setTimeout(() => {
+                    URL.revokeObjectURL(url);
+                }, 100);
             });
             setIsRecording(false);
         }
@@ -478,5 +485,7 @@ export default function Home() {
         </div>
     );
 }
+
+    
 
     
