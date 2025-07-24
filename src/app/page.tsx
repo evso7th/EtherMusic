@@ -21,10 +21,10 @@ type BeatPattern = {
 
 
 const beatPatterns: BeatPattern[] = [
-    { name: 'Rock', sequence: ['C1', null, 'G1', null, 'C1', 'C1', 'G1', null] },
-    { name: 'House', sequence: ['C1', 'C1', 'C1', 'C1', 'G1', 'C1', 'G1', 'C1'] },
-    { name: 'Hip Hop', sequence: ['C1', null, 'G1', 'C1', null, 'C1', 'G1', null] },
-    { name: 'Reggae', sequence: [null, 'C1', 'D2', 'G1', null, 'C1', 'D2', null] },
+    { name: 'Rock', sequence: ['C1', null, 'D1', null, 'C1', 'C1', 'D1', null] },
+    { name: 'House', sequence: ['C1', 'E1', 'C1', 'E1', 'D1', 'E1', 'C1', 'E1'] },
+    { name: 'Hip Hop', sequence: ['C1', null, 'E1', null, 'C1', 'D1', 'E1', null] },
+    { name: 'Reggae', sequence: [null, 'C1', 'D1', 'E1', null, 'C1', 'D1', null] },
     { name: 'Off', sequence: [] },
 ];
 
@@ -111,7 +111,7 @@ export default function Home() {
     const audioInitialized = useRef(false);
     const melodySynth = useRef<Tone.PolySynth | null>(null);
     const bassSynth = useRef<Tone.PolySynth | null>(null);
-    const drumSynths = useRef<{ kick: Tone.MembraneSynth, snare: Tone.NoiseSynth, hat: Tone.MetalSynth } | null>(null);
+    const drumSamplers = useRef<Tone.Players | null>(null);
     const channels = useRef<{ melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel } | null>(null);
     const drumSequence = useRef<Tone.Sequence | null>(null);
     const recorder = useRef<Tone.Recorder | null>(null);
@@ -173,16 +173,22 @@ export default function Home() {
             max: 1,
         }).start();
 
-        drumSynths.current = {
-            kick: new Tone.MembraneSynth({ pitchDecay: 0.02, octaves: 6, oscillator: { type: 'sine' }, envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4, attackCurve: 'exponential' } }).connect(channels.current.drums),
-            snare: new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.005, decay: 0.2, sustain: 0 } }).connect(channels.current.drums),
-            hat: new Tone.MetalSynth({ frequency: 200, envelope: { attack: 0.001, decay: 0.1, release: 0.05 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }).connect(channels.current.drums)
-        };
+        drumSamplers.current = new Tone.Players({
+            urls: {
+                C1: "/assets/sounds/kick.mp3",
+                D1: "/assets/sounds/snare.mp3",
+                E1: "/assets/sounds/hat.mp3",
+            },
+            onload: () => {
+                console.log('Drum samples loaded');
+            },
+            onerror: (error) => console.error("Error loading drum samples:", error),
+        }).connect(channels.current.drums);
         
         drumSequence.current = new Tone.Sequence((time, note) => {
-            if (note === 'C1') drumSynths.current?.kick.triggerAttackRelease('C1', '8n', time);
-            if (note === 'G1') drumSynths.current?.snare.triggerAttackRelease('16n', time);
-            if (note === 'D2') drumSynths.current?.hat.triggerAttackRelease('16n', time);
+            if (drumSamplers.current?.loaded && drumSamplers.current.has(note)) {
+                 drumSamplers.current.player(note).start(time);
+            }
         }, [], '8n').start(0);
 
         autopilot.current.bass = new Tone.Part((time, note) => {
@@ -369,9 +375,14 @@ export default function Home() {
     useEffect(() => {
         if (!isReady || !drumSequence.current) return;
         
-        drumSequence.current.clear();
+        drumSequence.current.stop(0).clear();
         if (activePattern.sequence.length > 0) {
-            (drumSequence.current as any).events = activePattern.sequence;
+            activePattern.sequence.forEach((note, i) => {
+                if (note) {
+                    drumSequence.current?.add(i, note);
+                }
+            });
+            drumSequence.current.start(0);
         }
     
     }, [activePattern, isReady]);
@@ -486,13 +497,13 @@ export default function Home() {
     }, [volumes, isReady]);
 
     useEffect(() => {
-        if (channels.current && isReady) {
-            channels.current.melody.send?.('reverb', effects.melody.reverb);
-            channels.current.melody.send?.('delay', effects.melody.delay);
-            channels.current.bass.send?.('reverb', effects.bass.reverb);
-            channels.current.bass.send?.('delay', effects.bass.delay);
-            channels.current.drums.send?.('reverb', effects.drums.reverb);
-            channels.current.drums.send?.('delay', effects.drums.delay);
+        if (channels.current && isReady && fx.current) {
+            channels.current.melody.send('reverb', effects.melody.reverb);
+            channels.current.melody.send('delay', effects.melody.delay);
+            channels.current.bass.send('reverb', effects.bass.reverb);
+            channels.current.bass.send('delay', effects.bass.delay);
+            channels.current.drums.send('reverb', effects.drums.reverb);
+            channels.current.drums.send('delay', effects.drums.delay);
         }
     }, [effects, isReady]);
 
@@ -562,7 +573,7 @@ export default function Home() {
                         synth.triggerRelease([activeNote.freq]);
                         synth.triggerAttack(quantizedFreq, undefined, velocity);
                         activeNotes.current.set(data.pointerId, { type, freq: quantizedFreq });
-                    } else if (synth.get().hasOwnProperty('volume')) {
+                    } else {
                         synth.set({ volume: -48 + (velocity * 48) });
                     }
                 }
@@ -577,12 +588,13 @@ export default function Home() {
                 }
                 
                 let hasActiveNotesForType = false;
-                activeNotes.current.forEach(note => {
+                for (const note of activeNotes.current.values()) {
                     if (note.type === type) {
                         hasActiveNotesForType = true;
+                        break;
                     }
-                });
-
+                }
+                
                 if (!hasActiveNotesForType) {
                     synth.releaseAll();
                 }
