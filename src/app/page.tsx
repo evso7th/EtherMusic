@@ -433,7 +433,7 @@ export default function Home() {
                         />
                     </div>
                 </header>
-                <main className="flex-grow flex flex-col gap-4">
+                <main className="flex-grow flex flex-col gap-4 overflow-hidden">
                     <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4">
                         <ThereminPad
                             title="Bass"
