@@ -149,7 +149,7 @@ export function BeatBoxControls({
                             <DialogHeader>
                                 <DialogTitle>Autopilot Style</DialogTitle>
                             </DialogHeader>
-                            <div className="grid grid-cols-2 gap-2 py-4">
+                            <div className="grid grid-cols-3 gap-2 py-4">
                                 {autopilotStyles.map((style) => (
                                     <Button
                                         key={style}
