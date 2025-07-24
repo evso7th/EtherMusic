@@ -306,14 +306,11 @@ export default function Home() {
     
     useEffect(() => {
         if (!isReady || !drumSequence.current) return;
-        const Tone = require('tone');
-    
+        
         drumSequence.current.clear();
-        activePattern.sequence.forEach((note) => {
-             if (note) {
-                drumSequence.current?.add(0, note)
-             }
-        })
+        if (activePattern.sequence.length > 0) {
+            (drumSequence.current as any).events = activePattern.sequence;
+        }
     
         if (isPlaying && activePattern.name !== 'Off') {
             drumSequence.current.start(0);
@@ -424,7 +421,7 @@ export default function Home() {
                 }
                 break;
         }
-    }, [isBassLatchOn, latchedBassNotes, allowedFrequencies, isPlaying, isBassPulsating]);
+    }, [isBassLatchOn, latchedBassNotes, allowedFrequencies, isPlaying]);
     
     const handleStartScreenInteraction = () => {
         if (backgroundAudioRef.current && backgroundAudioRef.current.paused) {
@@ -546,5 +543,7 @@ export default function Home() {
         </div>
     );
 }
+
+    
 
     
