@@ -31,6 +31,36 @@ const beatPatterns: BeatPattern[] = [
 export type MelodyInstrument = 'synth' | 'organ' | 'theremin' | 'glass';
 const melodyInstruments: MelodyInstrument[] = ['synth', 'organ', 'theremin', 'glass'];
 
+export type MusicKey = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B';
+export const musicKeys: MusicKey[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+export type MusicScale = 'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentatonic';
+export const musicScales: MusicScale[] = ['Major', 'Minor', 'Major Pentatonic', 'Minor Pentatonic'];
+
+const getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]): number[] => {
+    const Tone = require('tone');
+    const scaleType = scale.toLowerCase().replace(' ', '-');
+    let notes: string[] = [];
+    try {
+        notes = Tone.Scale.get(`${key}3 ${scaleType}`).notes;
+    } catch(e) {
+        // Fallback for pentatonic which isn't in Tone.Scale
+        if (scale === 'Major Pentatonic') {
+            notes = Tone.Scale.get(`${key}3 major`).notes.filter((_:string, i:number) => ![3, 6].includes(i % 7));
+        } else if (scale === 'Minor Pentatonic') {
+            notes = Tone.Scale.get(`${key}3 minor`).notes.filter((_:string, i:number) => ![1, 5].includes(i % 7));
+        }
+    }
+    
+    let allFrequencies: number[] = [];
+    octaves.forEach(octave => {
+         const octaveNotes = notes.map(note => `${note.replace(/[0-9]/, '')}${octave}`);
+         allFrequencies = [...allFrequencies, ...octaveNotes.map(n => Tone.Frequency(n).toFrequency())];
+    });
+
+    return allFrequencies;
+};
+
 
 export default function Home() {
     const { toast } = useToast();
@@ -45,6 +75,12 @@ export default function Home() {
     const [volumes, setVolumes] = useState({ melody: -6, bass: -12, drums: -6 });
     const [activePattern, setActivePattern] = useState<BeatPattern>(beatPatterns[4]);
     const [melodyInstrument, setMelodyInstrument] = useState<MelodyInstrument>('synth');
+
+    // --- New Harmony State ---
+    const [musicKey, setMusicKey] = useState<MusicKey>('C');
+    const [musicScale, setMusicScale] = useState<MusicScale>('Major Pentatonic');
+    const [allowedFrequencies, setAllowedFrequencies] = useState<number[]>([]);
+
 
     // Bass specific state
     const [isBassPulsating, setIsBassPulsating] = useState(false);
@@ -111,18 +147,25 @@ export default function Home() {
         setIsReady(true);
     }, [volumes.melody, volumes.bass, volumes.drums, tempo]);
     
+    // Update allowed frequencies when key or scale changes
+    useEffect(() => {
+        if (!isReady) return;
+        const freqs = getScaleFrequencies(musicKey, musicScale, [3, 4, 5]);
+        setAllowedFrequencies(freqs);
+    }, [musicKey, musicScale, isReady]);
+
     useEffect(() => {
         if (!isReady || !melodySynth.current) return;
         
         let newOptions;
 
         switch (melodyInstrument) {
-            case 'organ':
+             case 'organ':
                 newOptions = {
                     harmonicity: 3,
                     envelope: { attack: 0.1, decay: 0.5, sustain: 0.3, release: 1.2 },
                     modulation: { type: "sine" },
-                    modulationEnvelope: { attack: 0.5, decay: 0, sustain: 1, release: 0.5 }
+                    modulationEnvelope: { attack: 0.5, decay: 0.2, sustain: 0.8, release: 0.5 }
                 };
                 break;
             case 'theremin':
@@ -137,14 +180,14 @@ export default function Home() {
                 newOptions = {
                     harmonicity: 2.5,
                     envelope: { attack: 0.01, decay: 1.5, sustain: 0.1, release: 2 },
-                    modulation: {type: 'triangle'},
+                    modulation: {type: 'sine'},
                     modulationEnvelope: { attack: 0.2, decay: 1, sustain: 0.5, release: 1 }
                 };
                 break;
             case 'synth':
             default:
                  newOptions = {
-                    harmonicity: 0.5, // Warmer, less metallic
+                    harmonicity: 0.5, 
                     envelope: { attack: 0.1, decay: 0.8, sustain: 0.2, release: 1.0 },
                     modulation: { type: "sawtooth"},
                     modulationEnvelope: { attack: 0.5, decay: 0.2, sustain: 0.8, release: 0.5 }
@@ -224,9 +267,8 @@ export default function Home() {
                 anchor.href = url;
                 anchor.click();
                 toast({ title: "Recording Stopped", description: "Your recording has been downloaded." });
-                 setTimeout(() => {
-                    URL.revokeObjectURL(url);
-                }, 100);
+                 // URL.revokeObjectURL(url) should not be called immediately.
+                 // The browser needs time to initiate the download.
             });
             setIsRecording(false);
         }
@@ -319,6 +361,12 @@ export default function Home() {
         }
     }, [latchedBassNote, isPlaying, isBassPulsating]);
 
+    const getClosestFrequency = (targetFreq: number) => {
+        if (allowedFrequencies.length === 0) return targetFreq;
+        return allowedFrequencies.reduce((prev, curr) => {
+            return (Math.abs(curr - targetFreq) < Math.abs(prev - targetFreq) ? curr : prev);
+        });
+    };
 
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isPlaying || !audioInitialized.current) return;
@@ -361,14 +409,16 @@ export default function Home() {
             if (!synth) return;
     
             if (data && state === 'down' && data.frequency) {
+                const quantizedFreq = getClosestFrequency(data.frequency);
                 const velocity = data.volume; 
-                synth.triggerAttack(data.frequency, undefined, velocity);
+                synth.triggerAttack(quantizedFreq, undefined, velocity);
 
             } else if (state === 'up' && data?.frequency) {
-                synth.triggerRelease(data.frequency);
+                 const quantizedFreq = getClosestFrequency(data.frequency);
+                synth.triggerRelease(quantizedFreq);
             }
         }
-    }, [isPlaying, isBassLatchOn, latchedBassNote, isBassPulsating]);
+    }, [isPlaying, isBassLatchOn, latchedBassNote, isBassPulsating, allowedFrequencies]);
     
     const handleStartScreenInteraction = () => {
         if (backgroundAudioRef.current && backgroundAudioRef.current.paused) {
@@ -390,7 +440,7 @@ export default function Home() {
                 <audio ref={backgroundAudioRef} src="/assets/sounds/ethermusic_start.mp3" loop />
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
-                        <h1 className="text-5xl md:text-8xl font-bold text-primary">EtherMusic</h1>
+                        <h1 className="text-5xl md:text-8xl lg:text-5xl font-bold text-primary">EtherMusic</h1>
                         <p className="text-lg md:text-2xl text-white/80 font-light mt-2 tracking-wider">
                            Neuro Meditation Sound Processor
                         </p>
@@ -467,6 +517,12 @@ export default function Home() {
                             instruments={melodyInstruments}
                             activeInstrument={melodyInstrument}
                             onInstrumentChange={setMelodyInstrument}
+                            musicKeys={musicKeys}
+                            activeKey={musicKey}
+                            onKeyChange={setMusicKey}
+                            musicScales={musicScales}
+                            activeScale={musicScale}
+                            onScaleChange={setMusicScale}
                         />
                     </div>
                     <div className="flex-shrink-0">
@@ -485,6 +541,8 @@ export default function Home() {
         </div>
     );
 }
+
+    
 
     
 

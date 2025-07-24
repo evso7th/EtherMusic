@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Zap, Anchor } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { MelodyInstrument } from '@/app/page';
+import type { MelodyInstrument, MusicKey, MusicScale } from '@/app/page';
 
 interface ThereminPadProps {
     title: string;
@@ -18,11 +18,19 @@ interface ThereminPadProps {
     onInteraction: (type: 'melody' | 'bass', params: { frequency: number; volume: number } | null, state: 'down' | 'move' | 'up') => void;
     frequencyRange: [number, number];
     color: string;
-    isPulsating?: boolean;
-    onPulsateToggle?: () => void;
+    // Melody specific
     instruments?: MelodyInstrument[];
     activeInstrument?: MelodyInstrument;
     onInstrumentChange?: (instrument: MelodyInstrument) => void;
+    musicKeys?: MusicKey[];
+    activeKey?: MusicKey;
+    onKeyChange?: (key: MusicKey) => void;
+    musicScales?: MusicScale[];
+    activeScale?: MusicScale;
+    onScaleChange?: (scale: MusicScale) => void;
+    // Bass specific
+    isPulsating?: boolean;
+    onPulsateToggle?: () => void;
     isLatchOn?: boolean;
     onLatchToggle?: (checked: boolean) => void;
     isLatched?: boolean;
@@ -46,6 +54,12 @@ export function ThereminPad({
     instruments, 
     activeInstrument, 
     onInstrumentChange,
+    musicKeys,
+    activeKey,
+    onKeyChange,
+    musicScales,
+    activeScale,
+    onScaleChange,
     isLatchOn,
     onLatchToggle,
     isLatched,
@@ -182,6 +196,66 @@ export function ThereminPad({
         }
     }, [latchedNotePosition, frequencyRange, type]);
 
+    const renderMelodyControls = () => (
+        <>
+            {musicKeys && activeKey && onKeyChange && (
+                 <Select value={activeKey} onValueChange={onKeyChange}>
+                    <SelectTrigger className="w-[60px] h-8 text-xs">
+                        <SelectValue placeholder="Key" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {musicKeys.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            )}
+            {musicScales && activeScale && onScaleChange && (
+                 <Select value={activeScale} onValueChange={onScaleChange}>
+                    <SelectTrigger className="w-[120px] h-8 text-xs">
+                        <SelectValue placeholder="Scale" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {musicScales.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            )}
+            {instruments && activeInstrument && onInstrumentChange && (
+                <Select value={activeInstrument} onValueChange={onInstrumentChange}>
+                    <SelectTrigger className="w-[90px] capitalize h-8 text-xs">
+                        <SelectValue placeholder="Instrument" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {instruments.map(inst => (
+                            <SelectItem key={inst} value={inst} className="capitalize">{inst}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            )}
+        </>
+    );
+
+    const renderBassControls = () => (
+        <>
+            {onLatchToggle && (
+                <div className="flex items-center space-x-1">
+                    <Switch id="latch-mode" checked={isLatchOn} onCheckedChange={onLatchToggle} />
+                    <Label htmlFor="latch-mode" className="flex items-center gap-1 text-xs"><Anchor className="w-3 h-3" /> Latch</Label>
+                </div>
+            )}
+            {onPulsateToggle && (
+                 <Button
+                    variant={(isPulsating || isLatched) ? 'default' : 'outline'}
+                    size="icon"
+                    onClick={onPulsateToggle}
+                    className={cn('transition-all w-8 h-8', (isPulsating || isLatched) && 'animate-pulse-accent')}
+                    style={{ '--accent': 'hsl(var(--accent))' } as React.CSSProperties}
+
+                 >
+                     <Zap className="w-4 h-4" />
+                 </Button>
+            )}
+        </>
+    );
+
     return (
         <Card className={cn(
             "flex flex-col h-full bg-card/50 border-2 border-transparent transition-all duration-300",
@@ -190,36 +264,7 @@ export function ThereminPad({
             <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between p-2">
                 <CardTitle className="text-base font-bold" style={{ color }}>{title}</CardTitle>
                 <div className="flex items-center gap-2">
-                    {instruments && activeInstrument && onInstrumentChange && (
-                        <Select value={activeInstrument} onValueChange={onInstrumentChange}>
-                            <SelectTrigger className="w-[90px] capitalize h-8 text-xs">
-                                <SelectValue placeholder="Instrument" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {instruments.map(inst => (
-                                    <SelectItem key={inst} value={inst} className="capitalize">{inst}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    )}
-                     {onLatchToggle && (
-                        <div className="flex items-center space-x-1">
-                            <Switch id="latch-mode" checked={isLatchOn} onCheckedChange={onLatchToggle} />
-                            <Label htmlFor="latch-mode" className="flex items-center gap-1 text-xs"><Anchor className="w-3 h-3" /> Latch</Label>
-                        </div>
-                    )}
-                    {onPulsateToggle && (
-                         <Button
-                            variant={(isPulsating || isLatched) ? 'default' : 'outline'}
-                            size="icon"
-                            onClick={onPulsateToggle}
-                            className={cn('transition-all w-8 h-8', (isPulsating || isLatched) && 'animate-pulse-accent')}
-                            style={{ '--accent': 'hsl(var(--accent))' } as React.CSSProperties}
-
-                         >
-                             <Zap className="w-4 h-4" />
-                         </Button>
-                    )}
+                   {type === 'melody' ? renderMelodyControls() : renderBassControls()}
                 </div>
             </CardHeader>
             <CardContent className="flex-grow p-0">
