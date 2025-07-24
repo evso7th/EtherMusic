@@ -90,9 +90,9 @@
 
 @keyframes pulse {
   0%, 100% {
-    transform: rotateX(60deg) rotateZ(-30deg) scale(1);
+    transform: scale(1);
   }
   50% {
-    transform: rotateX(60deg) rotateZ(-30deg) scale(1.05);
+    transform: scale(1.05);
   }
 }
