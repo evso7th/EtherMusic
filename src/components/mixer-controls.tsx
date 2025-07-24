@@ -21,30 +21,66 @@ interface MixerControlsProps {
     onEffectChange: (effects: MixerControlsProps['effects']) => void;
 }
 
-const VolumeSlider = ({ label, icon: Icon, value, onChange, min = -48, max = 6, step = 1, showValue = false }: { 
+
+const EffectSlider = ({ label, value, onChange, min = -60, max = 0, step = 1 }: { 
     label: string; 
-    icon: React.ElementType;
     value: number;
     onChange: (value: number) => void;
     min?: number;
     max?: number;
     step?: number;
-    showValue?: boolean;
 }) => (
-    <div className="space-y-3 p-2">
-        <div className="flex items-center gap-2">
-            <Icon className="w-5 h-5 text-primary" />
-            <Label className="text-md font-medium">{label}</Label>
-        </div>
+    <div className="grid grid-cols-4 items-center gap-2">
+        <Label className="text-xs text-muted-foreground col-span-1">{label}</Label>
+        <Slider
+            className="col-span-3"
+            min={min}
+            max={max}
+            step={step}
+            value={[value]}
+            onValueChange={(v) => onChange(v[0])}
+        />
+    </div>
+);
+
+const InstrumentControls = ({
+    label,
+    icon: Icon,
+    volume,
+    reverb,
+    delay,
+    onVolumeChange,
+    onReverbChange,
+    onDelayChange,
+}: {
+    label: string,
+    icon: React.ElementType,
+    volume: number,
+    reverb: number,
+    delay: number,
+    onVolumeChange: (v: number) => void,
+    onReverbChange: (v: number) => void,
+    onDelayChange: (v: number) => void,
+}) => (
+    <div>
         <div className="flex items-center gap-4">
-            <Slider
-                min={min}
-                max={max}
-                step={step}
-                value={[value]}
-                onValueChange={(v) => onChange(v[0])}
-            />
-            {showValue && <span className="text-sm font-mono w-12 text-center">{value.toFixed(0)}</span>}
+            <div className="flex flex-col items-center gap-1 w-12">
+                <Icon className="w-6 h-6 text-primary" />
+                <Label className="text-sm font-medium">{label}</Label>
+            </div>
+            <div className="flex-grow space-y-2">
+                 <Slider
+                    min={-48}
+                    max={6}
+                    step={1}
+                    value={[volume]}
+                    onValueChange={(v) => onVolumeChange(v[0])}
+                />
+                <div className="space-y-2">
+                    <EffectSlider label="Reverb" value={reverb} onChange={onReverbChange} />
+                    <EffectSlider label="Delay" value={delay} onChange={onDelayChange} />
+                </div>
+            </div>
         </div>
     </div>
 );
@@ -63,45 +99,39 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
     };
 
     return (
-        <div className="p-2 space-y-4">
-            <div>
-                <VolumeSlider 
-                    label="Melody"
-                    icon={Music}
-                    value={volumes.melody}
-                    onChange={(v) => onVolumeChange({ ...volumes, melody: v })}
-                />
-                 <div className="pl-8 space-y-2">
-                    <VolumeSlider label="Reverb" icon={Wind} min={-60} max={0} value={effects.melody.reverb} onChange={(v) => handleEffectChange('melody', 'reverb', v)} />
-                    <VolumeSlider label="Delay" icon={Orbit} min={-60} max={0} value={effects.melody.delay} onChange={(v) => handleEffectChange('melody', 'delay', v)} />
-                </div>
-            </div>
+        <div className="p-1 space-y-3">
+            <InstrumentControls 
+                label="Melody"
+                icon={Music}
+                volume={volumes.melody}
+                reverb={effects.melody.reverb}
+                delay={effects.melody.delay}
+                onVolumeChange={(v) => onVolumeChange({ ...volumes, melody: v })}
+                onReverbChange={(v) => handleEffectChange('melody', 'reverb', v)}
+                onDelayChange={(v) => handleEffectChange('melody', 'delay', v)}
+            />
             <Separator />
-             <div>
-                <VolumeSlider 
-                    label="Bass"
-                    icon={Waves}
-                    value={volumes.bass}
-                    onChange={(v) => onVolumeChange({ ...volumes, bass: v })}
-                />
-                 <div className="pl-8 space-y-2">
-                    <VolumeSlider label="Reverb" icon={Wind} min={-60} max={0} value={effects.bass.reverb} onChange={(v) => handleEffectChange('bass', 'reverb', v)} />
-                    <VolumeSlider label="Delay" icon={Orbit} min={-60} max={0} value={effects.bass.delay} onChange={(v) => handleEffectChange('bass', 'delay', v)} />
-                </div>
-            </div>
+            <InstrumentControls 
+                label="Bass"
+                icon={Waves}
+                volume={volumes.bass}
+                reverb={effects.bass.reverb}
+                delay={effects.bass.delay}
+                onVolumeChange={(v) => onVolumeChange({ ...volumes, bass: v })}
+                onReverbChange={(v) => handleEffectChange('bass', 'reverb', v)}
+                onDelayChange={(v) => handleEffectChange('bass', 'delay', v)}
+            />
             <Separator />
-            <div>
-                 <VolumeSlider 
-                    label="Drums"
-                    icon={Drum}
-                    value={volumes.drums}
-                    onChange={(v) => onVolumeChange({ ...volumes, drums: v })}
-                />
-                 <div className="pl-8 space-y-2">
-                    <VolumeSlider label="Reverb" icon={Wind} min={-60} max={0} value={effects.drums.reverb} onChange={(v) => handleEffectChange('drums', 'reverb', v)} />
-                    <VolumeSlider label="Delay" icon={Orbit} min={-60} max={0} value={effects.drums.delay} onChange={(v) => handleEffectChange('drums', 'delay', v)} />
-                </div>
-            </div>
+            <InstrumentControls 
+                label="Drums"
+                icon={Drum}
+                volume={volumes.drums}
+                reverb={effects.drums.reverb}
+                delay={effects.drums.delay}
+                onVolumeChange={(v) => onVolumeChange({ ...volumes, drums: v })}
+                onReverbChange={(v) => handleEffectChange('drums', 'reverb', v)}
+                onDelayChange={(v) => handleEffectChange('drums', 'delay', v)}
+            />
         </div>
     );
 }
