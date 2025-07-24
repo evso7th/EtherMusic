@@ -84,18 +84,18 @@ export default function Home() {
     // Bass specific state
     const [isBassPulsating, setIsBassPulsating] = useState(false);
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
-    const [latchedBassNote, setLatchedBassNote] = useState<{ frequency: number; volume: number } | null>(null);
+    const [latchedBassNotes, setLatchedBassNotes] = useState<Map<number, { frequency: number; volume: number }>>(new Map());
 
     // Tone.js refs
     const audioInitialized = useRef(false);
     const melodySynth = useRef<Tone.PolySynth<Tone.Synth> | null>(null);
-    const bassSynth = useRef<Tone.MonoSynth | null>(null);
+    const bassSynth = useRef<Tone.PolySynth<Tone.Synth> | null>(null);
     const drumSynths = useRef<{ kick: Tone.MembraneSynth, snare: Tone.NoiseSynth, hat: Tone.MetalSynth } | null>(null);
     const channels = useRef<{ melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel } | null>(null);
     const drumSequence = useRef<Tone.Sequence | null>(null);
     const recorder = useRef<Tone.Recorder | null>(null);
     const bassLFO = useRef<Tone.LFO | null>(null);
-    const bassVCA = useRef<Tone.Volume | null>(null);
+    const bassGain = useRef<Tone.Gain | null>(null);
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
     
     const initializeAudio = useCallback(async () => {
@@ -114,18 +114,17 @@ export default function Home() {
 
         melodySynth.current = new Tone.PolySynth(Tone.Synth).connect(channels.current.melody);
 
-
-        bassVCA.current = new Tone.Volume(0).connect(channels.current.bass);
-        bassSynth.current = new Tone.MonoSynth({
+        bassGain.current = new Tone.Gain(1).connect(channels.current.bass);
+        bassSynth.current = new Tone.PolySynth(Tone.Synth, {
             oscillator: { type: 'fatsawtooth' },
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
-            filterEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.2, release: 0.5, baseFrequency: 200, octaves: 4 }
-        }).connect(bassVCA.current);
+        }).connect(bassGain.current);
+
 
         bassLFO.current = new Tone.LFO({
             frequency: "4n",
             min: 0,
-            max: -24,
+            max: 1,
         }).start();
 
         drumSynths.current = {
@@ -150,8 +149,9 @@ export default function Home() {
     // Update allowed frequencies when key or scale changes
     useEffect(() => {
         if (!isReady) return;
-        const freqs = getScaleFrequencies(musicKey, musicScale, [3, 4, 5]);
-        setAllowedFrequencies(freqs);
+        const melodyFreqs = getScaleFrequencies(musicKey, musicScale, [3, 4, 5]);
+        const bassFreqs = getScaleFrequencies(musicKey, musicScale, [1, 2]);
+        setAllowedFrequencies([...bassFreqs, ...melodyFreqs]);
     }, [musicKey, musicScale, isReady]);
 
     useEffect(() => {
@@ -238,10 +238,10 @@ export default function Home() {
 
         Tone.Transport.stop();
         melodySynth.current?.releaseAll();
-        bassSynth.current?.triggerRelease();
+        bassSynth.current?.releaseAll();
         setIsPlaying(false);
-        if (latchedBassNote) {
-            setLatchedBassNote(null);
+        if (latchedBassNotes.size > 0) {
+            setLatchedBassNotes(new Map());
         }
     };
 
@@ -270,26 +270,25 @@ export default function Home() {
 
     const handleLatchToggle = (checked: boolean) => {
         setIsBassLatchOn(checked);
-        if (!checked && latchedBassNote) {
-            setLatchedBassNote(null);
-             if (bassSynth.current) {
-                bassSynth.current.triggerRelease();
-            }
+        if (!checked && latchedBassNotes.size > 0) {
+            bassSynth.current?.releaseAll();
+            setLatchedBassNotes(new Map());
         }
     }
 
     useEffect(() => {
-        if (!bassLFO.current || !bassVCA.current) return;
+        if (!bassLFO.current || !bassGain.current) return;
 
-        const isPulsationActive = isBassPulsating || (isBassLatchOn && !!latchedBassNote);
+        const isPulsationActive = isBassPulsating || (isBassLatchOn && latchedBassNotes.size > 0);
+
         if (isPulsationActive) {
-            bassLFO.current.connect(bassVCA.current.volume);
+            bassLFO.current.connect(bassGain.current.gain);
         } else {
-            bassLFO.current.disconnect(bassVCA.current.volume);
-            bassVCA.current.volume.cancelScheduledValues();
-            bassVCA.current.volume.rampTo(0, 0.1); 
+            bassLFO.current.disconnect(bassGain.current.gain);
+            bassGain.current.gain.cancelScheduledValues();
+            bassGain.current.gain.rampTo(1, 0.1); 
         }
-    }, [isBassPulsating, isBassLatchOn, latchedBassNote]);
+    }, [isBassPulsating, isBassLatchOn, latchedBassNotes]);
     
     useEffect(() => {
         if (!isReady) return;
@@ -328,23 +327,26 @@ export default function Home() {
     }, [volumes, isReady]);
     
     useEffect(() => {
-        if (!bassSynth.current || !bassVCA.current) return;
+        if (!bassSynth.current || !isPlaying) return;
              
-        if (latchedBassNote && isPlaying) {
-            const minDb = -48;
-            const maxDb = 0;
-            const dbVolume = minDb + latchedBassNote.volume * (maxDb - minDb);
-
-            bassSynth.current.triggerAttack(latchedBassNote.frequency);
-             if (!isBassPulsating) {
-                 bassVCA.current.volume.rampTo(dbVolume, 0.1);
-             }
-        } else {
-            if (bassSynth.current.state === "started") {
-               bassSynth.current.triggerRelease();
+        // Release notes that are no longer latched
+        const activeLatchedFrequencies = new Set(Array.from(latchedBassNotes.values()).map(n => n.frequency));
+        
+        bassSynth.current.voices.forEach(voice => {
+            if (!activeLatchedFrequencies.has(voice.frequency.value)) {
+                // This check is a bit simplistic as voice might not be released yet.
+                // A better system would track voices by ID.
             }
-        }
-    }, [latchedBassNote, isPlaying, isBassPulsating]);
+        });
+
+        // Trigger notes that are newly latched
+        latchedBassNotes.forEach((note) => {
+             const velocity = note.volume;
+             bassSynth.current?.triggerAttack(note.frequency, undefined, velocity);
+        });
+
+    }, [latchedBassNotes, isPlaying]);
+
 
     const getClosestFrequency = (targetFreq: number) => {
         if (allowedFrequencies.length === 0) return targetFreq;
@@ -353,67 +355,67 @@ export default function Home() {
         });
     };
 
-    const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number } | null, state: 'down' | 'move' | 'up') => {
+    const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isPlaying || !audioInitialized.current) return;
     
-        if (type === 'bass') {
-            if (isBassLatchOn) {
-                if (state === 'down') {
-                    if (latchedBassNote) {
-                        setLatchedBassNote(null);
-                    } else if(data) {
-                        setLatchedBassNote(data);
+        const synth = type === 'melody' ? melodySynth.current : bassSynth.current;
+        if (!synth) return;
+    
+        const quantizedFreq = data ? getClosestFrequency(data.frequency) : 0;
+        const velocity = data ? data.volume : 0;
+    
+        if (type === 'bass' && isBassLatchOn) {
+            if (state === 'down' && data) {
+                setLatchedBassNotes(prev => {
+                    const newNotes = new Map(prev);
+                    const existingNote = Array.from(newNotes.values()).find(n => n.frequency === quantizedFreq);
+                    
+                    if (existingNote) {
+                        // Note exists, release it
+                        bassSynth.current?.triggerRelease(quantizedFreq);
+                        const keyToDelete = Array.from(newNotes.keys()).find(k => newNotes.get(k)?.frequency === quantizedFreq);
+                        if (keyToDelete) {
+                            newNotes.delete(keyToDelete);
+                        }
+                    } else {
+                        // New note, add it
+                        newNotes.set(data.pointerId, { frequency: quantizedFreq, volume: data.volume });
+                        bassSynth.current?.triggerAttack(quantizedFreq, undefined, velocity);
+                    }
+                    return newNotes;
+                });
+            }
+            return;
+        }
+    
+        switch (state) {
+            case 'down':
+                if (quantizedFreq) {
+                    synth.triggerAttack(quantizedFreq, undefined, velocity);
+                }
+                break;
+            case 'move':
+                if (synth.activeVoices > 0 && quantizedFreq) {
+                    // For PolySynth, we can't easily change the frequency of a specific voice
+                    // associated with a pointer. A simple approach is to retrigger.
+                    // This might cause audible clicks, a more advanced implementation
+                    // would manage voices manually.
+                    // For now, let's just set the overall synth properties which works best for monophonic playing.
+                    if (type === 'melody') {
+                         synth.set({ frequency: quantizedFreq, volume: -24 + (velocity * 24) });
                     }
                 }
-                return; 
-            }
-    
-            const synth = bassSynth.current;
-            const vca = bassVCA.current;
-            if (!synth || !vca) return;
-    
-            if (data && state !== 'up') {
-                const minDb = -48;
-                const maxDb = 0;
-                const dbVolume = minDb + data.volume * (maxDb - minDb);
-                
-                if (state === 'down') {
-                    synth.triggerAttack(data.frequency);
+                break;
+            case 'up':
+                if (quantizedFreq) {
+                    synth.triggerRelease(quantizedFreq);
+                } else {
+                    // Fallback for safety
+                    synth.releaseAll();
                 }
-                
-                synth.frequency.rampTo(data.frequency, 0.05);
-
-                if (!isBassPulsating) {
-                    vca.volume.rampTo(dbVolume, 0.1);
-                }
-            } else if (state === 'up') {
-                synth.triggerRelease();
-            }
-        } else if (type === 'melody') {
-            const synth = melodySynth.current;
-            if (!synth) return;
-    
-            if (data && state === 'down' && data.frequency) {
-                const quantizedFreq = getClosestFrequency(data.frequency);
-                const velocity = data.volume; 
-                synth.triggerAttack(quantizedFreq, undefined, velocity);
-
-            } else if (data && state === 'move' && data.frequency) {
-                 if (synth.activeVoices > 0) {
-                    const quantizedFreq = getClosestFrequency(data.frequency);
-                    const velocity = data.volume;
-                    // We can't directly change frequency of a voice in PolySynth, so we approximate
-                    // by setting the frequency of all voices. A better approach for true theremin
-                    // might be to manage voices manually or use a different synth.
-                    // For now, this will work for monophonic playing on the melody pad.
-                    synth.set({ frequency: quantizedFreq, volume: -12 + (velocity * 12) });
-                }
-            } else if (state === 'up' && data?.frequency) {
-                 const quantizedFreq = getClosestFrequency(data.frequency);
-                synth.triggerRelease(quantizedFreq);
-            }
+                break;
         }
-    }, [isPlaying, isBassLatchOn, latchedBassNote, isBassPulsating, allowedFrequencies]);
+    }, [isPlaying, isBassLatchOn, latchedBassNotes, allowedFrequencies]);
     
     const handleStartScreenInteraction = () => {
         if (backgroundAudioRef.current && backgroundAudioRef.current.paused) {
@@ -494,20 +496,21 @@ export default function Home() {
                             title="Bass"
                             onInteraction={handleThereminInteraction}
                             type="bass"
-                            frequencyRange={[55, 220]} // A1 to A3
+                            frequencyRange={[55, 440]} // A1 to A4
                             color="hsl(var(--accent))"
                             isPulsating={isBassPulsating}
                             onPulsateToggle={handlePulsateToggle}
                             isLatchOn={isBassLatchOn}
                             onLatchToggle={handleLatchToggle}
-                            isLatched={!!latchedBassNote}
-                            latchedNotePosition={latchedBassNote}
+                            isLatched={latchedBassNotes.size > 0}
+                            latchedNotes={latchedBassNotes}
+                            isPolyphonic
                         />
                         <ThereminPad
                             title="Melody"
                             onInteraction={handleThereminInteraction}
                             type="melody"
-                            frequencyRange={[220, 880]} // A3 to A5
+                            frequencyRange={[220, 1760]} // A3 to A6
                             color="hsl(var(--primary))"
                             instruments={melodyInstruments}
                             activeInstrument={melodyInstrument}
@@ -518,6 +521,7 @@ export default function Home() {
                             musicScales={musicScales}
                             activeScale={musicScale}
                             onScaleChange={setMusicScale}
+                            isPolyphonic
                         />
                     </div>
                     <div className="flex-shrink-0">

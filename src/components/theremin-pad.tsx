@@ -2,8 +2,8 @@
 "use client";
 
 import type { PointerEvent } from 'react';
-import { useRef, useCallback, useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useRef, useCallback, useEffect } from 'react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -15,9 +15,10 @@ import type { MelodyInstrument, MusicKey, MusicScale } from '@/app/page';
 interface ThereminPadProps {
     title: string;
     type: 'melody' | 'bass';
-    onInteraction: (type: 'melody' | 'bass', params: { frequency: number; volume: number } | null, state: 'down' | 'move' | 'up') => void;
+    onInteraction: (type: 'melody' | 'bass', params: { frequency: number; volume: number; pointerId: number } | null, state: 'down' | 'move' | 'up') => void;
     frequencyRange: [number, number];
     color: string;
+    isPolyphonic?: boolean;
     // Melody specific
     instruments?: MelodyInstrument[];
     activeInstrument?: MelodyInstrument;
@@ -34,7 +35,7 @@ interface ThereminPadProps {
     isLatchOn?: boolean;
     onLatchToggle?: (checked: boolean) => void;
     isLatched?: boolean;
-    latchedNotePosition?: { frequency: number; volume: number } | null;
+    latchedNotes?: Map<number, { frequency: number; volume: number }>;
 }
 
 interface PointerState {
@@ -48,7 +49,8 @@ export function ThereminPad({
     type, 
     onInteraction, 
     frequencyRange, 
-    color, 
+    color,
+    isPolyphonic = false,
     isPulsating, 
     onPulsateToggle, 
     instruments, 
@@ -63,15 +65,11 @@ export function ThereminPad({
     isLatchOn,
     onLatchToggle,
     isLatched,
-    latchedNotePosition,
+    latchedNotes,
 }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
     const activePointers = useRef<Map<number, PointerState>>(new Map());
     
-    // For bass theremin which is monophonic
-    const bassOrbRef = useRef<HTMLDivElement>(null);
-    const isPointerDown = useRef(false);
-
     const calculateInteraction = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (!padRef.current) return null;
         const rect = padRef.current.getBoundingClientRect();
@@ -88,7 +86,7 @@ export function ThereminPad({
         
         const volume = 1 - normalizedY;
         
-        return { x, y, frequency, volume };
+        return { x, y, frequency, volume, pointerId: event.pointerId };
     }, [frequencyRange]);
 
 
@@ -114,38 +112,26 @@ export function ThereminPad({
         
         onInteraction(type, interactionData, 'down');
 
-        if (type === 'melody') {
+        if (isPolyphonic) {
             const orb = createOrb(interactionData.x, interactionData.y);
             if(orb) {
                 const newPointer = { id: event.pointerId, orb, frequency: interactionData.frequency };
                 activePointers.current.set(event.pointerId, newPointer);
             }
-        } else {
-            isPointerDown.current = true;
-            if (bassOrbRef.current && !isLatched) {
-                bassOrbRef.current.style.opacity = '1';
-                bassOrbRef.current.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
-            }
         }
-    }, [calculateInteraction, onInteraction, type, isLatched, color]);
+    }, [calculateInteraction, onInteraction, type, color, isPolyphonic]);
 
     const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
         const interactionData = calculateInteraction(event);
         if (!interactionData) return;
         
+        if (!activePointers.current.has(event.pointerId)) return;
+
         onInteraction(type, interactionData, 'move');
 
-        if (type === 'melody') {
-            const pointer = activePointers.current.get(event.pointerId);
-            if (pointer && pointer.orb) {
-                pointer.orb.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
-            }
-        } else {
-            if (isPointerDown.current) {
-                 if (bassOrbRef.current) {
-                    bassOrbRef.current.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
-                 }
-            }
+        const pointer = activePointers.current.get(event.pointerId);
+        if (pointer && pointer.orb) {
+            pointer.orb.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
         }
 
     }, [calculateInteraction, onInteraction, type]);
@@ -153,30 +139,33 @@ export function ThereminPad({
     const handlePointerUpOrLeave = useCallback((event: PointerEvent<HTMLDivElement>) => {
         (event.target as HTMLElement).releasePointerCapture(event.pointerId);
         
-        if (type === 'melody') {
-            const pointer = activePointers.current.get(event.pointerId);
-            if (pointer) {
-                onInteraction(type, { frequency: pointer.frequency, volume: 0}, 'up');
-                pointer.orb.remove();
-                activePointers.current.delete(event.pointerId);
-            }
-        } else {
-            if (isPointerDown.current) {
-                isPointerDown.current = false;
-                if (bassOrbRef.current && !isLatched) {
-                    bassOrbRef.current.style.opacity = '0';
-                }
-                onInteraction(type, null, 'up');
-            }
+        const pointer = activePointers.current.get(event.pointerId);
+        if (pointer) {
+            onInteraction(type, { frequency: pointer.frequency, volume: 0, pointerId: event.pointerId}, 'up');
+            pointer.orb.remove();
+            activePointers.current.delete(event.pointerId);
         }
-    }, [onInteraction, type, isLatched]);
+    }, [onInteraction, type]);
     
     useEffect(() => {
-        if (type === 'bass' && !padRef.current || !bassOrbRef.current) return;
+        if (type !== 'bass' || !isLatchOn || !latchedNotes) return;
+        
+        const latchedIds = new Set(latchedNotes.keys());
 
-        if (latchedNotePosition) {
-            const rect = padRef.current!.getBoundingClientRect();
-            const { frequency, volume } = latchedNotePosition;
+        // Remove orbs for notes that are no longer latched
+        activePointers.current.forEach((pointer, id) => {
+            if (!latchedIds.has(id)) {
+                pointer.orb.remove();
+                activePointers.current.delete(id);
+            }
+        });
+
+        // Add or update orbs for latched notes
+        latchedNotes.forEach((note, id) => {
+            const rect = padRef.current?.getBoundingClientRect();
+            if (!rect) return;
+
+            const { frequency, volume } = note;
             const [minFreq, maxFreq] = frequencyRange;
 
             const logMin = Math.log(minFreq);
@@ -186,15 +175,24 @@ export function ThereminPad({
 
             const x = normalizedX * rect.width;
             const y = normalizedY * rect.height;
-            
-            bassOrbRef.current!.style.transform = `translate(${x}px, ${y}px)`;
-            bassOrbRef.current!.style.opacity = '1';
-        } else {
-             if (!isPointerDown.current) {
-                if(bassOrbRef.current) bassOrbRef.current.style.opacity = '0';
-             }
-        }
-    }, [latchedNotePosition, frequencyRange, type]);
+
+            let pointer = activePointers.current.get(id);
+            if (!pointer) {
+                const orb = createOrb(x, y);
+                if (orb) {
+                    pointer = { id, orb, frequency };
+                    activePointers.current.set(id, pointer);
+                }
+            }
+            if (pointer?.orb) {
+                pointer.orb.style.transform = `translate(${x}px, ${y}px)`;
+                pointer.orb.style.opacity = '1';
+            }
+        });
+
+
+    }, [latchedNotes, isLatchOn, frequencyRange, type, color]);
+
 
     const renderMelodyControls = () => (
         <>
@@ -261,8 +259,7 @@ export function ThereminPad({
             "flex flex-col h-full bg-card/50 border-2 border-transparent transition-all duration-300",
             (isLatched) && type === 'bass' && "border-accent ring-4 ring-accent/50",
         )}>
-            <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between p-2">
-                <CardTitle className="text-base font-bold" style={{ color }}>{title}</CardTitle>
+            <CardHeader className="flex-shrink-0 flex flex-row items-center justify-end p-2">
                 <div className="flex items-center gap-2">
                    {type === 'melody' ? renderMelodyControls() : renderBassControls()}
                 </div>
@@ -284,22 +281,11 @@ export function ThereminPad({
                         `,
                     }}
                 >
-                    {type === 'bass' && <div
-                        ref={bassOrbRef}
-                        className={cn(
-                            'absolute top-0 left-0 rounded-full w-8 h-8 md:w-12 md:h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-0',
-                             (isPointerDown.current || isLatched) && 'opacity-100',
-                             (isPulsating || isLatched) ? 'animate-pulse-accent' : ''
-                        )}
-                        style={{
-                            backgroundColor: color,
-                            animationDuration: '1s',
-                        }}
-                    />}
+                    <div className="absolute inset-0 flex items-center justify-center text-5xl md:text-7xl font-bold text-foreground/10 pointer-events-none uppercase tracking-widest">
+                        {title} Pad
+                    </div>
                 </div>
             </CardContent>
         </Card>
     );
 }
-
-    
