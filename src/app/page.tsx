@@ -203,7 +203,7 @@ export default function Home() {
         
         Tone.Transport.bpm.value = activeTempo.bpm;
         setIsReady(true);
-    }, [activeTempo.bpm, effects.bass.delay, effects.bass.reverb, effects.drums.delay, effects.drums.reverb, effects.melody.delay, effects.melody.reverb, volumes.bass, volumes.drums, volumes.melody]);
+    }, []);
     
     // Update allowed frequencies when key or scale changes
     useEffect(() => {
@@ -562,14 +562,8 @@ export default function Home() {
                         synth.triggerRelease([activeNote.freq]);
                         synth.triggerAttack(quantizedFreq, undefined, velocity);
                         activeNotes.current.set(data.pointerId, { type, freq: quantizedFreq });
-                    } else {
-                        // This handles volume changes while holding a note
-                        const currentVolume = -48 + (velocity * 48);
-                        if (type === 'melody') {
-                            (melodySynth.current?.get() as any).volume = currentVolume;
-                        } else {
-                            (bassSynth.current?.get() as any).volume = currentVolume;
-                        }
+                    } else if (synth.get().hasOwnProperty('volume')) {
+                        (synth.get() as any).volume.value = -48 + (velocity * 48);
                     }
                 }
                 break;
@@ -724,3 +718,4 @@ export default function Home() {
         </div>
     );
 }
+
