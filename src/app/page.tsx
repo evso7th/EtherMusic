@@ -329,15 +329,16 @@ export default function Home() {
     useEffect(() => {
         if (!bassSynth.current || !isPlaying) return;
              
-        // Release notes that are no longer latched
         const activeLatchedFrequencies = new Set(Array.from(latchedBassNotes.values()).map(n => n.frequency));
         
-        bassSynth.current.voices.forEach(voice => {
-            if (!activeLatchedFrequencies.has(voice.frequency.value)) {
-                // This check is a bit simplistic as voice might not be released yet.
-                // A better system would track voices by ID.
-            }
-        });
+        if (bassSynth.current.voices) {
+            bassSynth.current.voices.forEach(voice => {
+                if (!activeLatchedFrequencies.has(voice.frequency.value)) {
+                    // This check is a bit simplistic as voice might not be released yet.
+                    // A better system would track voices by ID.
+                }
+            });
+        }
 
         // Trigger notes that are newly latched
         latchedBassNotes.forEach((note) => {
@@ -395,14 +396,11 @@ export default function Home() {
                 }
                 break;
             case 'move':
-                if (synth.activeVoices > 0 && quantizedFreq) {
-                    // For PolySynth, we can't easily change the frequency of a specific voice
-                    // associated with a pointer. A simple approach is to retrigger.
-                    // This might cause audible clicks, a more advanced implementation
-                    // would manage voices manually.
-                    // For now, let's just set the overall synth properties which works best for monophonic playing.
-                    if (type === 'melody') {
-                         synth.set({ frequency: quantizedFreq, volume: -24 + (velocity * 24) });
+                 if (synth.activeVoices > 0 && quantizedFreq) {
+                    const activeVoice = synth.get(quantizedFreq);
+                    if (activeVoice) {
+                       (activeVoice as any).frequency.value = quantizedFreq;
+                       (activeVoice as any).volume.value = -24 + (velocity * 24);
                     }
                 }
                 break;
