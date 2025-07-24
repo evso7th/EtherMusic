@@ -21,9 +21,9 @@ type BeatPattern = {
 
 
 const beatPatterns: BeatPattern[] = [
-    { name: 'Rock', sequence: ['C1', null, 'G1', null, 'C1', null, 'G1', 'D2'] },
-    { name: 'House', sequence: ['C1', 'D2', 'C1', 'D2', 'G1', 'D2', 'G1', 'D2'] },
-    { name: 'Hip Hop', sequence: ['C1', null, 'G1', 'D2', 'C1', null, 'G1', null] },
+    { name: 'Rock', sequence: ['C1', null, 'G1', null, 'C1', 'C1', 'G1', null] },
+    { name: 'House', sequence: ['C1', 'C1', 'C1', 'C1', 'G1', 'C1', 'G1', 'C1'] },
+    { name: 'Hip Hop', sequence: ['C1', null, 'G1', 'C1', null, 'C1', 'G1', null] },
     { name: 'Reggae', sequence: [null, 'C1', 'D2', 'G1', null, 'C1', 'D2', null] },
     { name: 'Off', sequence: [] },
 ];
@@ -719,5 +719,7 @@ export default function Home() {
     );
 }
 
+
+    
 
     
