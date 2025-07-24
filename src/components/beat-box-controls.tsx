@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { MixerControls } from '@/components/mixer-controls';
 import { SlidersHorizontal, Drum, Zap } from 'lucide-react';
 import { useState } from "react";
+import { cn } from "@/lib/utils";
+
 
 type BeatPattern = {
     name: string;
@@ -43,8 +45,8 @@ export function BeatBoxControls({
                 <Dialog open={isBeatsOpen} onOpenChange={setIsBeatsOpen}>
                     <DialogTrigger asChild>
                         <Button variant="outline" className="flex-1">
-                            <Drum className="w-4 h-4 mr-2" />
-                            Beats
+                            <Drum className="w-4 h-4 md:mr-2" />
+                            <span className="hidden md:inline">Beats</span>
                         </Button>
                     </DialogTrigger>
                     <DialogContent>
@@ -70,9 +72,9 @@ export function BeatBoxControls({
 
                 <Dialog open={isTempoOpen} onOpenChange={setIsTempoOpen}>
                     <DialogTrigger asChild>
-                        <Button variant="outline" className="flex-1">
-                            <Zap className="w-4 h-4 mr-2" />
-                            Tempo
+                         <Button variant="outline" className="flex-1">
+                            <Zap className="w-4 h-4 md:mr-2" />
+                            <span className="hidden md:inline">Tempo</span>
                         </Button>
                     </DialogTrigger>
                     <DialogContent>
@@ -101,9 +103,9 @@ export function BeatBoxControls({
 
                 <Dialog>
                     <DialogTrigger asChild>
-                        <Button variant="outline" className="flex-1">
-                            <SlidersHorizontal className="w-4 h-4 mr-2"/>
-                            Mixer
+                        <Button variant="outline" className="flex-1 px-2 md:px-4">
+                            <SlidersHorizontal className="w-4 h-4 md:mr-2"/>
+                             <span className="hidden md:inline">Mixer</span>
                         </Button>
                     </DialogTrigger>
                     <DialogContent>
