@@ -18,12 +18,18 @@ type BeatPattern = {
     sequence: (string | null)[];
 };
 
+export type Tempo = {
+    name: string;
+    bpm: number;
+};
+
 interface BeatBoxControlsProps {
     patterns: BeatPattern[];
     activePattern: BeatPattern;
     onPatternChange: (pattern: BeatPattern) => void;
-    tempo: number;
-    onTempoChange: (tempo: number) => void;
+    tempos: Tempo[];
+    activeTempo: Tempo;
+    onTempoChange: (tempo: Tempo) => void;
     volumes: { melody: number; bass: number; drums: number };
     onVolumeChange: (volumes: { melody: number; bass: number; drums: number; }) => void;
     effects: {
@@ -40,7 +46,8 @@ export function BeatBoxControls({
     patterns,
     activePattern,
     onPatternChange,
-    tempo,
+    tempos,
+    activeTempo,
     onTempoChange,
     volumes,
     onVolumeChange,
@@ -94,22 +101,21 @@ export function BeatBoxControls({
                         <DialogHeader>
                             <DialogTitle>Adjust Tempo</DialogTitle>
                         </DialogHeader>
-                        <div className="py-4 space-y-4">
-                             <div className="flex-grow flex items-center gap-4">
-                                <Slider
-                                    id="tempo"
-                                    min={60}
-                                    max={240}
-                                    step={1}
-                                    value={[tempo]}
-                                    onValueChange={(value) => onTempoChange(value[0])}
-                                    className="w-full"
-                                />
-                                <span className="text-lg font-mono w-16 text-center p-2 rounded-md bg-muted">{tempo}</span>
-                            </div>
-                            <DialogClose asChild>
-                                <Button className="w-full">Done</Button>
-                            </DialogClose>
+                        <div className="grid grid-cols-1 gap-2 py-4">
+                            {tempos.map((tempo) => (
+                                <Button
+                                    key={tempo.name}
+                                    variant={activeTempo.name === tempo.name ? 'default' : 'outline'}
+                                    onClick={() => {
+                                        onTempoChange(tempo);
+                                        setIsTempoOpen(false);
+                                    }}
+                                    className="flex justify-between w-full"
+                                >
+                                    <span>{tempo.name}</span>
+                                    <span className="text-sm text-muted-foreground">{tempo.bpm} BPM</span>
+                                </Button>
+                            ))}
                         </div>
                     </DialogContent>
                 </Dialog>

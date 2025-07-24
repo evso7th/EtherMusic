@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type * as Tone from 'tone';
 import { Button } from "@/components/ui/button";
 import { ThereminPad } from '@/components/theremin-pad';
-import { BeatBoxControls } from '@/components/beat-box-controls';
+import { BeatBoxControls, type Tempo } from '@/components/beat-box-controls';
 import { useToast } from "@/hooks/use-toast";
 import { OrbitalAnimation } from '@/components/orbital-animation';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -26,6 +26,14 @@ const beatPatterns: BeatPattern[] = [
     { name: 'Hip Hop', sequence: ['C1', null, 'G1', 'D2', 'C1', null, 'G1', null] },
     { name: 'Reggae', sequence: [null, 'C1', 'D2', 'G1', null, 'C1', 'D2', null] },
     { name: 'Off', sequence: [] },
+];
+
+export const tempos: Tempo[] = [
+    { name: 'Largo', bpm: 50 },
+    { name: 'Adagio', bpm: 70 },
+    { name: 'Andante', bpm: 90 },
+    { name: 'Moderato', bpm: 110 },
+    { name: 'Allegretto', bpm: 130 },
 ];
 
 export type MelodyInstrument = 'synth' | 'organ' | 'theremin' | 'glass';
@@ -70,7 +78,7 @@ export default function Home() {
     const [isRecording, setIsRecording] = useState(false);
     
     // Audio state
-    const [tempo, setTempo] = useState(120);
+    const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
     const [volumes, setVolumes] = useState({ melody: -6, bass: -12, drums: -6 });
     const [effects, setEffects] = useState({
         melody: { reverb: -Infinity, delay: -Infinity },
@@ -128,20 +136,14 @@ export default function Home() {
             drums: new Tone.Channel(volumes.drums).toDestination(),
         };
 
-        channels.current.melody.send('reverb', effects.melody.reverb);
-        channels.current.melody.connect(fx.current.reverb);
-        channels.current.melody.send('delay', effects.melody.delay);
-        channels.current.melody.connect(fx.current.delay);
+        channels.current.melody.connect(fx.current.reverb).connect(channels.current.melody);
+        channels.current.melody.connect(fx.current.delay).connect(channels.current.melody);
 
-        channels.current.bass.send('reverb', effects.bass.reverb);
-        channels.current.bass.connect(fx.current.reverb);
-        channels.current.bass.send('delay', effects.bass.delay);
-        channels.current.bass.connect(fx.current.delay);
+        channels.current.bass.connect(fx.current.reverb).connect(channels.current.bass);
+        channels.current.bass.connect(fx.current.delay).connect(channels.current.bass);
 
-        channels.current.drums.send('reverb', effects.drums.reverb);
-        channels.current.drums.connect(fx.current.reverb);
-        channels.current.drums.send('delay', effects.drums.delay);
-        channels.current.drums.connect(fx.current.delay);
+        channels.current.drums.connect(fx.current.reverb).connect(channels.current.drums);
+        channels.current.drums.connect(fx.current.delay).connect(channels.current.drums);
 
 
         melodySynth.current = new Tone.PolySynth(Tone.Synth).connect(channels.current.melody);
@@ -188,9 +190,9 @@ export default function Home() {
         recorder.current = new Tone.Recorder();
         Tone.getDestination().connect(recorder.current);
         
-        Tone.Transport.bpm.value = tempo;
+        Tone.Transport.bpm.value = activeTempo.bpm;
         setIsReady(true);
-    }, [volumes.melody, volumes.bass, volumes.drums, tempo, effects]);
+    }, [volumes.melody, volumes.bass, volumes.drums, activeTempo.bpm, effects]);
     
     // Update allowed frequencies when key or scale changes
     useEffect(() => {
@@ -408,11 +410,11 @@ export default function Home() {
     useEffect(() => {
         if (!isReady) return;
         const Tone = require('tone');
-        Tone.Transport.bpm.value = tempo;
+        Tone.Transport.bpm.value = activeTempo.bpm;
         if (bassLFO.current) {
             bassLFO.current.frequency.value = Tone.Transport.bpm.value / 60 * 2;
         }
-    }, [tempo, isReady]);
+    }, [activeTempo, isReady]);
 
     useEffect(() => {
         if (channels.current && isReady) {
@@ -510,7 +512,7 @@ export default function Home() {
                 }
                 break;
             case 'up':
-                if (data && activeNotes.has(data.pointerId)) {
+                 if (data && activeNotes.has(data.pointerId)) {
                     const freqToRelease = activeNotes.get(data.pointerId);
                     if (freqToRelease) synth.triggerRelease([freqToRelease]);
                     activeNotes.delete(data.pointerId);
@@ -535,7 +537,7 @@ export default function Home() {
                 <div className="absolute top-4 right-4 z-20">
                     <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
                 </div>
-                <OrbitalAnimation />
+                <OrbitalAnimation isPlaying={false} tempo={activeTempo.bpm}/>
                 <audio ref={backgroundAudioRef} src="/assets/sounds/ethermusic_start.mp3" loop />
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
@@ -573,7 +575,7 @@ export default function Home() {
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
             <div className="fixed inset-0 z-0">
-                 <OrbitalAnimation isPlaying={isPlaying} />
+                 <OrbitalAnimation isPlaying={isPlaying && isBassPulsating} tempo={activeTempo.bpm} />
             </div>
             <div className="relative z-10 flex flex-col h-full p-4 md:p-6 lg:p-8">
                 <header className="flex-shrink-0 flex items-center justify-between mb-4">
@@ -628,8 +630,9 @@ export default function Home() {
                             patterns={beatPatterns}
                             activePattern={activePattern}
                             onPatternChange={setActivePattern}
-                            tempo={tempo}
-                            onTempoChange={setTempo}
+                            tempos={tempos}
+                            activeTempo={activeTempo}
+                            onTempoChange={setActiveTempo}
                             volumes={volumes}
                             onVolumeChange={setVolumes}
                             effects={effects}
@@ -643,5 +646,7 @@ export default function Home() {
         </div>
     );
 }
+
+    
 
     
