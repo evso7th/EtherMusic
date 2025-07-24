@@ -66,12 +66,9 @@ export default function Home() {
     
     useEffect(() => {
         if (backgroundAudioRef.current) {
-            if (!isAppStarted) {
-                backgroundAudioRef.current.volume = 0.3;
-                backgroundAudioRef.current.play().catch(error => console.error("Autoplay failed", error));
-            } else {
-                backgroundAudioRef.current.pause();
-                backgroundAudioRef.current.currentTime = 0;
+            if (isAppStarted && !backgroundAudioRef.current.paused) {
+                 backgroundAudioRef.current.pause();
+                 backgroundAudioRef.current.currentTime = 0;
             }
         }
     }, [isAppStarted]);
@@ -178,6 +175,11 @@ export default function Home() {
             }
         }
         
+        if (backgroundAudioRef.current) {
+            backgroundAudioRef.current.volume = 0.3;
+            backgroundAudioRef.current.play().catch(error => console.error("Error playing background audio:", error));
+        }
+
         const Tone = await import('tone');
         await Tone.start();
         await initializeAudio();
