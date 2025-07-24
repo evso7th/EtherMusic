@@ -394,15 +394,21 @@ export default function Home() {
                 break;
             case 'move':
                 if (quantizedFreq && data && activeNotes.has(data.pointerId)) {
-                    // This method is better for PolySynth as it sets properties for all voices.
-                    // It creates a smoother "legato" or "theremin" effect.
-                    synth.set({
-                        frequency: quantizedFreq,
-                    });
-                     // Adjust volume for the specific channel
-                    if (channels.current) {
-                        const newVolume = -48 + (velocity * 48); // Scale volume from 0-1 to -48-0 dB
-                        channels.current.melody.volume.rampTo(newVolume, 0.05);
+                    const newVolume = -48 + (velocity * 48); // Scale volume from 0-1 to -48-0 dB
+                    if (type === 'melody' && melodySynth.current) {
+                        melodySynth.current.set({ 
+                            frequency: quantizedFreq,
+                        });
+                        if(channels.current) {
+                             channels.current.melody.volume.rampTo(newVolume, 0.05);
+                        }
+                    } else if (type === 'bass' && bassSynth.current) {
+                         bassSynth.current.set({
+                            frequency: quantizedFreq
+                        });
+                        if (channels.current) {
+                            channels.current.bass.volume.rampTo(newVolume, 0.05);
+                        }
                     }
                 }
                 break;
@@ -411,9 +417,6 @@ export default function Home() {
                     const freqToRelease = activeNotes.get(data.pointerId);
                     if (freqToRelease) synth.triggerRelease([freqToRelease]);
                     activeNotes.delete(data.pointerId);
-                } else if (!isPolyphonic) { // Only release all if not polyphonic to avoid killing other notes
-                    synth.releaseAll();
-                    activeNotes.clear();
                 }
                 break;
         }
