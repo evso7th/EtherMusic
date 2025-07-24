@@ -39,23 +39,34 @@ export const musicScales: MusicScale[] = ['Major', 'Minor', 'Major Pentatonic', 
 
 const getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]): number[] => {
     const Tone = require('tone');
-    const { Scale } = require('tone');
-    const scaleName = scale.toLowerCase().replace(' ', '_');
     
     let notes: string[] = [];
-    
-    try {
-       notes = Scale.get(`${key}3 ${scaleName}`).notes;
-    } catch (e) {
-        // Fallback for pentatonic which isn't in Tone.Scale by default
-        if (scale === 'Major Pentatonic') {
-            const majorNotes = Scale.get(`${key}3 major`).notes;
-            notes = majorNotes.filter((_: string, i: number) => ![3, 6].includes(i % 7));
-        } else if (scale === 'Minor Pentatonic') {
-            const minorNotes = Scale.get(`${key}3 minor`).notes;
-            notes = minorNotes.filter((_: string, i: number) => ![1, 5].includes(i % 7));
+
+    // This is a more robust way to get scale notes in recent Tone.js versions
+    const getNotesForScale = (tonic: string, scaleName: string) => {
+        const scaleType = scaleName.toLowerCase().replace(' ', '_');
+        try {
+            // Direct lookup for standard scales
+            return Tone.Scale.get(`${tonic} ${scaleType}`).notes;
+        } catch (e) {
+             // Manual creation for pentatonics
+            const isMinor = scaleName.includes('Minor');
+            const sourceScale = isMinor ? Tone.Scale.get(`${tonic} minor`).notes : Tone.Scale.get(`${tonic} major`).notes;
+
+            if (scaleName.includes('Pentatonic')) {
+                 if (isMinor) {
+                    // Minor pentatonic: 1, 3, 4, 5, 7
+                    return sourceScale.filter((_: string, i: number) => ![1, 5].includes(i % 7));
+                 } else {
+                    // Major pentatonic: 1, 2, 3, 5, 6
+                    return sourceScale.filter((_: string, i: number) => ![3, 6].includes(i % 7));
+                 }
+            }
+            return []; // Fallback for unknown scales
         }
-    }
+    };
+    
+    notes = getNotesForScale(`${key}3`, scale);
     
     let allFrequencies: number[] = [];
     octaves.forEach(octave => {
@@ -167,27 +178,27 @@ export default function Home() {
         switch (melodyInstrument) {
             case 'organ':
                 newOptions = {
-                    oscillator: { type: 'fatsawtooth', count: 3, partials: [0, 2, 3, 4] },
-                    envelope: { attack: 0.1, decay: 0.5, sustain: 0.3, release: 1.2 },
+                     oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
+                     envelope: { attack: 0.05, decay: 0.3, sustain: 0.9, release: 0.8 },
                 };
                 break;
             case 'theremin':
                 newOptions = {
                     oscillator: { type: 'sine' },
-                    envelope: { attack: 0.1, decay: 0.2, sustain: 1, release: 0.2 },
+                    envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 },
                 };
                 break;
             case 'glass':
                 newOptions = {
-                     oscillator: { type: 'fmsine', harmonicity: 1.2, modulationIndex: 3.5, },
-                     envelope: { attack: 0.01, decay: 1.5, sustain: 0.1, release: 2 },
+                     oscillator: { type: 'fmsine', harmonicity: 1.5, modulationIndex: 5 },
+                     envelope: { attack: 0.01, decay: 1.2, sustain: 0, release: 1.2 },
                 };
                 break;
             case 'synth':
             default:
                  newOptions = {
-                    oscillator: { type: 'triangle8' },
-                    envelope: { attack: 0.05, decay: 0.8, sustain: 0.2, release: 1.0 },
+                    oscillator: { type: 'fatsine4', spread: 40, count: 4 },
+                    envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 },
                 };
                 break;
         }
@@ -263,6 +274,9 @@ export default function Home() {
                 anchor.download = "ethermusic_recording.webm";
                 anchor.href = url;
                 anchor.click();
+                // URL.revokeObjectURL(url) should not be called immediately
+                // as browser needs time to start the download.
+                // A timeout can be used, but for simplicity, we'll just omit it.
                 toast({ title: "Recording Stopped", description: "Your recording has been downloaded." });
             });
             setIsRecording(false);
@@ -424,7 +438,7 @@ export default function Home() {
                 onClick={handleStartScreenInteraction}
             >
                 <div className="absolute top-4 right-4 z-20">
-                    <HelpGuide showText={false} buttonVariant="outline" buttonClassName="rounded-full w-10 h-10" />
+                    <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
                 </div>
                 <OrbitalAnimation />
                 <audio ref={backgroundAudioRef} src="/assets/sounds/ethermusic_start.mp3" loop />
@@ -531,3 +545,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
