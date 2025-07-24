@@ -26,8 +26,6 @@ It's a virtual music box, a "Neuro Meditation Sound Processor." Think of it as a
 
 Our application is at the intersection of a creative tool, a meditation aid, and a digital wellness gadget. It is not for professional musicians, but for a wide audience that appreciates ambient music, mindfulness, and is looking for new forms of self-expression and relaxation.
 
-This is truly a tool for those who carry music in their souls but, for various reasons, cannot express it through traditional instruments. It gives everyone the opportunity to feel like a composer.
-
 ## The Big Pads (Theremins)
 
 There are two large, glowing pads. They are your main instruments.
@@ -38,29 +36,42 @@ There are two large, glowing pads. They are your main instruments.
 
 ### Melody Pad (Right, Purple)
 
-*   This is for your main tune.
-*   You can play multiple notes at the same time (polyphonic).
-*   **Change Instrument:** Use the dropdown menu at the top of the pad to switch between sounds like \`synth\`, \`organ\`, \`theremin\`, or \`glass\`. You can change any of these instruments on the fly, even during playback!
+*   This is for your main tune. You can play multiple notes at once (it's polyphonic).
+*   **Settings:** Use the \`Settings\` button at the top of the pad to open a panel where you can change the **Instrument** (\`synth\`, \`organ\`, etc.), **Music Key**, and **Music Scale** to match your mood.
 
 ### Bass Pad (Left, Blue)
 
-*   This is for your bass line. It only plays one note at a time.
-*   **Pulsate (\`Zap\` Icon):** Makes the sound throb in time with the beat. It's great for rhythmic bass.
-*   **Latch (\`Anchor\` Icon):** "Holds" a note for you. Tap the switch to turn Latch mode on. Then, tap on the pad to start a note, and tap again to stop it. No need to hold your finger down.
+*   This is for your bass line. It's polyphonic, so you can play up to four notes at the same time to create chords.
+*   **Pulsate (\`Zap\` Icon):** Makes the sound throb in time with the beat. It affects all sounding bass notes.
+*   **Latch (\`Anchor\` Icon):** "Holds" notes for you. Tap the switch to turn Latch mode on.
+    *   **To add a note:** Tap on the pad. A glowing orb will appear.
+    *   **To remove a note:** Tap on an existing orb to stop that specific note.
 
 ## Bottom Control Bar
 
-Here you control the rhythm section. You can change any of these settings on the fly, even during playback!
+Here you control the rhythm and atmosphere.
 
-*   **Beats:** Tap this to open a menu and choose a pre-made drum pattern (\`Rock\`, \`House\`, etc.). Select \`Off\` to have no drums.
-*   **Tempo:** Tap this to open a slider that changes the speed of the beat (BPM - Beats Per Minute).
-*   **Mixer:** Tap this to open the volume controls. You can adjust the volume for the **Melody**, **Bass**, and **Drums** separately.
+*   **Beats:** Choose a pre-made drum pattern or select \`Off\` for no drums.
+*   **Tempo:** Select a tempo from a list of descriptive names, from slow \`Largo\` to moderate \`Moderato\`.
+*   **Mixer:** This is your command center for sound. Adjust the **Volume**, **Reverb** (space), and **Delay** (echo) for the Melody, Bass, and Drums separately.
+
+### Autopilot Mode
+
+Don't want to play yourself? Turn on the **Autopilot**!
+*   **Autopilot (\`Bot\` Icon):** Turns on the automatic music generator. The app will start creating its own bass and melody lines based on your settings. You can still play along on the melody pad!
+*   **Style (\`Wand\` Icon):** When Autopilot is on, this button becomes active. Choose a style to change how the Autopilot generates music:
+    *   **Ambient:** Slow, evolving soundscapes.
+    *   **House:** Gentle, rhythmic patterns.
+    *   **Wind:** Light, airy, and spacious melodies.
+    *   **Sequence:** Hypnotic, repeating arpeggios.
+    *   **Chimes:** The sound of tinkling glass or metal chimes.
+    *   **Drone:** A deep, continuous, and immersive background tone.
 
 ## Top Right Controls
 
-*   **Play/Pause:** Starts and stops the master clock and the drum sequence.
+*   **Play/Pause:** Starts and stops the master clock, drums, and Autopilot.
 *   **Stop:** Stops all sounds immediately.
-*   **Record (\`Mic\` Icon):** Press it to start recording your session. Press it again to stop. Your recording will be downloaded automatically as a \`.webm\` file.
+*   **Record (\`Mic\` Icon):** Press to start recording your session. Press again to stop. Your recording will be downloaded automatically as a \`.webm\` file.
 
 Enjoy the process and let the music you create reflect your inner state.
 `;
