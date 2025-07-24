@@ -21,9 +21,9 @@ type BeatPattern = {
 
 
 const beatPatterns: BeatPattern[] = [
-    { name: 'Rock', sequence: ['C1', null, 'D1', null, 'C1', null, 'D1', null] },
+    { name: 'Rock', sequence: ['C1', null, 'D1', null, 'C1', null, 'D1', 'E1'] },
     { name: 'House', sequence: ['C1', 'C1', 'D1', 'C1', 'C1', 'C1', 'D1', 'C1'] },
-    { name: 'Hip Hop', sequence: ['C1', null, 'D1', null, null, 'C1', null, 'D1'] },
+    { name: 'Hip Hop', sequence: ['C1', null, 'D1', 'C1', null, 'C1', 'D1', null] },
     { name: 'Reggae', sequence: [null, 'C1', 'D1', 'E1', null, 'C1', 'D1', null] },
     { name: 'Off', sequence: [] },
 ];
@@ -209,7 +209,7 @@ export default function Home() {
         
         Tone.Transport.bpm.value = activeTempo.bpm;
         setIsReady(true);
-    }, [volumes, effects]);
+    }, [volumes.melody, volumes.bass, volumes.drums, effects.melody.reverb, effects.melody.delay, effects.bass.reverb, effects.bass.delay, effects.drums.reverb, effects.drums.delay, activeTempo.bpm]);
     
     // Update allowed frequencies when key or scale changes
     useEffect(() => {
@@ -374,15 +374,16 @@ export default function Home() {
     // Drum machine logic
     useEffect(() => {
         if (!isReady || !drumSequence.current) return;
-        
-        drumSequence.current.clear();
+    
+        drumSequence.current.stop(0).clear();
+    
         if (activePattern.sequence.length > 0) {
-            drumSequence.current.events = []; // Clear previous events
             activePattern.sequence.forEach((note, i) => {
                 if (note) {
-                    drumSequence.current?.add(i, note);
+                    drumSequence.current?.add(i * (drumSequence.current.subdivision as number), note);
                 }
             });
+            drumSequence.current.start(0);
         }
     
     }, [activePattern, isReady]);
@@ -392,7 +393,9 @@ export default function Home() {
         const bassPart = autopilot.current.bass;
         const melodyPart = autopilot.current.melody;
 
-        if (isAutopilotOn && isPlaying && bassPart && melodyPart && allowedFrequencies.bass.length > 0 && allowedFrequencies.melody.length > 0) {
+        const regeneratePatterns = () => {
+            if (!bassPart || !melodyPart || !allowedFrequencies.bass.length || !allowedFrequencies.melody.length) return;
+            
             bassPart.clear();
             melodyPart.clear();
             
@@ -467,10 +470,12 @@ export default function Home() {
 
             bassPattern.forEach(note => bassPart.add(note.time, note));
             melodyPattern.forEach(note => melodyPart.add(note.time, note));
-
-            bassPart.start(0);
-            melodyPart.start(0);
-
+        };
+        
+        if (isAutopilotOn && isPlaying) {
+            regeneratePatterns();
+            bassPart?.start(0);
+            melodyPart?.start(0);
         } else if (bassPart && melodyPart) {
             bassPart.stop(0).clear();
             melodyPart.stop(0).clear();
@@ -735,4 +740,5 @@ export default function Home() {
     
 
     
+
 
