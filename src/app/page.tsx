@@ -403,8 +403,9 @@ export default function Home() {
                         <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                 </div>
-                 <footer className="z-10 text-xs text-white/50 pb-4">
-                    Based on theremin technology (c) 2025, EVS
+                 <footer className="z-10 text-xs text-white/50 pb-4 text-center">
+                    <p>Powered by theremin technology</p>
+                    <p>&copy; 2005, EVS</p>
                 </footer>
             </div>
         )
@@ -474,3 +475,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
