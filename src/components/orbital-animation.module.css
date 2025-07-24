@@ -33,6 +33,10 @@
   box-shadow: 0 0 120px hsl(var(--primary)), inset 0 0 120px hsl(var(--primary));
 }
 
+.view.pulsating .circle {
+  animation: pulse var(--pulse-duration) infinite ease-in-out;
+}
+
 .circle::before,
 .circle::after {
   content: '';
@@ -81,5 +85,15 @@
   }
   100% {
     transform: rotateX(60deg) rotateZ(-30deg) rotateY(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
   }
 }

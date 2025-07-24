@@ -393,18 +393,14 @@ export default function Home() {
                 }
                 break;
             case 'move':
-                 if (data && activeNotes.has(data.pointerId)) {
+                if (data && activeNotes.has(data.pointerId)) {
                     const activeFreq = activeNotes.get(data.pointerId);
-                    // This check prevents re-triggering the same note, which can cause clicks
                     if (activeFreq && quantizedFreq !== activeFreq) {
                         synth.set({ frequency: quantizedFreq });
                         activeNotes.set(data.pointerId, quantizedFreq);
                     }
-                    // Always update volume
-                    const newVolume = -48 + (velocity * 48); // Scale volume from 0-1 to -48-0 dB
-                    if (synth.get().volume) {
-                        synth.set({ volume: newVolume });
-                    }
+                    const newVolume = -48 + (velocity * 48);
+                    synth.set({ volume: newVolume });
                 }
                 break;
             case 'up':
@@ -471,7 +467,7 @@ export default function Home() {
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
             <div className="fixed inset-0 z-0">
-                <OrbitalAnimation />
+                 <OrbitalAnimation isPlaying={isPlaying} tempo={tempo} />
             </div>
             <div className="relative z-10 flex flex-col h-full p-4 md:p-6 lg:p-8">
                 <header className="flex-shrink-0 flex items-center justify-between mb-4">
