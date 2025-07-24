@@ -124,13 +124,11 @@ export function ThereminPad({
 
         onInteraction(type, interactionData, 'down');
 
-        if (type === 'melody' || !isLatchOn) {
-            const orb = createOrb(interactionData.x, interactionData.y);
-            if (orb) {
-                activePointers.current.set(event.pointerId, orb);
-            }
+        const orb = createOrb(interactionData.x, interactionData.y);
+        if (orb) {
+            activePointers.current.set(event.pointerId, orb);
         }
-    }, [calculateInteraction, onInteraction, type, createOrb, isLatchOn]);
+    }, [calculateInteraction, onInteraction, type, createOrb]);
 
     const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (!(event.buttons > 0)) return;
@@ -232,10 +230,10 @@ export function ThereminPad({
             )}
             {onPulsateToggle && (
                  <Button
-                    variant={(isPulsating || (latchedNotes && latchedNotes.size > 0 && isLatchOn)) ? 'default' : 'outline'}
+                    variant={isPulsating ? 'default' : 'outline'}
                     size="icon"
                     onClick={onPulsateToggle}
-                    className={cn('transition-all w-8 h-8', (isPulsating || (latchedNotes && latchedNotes.size > 0 && isLatchOn)) && 'animate-pulse-accent')}
+                    className={cn('transition-all w-8 h-8', isPulsating && 'animate-pulse-accent')}
                     style={{ '--accent': 'hsl(var(--accent))' } as React.CSSProperties}
 
                  >
@@ -255,7 +253,7 @@ export function ThereminPad({
     return (
         <Card className={cn(
             "flex flex-col h-full bg-card/50 border-2 border-transparent transition-all duration-300",
-            (latchedNotes && latchedNotes.size > 0 && isLatchOn) && type === 'bass' && "border-accent ring-4 ring-accent/50",
+            (isLatchOn && type === 'bass') && "border-accent ring-4 ring-accent/50",
         )}>
             <CardHeader className="flex-shrink-0 flex flex-row items-center justify-end p-2">
                 <div className="flex items-center gap-2">
@@ -266,10 +264,10 @@ export function ThereminPad({
                 <div
                     ref={padRef}
                     className="w-full h-full relative overflow-hidden cursor-crosshair touch-none"
-                    onPointerDown={type === 'bass' && isLatchOn ? handleInteractionForLatch : handlePointerDown}
-                    onPointerMove={type === 'bass' && isLatchOn ? undefined : handlePointerMove}
-                    onPointerUp={type === 'bass' && isLatchOn ? undefined : handlePointerUpOrLeave}
-                    onPointerLeave={type === 'bass' && isLatchOn ? undefined : handlePointerUpOrLeave}
+                    onPointerDown={isLatchOn && type === 'bass' ? handleInteractionForLatch : handlePointerDown}
+                    onPointerMove={isLatchOn && type === 'bass' ? undefined : handlePointerMove}
+                    onPointerUp={isLatchOn && type === 'bass' ? undefined : handlePointerUpOrLeave}
+                    onPointerLeave={isLatchOn && type === 'bass' ? undefined : handlePointerUpOrLeave}
                     style={{
                         backgroundColor: 'hsl(var(--muted) / 0.2)',
                         backgroundSize: '2rem 2rem',
@@ -292,3 +290,5 @@ export function ThereminPad({
         </Card>
     );
 }
+
+    

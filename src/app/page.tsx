@@ -291,7 +291,7 @@ export default function Home() {
     useEffect(() => {
         if (!bassLFO.current || !bassGain.current) return;
 
-        const isPulsationActive = (isBassPulsating || (isBassLatchOn && latchedBassNotes.size > 0)) && isPlaying;
+        const isPulsationActive = isBassPulsating && isPlaying;
         
         if (isPulsationActive) {
             bassLFO.current.connect(bassGain.current.gain);
@@ -302,7 +302,7 @@ export default function Home() {
             bassGain.current.gain.cancelScheduledValues();
             bassGain.current.gain.rampTo(1, 0.1); 
         }
-    }, [isBassPulsating, isBassLatchOn, latchedBassNotes, isPlaying]);
+    }, [isBassPulsating, isPlaying]);
     
     useEffect(() => {
         if (!isReady) return;
@@ -554,3 +554,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
