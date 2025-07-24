@@ -393,7 +393,7 @@ export default function Home() {
                 <audio ref={backgroundAudioRef} src="/assets/sounds/ethermusic_start.mp3" loop />
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
-                        <h1 className="text-6xl md:text-8xl font-bold text-primary">EtherMusic</h1>
+                        <h1 className="text-5xl md:text-8xl font-bold text-primary">EtherMusic</h1>
                         <p className="text-lg md:text-2xl text-white/80 font-light mt-2 tracking-wider">
                            Neuro Meditation Sound Processor
                         </p>
@@ -475,7 +475,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
-
-    
