@@ -26,6 +26,12 @@ interface BeatBoxControlsProps {
     onTempoChange: (tempo: number) => void;
     volumes: { melody: number; bass: number; drums: number };
     onVolumeChange: (volumes: { melody: number; bass: number; drums: number; }) => void;
+    effects: {
+        melody: { reverb: number, delay: number };
+        bass: { reverb: number, delay: number };
+        drums: { reverb: number, delay: number };
+    };
+    onEffectChange: (effects: BeatBoxControlsProps['effects']) => void;
 }
 
 export function BeatBoxControls({
@@ -36,6 +42,8 @@ export function BeatBoxControls({
     onTempoChange,
     volumes,
     onVolumeChange,
+    effects,
+    onEffectChange,
 }: BeatBoxControlsProps) {
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isTempoOpen, setIsTempoOpen] = useState(false);
@@ -113,7 +121,12 @@ export function BeatBoxControls({
                         <DialogHeader>
                             <DialogTitle>Mixer</DialogTitle>
                         </DialogHeader>
-                        <MixerControls volumes={volumes} onVolumeChange={onVolumeChange} />
+                        <MixerControls 
+                            volumes={volumes} 
+                            onVolumeChange={onVolumeChange}
+                            effects={effects}
+                            onEffectChange={onEffectChange}
+                         />
                     </DialogContent>
                 </Dialog>
 

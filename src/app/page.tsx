@@ -72,6 +72,11 @@ export default function Home() {
     // Audio state
     const [tempo, setTempo] = useState(120);
     const [volumes, setVolumes] = useState({ melody: -6, bass: -12, drums: -6 });
+    const [effects, setEffects] = useState({
+        melody: { reverb: -Infinity, delay: -Infinity },
+        bass: { reverb: -Infinity, delay: -Infinity },
+        drums: { reverb: -Infinity, delay: -Infinity },
+    });
     const [activePattern, setActivePattern] = useState<BeatPattern>(beatPatterns[4]);
     const [melodyInstrument, setMelodyInstrument] = useState<MelodyInstrument>('synth');
 
@@ -98,6 +103,7 @@ export default function Home() {
     const bassGain = useRef<Tone.Gain | null>(null);
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
     const activeMelodyNotes = useRef<Map<number, number>>(new Map());
+    const fx = useRef<{ reverb: Tone.Reverb, delay: Tone.FeedbackDelay } | null>(null);
     
     const initializeAudio = useCallback(async () => {
         if (audioInitialized.current) return;
@@ -106,12 +112,33 @@ export default function Home() {
 
         await Tone.start();
         audioInitialized.current = true;
+
+        fx.current = {
+            reverb: new Tone.Reverb({ decay: 8, wet: 1 }).toDestination(),
+            delay: new Tone.FeedbackDelay("8n", 0.5).toDestination(),
+        };
         
         channels.current = {
             melody: new Tone.Channel(volumes.melody).toDestination(),
             bass: new Tone.Channel(volumes.bass).toDestination(),
             drums: new Tone.Channel(volumes.drums).toDestination(),
         };
+
+        channels.current.melody.send('reverb', effects.melody.reverb);
+        channels.current.melody.connect(fx.current.reverb);
+        channels.current.melody.send('delay', effects.melody.delay);
+        channels.current.melody.connect(fx.current.delay);
+
+        channels.current.bass.send('reverb', effects.bass.reverb);
+        channels.current.bass.connect(fx.current.reverb);
+        channels.current.bass.send('delay', effects.bass.delay);
+        channels.current.bass.connect(fx.current.delay);
+
+        channels.current.drums.send('reverb', effects.drums.reverb);
+        channels.current.drums.connect(fx.current.reverb);
+        channels.current.drums.send('delay', effects.drums.delay);
+        channels.current.drums.connect(fx.current.delay);
+
 
         melodySynth.current = new Tone.PolySynth(Tone.Synth).connect(channels.current.melody);
 
@@ -146,7 +173,7 @@ export default function Home() {
         
         Tone.Transport.bpm.value = tempo;
         setIsReady(true);
-    }, [volumes.melody, volumes.bass, volumes.drums, tempo]);
+    }, [volumes.melody, volumes.bass, volumes.drums, tempo, effects]);
     
     // Update allowed frequencies when key or scale changes
     useEffect(() => {
@@ -329,6 +356,17 @@ export default function Home() {
             channels.current.drums.volume.value = volumes.drums;
         }
     }, [volumes, isReady]);
+
+    useEffect(() => {
+        if (channels.current && isReady && fx.current) {
+            channels.current.melody.send('reverb', effects.melody.reverb);
+            channels.current.melody.send('delay', effects.melody.delay);
+            channels.current.bass.send('reverb', effects.bass.reverb);
+            channels.current.bass.send('delay', effects.bass.delay);
+            channels.current.drums.send('reverb', effects.drums.reverb);
+            channels.current.drums.send('delay', effects.drums.delay);
+        }
+    }, [effects, isReady]);
 
 
     const getClosestFrequency = (targetFreq: number) => {
@@ -528,6 +566,8 @@ export default function Home() {
                             onTempoChange={setTempo}
                             volumes={volumes}
                             onVolumeChange={setVolumes}
+                            effects={effects}
+                            onEffectChange={setEffects}
                         />
                     </div>
                 </main>
