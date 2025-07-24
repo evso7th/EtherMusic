@@ -351,7 +351,7 @@ export default function Home() {
             if (state === 'down' && data) {
                 setLatchedBassNotes(prev => {
                     const newNotes = new Map(prev);
-                    const NOTE_PROXIMITY_THRESHOLD = 35; 
+                    const NOTE_PROXIMITY_THRESHOLD = 35;
                     let existingEntryKey;
                     
                     for (const [key, note] of newNotes.entries()) {
@@ -393,24 +393,25 @@ export default function Home() {
                 }
                 break;
             case 'move':
-                 if (quantizedFreq && data && activeNotes.has(data.pointerId)) {
-                    const newVolume = -48 + (velocity * 48); // Scale volume from 0-1 to -48-0 dB
+                if (quantizedFreq && data && activeNotes.has(data.pointerId)) {
+                    // This method is better for PolySynth as it sets properties for all voices.
+                    // It creates a smoother "legato" or "theremin" effect.
                     synth.set({
                         frequency: quantizedFreq,
-                        volume: newVolume,
                     });
-                    // Update the frequency in our active notes map
-                    if (activeNotes.get(data.pointerId) !== quantizedFreq) {
-                        activeNotes.set(data.pointerId, quantizedFreq);
+                     // Adjust volume for the specific channel
+                    if (channels.current) {
+                        const newVolume = -48 + (velocity * 48); // Scale volume from 0-1 to -48-0 dB
+                        channels.current.melody.volume.rampTo(newVolume, 0.05);
                     }
-                 }
+                }
                 break;
             case 'up':
                 if (data && activeNotes.has(data.pointerId)) {
                     const freqToRelease = activeNotes.get(data.pointerId);
                     if (freqToRelease) synth.triggerRelease([freqToRelease]);
                     activeNotes.delete(data.pointerId);
-                } else {
+                } else if (!isPolyphonic) { // Only release all if not polyphonic to avoid killing other notes
                     synth.releaseAll();
                     activeNotes.clear();
                 }
@@ -472,7 +473,7 @@ export default function Home() {
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
             <div className="fixed inset-0 z-0">
-                <OrbitalAnimation />
+                <OrbitalAnimation isPlaying={isPlaying} tempo={tempo} />
             </div>
             <div className="relative z-10 flex flex-col h-full p-4 md:p-6 lg:p-8">
                 <header className="flex-shrink-0 flex items-center justify-between mb-4">
