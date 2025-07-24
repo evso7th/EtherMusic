@@ -380,7 +380,7 @@ export default function Home() {
         if (activePattern.sequence.length > 0) {
             activePattern.sequence.forEach((note, i) => {
                 if (note) {
-                    drumSequence.current?.add(i * (drumSequence.current.subdivision as number), note);
+                    drumSequence.current?.add(i, note);
                 }
             });
             drumSequence.current.start(0);
@@ -742,3 +742,6 @@ export default function Home() {
     
 
 
+
+
+    
