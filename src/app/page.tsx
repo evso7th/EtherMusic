@@ -373,7 +373,7 @@ export default function Home() {
         return (
             <div className="absolute inset-0 bg-background flex items-center justify-center z-50">
                 <div className="text-center text-white">
-                    <p className="text-xl mb-4">Loading audio engine...</p>
+                    <p className="text-xl mb-4">loading your personal neuro meditation processor</p>
                     <div className='preloader'>
                         <div><div><div><div><div></div></div></div></div></div>
                     </div>
@@ -472,5 +472,7 @@ export default function Home() {
         </div>
     );
 }
+
+    
 
     
