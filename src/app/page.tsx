@@ -332,16 +332,7 @@ export default function Home() {
     }, [volumes, isReady]);
     
     useEffect(() => {
-        if (!bassSynth.current || !isPlaying || !bassSynth.current.voices) return;
-
-        const activeLatchedFrequencies = new Set(Array.from(latchedBassNotes.values()).map(n => n.frequency));
-        
-        bassSynth.current.voices.forEach(voice => {
-            if (!activeLatchedFrequencies.has(voice.frequency.value)) {
-                // This check is a bit simplistic as voice might not be released yet.
-                // A better system would track voices by ID.
-            }
-        });
+        if (!bassSynth.current || !isPlaying) return;
         
         latchedBassNotes.forEach((note) => {
              const velocity = note.volume;
@@ -442,7 +433,7 @@ export default function Home() {
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
                         <h1 className="text-5xl md:text-8xl lg:text-5xl xl:text-8xl font-bold text-primary sm:text-6xl" style={{fontSize: '48px'}}>EtherMusic</h1>
-                        <p className="text-base md:text-xl text-white/80 font-light mt-2 tracking-wider">
+                        <p className="text-sm md:text-base text-white/80 font-light mt-2 tracking-wide">
                            Neuro Meditation Sound Processor
                         </p>
                     </div>
@@ -481,7 +472,7 @@ export default function Home() {
                 <header className="flex-shrink-0 flex items-center justify-between mb-4">
                     <div>
                         <h1 className="text-2xl md:text-4xl font-bold text-primary">EtherMusic</h1>
-                        <p className="text-sm text-white/80 font-light -mt-1 tracking-wider">Neuro Meditation Processor</p>
+                        <p className="text-xs text-white/80 font-light -mt-1 tracking-wide">Neuro Meditation Processor</p>
                     </div>
                     <div className="flex items-center gap-1 md:gap-2">
                          <PlaybackControls

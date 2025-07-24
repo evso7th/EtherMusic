@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Zap, Anchor, Music, SlidersHorizontal } from 'lucide-react';
+import { Zap, Anchor, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { MelodyInstrument, MusicKey, MusicScale } from '@/app/page';
@@ -129,6 +129,7 @@ export function ThereminPad({
     }, [calculateInteraction, onInteraction, type, color, isPolyphonic, isLatchOn]);
 
     const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
+        if (!(event.buttons > 0)) return;
         const interactionData = calculateInteraction(event);
         if (!interactionData) return;
         
@@ -138,7 +139,7 @@ export function ThereminPad({
 
         const pointer = activePointers.current.get(event.pointerId);
         if (pointer && pointer.orb) {
-            pointer.orb.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
+            pointer.orb.style.transform = `translate(${interactionData.x}px, ${y}px)`;
         }
 
     }, [calculateInteraction, onInteraction, type]);
@@ -146,15 +147,18 @@ export function ThereminPad({
     const handlePointerUpOrLeave = useCallback((event: PointerEvent<HTMLDivElement>) => {
         (event.target as HTMLElement).releasePointerCapture(event.pointerId);
         
+        const interactionData = calculateInteraction(event); // Get data for up event
         const pointer = activePointers.current.get(event.pointerId);
+
         if (pointer) {
             if (!(type === 'bass' && isLatchOn)) {
+                // Pass pointer data for release, ensuring correct note is released
                 onInteraction(type, { frequency: pointer.frequency, volume: 0, pointerId: event.pointerId}, 'up');
                 pointer.orb.remove();
                 activePointers.current.delete(event.pointerId);
             }
         } else if (type !== 'bass' || !isLatchOn) {
-             const interactionData = calculateInteraction(event);
+            // Fallback for cases where pointer might not be in map
              if (interactionData) {
                 onInteraction(type, interactionData, 'up');
              }
@@ -166,6 +170,7 @@ export function ThereminPad({
         
         const latchedIds = new Set(latchedNotes.keys());
         
+        // Remove orbs for notes that are no longer latched
         activePointers.current.forEach((pointer, id) => {
             if (!latchedIds.has(id)) {
                 pointer.orb.remove();
@@ -173,6 +178,7 @@ export function ThereminPad({
             }
         });
 
+        // Add or update orbs for latched notes
         latchedNotes.forEach((note, id) => {
             const rect = padRef.current?.getBoundingClientRect();
             if (!rect) return;
@@ -275,10 +281,10 @@ export function ThereminPad({
             )}
             {onPulsateToggle && (
                  <Button
-                    variant={(isPulsating || isLatched) ? 'default' : 'outline'}
+                    variant={(isPulsating || (isLatched && isLatchOn)) ? 'default' : 'outline'}
                     size="icon"
                     onClick={onPulsateToggle}
-                    className={cn('transition-all w-8 h-8', (isPulsating || isLatched) && 'animate-pulse-accent')}
+                    className={cn('transition-all w-8 h-8', (isPulsating || (isLatched && isLatchOn)) && 'animate-pulse-accent')}
                     style={{ '--accent': 'hsl(var(--accent))' } as React.CSSProperties}
 
                  >
@@ -291,7 +297,7 @@ export function ThereminPad({
     return (
         <Card className={cn(
             "flex flex-col h-full bg-card/50 border-2 border-transparent transition-all duration-300",
-            (isLatched) && type === 'bass' && "border-accent ring-4 ring-accent/50",
+            (isLatched && isLatchOn) && type === 'bass' && "border-accent ring-4 ring-accent/50",
         )}>
             <CardHeader className="flex-shrink-0 flex flex-row items-center justify-end p-2">
                 <div className="flex items-center gap-2">
