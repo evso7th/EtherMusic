@@ -395,11 +395,13 @@ export default function Home() {
             case 'move':
                 if (data && activeNotes.has(data.pointerId)) {
                     const activeFreq = activeNotes.get(data.pointerId);
+                    // Using rampTo for smooth transitions
                     if (activeFreq && quantizedFreq !== activeFreq) {
                         synth.set({ frequency: quantizedFreq });
                         activeNotes.set(data.pointerId, quantizedFreq);
                     }
-                    const newVolume = -48 + (velocity * 48);
+                    // Adjust volume smoothly
+                    const newVolume = -48 + (velocity * 48); // Map velocity [0,1] to dB [-48, 0]
                     synth.set({ volume: newVolume });
                 }
                 break;

@@ -17,12 +17,19 @@ export function OrbitalAnimation({ isPlaying = false, tempo = 120 }: OrbitalAnim
 
   return (
     <div 
-      className={cn(styles.view, isPlaying && styles.pulsating)}
+      className={styles.view}
       style={animationStyle}
     >
       <div className={styles.plane}>
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className={styles.circle}></div>
+          <div 
+            key={i} 
+            className={cn(
+              styles.circle,
+              // Add pulsating class only to the first circle and only when playing
+              i === 0 && isPlaying && styles.pulsating
+            )}
+          ></div>
         ))}
       </div>
     </div>

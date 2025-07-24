@@ -33,7 +33,7 @@
   box-shadow: 0 0 120px hsl(var(--primary)), inset 0 0 120px hsl(var(--primary));
 }
 
-.view.pulsating .circle {
+.circle.pulsating {
   animation: pulse var(--pulse-duration) infinite ease-in-out;
 }
 
