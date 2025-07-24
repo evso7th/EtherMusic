@@ -264,9 +264,6 @@ export default function Home() {
                 anchor.download = "ethermusic_recording.webm";
                 anchor.href = url;
                 anchor.click();
-                // URL.revokeObjectURL(url) should not be called immediately
-                // as browser needs time to start the download.
-                // A timeout can be used, but for simplicity, we'll just omit it.
                 toast({ title: "Recording Stopped", description: "Your recording has been downloaded." });
             });
             setIsRecording(false);
