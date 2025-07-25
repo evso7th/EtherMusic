@@ -15,6 +15,58 @@ import { HelpGuide } from '@/components/help-guide';
 import { generateAutopilotPattern } from '@/lib/music-engine';
 
 
+const housePatterns = {
+    groove: [
+        'C1', 'E1', 'D1', 'E1', 'C1', 'E1', 'D1', 'E1',
+        'C1', 'E1', 'D1', 'E1', 'C1', 'E1', 'D1', 'E1',
+    ],
+    fills: [
+        [
+            'C1', 'E2', ['C1', 'E2'], 'E2', 'C1', 'E2', ['C1', 'E2'], 'E2',
+            'D1', 'E2', ['D1', 'E2'], 'E2', 'D1', 'E2', ['D1', 'E2', 'F1'], 'F1',
+        ]
+    ]
+};
+
+const trancePatterns = {
+    groove: [
+        'C1', ['E1', 'E2'], ['D1', 'E2'], ['E1', 'E2'], 'C1', ['E1', 'E2'], ['D1', 'E2'], ['E1', 'E2'],
+        'C1', ['E1', 'E2'], ['D1', 'E2'], ['E1', 'E2'], 'C1', ['E1', 'E2'], ['D1', 'E2'], ['E1', 'E2'],
+    ],
+    fills: [
+        [
+            'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2',
+            'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1',
+        ]
+    ]
+};
+
+const reggaePatterns = {
+    groove: [
+        null, ['E1', 'E2'], ['C1','D1'], ['E1', 'E2'], null, ['E1', 'E2'], ['C1','D1'], ['E1', 'E2'],
+        null, ['E1', 'E2'], ['C1','D1'], ['E1', 'E2'], null, ['E1', 'E2'], ['C1','D1'], ['E1', 'E2'],
+    ],
+    fills: [
+        [
+            'G1', null, 'G2', null, 'G3', null, ['C1','D1'], null,
+            'G1', 'G1', 'G2', 'G2', 'G3', 'G3', ['C1', 'D1', 'F1'], null,
+        ]
+    ]
+};
+
+const slowBluesPatterns = {
+    groove: [
+        ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1', ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1',
+        ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1', ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1',
+    ],
+    fills: [
+        [
+            'G1', null, 'G1', 'G2', null, 'G2', 'G3', null,
+            'G3', ['D1', 'G3'], 'D1', 'D1', ['F1', 'D1'], 'C1', 'D1', 'C1'
+        ]
+    ]
+};
+
 const rockPatterns = {
     groove: [
         ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2',
@@ -28,58 +80,6 @@ const rockPatterns = {
         [
             'G1', 'E2', 'G1', 'E2', 'G2', 'E2', 'G2', 'E2',
             'G3', 'E2', 'G3', 'E1', ['F1', 'D1'], 'C1', ['F1', 'C1'], 'C1'
-        ]
-    ]
-};
-
-const housePatterns = {
-    groove: [
-        'C1', 'E1', ['D1', 'E1'], 'E1', 'C1', 'E1', ['D1', 'E1'], 'E1',
-        'C1', 'E1', ['D1', 'E1'], 'E1', 'C1', 'E1', ['D1', 'E1'], 'E1',
-    ],
-    fills: [
-        [
-            'C1', 'E2', 'E2', 'E2', 'C1', 'E2', 'E2', 'E2',
-            'C1', ['D1', 'E2'], 'D1', ['D1', 'E2'], 'D1', 'E2', 'E2', 'F1'
-        ]
-    ]
-};
-
-const trancePatterns = {
-    groove: [
-        'C1', ['E1', 'E2'], ['D1', 'E1', 'E2'], ['E1', 'E2'], 'C1', ['E1', 'E2'], ['D1', 'E1', 'E2'], ['E1', 'E2'],
-        'C1', ['E1', 'E2'], ['D1', 'E1', 'E2'], ['E1', 'E2'], 'C1', ['E1', 'E2'], ['D1', 'E1', 'E2'], ['E1', 'E2'],
-    ],
-    fills: [
-        [
-            'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2',
-            'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1',
-        ]
-    ]
-};
-
-const reggaePatterns = {
-    groove: [
-        null, 'E2', 'E1', 'E2', null, 'E2', ['C1', 'D1', 'E1'], 'E2',
-        null, 'E2', 'E1', 'E2', null, 'E2', ['C1', 'D1', 'E1'], 'E2',
-    ],
-    fills: [
-        [
-            'G1', 'G1', 'G2', 'G2', 'G3', null, ['C1','D1'], null,
-            'G1', 'G1', 'G2', 'G2', 'G3', 'G3', ['C1', 'D1', 'F1'], null,
-        ]
-    ]
-};
-
-const slowBluesPatterns = {
-    groove: [
-        ['C1', 'E2'], 'E1', 'D1', 'E1', ['C1', 'E2'], 'E1', 'D1', 'E1',
-        ['C1', 'E2'], 'E1', 'D1', 'E1', ['C1', 'E2'], 'E1', 'D1', 'E1'
-    ],
-    fills: [
-        [
-            'G1', null, 'G1', 'G2', null, 'G2', 'G3', null,
-            'G3', ['D1', 'G3'], 'D1', 'D1', ['F1', 'D1'], 'C1', 'D1', 'C1'
         ]
     ]
 };
@@ -150,7 +150,7 @@ export default function Home() {
     
     // Audio state
     const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
-    const [volumes, setVolumes] = useState({ melody: -9, bass: -9, drums: -6 });
+    const [volumes, setVolumes] = useState({ melody: -9, bass: -9, drums: -9 });
     const [effects, setEffects] = useState({
         melody: { reverb: -60, delay: -60 },
         bass: { reverb: -60, delay: -60 },
@@ -233,11 +233,11 @@ export default function Home() {
         channels.current.drums.send("delay", effects.drums.delay);
 
 
-        melodySynth.current = new Tone.PolySynth(Tone.Synth).connect(channels.current.melody);
+        melodySynth.current = new Tone.PolySynth(Tone.Synth, { polyphony: 8 }).connect(channels.current.melody);
 
         bassGain.current = new Tone.Gain(1).connect(channels.current.bass);
         bassSynth.current = new Tone.PolySynth(Tone.Synth, {
-            polyphony: 4,
+            polyphony: 8,
             oscillator: { type: 'fatsawtooth' },
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
         }).connect(bassGain.current);
@@ -265,7 +265,7 @@ export default function Home() {
             return new Promise<void>((resolve) => {
                 const player = new Tone.Player(url).connect(channels.current!.drums);
                 if (note === 'E1' || note === 'E2') {
-                    player.volume.value = -3; // Boost hi-hat volume
+                    player.volume.value = -3;
                 }
                 drumSamplers.current![note] = player;
                 Tone.loaded().then(() => resolve());
@@ -802,5 +802,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
