@@ -16,17 +16,17 @@ import { HelpGuide } from '@/components/help-guide';
 
 const rockPatterns = {
     groove: [
-        ['C1', 'E1'], null, 'E2', 'E1', 'D1', 'E2', 'E1', 'E2',
-        ['C1', 'E1'], 'E2', 'E1', 'E2', 'D1', 'E1', ['C1', 'E2'], null
+        ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2',
+        ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2'
     ],
     fills: [
         [
-            'G1', 'E2', 'G1', 'E2', 'G2', 'E2', 'G2', 'E2',
-            'G3', 'E2', 'G3', 'E1', 'F1', null, 'F1', null
+            'G1', 'G1', 'G2', 'G2', 'G3', 'G3', ['F1', 'C1'], null,
+            'G1', 'G2', 'G3', null, 'F1', null, 'F1', null,
         ],
         [
-            'G1', 'G1', 'G2', 'G2', 'G3', 'G3', 'F1', ['F1', 'C1'],
-            'D1', null, 'G1', 'G2', 'G3', null, 'F1', null
+            'G1', 'E2', 'G1', 'E2', 'G2', 'E2', 'G2', 'E2',
+            'G3', 'E2', 'G3', 'E1', 'F1', null, 'F1', 'C1'
         ]
     ]
 };
@@ -271,7 +271,7 @@ export default function Home() {
             if (!notes) return;
 
             const playNote = (note: string) => {
-                 if (drumSamplers.current && drumSamplers.current[note]?.loaded) {
+                if (drumSamplers.current && drumSamplers.current[note]?.loaded) {
                     drumSamplers.current[note].start(time);
                 }
             }
