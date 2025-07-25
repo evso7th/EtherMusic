@@ -22,7 +22,7 @@ type BeatPattern = {
 
 const beatPatterns: BeatPattern[] = [
     { name: 'Rock', sequence: ['C1', 'E1', 'D1', 'E1', 'C1', 'E1', 'D1', 'E1'] },
-    { name: 'House', sequence: ['C1', 'E1', 'C1', 'E1', 'D1', 'E1', 'C1', 'E1'] },
+    { name: 'House', sequence: ['C1', 'C1', 'D1', 'C1', 'C1', 'C1', 'D1', 'C1'] },
     { name: 'Hip Hop', sequence: ['C1', null, 'E1', 'D1', null, 'C1', 'E1', null] },
     { name: 'Reggae', sequence: [null, 'D1', 'E1', 'C1', null, 'D1', 'E1', null] },
     { name: 'Off', sequence: [] },
@@ -378,16 +378,27 @@ export default function Home() {
     
     // Drum machine logic
     useEffect(() => {
-        if (!isReady || !drumSequence.current) return;
+        if (!isReady) return;
 
-        drumSequence.current.clear();
-        activePattern.sequence.forEach((note, i) => {
-            if (note) {
-                drumSequence.current?.at(i, note);
-            }
-        });
+        const Tone = require('tone');
+        
+        drumSequence.current?.dispose();
 
-    }, [activePattern, isReady]);
+        drumSequence.current = new Tone.Sequence(
+            (time, note) => {
+                if (drumSamplers.current?.loaded && note && drumSamplers.current.has(note)) {
+                    drumSamplers.current.player(note).start(time);
+                }
+            },
+            activePattern.sequence,
+            '8n'
+        );
+
+        if (isPlaying) {
+            drumSequence.current.start(0);
+        }
+
+    }, [activePattern, isReady, isPlaying]);
 
     // Autopilot logic
     useEffect(() => {
