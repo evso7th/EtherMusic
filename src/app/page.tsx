@@ -115,6 +115,13 @@ export const musicScales: MusicScale[] = ['Major', 'Minor', 'Major Pentatonic', 
 export type AutopilotStyle = 'Ambient' | 'House' | 'Wind' | 'Sequence' | 'Chimes' | 'Drone';
 export const autopilotStyles: AutopilotStyle[] = ['Ambient', 'House', 'Wind', 'Sequence', 'Chimes', 'Drone'];
 
+export type Orb = {
+    id: number;
+    x: number;
+    y: number;
+    type: 'melody' | 'bass' | 'latch';
+};
+
 
 const getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]): number[] => {
     const Tone = require('tone');
@@ -140,6 +147,7 @@ const getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]
 };
 
 const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
+const MemoizedThereminPad = memo(ThereminPad);
 
 
 export default function Home() {
@@ -177,7 +185,9 @@ export default function Home() {
     const activeNotes = useRef(new Map<number, { type: 'melody' | 'bass'; freq: number; vol: number }>());
     const audioCommandQueue = useRef<Map<number, { freq: number; vol: number }>>(new Map());
     const animationFrameId = useRef<number>();
-    const [, forceUpdate] = useState({}); // Helper to force re-render for latch mode visuals
+    
+    // Orb State
+    const [orbs, setOrbs] = useState<Orb[]>([]);
 
     // Autopilot state
     const [isAutopilotOn, setIsAutopilotOn] = useState(false);
@@ -353,7 +363,7 @@ export default function Home() {
         
         Tone.Transport.bpm.value = activeTempo.bpm;
         
-    }, []); 
+    }, [volumes.melody, volumes.bass, volumes.drums, effects.melody, effects.bass, effects.drums]); 
     
     // --- Performance Refactoring: RAF loop for audio commands ---
     const processAudioQueue = useCallback(() => {
@@ -500,7 +510,7 @@ export default function Home() {
         }
     };
 
-    const handleStop = async () => {
+    const handleStop = useCallback(async () => {
         const Tone = await import('tone');
         if (!isReady) return;
 
@@ -510,9 +520,9 @@ export default function Home() {
         bassSynth.current?.releaseAll();
         activeNotes.current.clear();
         latchedBassNotes.current.clear();
-        forceUpdate({}); // Force re-render to clear visual orbs
+        setOrbs([]); // Clear all visual orbs
         setIsPlaying(false);
-    };
+    }, [isReady]);
 
     const handleRecord = () => {
         if (!recorder.current) return;
@@ -537,14 +547,15 @@ export default function Home() {
         setIsBassPulsating(prev => !prev);
     }
 
-    const handleLatchToggle = (checked: boolean) => {
+    const handleLatchToggle = useCallback((checked: boolean) => {
         setIsBassLatchOn(checked);
         if (!checked && latchedBassNotes.current.size > 0) {
             bassSynth.current?.releaseAll();
             latchedBassNotes.current.clear();
-            forceUpdate({}); // Force re-render to clear visual orbs
+            setOrbs(orbs => orbs.filter(orb => orb.type !== 'latch'));
         }
-    }
+    }, []);
+
      const handleAutopilotToggle = () => {
         setIsAutopilotOn(prev => !prev);
     };
@@ -612,7 +623,8 @@ export default function Home() {
         const Tone = require('tone');
         Tone.Transport.bpm.value = activeTempo.bpm;
         if (bassLFO.current) {
-            bassLFO.current.frequency.value = Tone.Transport.bpm.value / 60 * 2;
+            // "4n" automatically syncs to transport BPM, no manual calc needed
+            // This simplifies the logic and makes it more robust.
         }
     }, [activeTempo, isReady]);
 
@@ -680,7 +692,11 @@ export default function Home() {
                         synth.triggerAttack(quantizedFreq, undefined, data.volume);
                     }
                 }
-                forceUpdate({}); // Force re-render to update visuals
+                // Update visual orbs for latch mode
+                setOrbs(currentOrbs => [
+                    ...currentOrbs.filter(orb => orb.type !== 'latch'),
+                    ...Array.from(newNotes.values()).map((note, index) => ({ id: 1000 + index, x: note.x, y: note.y, type: 'latch' }))
+                ]);
             }
             return; 
         }
@@ -692,6 +708,7 @@ export default function Home() {
                     if (quantizedFreq) {
                         synth.triggerAttack(quantizedFreq, undefined, data.volume);
                         activeNotes.current.set(pointerId, { type, freq: quantizedFreq, vol: data.volume });
+                        setOrbs(orbs => [...orbs, { id: pointerId, x: data.x, y: data.y, type }]);
                     }
                 }
                 break;
@@ -700,6 +717,7 @@ export default function Home() {
                     const quantizedFreq = getClosestFrequency(data.frequency, type);
                     if (quantizedFreq) {
                          audioCommandQueue.current.set(pointerId, { freq: quantizedFreq, vol: data.volume });
+                         setOrbs(orbs => orbs.map(orb => orb.id === pointerId ? { ...orb, x: data.x, y: data.y } : orb));
                     }
                 }
                 break;
@@ -711,6 +729,7 @@ export default function Home() {
                     }
                     activeNotes.current.delete(pointerId);
                     audioCommandQueue.current.delete(pointerId);
+                    setOrbs(orbs => orbs.filter(orb => orb.id !== pointerId));
 
                     let hasMoreNotes = false;
                     for (const note of activeNotes.current.values()) {
@@ -733,6 +752,9 @@ export default function Home() {
             backgroundAudioRef.current.play().catch(error => console.error("Error playing background audio:", error));
         }
     };
+    
+    const bassOrbs = orbs.filter(orb => orb.type === 'bass' || orb.type === 'latch');
+    const melodyOrbs = orbs.filter(orb => orb.type === 'melody');
 
     if (!isAppStarted) {
         return (
@@ -802,7 +824,7 @@ export default function Home() {
                 </header>
                 <main className="flex-grow flex flex-col gap-4 overflow-hidden">
                     <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <ThereminPad
+                        <MemoizedThereminPad
                             onInteraction={handleThereminInteraction}
                             type="bass"
                             frequencyRange={[55, 440]} // A1 to A4
@@ -811,10 +833,10 @@ export default function Home() {
                             onPulsateToggle={handlePulsateToggle}
                             isLatchOn={isBassLatchOn}
                             onLatchToggle={handleLatchToggle}
-                            latchedNotes={latchedBassNotes.current}
+                            orbs={bassOrbs}
                             isPolyphonic
                         />
-                        <ThereminPad
+                        <MemoizedThereminPad
                             onInteraction={handleThereminInteraction}
                             type="melody"
                             frequencyRange={[220, 1760]} // A3 to A6
@@ -828,6 +850,7 @@ export default function Home() {
                             musicScales={musicScales}
                             activeScale={musicScale}
                             onScaleChange={setMusicScale}
+                            orbs={melodyOrbs}
                             isPolyphonic
                         />
                     </div>

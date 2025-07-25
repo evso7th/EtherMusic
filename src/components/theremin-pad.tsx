@@ -2,7 +2,7 @@
 "use client";
 
 import type { PointerEvent } from 'react';
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback, useState, memo } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Zap, Anchor, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { MelodyInstrument, MusicKey, MusicScale } from '@/app/page';
+import type { MelodyInstrument, MusicKey, MusicScale, Orb } from '@/app/page';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 interface ThereminPadProps {
@@ -19,6 +19,7 @@ interface ThereminPadProps {
     frequencyRange: [number, number];
     color: string;
     isPolyphonic?: boolean;
+    orbs: Orb[];
     // Melody specific
     instruments?: MelodyInstrument[];
     activeInstrument?: MelodyInstrument;
@@ -34,7 +35,6 @@ interface ThereminPadProps {
     onPulsateToggle?: () => void;
     isLatchOn?: boolean;
     onLatchToggle?: (checked: boolean) => void;
-    latchedNotes?: Map<number, { x: number; y: number; frequency: number; volume: number }>;
 }
 
 
@@ -43,11 +43,11 @@ const padTitles = {
     bass: "Bass Pad"
 }
 
-const Orb = ({ x, y, color, isLatchOn }: { x: number, y: number, color: string, isLatchOn?: boolean }) => (
+const OrbComponent = ({ x, y, color, type }: { x: number, y: number, color: string, type: Orb['type'] }) => (
     <div
         className={cn(
             'absolute top-0 left-0 rounded-full w-8 h-8 md:w-12 md:h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-100',
-            isLatchOn && 'animate-pulse-primary'
+            type === 'latch' && 'animate-pulse-primary'
         )}
         style={{
             backgroundColor: color,
@@ -58,12 +58,13 @@ const Orb = ({ x, y, color, isLatchOn }: { x: number, y: number, color: string, 
     />
 );
 
-export function ThereminPad({ 
+export const ThereminPad = memo(function ThereminPad({ 
     type, 
     onInteraction, 
     frequencyRange, 
     color,
     isPolyphonic = false,
+    orbs,
     isPulsating, 
     onPulsateToggle, 
     instruments, 
@@ -77,10 +78,8 @@ export function ThereminPad({
     onScaleChange,
     isLatchOn,
     onLatchToggle,
-    latchedNotes,
 }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
-    const activeOrbs = useRef<Map<number, HTMLDivElement>>(new Map());
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     
     const calculateInteraction = useCallback((event: PointerEvent<HTMLDivElement>) => {
@@ -102,60 +101,26 @@ export function ThereminPad({
         return { x, y, frequency, volume, pointerId: event.pointerId };
     }, [frequencyRange]);
 
-
-    const createOrb = useCallback((x: number, y: number) => {
-        if (!padRef.current) return null;
-        const orb = document.createElement('div');
-         orb.className = cn(
-            'absolute top-0 left-0 rounded-full w-8 h-8 md:w-12 md:h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-100'
-        );
-        orb.style.backgroundColor = color;
-        orb.style.boxShadow = `0 0 20px ${color}, 0 0 30px ${color}`;
-        orb.style.transform = `translate(${x}px, ${y}px)`;
-        padRef.current.appendChild(orb);
-        return orb;
-    }, [color]);
-
-
     const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
         (event.target as HTMLElement).setPointerCapture(event.pointerId);
         const interactionData = calculateInteraction(event);
-        if (!interactionData) return;
-
-        onInteraction(type, interactionData, 'down');
-
-        if (isLatchOn && type === 'bass') return;
-
-        const orb = createOrb(interactionData.x, interactionData.y);
-        if (orb) {
-            activeOrbs.current.set(event.pointerId, orb);
+        if (interactionData) {
+            onInteraction(type, interactionData, 'down');
         }
-    }, [calculateInteraction, onInteraction, type, createOrb, isLatchOn]);
+    }, [calculateInteraction, onInteraction, type]);
 
     const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
-        if (!isLatchOn && !(event.buttons > 0)) return;
+        if (!(event.buttons > 0)) return;
         
         const interactionData = calculateInteraction(event);
-        if (!interactionData) return;
-
-        onInteraction(type, interactionData, 'move');
-        
-        if (isLatchOn && type === 'bass') return;
-
-        const orb = activeOrbs.current.get(event.pointerId);
-        if (orb) {
-            orb.style.transform = `translate(${interactionData.x}px, ${interactionData.y}px)`;
+        if (interactionData) {
+            onInteraction(type, interactionData, 'move');
         }
-    }, [calculateInteraction, onInteraction, type, isLatchOn]);
+    }, [calculateInteraction, onInteraction, type]);
 
     const handlePointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
         const interactionData = calculateInteraction(event);
         onInteraction(type, interactionData, 'up');
-
-        if (activeOrbs.current.has(event.pointerId)) {
-            activeOrbs.current.get(event.pointerId)?.remove();
-            activeOrbs.current.delete(event.pointerId);
-        }
         
         if ((event.target as HTMLElement).hasPointerCapture(event.pointerId)) {
             (event.target as HTMLElement).releasePointerCapture(event.pointerId);
@@ -245,13 +210,6 @@ export function ThereminPad({
         </>
     );
 
-    const handleInteractionForLatch = (event: PointerEvent<HTMLDivElement>) => {
-        const interactionData = calculateInteraction(event);
-        if (interactionData) {
-            onInteraction(type, interactionData, 'down');
-        }
-    };
-
     return (
         <Card className={cn(
             "flex flex-col h-full bg-card/50 border-2 border-transparent transition-all duration-300",
@@ -266,10 +224,10 @@ export function ThereminPad({
                 <div
                     ref={padRef}
                     className="w-full h-full relative overflow-hidden cursor-crosshair touch-none"
-                    onPointerDown={isLatchOn && type === 'bass' ? handleInteractionForLatch : handlePointerDown}
-                    onPointerMove={isLatchOn && type === 'bass' ? undefined : handlePointerMove}
-                    onPointerUp={isLatchOn && type === 'bass' ? undefined : handlePointerUp}
-                    onPointerLeave={isLatchOn && type === 'bass' ? undefined : handlePointerUp}
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerLeave={handlePointerUp}
                     style={{
                         backgroundColor: 'hsl(var(--muted) / 0.2)',
                         backgroundSize: '2rem 2rem',
@@ -282,13 +240,11 @@ export function ThereminPad({
                     <div className="absolute inset-0 flex items-center justify-center text-5xl md:text-7xl font-bold text-foreground/10 pointer-events-none uppercase tracking-widest">
                         <span>{padTitles[type]}</span>
                     </div>
-                     {type === 'bass' && isLatchOn && latchedNotes &&
-                        Array.from(latchedNotes.values()).map((note, index) => (
-                            <Orb key={index} x={note.x} y={note.y} color={color} isLatchOn />
-                        ))
-                    }
+                     {orbs.map(orb => (
+                        <OrbComponent key={orb.id} x={orb.x} y={orb.y} color={color} type={orb.type} />
+                     ))}
                 </div>
             </CardContent>
         </Card>
     );
-}
+});
