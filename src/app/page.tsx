@@ -252,17 +252,14 @@ export default function Home() {
         };
 
         drumSamplers.current = {};
-        const samplerPromises = Object.entries(drumUrls).map(([note, url]) => {
-            return new Promise<void>((resolve, reject) => {
-                const player = new Tone.Player(url, () => {
-                    drumSamplers.current![note] = player;
-                    resolve();
-                }).toDestination();
-                 player.connect(channels.current!.drums);
+        const loadingPromises = Object.entries(drumUrls).map(([note, url]) => {
+            return new Promise<void>((resolve) => {
+                drumSamplers.current![note] = new Tone.Player(url).connect(channels.current!.drums);
+                Tone.loaded().then(() => resolve());
             });
         });
 
-        await Promise.all(samplerPromises);
+        await Promise.all(loadingPromises);
         console.log('Drum samples loaded');
         setIsReady(true);
         
