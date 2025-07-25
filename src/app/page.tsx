@@ -21,7 +21,7 @@ type BeatPattern = {
 
 
 const beatPatterns: BeatPattern[] = [
-    { name: 'Rock', sequence: ['C1', 'E1', 'D1', 'E1', 'C1', 'E1', 'D1', 'E1'] },
+    { name: 'Rock', sequence: ['C1', 'E1', 'D1', 'E1', 'C1', 'E1', 'D1', 'F1'] },
     { name: 'House', sequence: ['C1', 'C1', 'D1', 'C1', 'C1', 'C1', 'D1', 'C1'] },
     { name: 'Hip Hop', sequence: ['C1', null, 'E1', 'D1', null, 'C1', 'E1', null] },
     { name: 'Reggae', sequence: [null, 'D1', 'E1', 'C1', null, 'D1', 'E1', null] },
@@ -178,6 +178,11 @@ export default function Home() {
                 C1: "/assets/sounds/kick%20drum.wav",
                 D1: "/assets/sounds/snare.wav",
                 E1: "/assets/sounds/closed%20hi%20hat%20accented.wav",
+                E2: "/assets/sounds/closed%20hi%20hat%20ghost.wav",
+                F1: "/assets/sounds/crash.wav",
+                G1: "/assets/sounds/high%20tom.wav",
+                G2: "/assets/sounds/mid%20tom.wav",
+                G3: "/assets/sounds/low%20tom.wav",
             },
             onload: () => {
                 console.log('Drum samples loaded');
