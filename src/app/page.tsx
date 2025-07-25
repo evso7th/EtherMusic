@@ -16,8 +16,8 @@ import { HelpGuide } from '@/components/help-guide';
 
 const rockPatterns = {
     groove: [
-        ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2',
-        ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2'
+        ['C1', 'E1'], ['E1'], ['D1', 'E1'], ['E1'], ['C1', 'E1'], ['E1'], ['D1', 'E1'], ['E1'],
+        ['C1', 'E1'], ['E1'], ['D1', 'E1'], ['E1'], ['C1', 'E1'], ['E1'], ['D1', 'E1'], ['E1']
     ],
     fills: [
         [
@@ -33,52 +33,62 @@ const rockPatterns = {
 
 const housePatterns = {
     groove: [
-        'C1', 'E2', ['D1', 'E2'], 'E2', 'C1', 'E2', ['D1', 'E2'], 'E2',
-        'C1', 'E2', ['D1', 'E2'], 'E2', 'C1', 'E2', ['D1', 'E2'], 'E2'
+        ['C1', 'E2'], 'E2', 'D1', 'E2',
+        ['C1', 'E2'], 'E2', 'D1', 'E2',
+        ['C1', 'E2'], 'E2', 'D1', 'E2',
+        ['C1', 'E2'], 'E2', 'D1', 'E2',
     ],
     fills: [
         [
-            'G1', null, 'G1', null, 'G2', null, 'G2', null,
-            'G3', null, 'G3', null, ['F1', 'D1'], 'D1', 'D1', 'D1'
+            'C1', 'C1', 'C1', 'C1',
+            'D1', 'D1', 'D1', 'D1',
+            'G1', 'G2', 'G3', null,
+            ['F1', 'D1'], null, 'D1', null
         ]
     ]
 };
 
 const hipHopPatterns = {
     groove: [
-        'C1', null, 'E2', 'D1', 'E2', 'C1', 'E2', null,
-        'E2', 'C1', 'D1', 'E2', null, 'E2', ['C1', 'D1'], 'E2'
+        'C1', null, 'E2', null, 'D1', null, 'E2', 'C1',
+        null, 'E2', null, 'C1', 'E2', null, 'D1', 'E2'
     ],
     fills: [
         [
-            'G1', 'G1', 'G2', 'G2', 'G3', null, 'G3', null,
-            'D1', 'D1', 'C1', null, 'D1', 'D1', 'C1', null
+            'G1', 'G1', null, 'G2',
+            'G2', null, 'G3', 'G3',
+            'C1', null, 'D1', null,
+            'C1', null, 'D1', ['F1', 'C1']
         ]
     ]
 };
 
 const reggaePatterns = {
     groove: [
-        null, 'E2', 'D1', 'E2', null, 'E2', 'D1', 'E2',
-        null, 'E2', 'D1', 'E2', null, 'E2', 'D1', ['E1', 'C1']
+        null, 'E2', 'C1', 'E2', 'D1', 'E2', 'C1', 'E2',
+        null, 'E2', 'C1', 'E2', 'D1', 'E2', 'C1', ['E1', 'D1']
     ],
     fills: [
         [
-            'G1', 'G1', null, 'G2', 'G2', null, 'G3', 'G3',
-            'D1', null, 'D1', null, 'F1', null, 'F1', null
+            'G1', null, 'G1', null,
+            'G2', null, 'G2', null,
+            'G3', null, 'G3', 'G3',
+            ['F1','C1'], null, 'D1', 'D1'
         ]
     ]
 };
 
 const slowBluesPatterns = {
     groove: [
-        'C1', 'E2', 'E1', 'D1', 'E2', 'E1', 'C1', 'E2',
-        'E1', 'D1', 'E2', 'E1', 'C1', ['E1', 'D1'], 'E2', 'E1'
+        'C1', ['E2', 'E1'], 'D1', 'E2', 'C1', ['E2', 'E1'], 'D1', 'E2',
+        'C1', ['E2', 'E1'], 'D1', 'E2', 'C1', ['E2', 'E1'], 'D1', ['E2','C1']
     ],
     fills: [
         [
-            'G1', null, 'G1', 'G2', 'G2', 'G3', 'G3', null,
-            'G1', 'G2', 'G3', null, ['F1', 'D1'], null, null, null,
+            'G1', null, 'G1', null,
+            'G2', 'G2', 'G3', 'G3',
+            'D1', null, 'D1', 'D1',
+            'F1', null, ['F1', 'C1'], null
         ]
     ]
 };
@@ -191,6 +201,7 @@ export default function Home() {
     // --- NEW --- Refs for stable callbacks
     const activePatternRef = useRef(activePattern);
     const measureCountRef = useRef(0);
+    const conductorEventId = useRef<number | null>(null);
 
     useEffect(() => {
         activePatternRef.current = activePattern;
@@ -248,14 +259,14 @@ export default function Home() {
         }).start();
 
         const drumUrls = {
-            C1: "/assets/sounds/kick%20drum.wav",
+            C1: "/assets/sounds/kick drum.wav",
             D1: "/assets/sounds/snare.wav",
-            E1: "/assets/sounds/closed%20hi%20hat%20accented.wav",
-            E2: "/assets/sounds/closed%20hi%20hat%20ghost.wav",
+            E1: "/assets/sounds/closed hi hat accented.wav",
+            E2: "/assets/sounds/closed hi hat ghost.wav",
             F1: "/assets/sounds/crash.wav",
-            G1: "/assets/sounds/high%20tom.wav",
-            G2: "/assets/sounds/mid%20tom.wav",
-            G3: "/assets/sounds/low%20tom.wav",
+            G1: "/assets/sounds/high tom.wav",
+            G2: "/assets/sounds/mid tom.wav",
+            G3: "/assets/sounds/low tom.wav",
         };
         
         drumSamplers.current = {};
@@ -277,7 +288,7 @@ export default function Home() {
         
         drumPart.current = new Tone.Part((time, value) => {
             const notes = (value as any).notes;
-            if (!notes) return;
+            if (!notes || !drumSamplers.current) return;
 
             const playNote = (note: string) => {
                 if (drumSamplers.current && drumSamplers.current[note]?.loaded) {
@@ -290,35 +301,38 @@ export default function Home() {
                 playNote(notes);
             }
         }, []).start(0);
-        drumPart.current.loop = false;
+        drumPart.current.loop = true;
+        drumPart.current.loopEnd = '1m';
 
 
         // The single, permanent "conductor"
-        Tone.Transport.scheduleRepeat((time: number) => {
-            Tone.Draw.schedule(() => {
-                const currentPattern = activePatternRef.current;
-                if (currentPattern.name === 'Off' || !currentPattern.patterns?.groove?.length) {
-                    drumPart.current?.clear();
-                    return;
-                }
-                
-                const { groove, fills } = currentPattern.patterns;
-                const isFillMeasure = (measureCountRef.current % 4) === 3 && fills.length > 0;
-                const patternToPlay = isFillMeasure
-                    ? fills[Math.floor(Math.random() * fills.length)]
-                    : groove;
-    
-                drumPart.current?.clear();
-                patternToPlay.forEach((notes: string | string[] | null, i: number) => {
-                    if (notes) {
-                        const noteTime = `${Math.floor(i / 16)}:${Math.floor(i/4)%4}:${i%4}`;
-                        drumPart.current?.add(noteTime, { notes });
+        if (conductorEventId.current === null) {
+            conductorEventId.current = Tone.Transport.scheduleRepeat((time) => {
+                Tone.Draw.schedule(() => {
+                    const currentPattern = activePatternRef.current;
+                    if (!drumPart.current || currentPattern.name === 'Off' || !currentPattern.patterns?.groove?.length) {
+                        drumPart.current?.clear();
+                        return;
                     }
-                });
-    
-                measureCountRef.current++;
-            }, time);
-        }, '1m');
+                    
+                    const { groove, fills } = currentPattern.patterns;
+                    const isFillMeasure = (measureCountRef.current % 4) === 3 && fills.length > 0;
+                    const patternToPlay = isFillMeasure
+                        ? fills[Math.floor(Math.random() * fills.length)]
+                        : groove;
+        
+                    drumPart.current?.clear();
+                    patternToPlay.forEach((notes: string | string[] | null, i: number) => {
+                        if (notes) {
+                            const noteTime = `0:${Math.floor(i/4)}:${i%4}`;
+                            drumPart.current?.add(noteTime, { notes });
+                        }
+                    });
+        
+                    measureCountRef.current++;
+                }, time);
+            }, '1m');
+        }
 
 
         autopilot.current.bass = new Tone.Part((time, note) => {
@@ -504,12 +518,13 @@ export default function Home() {
         }
     }, [isBassPulsating, isPlaying]);
     
-    // Simplified drum machine logic
     useEffect(() => {
         if (!isReady) return;
         
-        measureCountRef.current = 0;
-        drumPart.current?.clear();
+        measureCountRef.current = 0; // Reset measure count on pattern change
+        if (drumPart.current) {
+            drumPart.current.clear();
+        }
 
     }, [activePattern, isReady]);
     
