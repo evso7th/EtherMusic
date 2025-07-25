@@ -149,7 +149,7 @@ export default function Home() {
     
     // Audio state
     const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
-    const [volumes, setVolumes] = useState({ melody: -6, bass: -6, drums: -6 });
+    const [volumes, setVolumes] = useState({ melody: -9, bass: -9, drums: -6 });
     const [effects, setEffects] = useState({
         melody: { reverb: -60, delay: -60 },
         bass: { reverb: -60, delay: -60 },
@@ -254,7 +254,11 @@ export default function Home() {
         drumSamplers.current = {};
         const loadingPromises = Object.entries(drumUrls).map(([note, url]) => {
             return new Promise<void>((resolve) => {
-                drumSamplers.current![note] = new Tone.Player(url).connect(channels.current!.drums);
+                const player = new Tone.Player(url).connect(channels.current!.drums);
+                if (note === 'E1' || note === 'E2') {
+                    player.volume.value = -3; // Boost hi-hat volume
+                }
+                drumSamplers.current![note] = player;
                 Tone.loaded().then(() => resolve());
             });
         });

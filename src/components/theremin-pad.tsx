@@ -280,7 +280,7 @@ export function ThereminPad({
                     }}
                 >
                     <div className="absolute inset-0 flex items-center justify-center text-5xl md:text-7xl font-bold text-foreground/10 pointer-events-none uppercase tracking-widest">
-                        {padTitles[type]}
+                        <span>{padTitles[type]}</span>
                     </div>
                      {type === 'bass' && isLatchOn && latchedNotes &&
                         Array.from(latchedNotes.values()).map((note, index) => (
