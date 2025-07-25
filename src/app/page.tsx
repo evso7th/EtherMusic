@@ -33,47 +33,47 @@ const rockPatterns = {
 
 const housePatterns = {
     groove: [
-        ['C1', 'E2'], 'E2', 'D1', 'E2', ['C1', 'E2'], 'E2', 'D1', 'E2',
-        ['C1', 'E2'], 'E2', 'D1', 'E2', ['C1', 'E2'], 'E2', 'D1', 'E2'
+        'C1', 'E2', ['D1', 'E2'], 'E2', 'C1', 'E2', ['D1', 'E2'], 'E2',
+        'C1', 'E2', ['D1', 'E2'], 'E2', 'C1', 'E2', ['D1', 'E2'], 'E2'
     ],
     fills: [
         [
-            'C1', 'C1', 'C1', 'C1', 'D1', 'D1', 'D1', 'D1',
-            'E1', 'E1', 'E1', 'E1', 'F1', null, null, null
+            'G1', null, 'G1', null, 'G2', null, 'G2', null,
+            'G3', null, 'G3', null, ['F1', 'D1'], 'D1', 'D1', 'D1'
         ]
     ]
 };
 
 const hipHopPatterns = {
     groove: [
-        ['C1', 'E1'], 'E2', 'E1', 'E2', ['D1', 'C1'], 'E2', 'E1', 'E2',
-        ['C1', 'E1'], 'E2', 'E1', 'E2', 'D1', 'E2', ['C1', 'E1'], 'E2'
+        'C1', null, 'E2', 'D1', 'E2', 'C1', 'E2', null,
+        'E2', 'C1', 'D1', 'E2', null, 'E2', ['C1', 'D1'], 'E2'
     ],
     fills: [
         [
-            'G1', null, 'G1', null, 'G2', null, 'G3', 'G3',
-            'D1', null, 'D1', null, ['D1', 'C1'], null, null, null
+            'G1', 'G1', 'G2', 'G2', 'G3', null, 'G3', null,
+            'D1', 'D1', 'C1', null, 'D1', 'D1', 'C1', null
         ]
     ]
 };
 
 const reggaePatterns = {
     groove: [
-        'E1', 'E2', ['D1', 'C1'], 'E2', 'E1', 'E2', 'D1', 'E2',
-        'E1', 'E2', ['D1', 'C1'], 'E2', 'E1', 'E2', 'D1', 'E2'
+        null, 'E2', 'D1', 'E2', null, 'E2', 'D1', 'E2',
+        null, 'E2', 'D1', 'E2', null, 'E2', 'D1', ['E1', 'C1']
     ],
     fills: [
         [
-            null, 'G1', 'G1', null, 'G2', 'G2', null, 'G3',
-            null, 'G3', 'G3', null, 'D1', null, ['D1', 'F1'], null
+            'G1', 'G1', null, 'G2', 'G2', null, 'G3', 'G3',
+            'D1', null, 'D1', null, 'F1', null, 'F1', null
         ]
     ]
 };
 
 const slowBluesPatterns = {
     groove: [
-        'C1', 'E2', 'E1', ['D1', 'E2'], 'E1', 'E2', 'C1', 'E1',
-        'E2', 'E1', 'D1', 'E2', 'E1', 'E2', 'C1', null
+        'C1', 'E2', 'E1', 'D1', 'E2', 'E1', 'C1', 'E2',
+        'E1', 'D1', 'E2', 'E1', 'C1', ['E1', 'D1'], 'E2', 'E1'
     ],
     fills: [
         [
@@ -180,7 +180,6 @@ export default function Home() {
     const drumSamplers = useRef<Record<string, Tone.Player> | null>(null);
     const channels = useRef<{ melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel } | null>(null);
     const drumPart = useRef<Tone.Part | null>(null);
-    const drumSchedulerEvent = useRef<number | null>(null);
     const recorder = useRef<Tone.Recorder | null>(null);
     const bassLFO = useRef<Tone.LFO | null>(null);
     const bassGain = useRef<Tone.Gain | null>(null);
@@ -189,6 +188,14 @@ export default function Home() {
     const fx = useRef<{ reverb: Tone.Reverb, delay: Tone.FeedbackDelay } | null>(null);
     const autopilot = useRef<{bass: Tone.Part | null, melody: Tone.Part | null}>({ bass: null, melody: null });
     
+    // --- NEW --- Refs for stable callbacks
+    const activePatternRef = useRef(activePattern);
+    const measureCountRef = useRef(0);
+
+    useEffect(() => {
+        activePatternRef.current = activePattern;
+    }, [activePattern]);
+
     const initializeAudio = useCallback(async () => {
         if (audioInitialized.current) return;
         
@@ -284,6 +291,32 @@ export default function Home() {
             }
         }, []).start(0);
         drumPart.current.loop = false;
+
+
+        // The single, permanent "conductor"
+        Tone.Transport.scheduleRepeat((time: number) => {
+            const currentPattern = activePatternRef.current;
+            if (currentPattern.name === 'Off' || !currentPattern.patterns?.groove?.length) {
+                drumPart.current?.clear();
+                return;
+            }
+            
+            const { groove, fills } = currentPattern.patterns;
+            const isFillMeasure = (measureCountRef.current % 4) === 3 && fills.length > 0;
+            const patternToPlay = isFillMeasure
+                ? fills[Math.floor(Math.random() * fills.length)]
+                : groove;
+
+            drumPart.current?.clear(); // Clear previous measure's notes
+            patternToPlay.forEach((notes: string | string[] | null, i: number) => {
+                if (notes) {
+                    const noteTime = time + (Tone.Time('16n').toSeconds() * i);
+                    drumPart.current?.add(noteTime, { notes });
+                }
+            });
+
+            measureCountRef.current++;
+        }, '1m');
 
 
         autopilot.current.bass = new Tone.Part((time, note) => {
@@ -469,41 +502,14 @@ export default function Home() {
         }
     }, [isBassPulsating, isPlaying]);
     
-    // Drum machine logic
+    // Simplified drum machine logic
     useEffect(() => {
-        if (!isReady || !drumSamplers.current) return;
-
-        const Tone = require('tone');
-
-        if (drumSchedulerEvent.current !== null) {
-            Tone.Transport.clear(drumSchedulerEvent.current);
-            drumSchedulerEvent.current = null;
-        }
+        if (!isReady) return;
+        
+        // Reset the measure counter when the pattern changes.
+        // The permanent scheduler will pick up the new pattern on its next tick.
+        measureCountRef.current = 0;
         drumPart.current?.clear();
-
-        if (activePattern.name === 'Off' || !activePattern.patterns?.groove?.length) {
-            return;
-        }
-
-        const { groove, fills } = activePattern.patterns;
-        const measureLength = activePattern.length || '1m';
-        let measureCount = 0;
-
-        drumSchedulerEvent.current = Tone.Transport.scheduleRepeat((time: number) => {
-            const isFillMeasure = (measureCount % 4) === 3 && fills.length > 0;
-            const patternToPlay = isFillMeasure 
-                ? fills[Math.floor(Math.random() * fills.length)]
-                : groove;
-
-            patternToPlay.forEach((notes: string | string[] | null, i: number) => {
-                if (notes) {
-                    const noteTime = time + (Tone.Time('16n').toSeconds() * i);
-                    drumPart.current?.add(noteTime, { notes });
-                }
-            });
-
-            measureCount++;
-        }, measureLength);
 
     }, [activePattern, isReady]);
     
