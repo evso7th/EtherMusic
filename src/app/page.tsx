@@ -26,7 +26,7 @@ const rockPatterns = {
         ],
         [
             'G1', 'E2', 'G1', 'E2', 'G2', 'E2', 'G2', 'E2',
-            'G3', 'E2', 'G3', 'E1', 'F1', null, 'F1', 'C1'
+            'G3', 'E2', 'G3', 'E1', ['F1', 'D1'], null, ['F1', 'C1'], 'C1'
         ]
     ]
 };
@@ -295,27 +295,29 @@ export default function Home() {
 
         // The single, permanent "conductor"
         Tone.Transport.scheduleRepeat((time: number) => {
-            const currentPattern = activePatternRef.current;
-            if (currentPattern.name === 'Off' || !currentPattern.patterns?.groove?.length) {
-                drumPart.current?.clear();
-                return;
-            }
-            
-            const { groove, fills } = currentPattern.patterns;
-            const isFillMeasure = (measureCountRef.current % 4) === 3 && fills.length > 0;
-            const patternToPlay = isFillMeasure
-                ? fills[Math.floor(Math.random() * fills.length)]
-                : groove;
-
-            drumPart.current?.clear(); // Clear previous measure's notes
-            patternToPlay.forEach((notes: string | string[] | null, i: number) => {
-                if (notes) {
-                    const noteTime = time + (Tone.Time('16n').toSeconds() * i);
-                    drumPart.current?.add(noteTime, { notes });
+            Tone.Draw.schedule(() => {
+                const currentPattern = activePatternRef.current;
+                if (currentPattern.name === 'Off' || !currentPattern.patterns?.groove?.length) {
+                    drumPart.current?.clear();
+                    return;
                 }
-            });
-
-            measureCountRef.current++;
+                
+                const { groove, fills } = currentPattern.patterns;
+                const isFillMeasure = (measureCountRef.current % 4) === 3 && fills.length > 0;
+                const patternToPlay = isFillMeasure
+                    ? fills[Math.floor(Math.random() * fills.length)]
+                    : groove;
+    
+                drumPart.current?.clear();
+                patternToPlay.forEach((notes: string | string[] | null, i: number) => {
+                    if (notes) {
+                        const noteTime = `${Math.floor(i / 16)}:${Math.floor(i/4)%4}:${i%4}`;
+                        drumPart.current?.add(noteTime, { notes });
+                    }
+                });
+    
+                measureCountRef.current++;
+            }, time);
         }, '1m');
 
 
@@ -506,8 +508,6 @@ export default function Home() {
     useEffect(() => {
         if (!isReady) return;
         
-        // Reset the measure counter when the pattern changes.
-        // The permanent scheduler will pick up the new pattern on its next tick.
         measureCountRef.current = 0;
         drumPart.current?.clear();
 
