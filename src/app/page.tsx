@@ -642,7 +642,7 @@ export default function Home() {
                 if (data && quantizedFreq && activeNotes.current.has(data.pointerId)) {
                     const activeNote = activeNotes.current.get(data.pointerId);
                     if (activeNote && activeNote.freq !== quantizedFreq) {
-                        synth.set({ note: { frequency: quantizedFreq } });
+                        synth.set({ frequency: quantizedFreq });
                         activeNotes.current.set(data.pointerId, { type, freq: quantizedFreq });
                     } else {
                         synth.set({ volume: -48 + (velocity * 48) });
