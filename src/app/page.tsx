@@ -22,7 +22,7 @@ const rockPatterns = {
     fills: [
         [
             'G1', 'E2', 'G1', 'E2', 'G2', 'E2', 'G2', 'E2',
-            'G3', 'E2', 'G3', 'E1', 'F1', null, null, null
+            'G3', 'E2', 'G3', 'E1', 'F1', null, 'F1', null
         ],
         [
             'G1', 'G1', 'G2', 'G2', 'G3', 'G3', 'F1', ['F1', 'C1'],
@@ -177,7 +177,7 @@ export default function Home() {
     const audioInitialized = useRef(false);
     const melodySynth = useRef<Tone.PolySynth | null>(null);
     const bassSynth = useRef<Tone.PolySynth | null>(null);
-    const drumSamplers = useRef<Tone.Players | null>(null);
+    const drumSamplers = useRef<Record<string, Tone.Player> | null>(null);
     const channels = useRef<{ melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel } | null>(null);
     const drumPart = useRef<Tone.Part | null>(null);
     const drumSchedulerEvent = useRef<number | null>(null);
@@ -240,31 +240,39 @@ export default function Home() {
             max: 1,
         }).start();
 
-        drumSamplers.current = new Tone.Players({
-            urls: {
-                C1: "/assets/sounds/kick%20drum.wav",
-                D1: "/assets/sounds/snare.wav",
-                E1: "/assets/sounds/closed%20hi%20hat%20accented.wav",
-                E2: "/assets/sounds/closed%20hi%20hat%20ghost.wav",
-                F1: "/assets/sounds/crash.wav",
-                G1: "/assets/sounds/high%20tom.wav",
-                G2: "/assets/sounds/mid%20tom.wav",
-                G3: "/assets/sounds/low%20tom.wav",
-            },
-            onload: () => {
-                console.log('Drum samples loaded');
-                setIsReady(true);
-            },
-            onerror: (error) => console.error("Error loading drum samples:", error),
-        }).connect(channels.current.drums);
+        const drumUrls = {
+            C1: "/assets/sounds/kick%20drum.wav",
+            D1: "/assets/sounds/snare.wav",
+            E1: "/assets/sounds/closed%20hi%20hat%20accented.wav",
+            E2: "/assets/sounds/closed%20hi%20hat%20ghost.wav",
+            F1: "/assets/sounds/crash.wav",
+            G1: "/assets/sounds/high%20tom.wav",
+            G2: "/assets/sounds/mid%20tom.wav",
+            G3: "/assets/sounds/low%20tom.wav",
+        };
+
+        drumSamplers.current = {};
+        const samplerPromises = Object.entries(drumUrls).map(([note, url]) => {
+            return new Promise<void>((resolve, reject) => {
+                const player = new Tone.Player(url, () => {
+                    drumSamplers.current![note] = player;
+                    resolve();
+                }).toDestination();
+                 player.connect(channels.current!.drums);
+            });
+        });
+
+        await Promise.all(samplerPromises);
+        console.log('Drum samples loaded');
+        setIsReady(true);
         
         drumPart.current = new Tone.Part((time, value) => {
             const notes = (value as any).notes;
             if (!notes) return;
 
             const playNote = (note: string) => {
-                 if (drumSamplers.current?.loaded && drumSamplers.current.has(note)) {
-                    drumSamplers.current.player(note).start(time);
+                 if (drumSamplers.current && drumSamplers.current[note]?.loaded) {
+                    drumSamplers.current[note].start(time);
                 }
             }
             if (Array.isArray(notes)) {
@@ -461,7 +469,7 @@ export default function Home() {
     
     // Drum machine logic
     useEffect(() => {
-        if (!isReady || !drumSamplers.current?.loaded) return;
+        if (!isReady || !drumSamplers.current) return;
 
         const Tone = require('tone');
 
