@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import type * as Tone from 'tone';
 import { Button } from "@/components/ui/button";
 import { ThereminPad } from '@/components/theremin-pad';
@@ -138,6 +138,8 @@ const getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]
 
     return allFrequencies.sort((a,b) => a - b);
 };
+
+const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
 
 
 export default function Home() {
@@ -354,7 +356,7 @@ export default function Home() {
     }, []); 
     
     // --- Performance Refactoring: RAF loop for audio commands ---
-    const processAudioQueue = () => {
+    const processAudioQueue = useCallback(() => {
         if (!audioCommandQueue.current.size || !audioInitialized.current) {
             animationFrameId.current = requestAnimationFrame(processAudioQueue);
             return;
@@ -385,7 +387,7 @@ export default function Home() {
 
         audioCommandQueue.current.clear();
         animationFrameId.current = requestAnimationFrame(processAudioQueue);
-    };
+    }, []);
 
     useEffect(() => {
         if (isReady) {
@@ -396,7 +398,7 @@ export default function Home() {
                 cancelAnimationFrame(animationFrameId.current);
             }
         };
-    }, [isReady]);
+    }, [isReady, processAudioQueue]);
 
     // Update allowed frequencies when key or scale changes
     useEffect(() => {
@@ -634,13 +636,13 @@ export default function Home() {
     }, [effects, isReady]);
 
 
-    const getClosestFrequency = (targetFreq: number, type: 'bass' | 'melody') => {
+    const getClosestFrequency = useCallback((targetFreq: number, type: 'bass' | 'melody') => {
         const freqs = type === 'bass' ? allowedFrequencies.bass : allowedFrequencies.melody;
         if (freqs.length === 0) return targetFreq;
         return freqs.reduce((prev, curr) => {
             return (Math.abs(curr - targetFreq) < Math.abs(prev - targetFreq) ? curr : prev);
         });
-    };
+    }, [allowedFrequencies]);
 
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!audioInitialized.current) return;
@@ -649,11 +651,10 @@ export default function Home() {
         if (!synth) return;
 
         const pointerId = data?.pointerId ?? -1;
-        const quantizedFreq = data ? getClosestFrequency(data.frequency, type) : 0;
-        const velocity = data ? data.volume : 0;
         
         if (type === 'bass' && isBassLatchOn) {
             if (state === 'down' && data) {
+                const quantizedFreq = getClosestFrequency(data.frequency, type);
                 const newNotes = latchedBassNotes.current;
                 const NOTE_PROXIMITY_THRESHOLD = 35;
                 let existingEntryKey;
@@ -676,7 +677,7 @@ export default function Home() {
                     const newKey = Date.now();
                     newNotes.set(newKey, { x: data.x, y: data.y, frequency: quantizedFreq, volume: data.volume });
                     if (isPlaying) {
-                        synth.triggerAttack(quantizedFreq, undefined, velocity);
+                        synth.triggerAttack(quantizedFreq, undefined, data.volume);
                     }
                 }
                 forceUpdate({}); // Force re-render to update visuals
@@ -686,14 +687,20 @@ export default function Home() {
 
         switch (state) {
             case 'down':
-                if (data && quantizedFreq) {
-                    synth.triggerAttack(quantizedFreq, undefined, velocity);
-                    activeNotes.current.set(pointerId, { type, freq: quantizedFreq, vol: velocity });
+                if (data) {
+                    const quantizedFreq = getClosestFrequency(data.frequency, type);
+                    if (quantizedFreq) {
+                        synth.triggerAttack(quantizedFreq, undefined, data.volume);
+                        activeNotes.current.set(pointerId, { type, freq: quantizedFreq, vol: data.volume });
+                    }
                 }
                 break;
             case 'move':
-                if (data && quantizedFreq && activeNotes.current.has(pointerId)) {
-                    audioCommandQueue.current.set(pointerId, { freq: quantizedFreq, vol: velocity });
+                if (data && activeNotes.current.has(pointerId)) {
+                    const quantizedFreq = getClosestFrequency(data.frequency, type);
+                    if (quantizedFreq) {
+                         audioCommandQueue.current.set(pointerId, { freq: quantizedFreq, vol: data.volume });
+                    }
                 }
                 break;
             case 'up':
@@ -711,7 +718,6 @@ export default function Home() {
                             hasMoreNotes = true;
                             break;
                         }
-    
                     }
                     if (!hasMoreNotes) {
                         synth.releaseAll();
@@ -719,7 +725,7 @@ export default function Home() {
                 }
                 break;
         }
-    }, [isBassLatchOn, isPlaying, allowedFrequencies]);
+    }, [isBassLatchOn, isPlaying, getClosestFrequency]);
     
     const handleStartScreenInteraction = () => {
         if (backgroundAudioRef.current && backgroundAudioRef.current.paused) {
@@ -737,7 +743,7 @@ export default function Home() {
                 <div className="absolute top-4 right-4 z-20">
                     <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
                 </div>
-                <OrbitalAnimation isPlaying={false} tempo={activeTempo.bpm}/>
+                <MemoizedOrbitalAnimation isPlaying={false} tempo={activeTempo.bpm}/>
                 <audio ref={backgroundAudioRef} src="/assets/sounds/ethermusic_start.mp3" loop />
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
@@ -775,7 +781,7 @@ export default function Home() {
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
             <div className="fixed inset-0 z-0">
-                 <OrbitalAnimation isPlaying={isPlaying} tempo={activeTempo.bpm} />
+                 <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={activeTempo.bpm} />
             </div>
             <div className="relative z-10 flex flex-col h-full p-4 md:p-6 lg:p-8">
                 <header className="flex-shrink-0 flex items-center justify-between mb-4">
