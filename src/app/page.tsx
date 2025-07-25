@@ -14,19 +14,23 @@ import { ArrowRight } from 'lucide-react';
 import { HelpGuide } from '@/components/help-guide';
 
 
-type BeatPattern = {
-    name: string;
-    sequence: (string | string[] | null)[];
-};
+const rockGroove = [
+    ['C1', 'E1'], 'E2', 'D1', 'E2', ['C1', 'E1'], 'E2', 'D1', 'E2',
+    ['C1', 'E1'], 'E2', 'D1', 'E2', ['C1', 'E1'], 'G1', 'G2', 'G3',
+];
 
+const rockFill1 = [
+    ['C1', 'E1'], 'E2', 'G1', 'E2', 'G2', 'E2', 'G3', 'E2',
+    'D1', 'G1', 'G2', 'G3', 'D1', 'E1', 'F1', null
+];
 
-const beatPatterns: BeatPattern[] = [
-    { name: 'Rock', sequence: [
-        ['C1', 'E1'], 'E2', 'D1', 'E2', ['C1', 'E1'], 'E2', 'D1', 'E2',
-        ['C1', 'E1'], 'E2', 'D1', 'E2', ['C1', 'E1'], 'G1', 'G2', 'G3',
-        ['C1', 'E1'], null, 'D1', ['E1', 'E2'], ['C1'], 'E2', 'D1', 'E2',
-        ['C1', 'E1'], 'E2', 'D1', 'E2', 'G1', 'G2', 'G3', 'F1'
-    ]},
+const rockFill2 = [
+    ['C1', 'E1'], null, 'G1', ['G1', 'E2'], 'G2', null, 'G3', ['G3', 'E2'],
+    'D1', null, ['D1', 'E1'], null, ['C1', 'F1'], null, null, null
+];
+
+const beatPatterns = [
+    { name: 'Rock', patterns: { groove: rockGroove, fills: [rockFill1, rockFill2] }, length: '1m' },
     { name: 'House', sequence: ['C1', 'C1', 'D1', 'C1', 'C1', 'C1', 'D1', 'C1'] },
     { name: 'Hip Hop', sequence: ['C1', null, 'E1', 'D1', null, 'C1', 'E1', null] },
     { name: 'Reggae', sequence: [null, 'D1', 'E1', 'C1', null, 'D1', 'E1', null] },
@@ -94,7 +98,7 @@ export default function Home() {
         bass: { reverb: -60, delay: -60 },
         drums: { reverb: -60, delay: -60 },
     });
-    const [activePattern, setActivePattern] = useState<BeatPattern>(beatPatterns[4]);
+    const [activePattern, setActivePattern] = useState<any>(beatPatterns[4]);
     const [melodyInstrument, setMelodyInstrument] = useState<MelodyInstrument>('synth');
 
     // --- New Harmony State ---
@@ -118,7 +122,8 @@ export default function Home() {
     const bassSynth = useRef<Tone.PolySynth | null>(null);
     const drumSamplers = useRef<Tone.Players | null>(null);
     const channels = useRef<{ melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel } | null>(null);
-    const drumSequence = useRef<Tone.Sequence | null>(null);
+    const drumPart = useRef<Tone.Part | null>(null);
+    const drumSchedulerEvent = useRef<number | null>(null);
     const recorder = useRef<Tone.Recorder | null>(null);
     const bassLFO = useRef<Tone.LFO | null>(null);
     const bassGain = useRef<Tone.Gain | null>(null);
@@ -196,8 +201,22 @@ export default function Home() {
             onerror: (error) => console.error("Error loading drum samples:", error),
         }).connect(channels.current.drums);
         
-        // This will be properly initialized in the useEffect
-        drumSequence.current = null;
+        drumPart.current = new Tone.Part((time, value) => {
+            const notes = value.notes;
+            if (!notes) return;
+            const playNote = (note: string) => {
+                 if (drumSamplers.current?.loaded && drumSamplers.current.has(note)) {
+                    drumSamplers.current.player(note).start(time);
+                }
+            }
+            if (Array.isArray(notes)) {
+                notes.forEach(playNote);
+            } else {
+                playNote(notes);
+            }
+        }, []).start(0);
+        drumPart.current.loop = false;
+
 
         autopilot.current.bass = new Tone.Part((time, note) => {
             bassSynth.current?.triggerAttackRelease(note.freq, note.dur, time, note.vel);
@@ -301,7 +320,7 @@ export default function Home() {
         if (willBePlaying) {
             await Tone.start();
             Tone.Transport.start();
-            drumSequence.current?.start(0);
+            
             if (isBassLatchOn) {
                 latchedBassNotes.forEach(note => {
                     bassSynth.current!.triggerAttack(note.frequency, undefined, note.volume);
@@ -309,7 +328,7 @@ export default function Home() {
             }
         } else {
             Tone.Transport.pause();
-            drumSequence.current?.stop();
+            
             if (isBassLatchOn || isAutopilotOn) {
                  bassSynth.current.releaseAll();
             }
@@ -324,7 +343,7 @@ export default function Home() {
         if (!isReady) return;
 
         Tone.Transport.stop();
-        drumSequence.current?.stop(0);
+        
         melodySynth.current?.releaseAll();
         bassSynth.current?.releaseAll();
         activeNotes.current.clear();
@@ -385,41 +404,58 @@ export default function Home() {
     // Drum machine logic
     useEffect(() => {
         if (!isReady || !drumSamplers.current?.loaded) return;
-    
+
         const Tone = require('tone');
-    
-        // Stop and dispose the old sequence if it exists
-        drumSequence.current?.dispose();
-    
-        drumSequence.current = new Tone.Sequence((time, notes) => {
-            if (!notes) return;
-    
-            const playNote = (note) => {
-                if (drumSamplers.current?.loaded && drumSamplers.current.has(note)) {
-                    drumSamplers.current.player(note).start(time);
-                }
-            };
-    
-            if (Array.isArray(notes)) {
-                notes.forEach(playNote);
-            } else {
-                playNote(notes);
-            }
-        }, activePattern.sequence, '32n');
-    
-        if (isPlaying) {
-            drumSequence.current.start(0);
+
+        // Clear previous scheduled events
+        if (drumSchedulerEvent.current !== null) {
+            Tone.Transport.clear(drumSchedulerEvent.current);
+            drumSchedulerEvent.current = null;
         }
-    
+        drumPart.current?.clear();
+
+        if (activePattern.name === 'Off' || activePattern.sequence?.length === 0) {
+            return;
+        }
+
+        // --- New Dynamic Scheduler for Rock Pattern ---
+        if (activePattern.name === 'Rock' && activePattern.patterns) {
+            let measureCount = 0;
+            drumSchedulerEvent.current = Tone.Transport.scheduleRepeat((time: number) => {
+                const isFillMeasure = (measureCount % 4) === 3;
+                let patternToPlay;
+                
+                if (isFillMeasure) {
+                    const fills = activePattern.patterns.fills;
+                    patternToPlay = fills[Math.floor(Math.random() * fills.length)];
+                } else {
+                    patternToPlay = activePattern.patterns.groove;
+                }
+
+                patternToPlay.forEach((notes: string | string[] | null, i: number) => {
+                    if (notes) {
+                        const noteTime = time + Tone.Time('16n').toSeconds() * i;
+                        drumPart.current?.add(noteTime, { notes });
+                    }
+                });
+
+                measureCount++;
+            }, '1m'); // Schedule every measure (4 beats)
+
+        } else if (activePattern.sequence) {
+             // Fallback for simple patterns
+             drumSchedulerEvent.current = Tone.Transport.scheduleRepeat((time: number) => {
+                 activePattern.sequence.forEach((notes: string | string[] | null, i: number) => {
+                    if (notes) {
+                        const noteTime = time + Tone.Time('16n').toSeconds() * i;
+                        drumPart.current?.add(noteTime, { notes });
+                    }
+                });
+            }, '2m');
+        }
+
     }, [activePattern, isReady]);
     
-    useEffect(() => {
-        if (!isPlaying || !drumSequence.current) return;
-        if (drumSequence.current.state !== 'started') {
-            drumSequence.current.start(0);
-        }
-    }, [isPlaying]);
-
     // Autopilot logic
     useEffect(() => {
         const bassPart = autopilot.current.bass;
