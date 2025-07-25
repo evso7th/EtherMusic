@@ -168,7 +168,8 @@ export default function Home() {
     // Bass specific state
     const [isBassPulsating, setIsBassPulsating] = useState(false);
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
-    const [latchedBassNotes, setLatchedBassNotes] = useState<Map<number, { x: number; y: number; frequency: number; volume: number }>>(new Map());
+    const latchedBassNotes = useRef<Map<number, { x: number; y: number; frequency: number; volume: number }>>(new Map());
+    const [, forceUpdate] = useState({}); // Helper to force re-render for latch mode visuals
 
     // Autopilot state
     const [isAutopilotOn, setIsAutopilotOn] = useState(false);
@@ -430,7 +431,7 @@ export default function Home() {
             Tone.Transport.start();
             
             if (isBassLatchOn) {
-                latchedBassNotes.forEach(note => {
+                latchedBassNotes.current.forEach(note => {
                     bassSynth.current!.triggerAttack(note.frequency, undefined, note.volume);
                 });
             }
@@ -455,7 +456,8 @@ export default function Home() {
         melodySynth.current?.releaseAll();
         bassSynth.current?.releaseAll();
         activeNotes.current.clear();
-        setLatchedBassNotes(new Map());
+        latchedBassNotes.current.clear();
+        forceUpdate({}); // Force re-render to clear visual orbs
         setIsPlaying(false);
     };
 
@@ -484,9 +486,10 @@ export default function Home() {
 
     const handleLatchToggle = (checked: boolean) => {
         setIsBassLatchOn(checked);
-        if (!checked && latchedBassNotes.size > 0) {
+        if (!checked && latchedBassNotes.current.size > 0) {
             bassSynth.current?.releaseAll();
-            setLatchedBassNotes(new Map());
+            latchedBassNotes.current.clear();
+            forceUpdate({}); // Force re-render to clear visual orbs
         }
     }
      const handleAutopilotToggle = () => {
@@ -599,34 +602,33 @@ export default function Home() {
         
         if (type === 'bass' && isBassLatchOn) {
             if (state === 'down' && data) {
-                setLatchedBassNotes(prev => {
-                    const newNotes = new Map(prev);
-                    const NOTE_PROXIMITY_THRESHOLD = 35;
-                    let existingEntryKey;
-                    
-                    for (const [key, note] of newNotes.entries()) {
-                         const distance = Math.sqrt(Math.pow(note.x - data.x, 2) + Math.pow(note.y - data.y, 2));
-                         if (distance < NOTE_PROXIMITY_THRESHOLD) {
-                            existingEntryKey = key;
-                            break;
-                         }
-                    }
+                const newNotes = latchedBassNotes.current;
+                const NOTE_PROXIMITY_THRESHOLD = 35;
+                let existingEntryKey;
+                
+                for (const [key, note] of newNotes.entries()) {
+                     const distance = Math.sqrt(Math.pow(note.x - data.x, 2) + Math.pow(note.y - data.y, 2));
+                     if (distance < NOTE_PROXIMITY_THRESHOLD) {
+                        existingEntryKey = key;
+                        break;
+                     }
+                }
 
-                    if (existingEntryKey !== undefined) {
-                        const noteToRelease = newNotes.get(existingEntryKey);
-                        if (noteToRelease) {
-                            synth.triggerRelease([noteToRelease.frequency]);
-                        }
-                        newNotes.delete(existingEntryKey);
-                    } else if (newNotes.size < 4) {
-                        const newKey = Date.now();
-                        newNotes.set(newKey, { x: data.x, y: data.y, frequency: quantizedFreq, volume: data.volume });
-                        if (isPlaying) {
-                            synth.triggerAttack(quantizedFreq, undefined, velocity);
-                        }
+                if (existingEntryKey !== undefined) {
+                    const noteToRelease = newNotes.get(existingEntryKey);
+                    if (noteToRelease) {
+                        synth.triggerRelease([noteToRelease.frequency]);
                     }
-                    return newNotes;
-                });
+                    newNotes.delete(existingEntryKey);
+                } else if (newNotes.size < 4) {
+                    const newKey = Date.now();
+                    newNotes.set(newKey, { x: data.x, y: data.y, frequency: quantizedFreq, volume: data.volume });
+                    if (isPlaying) {
+                        synth.triggerAttack(quantizedFreq, undefined, velocity);
+                    }
+                }
+                latchedBassNotes.current = newNotes;
+                forceUpdate({}); // Force re-render to update visuals
             }
             return; 
         }
@@ -644,9 +646,9 @@ export default function Home() {
                     if (activeNote && activeNote.freq !== quantizedFreq) {
                         synth.set({ frequency: quantizedFreq });
                         activeNotes.current.set(data.pointerId, { type, freq: quantizedFreq });
-                    } else {
-                        synth.set({ volume: -48 + (velocity * 48) });
                     }
+                    // This part seems to have caused issues, let's keep it simple
+                    // synth.set({ volume: -48 + (velocity * 48) });
                 }
                 break;
             case 'up':
@@ -656,18 +658,6 @@ export default function Home() {
                         synth.triggerRelease([activeNote.freq]);
                     }
                     activeNotes.current.delete(data.pointerId);
-                }
-                
-                let hasActiveNotesForType = false;
-                for (const note of activeNotes.current.values()) {
-                    if (note.type === type) {
-                        hasActiveNotesForType = true;
-                        break;
-                    }
-                }
-                
-                if (!hasActiveNotesForType) {
-                    synth.releaseAll();
                 }
                 break;
         }
@@ -757,7 +747,7 @@ export default function Home() {
                             onPulsateToggle={handlePulsateToggle}
                             isLatchOn={isBassLatchOn}
                             onLatchToggle={handleLatchToggle}
-                            latchedNotes={latchedBassNotes}
+                            latchedNotes={latchedBassNotes.current}
                             isPolyphonic
                         />
                         <ThereminPad
@@ -801,3 +791,4 @@ export default function Home() {
         </div>
     );
 }
+
