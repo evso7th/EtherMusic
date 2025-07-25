@@ -150,7 +150,7 @@ export default function Home() {
     
     // Audio state
     const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
-    const [volumes, setVolumes] = useState({ melody: -9, bass: -9, drums: -9 });
+    const [volumes, setVolumes] = useState({ melody: -9, bass: -6, drums: -9 });
     const [effects, setEffects] = useState({
         melody: { reverb: -60, delay: -60 },
         bass: { reverb: -60, delay: -60 },
@@ -238,7 +238,7 @@ export default function Home() {
         bassGain.current = new Tone.Gain(1).connect(channels.current.bass);
         bassSynth.current = new Tone.PolySynth(Tone.Synth, {
             polyphony: 8,
-            oscillator: { type: 'fatsawtooth' },
+            oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
         }).connect(bassGain.current);
 
@@ -642,8 +642,7 @@ export default function Home() {
                 if (data && quantizedFreq && activeNotes.current.has(data.pointerId)) {
                     const activeNote = activeNotes.current.get(data.pointerId);
                     if (activeNote && activeNote.freq !== quantizedFreq) {
-                        synth.triggerRelease([activeNote.freq]);
-                        synth.triggerAttack(quantizedFreq, undefined, velocity);
+                        synth.set({ note: { frequency: quantizedFreq } });
                         activeNotes.current.set(data.pointerId, { type, freq: quantizedFreq });
                     } else {
                         synth.set({ volume: -48 + (velocity * 48) });
