@@ -355,22 +355,34 @@ export default function Home() {
     
     // --- Performance Refactoring: RAF loop for audio commands ---
     const processAudioQueue = () => {
-        if (!audioCommandQueue.current.size) {
+        if (!audioCommandQueue.current.size || !audioInitialized.current) {
             animationFrameId.current = requestAnimationFrame(processAudioQueue);
             return;
         }
+        
+        const Tone = require('tone');
 
         audioCommandQueue.current.forEach((value, pointerId) => {
             const activeNote = activeNotes.current.get(pointerId);
             if (activeNote) {
                 const synth = activeNote.type === 'melody' ? melodySynth.current : bassSynth.current;
-                synth?.set({
-                    frequency: value.freq,
-                    // volume is not a valid parameter for set(), but we can adjust gain if needed
-                });
-                activeNote.freq = value.freq; // Update frequency for release
+                
+                if (synth) {
+                     // Separate commands for frequency and volume for better performance
+                    synth.set({ frequency: value.freq });
+                    
+                    // Directly set volume on the synth's output node for smoother changes.
+                    // Convert linear gain (0-1) to dB.
+                    if (synth.volume) {
+                        synth.volume.value = Tone.gainToDb(value.vol * value.vol); // square for more perceptual curve
+                    }
+
+                    activeNote.freq = value.freq;
+                    activeNote.vol = value.vol;
+                }
             }
         });
+
         audioCommandQueue.current.clear();
         animationFrameId.current = requestAnimationFrame(processAudioQueue);
     };
@@ -681,7 +693,6 @@ export default function Home() {
                 break;
             case 'move':
                 if (data && quantizedFreq && activeNotes.current.has(pointerId)) {
-                    // --- Performance Refactoring: Queue command instead of direct call ---
                     audioCommandQueue.current.set(pointerId, { freq: quantizedFreq, vol: velocity });
                 }
                 break;
@@ -694,7 +705,6 @@ export default function Home() {
                     activeNotes.current.delete(pointerId);
                     audioCommandQueue.current.delete(pointerId);
 
-                    // Check if any other notes of the same type are active
                     let hasMoreNotes = false;
                     for (const note of activeNotes.current.values()) {
                         if (note.type === type) {
