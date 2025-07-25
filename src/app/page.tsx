@@ -355,18 +355,18 @@ export default function Home() {
     
     // --- Performance Refactoring: RAF loop for audio commands ---
     const processAudioQueue = () => {
-        if (audioCommandQueue.current.size === 0) {
+        if (!audioCommandQueue.current.size) {
             animationFrameId.current = requestAnimationFrame(processAudioQueue);
             return;
         }
-        
+
         audioCommandQueue.current.forEach((value, pointerId) => {
             const activeNote = activeNotes.current.get(pointerId);
             if (activeNote) {
                 const synth = activeNote.type === 'melody' ? melodySynth.current : bassSynth.current;
                 synth?.set({
-                    note: { frequency: value.freq },
-                    volume: -48 + (value.vol * 48) // Linear volume mapping
+                    frequency: value.freq,
+                    // volume is not a valid parameter for set(), but we can adjust gain if needed
                 });
                 activeNote.freq = value.freq; // Update frequency for release
             }
@@ -686,13 +686,26 @@ export default function Home() {
                 }
                 break;
             case 'up':
-                 if (activeNotes.current.has(pointerId)) {
+                if (activeNotes.current.has(pointerId)) {
                     const activeNote = activeNotes.current.get(pointerId);
                     if (activeNote) {
                         synth.triggerRelease([activeNote.freq]);
                     }
                     activeNotes.current.delete(pointerId);
                     audioCommandQueue.current.delete(pointerId);
+
+                    // Check if any other notes of the same type are active
+                    let hasMoreNotes = false;
+                    for (const note of activeNotes.current.values()) {
+                        if (note.type === type) {
+                            hasMoreNotes = true;
+                            break;
+                        }
+    
+                    }
+                    if (!hasMoreNotes) {
+                        synth.releaseAll();
+                    }
                 }
                 break;
         }
@@ -827,3 +840,6 @@ export default function Home() {
     );
 }
 
+
+
+    
