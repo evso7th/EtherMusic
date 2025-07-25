@@ -168,7 +168,13 @@ export default function Home() {
     // Bass specific state
     const [isBassPulsating, setIsBassPulsating] = useState(false);
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
+    
+    // --- Performance Refactoring ---
+    // Use refs for high-frequency state to avoid re-renders
     const latchedBassNotes = useRef<Map<number, { x: number; y: number; frequency: number; volume: number }>>(new Map());
+    const activeNotes = useRef(new Map<number, { type: 'melody' | 'bass'; freq: number; vol: number }>());
+    const audioCommandQueue = useRef<Map<number, { freq: number; vol: number }>>(new Map());
+    const animationFrameId = useRef<number>();
     const [, forceUpdate] = useState({}); // Helper to force re-render for latch mode visuals
 
     // Autopilot state
@@ -186,11 +192,10 @@ export default function Home() {
     const bassLFO = useRef<Tone.LFO | null>(null);
     const bassGain = useRef<Tone.Gain | null>(null);
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
-    const activeNotes = useRef(new Map<number, {type: 'melody' | 'bass', freq: number}>());
     const fx = useRef<{ reverb: Tone.Reverb, delay: Tone.FeedbackDelay } | null>(null);
     const autopilot = useRef<{bass: Tone.Part | null, melody: Tone.Part | null}>({ bass: null, melody: null });
     
-    // --- NEW --- Refs for stable callbacks
+    // Refs for stable callbacks
     const activePatternRef = useRef(activePattern);
     const measureCountRef = useRef(0);
     const conductorEventId = useRef<number | null>(null);
@@ -234,11 +239,12 @@ export default function Home() {
         channels.current.drums.send("delay", effects.drums.delay);
 
 
-        melodySynth.current = new Tone.PolySynth(Tone.Synth, { polyphony: 8 }).connect(channels.current.melody);
+        melodySynth.current = new Tone.PolySynth(Tone.Synth, { polyphony: 8, portamento: 0.02 }).connect(channels.current.melody);
 
         bassGain.current = new Tone.Gain(1).connect(channels.current.bass);
         bassSynth.current = new Tone.PolySynth(Tone.Synth, {
             polyphony: 8,
+            portamento: 0.02,
             oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
         }).connect(bassGain.current);
@@ -345,8 +351,41 @@ export default function Home() {
         
         Tone.Transport.bpm.value = activeTempo.bpm;
         
-    }, []); // Removed dependencies to ensure it runs only once
+    }, []); 
     
+    // --- Performance Refactoring: RAF loop for audio commands ---
+    const processAudioQueue = () => {
+        if (audioCommandQueue.current.size === 0) {
+            animationFrameId.current = requestAnimationFrame(processAudioQueue);
+            return;
+        }
+        
+        audioCommandQueue.current.forEach((value, pointerId) => {
+            const activeNote = activeNotes.current.get(pointerId);
+            if (activeNote) {
+                const synth = activeNote.type === 'melody' ? melodySynth.current : bassSynth.current;
+                synth?.set({
+                    note: { frequency: value.freq },
+                    volume: -48 + (value.vol * 48) // Linear volume mapping
+                });
+                activeNote.freq = value.freq; // Update frequency for release
+            }
+        });
+        audioCommandQueue.current.clear();
+        animationFrameId.current = requestAnimationFrame(processAudioQueue);
+    };
+
+    useEffect(() => {
+        if (isReady) {
+            animationFrameId.current = requestAnimationFrame(processAudioQueue);
+        }
+        return () => {
+            if (animationFrameId.current) {
+                cancelAnimationFrame(animationFrameId.current);
+            }
+        };
+    }, [isReady]);
+
     // Update allowed frequencies when key or scale changes
     useEffect(() => {
         if (!isReady) return;
@@ -597,6 +636,7 @@ export default function Home() {
         const synth = type === 'melody' ? melodySynth.current : bassSynth.current;
         if (!synth) return;
 
+        const pointerId = data?.pointerId ?? -1;
         const quantizedFreq = data ? getClosestFrequency(data.frequency, type) : 0;
         const velocity = data ? data.volume : 0;
         
@@ -627,7 +667,6 @@ export default function Home() {
                         synth.triggerAttack(quantizedFreq, undefined, velocity);
                     }
                 }
-                latchedBassNotes.current = newNotes;
                 forceUpdate({}); // Force re-render to update visuals
             }
             return; 
@@ -637,27 +676,23 @@ export default function Home() {
             case 'down':
                 if (data && quantizedFreq) {
                     synth.triggerAttack(quantizedFreq, undefined, velocity);
-                    activeNotes.current.set(data.pointerId, { type, freq: quantizedFreq });
+                    activeNotes.current.set(pointerId, { type, freq: quantizedFreq, vol: velocity });
                 }
                 break;
             case 'move':
-                if (data && quantizedFreq && activeNotes.current.has(data.pointerId)) {
-                    const activeNote = activeNotes.current.get(data.pointerId);
-                    if (activeNote && activeNote.freq !== quantizedFreq) {
-                        synth.set({ frequency: quantizedFreq });
-                        activeNotes.current.set(data.pointerId, { type, freq: quantizedFreq });
-                    }
-                    // This part seems to have caused issues, let's keep it simple
-                    // synth.set({ volume: -48 + (velocity * 48) });
+                if (data && quantizedFreq && activeNotes.current.has(pointerId)) {
+                    // --- Performance Refactoring: Queue command instead of direct call ---
+                    audioCommandQueue.current.set(pointerId, { freq: quantizedFreq, vol: velocity });
                 }
                 break;
             case 'up':
-                 if (data && activeNotes.current.has(data.pointerId)) {
-                    const activeNote = activeNotes.current.get(data.pointerId);
+                 if (activeNotes.current.has(pointerId)) {
+                    const activeNote = activeNotes.current.get(pointerId);
                     if (activeNote) {
                         synth.triggerRelease([activeNote.freq]);
                     }
-                    activeNotes.current.delete(data.pointerId);
+                    activeNotes.current.delete(pointerId);
+                    audioCommandQueue.current.delete(pointerId);
                 }
                 break;
         }
