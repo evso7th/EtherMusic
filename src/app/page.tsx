@@ -22,8 +22,10 @@ type BeatPattern = {
 
 const beatPatterns: BeatPattern[] = [
     { name: 'Rock', sequence: [
-        'C1', 'E2', ['C1', 'E1'], 'E2', 'D1', 'E2', ['C1', 'E1'], 'E2',
-        'C1', 'E2', ['C1', 'E1'], 'E2', 'D1', 'G1', 'G2', 'G3'
+        ['C1', 'E1'], 'E2', 'D1', 'E2', ['C1', 'E1'], 'E2', 'D1', 'E2',
+        ['C1', 'E1'], 'E2', 'D1', 'E2', ['C1', 'E1'], 'G1', 'G2', 'G3',
+        ['C1', 'E1'], null, 'D1', ['E1', 'E2'], ['C1'], 'E2', 'D1', 'E2',
+        ['C1', 'E1'], 'E2', 'D1', 'E2', 'G1', 'G2', 'G3', 'F1'
     ]},
     { name: 'House', sequence: ['C1', 'C1', 'D1', 'C1', 'C1', 'C1', 'D1', 'C1'] },
     { name: 'Hip Hop', sequence: ['C1', null, 'E1', 'D1', null, 'C1', 'E1', null] },
@@ -403,7 +405,7 @@ export default function Home() {
             } else {
                 playNote(notes);
             }
-        }, activePattern.sequence, '16n'); // Changed to 16n for more resolution
+        }, activePattern.sequence, '32n');
     
         if (isPlaying) {
             drumSequence.current.start(0);
@@ -412,10 +414,9 @@ export default function Home() {
     }, [activePattern, isReady]);
     
     useEffect(() => {
-        if (isPlaying && drumSequence.current?.state !== 'started') {
-            drumSequence.current?.start(0);
-        } else if (!isPlaying && drumSequence.current?.state === 'started') {
-            drumSequence.current?.stop(0);
+        if (!isPlaying || !drumSequence.current) return;
+        if (drumSequence.current.state !== 'started') {
+            drumSequence.current.start(0);
         }
     }, [isPlaying]);
 
@@ -766,5 +767,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
