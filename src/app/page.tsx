@@ -16,8 +16,8 @@ import { HelpGuide } from '@/components/help-guide';
 
 const rockPatterns = {
     groove: [
-        ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2',
-        ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2'
+        ['C1', 'E1'], ['E1', 'E2'], ['D1', 'E1'], ['E1', 'E2'], ['C1', 'E1'], ['E1', 'E2'], ['D1', 'E1'], ['E1', 'E2'],
+        ['C1', 'E1'], ['E1', 'E2'], ['D1', 'E1'], ['E1', 'E2'], ['C1', 'E1'], ['E1', 'E2'], ['D1', 'E1'], ['E1', 'E2']
     ],
     fills: [
         [
@@ -33,28 +33,26 @@ const rockPatterns = {
 
 const housePatterns = {
     groove: [
-        ['C1', 'E2'], 'E2', ['D1', 'E2'], 'E2',
-        ['C1', 'E2'], 'E2', ['D1', 'E2'], 'E2',
-        ['C1', 'E2'], 'E2', ['D1', 'E2'], 'E2',
-        ['C1', 'E2'], 'E2', ['D1', 'E2'], 'E2',
+        'C1', 'E2', ['D1', 'E1'], 'E2', 'C1', 'E2', ['D1', 'E1'], 'E2',
+        'C1', 'E2', ['D1', 'E1'], 'E2', 'C1', 'E2', ['D1', 'E1'], 'E2'
     ],
     fills: [
         [
-            'C1', null, 'D1', null, 'C1', null, 'D1', null,
-            'G1', 'G1', 'G2', 'G2', 'G3', null, ['F1', 'D1'], 'D1'
+            'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1',
+            'G1', 'G2', 'G3', 'G3', 'F1', null, 'F1', null
         ]
     ]
 };
 
-const hipHopPatterns = {
+const trancePatterns = {
     groove: [
-        ['C1', 'E2'], null, 'E2', 'D1', 'E2', ['C1', 'E2'], 'E2', null,
-        'C1', 'E2', ['C1', 'E2'], 'D1', 'E2', null, 'E2', 'D1'
+        ['C1', 'E2'], 'E2', 'E2', 'E2', ['D1', 'E2'], 'E2', 'E2', 'E2',
+        ['C1', 'E2'], 'E2', 'E2', 'E2', ['D1', 'E2'], 'E2', 'E2', ['E1', 'E2'],
     ],
     fills: [
         [
-            'G1', null, 'G1', 'G2', null, 'G2', 'G3', null,
-            'C1', null, 'D1', null, 'C1', null, 'D1', ['F1', 'C1']
+            'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1',
+            'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1', ['F1', 'D1']
         ]
     ]
 };
@@ -74,8 +72,8 @@ const reggaePatterns = {
 
 const slowBluesPatterns = {
     groove: [
-        ['C1', 'E1'], 'E2', 'E2', ['D1', 'E1'], 'E2', 'E2', 'C1', 'E1',
-        'E2', 'E2', ['D1', 'E1'], 'E2', 'E2', 'C1', 'E1', 'E2'
+        ['C1', 'E1'], 'E2', 'E1', ['D1', 'E2'], 'E1', 'E2', 'E1', ['C1', 'E2'],
+        'E1', 'E2', 'E1', ['D1', 'E2'], 'E1', 'E2', 'E1', 'E2'
     ],
     fills: [
         [
@@ -89,7 +87,7 @@ const slowBluesPatterns = {
 const beatPatterns = [
     { name: 'Rock', patterns: rockPatterns, length: '1m' },
     { name: 'House', patterns: housePatterns, length: '1m' },
-    { name: 'Hip Hop', patterns: hipHopPatterns, length: '1m' },
+    { name: 'Trance', patterns: trancePatterns, length: '1m' },
     { name: 'Reggae', patterns: reggaePatterns, length: '1m' },
     { name: 'Slow Blues', patterns: slowBluesPatterns, length: '1m' },
     { name: 'Off', patterns: { groove: [], fills: [] }, length: '1m' },
