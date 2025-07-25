@@ -16,8 +16,8 @@ import { HelpGuide } from '@/components/help-guide';
 
 const rockPatterns = {
     groove: [
-        ['C1', 'E1'], ['E1', 'E2'], ['D1', 'E1'], ['E1', 'E2'], ['C1', 'E1'], ['E1', 'E2'], ['D1', 'E1'], ['E1', 'E2'],
-        ['C1', 'E1'], ['E1', 'E2'], ['D1', 'E1'], ['E1', 'E2'], ['C1', 'E1'], ['E1', 'E2'], ['D1', 'E1'], ['E1', 'E2']
+        ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2',
+        ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2'
     ],
     fills: [
         [
@@ -33,13 +33,13 @@ const rockPatterns = {
 
 const housePatterns = {
     groove: [
-        'C1', 'E2', ['D1', 'E1'], 'E2', 'C1', 'E2', ['D1', 'E1'], 'E2',
-        'C1', 'E2', ['D1', 'E1'], 'E2', 'C1', 'E2', ['D1', 'E1'], 'E2'
+        ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1', ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1',
+        ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1', ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1'
     ],
     fills: [
         [
-            'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1',
-            'G1', 'G2', 'G3', 'G3', 'F1', null, 'F1', null
+            ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1', ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1',
+            ['C1', 'G1'], 'G1', 'G2', 'G2', ['D1', 'G3'], 'G3', 'F1', null
         ]
     ]
 };
@@ -59,21 +59,21 @@ const trancePatterns = {
 
 const reggaePatterns = {
     groove: [
-        null, 'E2', ['C1', 'D1'], 'E2', null, 'E2', 'D1', 'E2',
-        null, 'E2', ['C1', 'D1'], 'E2', null, 'E2', 'D1', ['E1', 'C1']
+        'E1', 'E2', 'D1', 'E2', 'E1', 'E2', ['C1', 'D1'], 'E2',
+        'E1', 'E2', 'D1', 'E2', 'E1', 'E2', ['C1', 'D1'], 'E2'
     ],
     fills: [
         [
-            null, 'G1', 'G1', 'G1', null, 'G2', 'G2', null,
-            null, 'G3', 'G3', 'G3', 'D1', null, 'D1', ['F1', 'C1']
+            'D1', 'D1', 'D1', 'G1', 'G1', 'G2', 'G2', 'G3',
+            'G3', null, 'D1', null, 'D1', null, ['F1', 'C1'], 'D1'
         ]
     ]
 };
 
 const slowBluesPatterns = {
     groove: [
-        ['C1', 'E1'], 'E2', 'E1', ['D1', 'E2'], 'E1', 'E2', 'E1', ['C1', 'E2'],
-        'E1', 'E2', 'E1', ['D1', 'E2'], 'E1', 'E2', 'E1', 'E2'
+        ['C1', 'E1'], 'E2', 'E1', ['D1', 'E2'], ['C1', 'E1'], 'E2', 'E1', ['D1', 'E2'],
+        ['C1', 'E1'], 'E2', 'E1', ['D1', 'E2'], ['C1', 'E1'], 'E2', 'E1', ['D1', 'E2']
     ],
     fills: [
         [
@@ -264,7 +264,7 @@ export default function Home() {
             return new Promise<void>((resolve) => {
                 const player = new Tone.Player(url).connect(channels.current!.drums);
                 if (note === 'E1' || note === 'E2') {
-                    player.volume.value = 0;
+                    player.volume.value = -3; // Boost hi-hat volume
                 }
                 drumSamplers.current![note] = player;
                 Tone.loaded().then(() => resolve());
