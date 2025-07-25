@@ -627,9 +627,9 @@ export default function Home() {
             channels.current.melody.send('reverb', effects.melody.reverb);
             channels.current.melody.send('delay', effects.melody.delay);
             channels.current.bass.send('reverb', effects.bass.reverb);
-            channels.current.bass.send('delay', effects.bass.delay);
+            channels.current.bass.send('delay', effects.melody.delay);
             channels.current.drums.send('reverb', effects.drums.reverb);
-            channels.current.drums.send('delay', effects.drums.delay);
+            channels.current.drums.send('delay', effects.melody.delay);
         }
     }, [effects, isReady]);
 
@@ -851,5 +851,6 @@ export default function Home() {
 }
 
 
+    
 
     
