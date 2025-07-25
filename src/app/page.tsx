@@ -12,6 +12,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { PlaybackControls } from '@/components/playback-controls';
 import { ArrowRight } from 'lucide-react';
 import { HelpGuide } from '@/components/help-guide';
+import { generateAutopilotPattern } from '@/lib/music-engine';
 
 
 const rockPatterns = {
@@ -21,59 +22,59 @@ const rockPatterns = {
     ],
     fills: [
         [
-            'G1', 'G1', 'G2', 'G2', 'G3', 'G3', ['F1', 'C1'], null,
-            'G1', 'G2', 'G3', null, 'F1', null, 'F1', null,
+            'G1', 'G1', 'G2', 'G2', 'G3', 'G3', ['F1', 'C1'], ['F1'],
+            'G1', 'G2', 'G3', null, 'F1', 'D1', ['F1', 'C1'], ['F1', 'D1'],
         ],
         [
             'G1', 'E2', 'G1', 'E2', 'G2', 'E2', 'G2', 'E2',
-            'G3', 'E2', 'G3', 'E1', ['F1', 'D1'], null, ['F1', 'C1'], 'C1'
+            'G3', 'E2', 'G3', 'E1', ['F1', 'D1'], 'C1', ['F1', 'C1'], 'C1'
         ]
     ]
 };
 
 const housePatterns = {
     groove: [
-        ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1', ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1',
-        ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1', ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1'
+        'C1', 'E1', ['D1', 'E1'], 'E1', 'C1', 'E1', ['D1', 'E1'], 'E1',
+        'C1', 'E1', ['D1', 'E1'], 'E1', 'C1', 'E1', ['D1', 'E1'], 'E1',
     ],
     fills: [
         [
-            ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1', ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1',
-            ['C1', 'G1'], 'G1', 'G2', 'G2', ['D1', 'G3'], 'G3', 'F1', null
+            'C1', 'E2', 'E2', 'E2', 'C1', 'E2', 'E2', 'E2',
+            'C1', ['D1', 'E2'], 'D1', ['D1', 'E2'], 'D1', 'E2', 'E2', 'F1'
         ]
     ]
 };
 
 const trancePatterns = {
     groove: [
-        ['C1', 'E2'], 'E2', 'E2', 'E2', ['D1', 'E2'], 'E2', 'E2', 'E2',
-        ['C1', 'E2'], 'E2', 'E2', 'E2', ['D1', 'E2'], 'E2', 'E2', ['E1', 'E2'],
+        'C1', ['E1', 'E2'], ['D1', 'E1', 'E2'], ['E1', 'E2'], 'C1', ['E1', 'E2'], ['D1', 'E1', 'E2'], ['E1', 'E2'],
+        'C1', ['E1', 'E2'], ['D1', 'E1', 'E2'], ['E1', 'E2'], 'C1', ['E1', 'E2'], ['D1', 'E1', 'E2'], ['E1', 'E2'],
     ],
     fills: [
         [
+            'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2',
             'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1',
-            'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1', ['F1', 'D1']
         ]
     ]
 };
 
 const reggaePatterns = {
     groove: [
-        'E1', 'E2', 'D1', 'E2', 'E1', 'E2', ['C1', 'D1'], 'E2',
-        'E1', 'E2', 'D1', 'E2', 'E1', 'E2', ['C1', 'D1'], 'E2'
+        null, 'E2', 'E1', 'E2', null, 'E2', ['C1', 'D1', 'E1'], 'E2',
+        null, 'E2', 'E1', 'E2', null, 'E2', ['C1', 'D1', 'E1'], 'E2',
     ],
     fills: [
         [
-            'D1', 'D1', 'D1', 'G1', 'G1', 'G2', 'G2', 'G3',
-            'G3', null, 'D1', null, 'D1', null, ['F1', 'C1'], 'D1'
+            'G1', 'G1', 'G2', 'G2', 'G3', null, ['C1','D1'], null,
+            'G1', 'G1', 'G2', 'G2', 'G3', 'G3', ['C1', 'D1', 'F1'], null,
         ]
     ]
 };
 
 const slowBluesPatterns = {
     groove: [
-        ['C1', 'E1'], 'E2', 'E1', ['D1', 'E2'], ['C1', 'E1'], 'E2', 'E1', ['D1', 'E2'],
-        ['C1', 'E1'], 'E2', 'E1', ['D1', 'E2'], ['C1', 'E1'], 'E2', 'E1', ['D1', 'E2']
+        ['C1', 'E2'], 'E1', 'D1', 'E1', ['C1', 'E2'], 'E1', 'D1', 'E1',
+        ['C1', 'E2'], 'E1', 'D1', 'E1', ['C1', 'E2'], 'E1', 'D1', 'E1'
     ],
     fills: [
         [
@@ -329,7 +330,7 @@ export default function Home() {
             bassSynth.current?.triggerAttackRelease(note.freq, note.dur, time, note.vel);
         }, []).start(0);
         autopilot.current.bass.loop = true;
-        autopilot.current.bass.loopEnd = '2m';
+        autopilot.current.bass.loopEnd = '4m';
 
         autopilot.current.melody = new Tone.Part((time, note) => {
              melodySynth.current?.triggerAttackRelease(note.freq, note.dur, time, note.vel);
@@ -518,7 +519,7 @@ export default function Home() {
 
     }, [activePattern, isReady]);
     
-    // Autopilot logic
+    // Autopilot logic using the new music engine
     useEffect(() => {
         const bassPart = autopilot.current.bass;
         const melodyPart = autopilot.current.melody;
@@ -528,75 +529,11 @@ export default function Home() {
             
             bassPart.clear();
             melodyPart.clear();
-            
-            const bassPattern: { time: string, freq: number, dur: string, vel: number }[] = [];
-            const melodyPattern: { time: string, freq: number, dur: string, vel: number }[] = [];
 
-            if (autopilotStyle === 'Ambient') {
-                 for (let i = 0; i < 2; i++) {
-                    const time = `${i}:0:0`;
-                    const freq = allowedFrequencies.bass[Math.floor(Math.random() * allowedFrequencies.bass.length)];
-                    bassPattern.push({ time, freq, dur: '1m', vel: 0.2 + Math.random() * 0.1 });
-                }
-                const numMelodyNotes = 2 + Math.floor(Math.random() * 3);
-                for (let i = 0; i < numMelodyNotes; i++) {
-                    const time = `${Math.floor(Math.random() * 4)}:${Math.floor(Math.random() * 4)}:0`;
-                    const freq = allowedFrequencies.melody[Math.floor(Math.random() * allowedFrequencies.melody.length)];
-                    melodyPattern.push({ time, freq, dur: '2n', vel: 0.4 + Math.random() * 0.2 });
-                }
-            } else if (autopilotStyle === 'House') {
-                for (let i = 0; i < 8; i++) {
-                    const time = `0:${Math.floor(i/2)}:${(i%2)*2}`;
-                    const freq = allowedFrequencies.bass[Math.floor(Math.random() * 2)];
-                    bassPattern.push({ time, freq, dur: '8n', vel: 0.3 + Math.random() * 0.2 });
-                }
-                 const numMelodyNotes = 5 + Math.floor(Math.random() * 8);
-                for (let i = 0; i < numMelodyNotes; i++) {
-                    const measure = Math.floor(Math.random() * 4);
-                    const beat = Math.floor(Math.random() * 4);
-                    const sixteenth = Math.floor(Math.random() * 4);
-                    const time = `${measure}:${beat}:${sixteenth}`;
-                    const freq = allowedFrequencies.melody[Math.floor(Math.random() * allowedFrequencies.melody.length)];
-                    const dur = ['8n', '16n'][Math.floor(Math.random()*2)];
-                    melodyPattern.push({ time, freq, dur, vel: 0.5 + Math.random() * 0.3 });
-                }
-            } else if (autopilotStyle === 'Wind') {
-                const numMelodyNotes = 10 + Math.floor(Math.random() * 10);
-                for (let i = 0; i < numMelodyNotes; i++) {
-                    const time = `${Math.floor(Math.random() * 4)}:${Math.floor(Math.random() * 4)}:${Math.floor(Math.random() * 4)}`;
-                    const freq = allowedFrequencies.melody[Math.floor(Math.random() * allowedFrequencies.melody.length)];
-                    melodyPattern.push({ time, freq, dur: '4n', vel: 0.1 + Math.random() * 0.2 });
-                }
-            } else if (autopilotStyle === 'Sequence') {
-                let lastNoteIndex = Math.floor(Math.random() * allowedFrequencies.bass.length);
-                for (let i = 0; i < 16; i++) {
-                    const time = `0:${Math.floor(i/4)}:${i%4}`;
-                    lastNoteIndex = (lastNoteIndex + Math.floor(Math.random() * 3) - 1 + allowedFrequencies.bass.length) % allowedFrequencies.bass.length;
-                    const freq = allowedFrequencies.bass[lastNoteIndex];
-                    bassPattern.push({ time, freq, dur: '16n', vel: 0.3 + Math.random() * 0.2 });
-                }
-                 const numMelodyNotes = 3 + Math.floor(Math.random() * 4);
-                for (let i = 0; i < numMelodyNotes; i++) {
-                    const time = `${Math.floor(Math.random() * 2)}:${Math.floor(Math.random() * 4)}:0`;
-                    const freq = allowedFrequencies.melody[Math.floor(Math.random() * allowedFrequencies.melody.length)];
-                    melodyPattern.push({ time, freq, dur: '2n', vel: 0.5 + Math.random() * 0.2 });
-                }
-            } else if (autopilotStyle === 'Chimes') {
-                const numMelodyNotes = 15 + Math.floor(Math.random() * 15);
-                for (let i = 0; i < numMelodyNotes; i++) {
-                    const time = `${Math.floor(Math.random() * 4)}:${Math.floor(Math.random() * 4)}:${Math.floor(Math.random() * 4)}`;
-                    const freq = allowedFrequencies.melody[Math.floor(Math.random() * allowedFrequencies.melody.length)];
-                    const dur = ['2n', '4n', '8n'][Math.floor(Math.random() * 3)];
-                    melodyPattern.push({ time, freq, dur, vel: 0.2 + Math.random() * 0.3 });
-                }
-            } else if (autopilotStyle === 'Drone') {
-                const rootNote = allowedFrequencies.bass[0];
-                const fifthNote = allowedFrequencies.bass.find(f => f > rootNote * 1.4 && f < rootNote * 1.6) || allowedFrequencies.bass[Math.min(4, allowedFrequencies.bass.length-1)];
-                bassPattern.push({ time: '0:0:0', freq: rootNote, dur: '2m', vel: 0.2 });
-                if (fifthNote) {
-                    bassPattern.push({ time: '0:0:0', freq: fifthNote, dur: '2m', vel: 0.15 });
-                }
-            }
+            const { bassPattern, melodyPattern } = generateAutopilotPattern(
+                autopilotStyle,
+                allowedFrequencies
+            );
 
             bassPattern.forEach(note => bassPart.add(note.time, note));
             melodyPattern.forEach(note => melodyPart.add(note.time, note));
@@ -865,3 +802,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
