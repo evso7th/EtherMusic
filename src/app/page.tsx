@@ -16,12 +16,15 @@ import { HelpGuide } from '@/components/help-guide';
 
 type BeatPattern = {
     name: string;
-    sequence: (string | null)[];
+    sequence: (string | string[] | null)[];
 };
 
 
 const beatPatterns: BeatPattern[] = [
-    { name: 'Rock', sequence: ['C1', 'E1', 'D1', 'E1', 'C1', 'E1', 'D1', 'F1'] },
+    { name: 'Rock', sequence: [
+        'C1', 'E2', ['C1', 'E1'], 'E2', 'D1', 'E2', ['C1', 'E1'], 'E2',
+        'C1', 'E2', ['C1', 'E1'], 'E2', 'D1', 'G1', 'G2', 'G3'
+    ]},
     { name: 'House', sequence: ['C1', 'C1', 'D1', 'C1', 'C1', 'C1', 'D1', 'C1'] },
     { name: 'Hip Hop', sequence: ['C1', null, 'E1', 'D1', null, 'C1', 'E1', null] },
     { name: 'Reggae', sequence: [null, 'D1', 'E1', 'C1', null, 'D1', 'E1', null] },
@@ -191,11 +194,8 @@ export default function Home() {
             onerror: (error) => console.error("Error loading drum samples:", error),
         }).connect(channels.current.drums);
         
-        drumSequence.current = new Tone.Sequence((time, note) => {
-            if (drumSamplers.current?.loaded && note && drumSamplers.current.has(note)) {
-                 drumSamplers.current.player(note).start(time);
-            }
-        }, activePattern.sequence, '8n');
+        // This will be properly initialized in the useEffect
+        drumSequence.current = null;
 
         autopilot.current.bass = new Tone.Part((time, note) => {
             bassSynth.current?.triggerAttackRelease(note.freq, note.dur, time, note.vel);
@@ -287,7 +287,6 @@ export default function Home() {
         const Tone = await import('tone');
         setIsPlaying(true);
         Tone.Transport.start();
-        drumSequence.current?.start(0);
     }
     
     const handlePlayPause = async () => {
@@ -323,7 +322,7 @@ export default function Home() {
         if (!isReady) return;
 
         Tone.Transport.stop();
-        drumSequence.current?.stop(0).clear();
+        drumSequence.current?.stop(0);
         melodySynth.current?.releaseAll();
         bassSynth.current?.releaseAll();
         activeNotes.current.clear();
@@ -383,27 +382,42 @@ export default function Home() {
     
     // Drum machine logic
     useEffect(() => {
-        if (!isReady) return;
-
+        if (!isReady || !drumSamplers.current?.loaded) return;
+    
         const Tone = require('tone');
-        
+    
+        // Stop and dispose the old sequence if it exists
         drumSequence.current?.dispose();
-
-        drumSequence.current = new Tone.Sequence(
-            (time, note) => {
-                if (drumSamplers.current?.loaded && note && drumSamplers.current.has(note)) {
+    
+        drumSequence.current = new Tone.Sequence((time, notes) => {
+            if (!notes) return;
+    
+            const playNote = (note) => {
+                if (drumSamplers.current?.loaded && drumSamplers.current.has(note)) {
                     drumSamplers.current.player(note).start(time);
                 }
-            },
-            activePattern.sequence,
-            '8n'
-        );
-
+            };
+    
+            if (Array.isArray(notes)) {
+                notes.forEach(playNote);
+            } else {
+                playNote(notes);
+            }
+        }, activePattern.sequence, '16n'); // Changed to 16n for more resolution
+    
         if (isPlaying) {
             drumSequence.current.start(0);
         }
-
-    }, [activePattern, isReady, isPlaying]);
+    
+    }, [activePattern, isReady]);
+    
+    useEffect(() => {
+        if (isPlaying && drumSequence.current?.state !== 'started') {
+            drumSequence.current?.start(0);
+        } else if (!isPlaying && drumSequence.current?.state === 'started') {
+            drumSequence.current?.stop(0);
+        }
+    }, [isPlaying]);
 
     // Autopilot logic
     useEffect(() => {
@@ -752,3 +766,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
