@@ -33,39 +33,39 @@ const rockPatterns = {
 
 const housePatterns = {
     groove: [
-        ['C1', 'E2'], 'E2', ['D1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['D1', 'E2'], 'E2',
-        ['C1', 'E2'], 'E2', ['D1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['D1', 'E2'], ['E1', 'F1']
+        ['C1', 'E2'], 'E2', 'D1', 'E2', ['C1', 'E2'], 'E2', 'D1', 'E2',
+        ['C1', 'E2'], 'E2', 'D1', 'E2', ['C1', 'E2'], 'E2', 'D1', 'E2'
     ],
     fills: [
         [
-            'C1', 'E1', 'C1', 'E1', 'C1', 'E1', 'C1', 'E1',
-            'D1', 'D1', 'D1', 'D1', 'F1', null, null, null
+            'C1', 'C1', 'C1', 'C1', 'D1', 'D1', 'D1', 'D1',
+            'E1', 'E1', 'E1', 'E1', 'F1', null, null, null
         ]
     ]
 };
 
 const hipHopPatterns = {
     groove: [
-        'C1', null, 'E2', ['E1', 'E2'], 'D1', null, 'E2', 'C1',
-        'E2', 'C1', 'E2', 'E1', 'D1', null, 'E2', null
+        ['C1', 'E1'], 'E2', 'E1', 'E2', ['D1', 'C1'], 'E2', 'E1', 'E2',
+        ['C1', 'E1'], 'E2', 'E1', 'E2', 'D1', 'E2', ['C1', 'E1'], 'E2'
     ],
     fills: [
         [
-            'G1', 'G1', null, 'G2', null, 'G3', 'G3', null,
-            'C1', null, 'D1', null, 'F1', null, null, null
+            'G1', null, 'G1', null, 'G2', null, 'G3', 'G3',
+            'D1', null, 'D1', null, ['D1', 'C1'], null, null, null
         ]
     ]
 };
 
 const reggaePatterns = {
     groove: [
-        null, 'E1', null, ['C1', 'D1'], null, 'E1', null, 'D1',
-        null, 'E1', null, ['C1', 'D1'], null, 'E1', null, 'D1'
+        'E1', 'E2', ['D1', 'C1'], 'E2', 'E1', 'E2', 'D1', 'E2',
+        'E1', 'E2', ['D1', 'C1'], 'E2', 'E1', 'E2', 'D1', 'E2'
     ],
     fills: [
         [
-            null, 'G1', 'G1', 'G1', null, 'G2', 'G2', 'G2',
-            null, 'G3', 'G3', 'G3', 'F1', null, 'F1', null
+            null, 'G1', 'G1', null, 'G2', 'G2', null, 'G3',
+            null, 'G3', 'G3', null, 'D1', null, ['D1', 'F1'], null
         ]
     ]
 };
@@ -77,8 +77,8 @@ const slowBluesPatterns = {
     ],
     fills: [
         [
-            'G1', 'G1', 'G2', 'G2', 'G3', 'G3', 'F1', null,
-            'G1', 'G2', 'G3', null, 'F1', null, null, null,
+            'G1', null, 'G1', 'G2', 'G2', 'G3', 'G3', null,
+            'G1', 'G2', 'G3', null, ['F1', 'D1'], null, null, null,
         ]
     ]
 };
@@ -250,18 +250,19 @@ export default function Home() {
             G2: "/assets/sounds/mid%20tom.wav",
             G3: "/assets/sounds/low%20tom.wav",
         };
-
+        
         drumSamplers.current = {};
         const loadingPromises = Object.entries(drumUrls).map(([note, url]) => {
             return new Promise<void>((resolve) => {
                 const player = new Tone.Player(url).connect(channels.current!.drums);
                 if (note === 'E1' || note === 'E2') {
-                    player.volume.value = -3; // Boost hi-hat volume
+                    player.volume.value = -3;
                 }
                 drumSamplers.current![note] = player;
                 Tone.loaded().then(() => resolve());
             });
         });
+
 
         await Promise.all(loadingPromises);
         console.log('Drum samples loaded');
