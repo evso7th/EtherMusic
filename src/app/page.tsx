@@ -160,7 +160,7 @@ export default function Home() {
     
     // Audio state
     const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
-    const [volumes, setVolumes] = useState({ melody: -9, bass: -6, drums: -9 });
+    const [volumes, setVolumes] = useState({ melody: -9, bass: -6, drums: -9, autopilot: -9 });
     const [effects, setEffects] = useState({
         melody: { reverb: -60, delay: -60 },
         bass: { reverb: -60, delay: -60 },
@@ -198,14 +198,14 @@ export default function Home() {
     const melodySynth = useRef<Tone.PolySynth | null>(null);
     const bassSynth = useRef<Tone.PolySynth | null>(null);
     const drumSamplers = useRef<Record<string, Tone.Player> | null>(null);
-    const channels = useRef<{ melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel } | null>(null);
+    const channels = useRef<{ melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel, autopilot: Tone.Channel } | null>(null);
     const drumPart = useRef<Tone.Part | null>(null);
     const recorder = useRef<Tone.Recorder | null>(null);
     const bassLFO = useRef<Tone.LFO | null>(null);
     const bassGain = useRef<Tone.Gain | null>(null);
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
     const fx = useRef<{ reverb: Tone.Reverb, delay: Tone.FeedbackDelay } | null>(null);
-    const autopilot = useRef<{bass: Tone.Part | null, melody: Tone.Part | null}>({ bass: null, melody: null });
+    const autopilot = useRef<{bass: Tone.Part | null, melody: Tone.Part | null, melodySynth?: Tone.PolySynth, bassSynth?: Tone.PolySynth}>({ bass: null, melody: null });
     
     // Refs for stable callbacks
     const activePatternRef = useRef(activePattern);
@@ -233,6 +233,7 @@ export default function Home() {
             melody: new Tone.Channel(volumes.melody).toDestination(),
             bass: new Tone.Channel(volumes.bass).toDestination(),
             drums: new Tone.Channel(volumes.drums).toDestination(),
+            autopilot: new Tone.Channel(volumes.autopilot).toDestination(),
         };
 
         channels.current.melody.connect(fx.current.reverb);
@@ -250,7 +251,7 @@ export default function Home() {
         channels.current.drums.send("reverb", effects.drums.reverb);
         channels.current.drums.send("delay", effects.drums.delay);
 
-
+        // --- Synths for Pads ---
         melodySynth.current = new Tone.PolySynth(Tone.Synth, { polyphony: 8, portamento: 0.02 }).connect(channels.current.melody);
 
         bassGain.current = new Tone.Gain(1).connect(channels.current.bass);
@@ -260,6 +261,13 @@ export default function Home() {
             oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
         }).connect(bassGain.current);
+        
+        // --- Synths for Autopilot ---
+        autopilot.current.melodySynth = new Tone.PolySynth(Tone.Synth).connect(channels.current.autopilot);
+        autopilot.current.bassSynth = new Tone.PolySynth(Tone.Synth, {
+             oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
+             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
+        }).connect(channels.current.autopilot);
 
 
         bassLFO.current = new Tone.LFO({
@@ -346,13 +354,13 @@ export default function Home() {
 
 
         autopilot.current.bass = new Tone.Part((time, note) => {
-            bassSynth.current?.triggerAttackRelease(note.freq, note.dur, time, note.vel);
+            autopilot.current.bassSynth?.triggerAttackRelease(note.freq, note.dur, time, note.vel);
         }, []).start(0);
         autopilot.current.bass.loop = true;
         autopilot.current.bass.loopEnd = '4m';
 
         autopilot.current.melody = new Tone.Part((time, note) => {
-             melodySynth.current?.triggerAttackRelease(note.freq, note.dur, time, note.vel);
+             autopilot.current.melodySynth?.triggerAttackRelease(note.freq, note.dur, time, note.vel);
         }, []).start(0);
         autopilot.current.melody.loop = true;
         autopilot.current.melody.loopEnd = '4m';
@@ -363,7 +371,7 @@ export default function Home() {
         
         Tone.Transport.bpm.value = activeTempo.bpm;
         
-    }, [volumes.melody, volumes.bass, volumes.drums, effects.melody, effects.bass, effects.drums]); 
+    }, []); 
     
     // --- Performance Refactoring: RAF loop for audio commands ---
     const processAudioQueue = useCallback(() => {
@@ -419,7 +427,7 @@ export default function Home() {
     }, [musicKey, musicScale, isReady]);
 
     useEffect(() => {
-        if (!isReady || !melodySynth.current) return;
+        if (!isReady || !melodySynth.current || !autopilot.current.melodySynth) return;
         
         let newOptions;
 
@@ -451,6 +459,7 @@ export default function Home() {
                 break;
         }
         melodySynth.current.set(newOptions);
+        autopilot.current.melodySynth.set(newOptions);
 
     }, [melodyInstrument, isReady]);
 
@@ -501,11 +510,12 @@ export default function Home() {
         } else {
             Tone.Transport.pause();
             
-            if (isBassLatchOn || isAutopilotOn) {
+            if (isBassLatchOn) {
                  bassSynth.current.releaseAll();
             }
             if (isAutopilotOn) {
-                melodySynth.current?.releaseAll();
+                autopilot.current.bassSynth?.releaseAll();
+                autopilot.current.melodySynth?.releaseAll();
             }
         }
     };
@@ -518,6 +528,9 @@ export default function Home() {
         
         melodySynth.current?.releaseAll();
         bassSynth.current?.releaseAll();
+        autopilot.current.melodySynth?.releaseAll();
+        autopilot.current.bassSynth?.releaseAll();
+
         activeNotes.current.clear();
         latchedBassNotes.current.clear();
         setOrbs([]); // Clear all visual orbs
@@ -613,6 +626,8 @@ export default function Home() {
         } else if (bassPart && melodyPart) {
             bassPart.stop(0).clear();
             melodyPart.stop(0).clear();
+            autopilot.current.bassSynth?.releaseAll();
+            autopilot.current.melodySynth?.releaseAll();
         }
 
     }, [isAutopilotOn, isPlaying, allowedFrequencies, autopilotStyle]);
@@ -622,10 +637,6 @@ export default function Home() {
         if (!isReady) return;
         const Tone = require('tone');
         Tone.Transport.bpm.value = activeTempo.bpm;
-        if (bassLFO.current) {
-            // "4n" automatically syncs to transport BPM, no manual calc needed
-            // This simplifies the logic and makes it more robust.
-        }
     }, [activeTempo, isReady]);
 
     useEffect(() => {
@@ -633,6 +644,7 @@ export default function Home() {
             channels.current.melody.volume.value = volumes.melody;
             channels.current.bass.volume.value = volumes.bass;
             channels.current.drums.volume.value = volumes.drums;
+            channels.current.autopilot.volume.value = volumes.autopilot;
         }
     }, [volumes, isReady]);
 
@@ -657,7 +669,7 @@ export default function Home() {
     }, [allowedFrequencies]);
 
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
-        if (!audioInitialized.current) return;
+        if (!audioInitialized.current || isAutopilotOn) return;
 
         const synth = type === 'melody' ? melodySynth.current : bassSynth.current;
         if (!synth) return;
@@ -744,7 +756,7 @@ export default function Home() {
                 }
                 break;
         }
-    }, [isBassLatchOn, isPlaying, getClosestFrequency]);
+    }, [isBassLatchOn, isPlaying, getClosestFrequency, isAutopilotOn]);
     
     const handleStartScreenInteraction = () => {
         if (backgroundAudioRef.current && backgroundAudioRef.current.paused) {
@@ -835,6 +847,7 @@ export default function Home() {
                             onLatchToggle={handleLatchToggle}
                             orbs={bassOrbs}
                             isPolyphonic
+                            isDisabled={isAutopilotOn}
                         />
                         <MemoizedThereminPad
                             onInteraction={handleThereminInteraction}
@@ -852,6 +865,7 @@ export default function Home() {
                             onScaleChange={setMusicScale}
                             orbs={melodyOrbs}
                             isPolyphonic
+                            isDisabled={isAutopilotOn}
                         />
                     </div>
                     <div className="flex-shrink-0">

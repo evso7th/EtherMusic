@@ -3,7 +3,7 @@
 
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
-import { Music, Waves, Drum, Wind, Orbit } from 'lucide-react';
+import { Music, Waves, Drum, Bot } from 'lucide-react';
 import { Separator } from './ui/separator';
 
 interface MixerControlsProps {
@@ -11,8 +11,9 @@ interface MixerControlsProps {
         melody: number;
         bass: number;
         drums: number;
+        autopilot: number;
     };
-    onVolumeChange: (volumes: { melody: number; bass: number; drums: number; }) => void;
+    onVolumeChange: (volumes: MixerControlsProps['volumes']) => void;
     effects: {
         melody: { reverb: number, delay: number };
         bass: { reverb: number, delay: number };
@@ -52,15 +53,17 @@ const InstrumentControls = ({
     onVolumeChange,
     onReverbChange,
     onDelayChange,
+    showEffects = true,
 }: {
     label: string,
     icon: React.ElementType,
     volume: number,
-    reverb: number,
-    delay: number,
+    reverb?: number,
+    delay?: number,
     onVolumeChange: (v: number) => void,
-    onReverbChange: (v: number) => void,
-    onDelayChange: (v: number) => void,
+    onReverbChange?: (v: number) => void,
+    onDelayChange?: (v: number) => void,
+    showEffects?: boolean,
 }) => (
     <div>
         <div className="flex items-center gap-4">
@@ -76,10 +79,12 @@ const InstrumentControls = ({
                     value={[volume]}
                     onValueChange={(v) => onVolumeChange(v[0])}
                 />
-                <div className="space-y-2">
-                    <EffectSlider label="Reverb" value={reverb} onChange={onReverbChange} />
-                    <EffectSlider label="Delay" value={delay} onChange={onDelayChange} />
-                </div>
+                {showEffects && onReverbChange && onDelayChange && typeof reverb !== 'undefined' && typeof delay !== 'undefined' && (
+                    <div className="space-y-2">
+                        <EffectSlider label="Reverb" value={reverb} onChange={onReverbChange} />
+                        <EffectSlider label="Delay" value={delay} onChange={onDelayChange} />
+                    </div>
+                )}
             </div>
         </div>
     </div>
@@ -131,6 +136,14 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
                 onVolumeChange={(v) => onVolumeChange({ ...volumes, drums: v })}
                 onReverbChange={(v) => handleEffectChange('drums', 'reverb', v)}
                 onDelayChange={(v) => handleEffectChange('drums', 'delay', v)}
+            />
+             <Separator />
+            <InstrumentControls 
+                label="Autopilot"
+                icon={Bot}
+                volume={volumes.autopilot}
+                onVolumeChange={(v) => onVolumeChange({ ...volumes, autopilot: v })}
+                showEffects={false}
             />
         </div>
     );

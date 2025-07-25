@@ -20,6 +20,7 @@ interface ThereminPadProps {
     color: string;
     isPolyphonic?: boolean;
     orbs: Orb[];
+    isDisabled?: boolean;
     // Melody specific
     instruments?: MelodyInstrument[];
     activeInstrument?: MelodyInstrument;
@@ -65,6 +66,7 @@ export const ThereminPad = memo(function ThereminPad({
     color,
     isPolyphonic = false,
     orbs,
+    isDisabled = false,
     isPulsating, 
     onPulsateToggle, 
     instruments, 
@@ -102,30 +104,32 @@ export const ThereminPad = memo(function ThereminPad({
     }, [frequencyRange]);
 
     const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
+        if (isDisabled) return;
         (event.target as HTMLElement).setPointerCapture(event.pointerId);
         const interactionData = calculateInteraction(event);
         if (interactionData) {
             onInteraction(type, interactionData, 'down');
         }
-    }, [calculateInteraction, onInteraction, type]);
+    }, [calculateInteraction, onInteraction, type, isDisabled]);
 
     const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
-        if (!(event.buttons > 0)) return;
+        if (isDisabled || !(event.buttons > 0)) return;
         
         const interactionData = calculateInteraction(event);
         if (interactionData) {
             onInteraction(type, interactionData, 'move');
         }
-    }, [calculateInteraction, onInteraction, type]);
+    }, [calculateInteraction, onInteraction, type, isDisabled]);
 
     const handlePointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
+        if (isDisabled) return;
         const interactionData = calculateInteraction(event);
         onInteraction(type, interactionData, 'up');
         
         if ((event.target as HTMLElement).hasPointerCapture(event.pointerId)) {
             (event.target as HTMLElement).releasePointerCapture(event.pointerId);
         }
-    }, [onInteraction, type, calculateInteraction]);
+    }, [onInteraction, type, calculateInteraction, isDisabled]);
     
     const renderMelodyControls = () => (
         <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
@@ -214,6 +218,7 @@ export const ThereminPad = memo(function ThereminPad({
         <Card className={cn(
             "flex flex-col h-full bg-card/50 border-2 border-transparent transition-all duration-300",
             (isLatchOn && type === 'bass') && "border-accent ring-4 ring-accent/50",
+            isDisabled && "opacity-50 pointer-events-none"
         )}>
             <CardHeader className="flex-shrink-0 flex flex-row items-center justify-end p-2">
                 <div className="flex items-center gap-2">
