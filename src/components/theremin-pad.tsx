@@ -237,7 +237,7 @@ export function ThereminPad({
                     onPointerLeave={handlePointerUp}
                     style={{
                         backgroundColor: 'hsl(var(--muted) / 0.2)',
-                        backgroundImage: `linear-gradient(to bottom, transparent 30%, ${type === 'bass' ? 'hsl(var(--accent) / 0.2)' : 'hsl(var(--primary) / 0.2)'})`,
+                        backgroundImage: `linear-gradient(to top, transparent 30%, hsl(var(--primary) / 0.2))`,
                     }}
                 >
                     <div className="absolute inset-0 flex items-center justify-center text-5xl md:text-7xl font-bold text-foreground/10 pointer-events-none uppercase tracking-widest text-center">
