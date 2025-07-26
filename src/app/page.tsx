@@ -267,7 +267,7 @@ export default function Home() {
         drums: { reverb: -60, delay: -60 },
         autopilot: { reverb: -60, delay: -60 },
     });
-    const [activePattern, setActivePattern] = useState<any>(beatPatterns.find(p => p.name === 'Off'));
+    const [activePattern, setActivePattern] = useState<any>(beatPatterns.find(p => p.name === 'Air'));
     const [melodyInstrument, setMelodyInstrument] = useState<MelodyInstrument>('synth');
 
     // --- New Harmony State ---
@@ -426,7 +426,6 @@ export default function Home() {
         
         drumPart.current = new Tone.Part((time, value) => {
             const notes = (value as any).notes;
-            if (!kickSynth.current || !snareSynth.current || !drumSamplers.current) return;
 
             const playNote = (note: string) => {
                  if (note === 'C1') {
