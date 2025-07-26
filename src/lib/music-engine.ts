@@ -99,7 +99,7 @@ function interpretLSystem(
 // Main Generation Function
 export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequencies): { bassPattern: NoteEvent[], melodyPattern: NoteEvent[] } {
     let bassPattern: NoteEvent[] = [];
-    const melodyPattern: NoteEvent[] = [];
+    let melodyPattern: NoteEvent[] = [];
 
     const baseNote = freqs.bass[0];
     const fifthNote = freqs.bass.find(f => f > baseNote * 1.4 && f < baseNote * 1.6) || freqs.bass[Math.min(4, freqs.bass.length - 1)];
@@ -109,42 +109,39 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
              // Bass: Long, sustained drone notes
              bassPattern.push({ time: '0:0:0', freq: baseNote, dur: '4m', vel: 0.2 });
              if (fifthNote) {
-                 bassPattern.push({ time: '0:0:0', freq: fifthNote, dur: '4m', vel: 0.15 });
+                 bassPattern.push({ time: '2:0:0', freq: fifthNote, dur: '2m', vel: 0.15 });
              }
 
             // Melody: Slow, sparse notes using a simple L-system for gentle evolution
-            const sequence = generateLSystemSequence('F', { 'F': 'F-F+F' }, 3);
+            const sequence = generateLSystemSequence('F', { 'F': 'F-F++F-F' }, 2);
             const initialMelodyIndex = Math.floor(freqs.melody.length / 2);
-            const ambientNotes = interpretLSystem(sequence, freqs.melody, initialMelodyIndex, 16, '1m', 0.4);
-            melodyPattern.push(...ambientNotes);
+            melodyPattern = interpretLSystem(sequence, freqs.melody, initialMelodyIndex, 16, '1m', 0.4);
             break;
         }
 
-        case 'House': // Changed to be more melodic and evolving
+        case 'House': 
         case 'Sequence': {
-             // Bass: A steady, pulsing root note
-            for (let i = 0; i < 4; i++) {
-                bassPattern.push({ time: `${i}:0:0`, freq: baseNote, dur: '2n', vel: 0.3 });
-                bassPattern.push({ time: `${i}:2:0`, freq: fifthNote, dur: '4n', vel: 0.3 });
+             // Bass: A steady, pulsing root note, occasionally hitting the fifth
+            for (let i = 0; i < 4; i++) { // Loop over 4 measures
+                const measureTime = `${i}:0:0`;
+                bassPattern.push({ time: measureTime, freq: i % 2 === 0 ? baseNote : fifthNote, dur: '1m', vel: 0.3 });
             }
 
             // Melody: Classic arpeggiator-style sequence using the stack
-            const rules = { 'A': 'F+F-F[A]F-F+F', 'F': 'F' };
-            const sequence = generateLSystemSequence('A', rules, 2);
+            const rules = { 'A': 'F+F-F[A]F-F+F', 'F': 'G', 'G': 'F' };
+            const sequence = generateLSystemSequence('A', rules, 3);
             const initialMelodyIndex = Math.floor(freqs.melody.length / 3);
-            const sequenceNotes = interpretLSystem(sequence, freqs.melody, initialMelodyIndex, 2, '16n', 0.5);
-            melodyPattern.push(...sequenceNotes);
+            melodyPattern = interpretLSystem(sequence, freqs.melody, initialMelodyIndex, 2, '16n', 0.5);
             break;
         }
 
         case 'Wind': {
             // No bass for a light, airy feel
             // Melody: Fast, fluttering notes using +/- for rapid pitch changes
-            const rules = { 'A': 'F+F-F+F-F', 'F': 'A' };
+            const rules = { 'A': 'F+F-F+F-F[--A]', 'F': 'G', 'G': 'A' };
             const sequence = generateLSystemSequence('A', rules, 4);
              const initialMelodyIndex = Math.floor(freqs.melody.length / 2);
-            const windNotes = interpretLSystem(sequence, freqs.melody, initialMelodyIndex, 1, '32n', 0.3);
-            melodyPattern.push(...windNotes);
+            melodyPattern = interpretLSystem(sequence, freqs.melody, initialMelodyIndex, 1, '32n', 0.3);
             break;
         }
         
@@ -152,11 +149,10 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
              // No bass
              // Melody: High-pitched, sparse, using the stack for "cascading" effects
             const highFreqs = freqs.melody.slice(Math.floor(freqs.melody.length / 2));
-            const rules = { 'A': 'F[+A][-A]F' };
+            const rules = { 'A': 'G[+A]F[-A]G' , 'F': 'G', 'G': 'F'};
             const sequence = generateLSystemSequence('A', rules, 3);
             const initialMelodyIndex = Math.floor(highFreqs.length / 2);
-            const chimeNotes = interpretLSystem(sequence, highFreqs, initialMelodyIndex, 4, '8n', 0.6);
-            melodyPattern.push(...chimeNotes);
+            melodyPattern = interpretLSystem(sequence, highFreqs, initialMelodyIndex, 4, '8n', 0.6);
             break;
         }
 
@@ -179,41 +175,40 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
     const loopPattern = (pattern: NoteEvent[], measures: number): NoteEvent[] => {
         if (!pattern.length) return [];
         const totalSixteenths = measures * 16;
-        const patternDuration = pattern.reduce((max, note) => {
-            const [m, b, s] = note.time.split(':').map(Number);
-            return Math.max(max, m * 16 + b * 4 + s);
-        }, 0) + 4; // Add a buffer
 
-        if (patternDuration === 0) return [];
+        let patternDurationSixteenths = 0;
+        if (pattern.length > 0) {
+            const lastNote = pattern[pattern.length - 1];
+            const [m, b, s] = lastNote.time.split(':').map(Number);
+            patternDurationSixteenths = m * 16 + b * 4 + s + 4; // Add buffer for last note duration
+        }
+
+        if (patternDurationSixteenths === 0) return [];
         
         const looped = [];
-        let currentTime = 0;
-        let patternIndex = 0;
-        while(currentTime < totalSixteenths) {
-            const note = pattern[patternIndex % pattern.length];
-            const [m, b, s] = note.time.split(':').map(Number);
-            const noteTimeInSixteenths = m * 16 + b * 4 + s;
-            
-            const loopOffset = Math.floor(currentTime / patternDuration) * patternDuration;
-            const newTimeInSixteenths = loopOffset + noteTimeInSixteenths;
-
-            if (newTimeInSixteenths < totalSixteenths) {
-                const newM = Math.floor(newTimeInSixteenths / 16);
-                const newB = Math.floor((newTimeInSixteenths % 16) / 4);
-                const newS = newTimeInSixteenths % 4;
-                looped.push({...note, time: `${newM}:${newB}:${newS}`});
+        let currentSixteenth = 0;
+        
+        while(currentSixteenth < totalSixteenths) {
+            for(const note of pattern) {
+                 const [m, b, s] = note.time.split(':').map(Number);
+                 const noteTimeInSixteenths = m * 16 + b * 4 + s;
+                 const newTime = currentSixteenth + noteTimeInSixteenths;
+                 
+                 if (newTime < totalSixteenths) {
+                    const newM = Math.floor(newTime / 16);
+                    const newB = Math.floor((newTime % 16) / 4);
+                    const newS = newTime % 4;
+                    looped.push({...note, time: `${newM}:${newB}:${newS}`});
+                 }
             }
-            
-            patternIndex++;
-            // This is a simplified loop progression, assuming the next note in pattern follows
-            currentTime = loopOffset + noteTimeInSixteenths + 4; // Assume avg 4/16th duration
+            currentSixteenth += patternDurationSixteenths;
         }
-        // Remove duplicates
+
         const uniqueNotes = Array.from(new Map(looped.map(n => [n.time, n])).values());
         return uniqueNotes;
     }
     
-    // Looping melody to fill 4 measures. Bass part is already set for 4 measures.
+    // Looping melody to fill 4 measures.
     const loopedMelody = loopPattern(melodyPattern, 4);
 
     return { bassPattern, melodyPattern: loopedMelody };

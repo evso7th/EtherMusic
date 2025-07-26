@@ -205,6 +205,7 @@ export default function Home() {
         melody: { reverb: -60, delay: -60 },
         bass: { reverb: -60, delay: -60 },
         drums: { reverb: -60, delay: -60 },
+        autopilot: { reverb: -60, delay: -60 },
     });
     const [activePattern, setActivePattern] = useState<any>(beatPatterns[beatPatterns.length - 1]);
     const [melodyInstrument, setMelodyInstrument] = useState<MelodyInstrument>('synth');
@@ -290,6 +291,11 @@ export default function Home() {
         channels.current.drums.connect(fx.current.delay);
         channels.current.drums.send("reverb", effects.drums.reverb);
         channels.current.drums.send("delay", effects.drums.delay);
+
+        channels.current.autopilot.connect(fx.current.reverb);
+        channels.current.autopilot.connect(fx.current.delay);
+        channels.current.autopilot.send("reverb", effects.autopilot.reverb);
+        channels.current.autopilot.send("delay", effects.autopilot.delay);
 
         // --- Synths for Pads ---
         melodySynth.current = new Tone.PolySynth(Tone.Synth, { polyphony: 8, portamento: 0.02 }).connect(channels.current.melody);
@@ -411,7 +417,7 @@ export default function Home() {
         
         Tone.Transport.bpm.value = activeTempo.bpm;
         
-    }, []); 
+    }, [effects.autopilot, effects.bass, effects.drums, effects.melody, volumes.autopilot, volumes.bass, volumes.drums, volumes.melody]); 
     
     // --- Performance Refactoring: RAF loop for audio commands ---
     const processAudioQueue = useCallback(() => {
@@ -608,7 +614,7 @@ export default function Home() {
             latchedBassNotes.current.clear();
             setOrbs(orbs => orbs.filter(orb => orb.type !== 'latch'));
         }
-    }, []);
+    }, [bassSynth]);
 
      const handleAutopilotToggle = () => {
         setIsAutopilotOn(prev => !prev);
@@ -694,9 +700,11 @@ export default function Home() {
             channels.current.melody.send('reverb', effects.melody.reverb);
             channels.current.melody.send('delay', effects.melody.delay);
             channels.current.bass.send('reverb', effects.bass.reverb);
-            channels.current.bass.send('delay', effects.melody.delay);
+            channels.current.bass.send('delay', effects.bass.delay);
             channels.current.drums.send('reverb', effects.drums.reverb);
-            channels.current.drums.send('delay', effects.melody.delay);
+            channels.current.drums.send('delay', effects.drums.delay);
+            channels.current.autopilot.send('reverb', effects.autopilot.reverb);
+            channels.current.autopilot.send('delay', effects.autopilot.delay);
         }
     }, [effects, isReady]);
 
@@ -871,7 +879,6 @@ export default function Home() {
                             onRecord={handleRecord}
                             onStop={handleStop}
                             isReady={isReady}
-                            isMobile={isMobile}
                         />
                     </div>
                 </header>
@@ -932,3 +939,5 @@ export default function Home() {
         </div>
     );
 }
+
+    

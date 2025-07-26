@@ -18,6 +18,7 @@ interface MixerControlsProps {
         melody: { reverb: number, delay: number };
         bass: { reverb: number, delay: number };
         drums: { reverb: number, delay: number };
+        autopilot: { reverb: number, delay: number };
     };
     onEffectChange: (effects: MixerControlsProps['effects']) => void;
 }
@@ -100,10 +101,11 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
         });
     };
 
-    const handleEffectChange = (instrument: 'melody' | 'bass' | 'drums', effect: 'reverb' | 'delay', value: number) => {
+    const handleEffectChange = (instrument: 'melody' | 'bass' | 'drums' | 'autopilot', effect: 'reverb' | 'delay', value: number) => {
         onEffectChange({
             ...effects,
             [instrument]: {
+                // @ts-ignore
                 ...effects[instrument],
                 [effect]: value
             }
@@ -149,8 +151,11 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
                 label="Autopilot"
                 icon={Bot}
                 volume={volumes.autopilot}
+                reverb={effects.autopilot.reverb}
+                delay={effects.autopilot.delay}
                 onVolumeChange={(v) => handleVolumeChange('autopilot', v)}
-                showEffects={false}
+                onReverbChange={(v) => handleEffectChange('autopilot', 'reverb', v)}
+                onDelayChange={(v) => handleEffectChange('autopilot', 'delay', v)}
             />
         </div>
     );

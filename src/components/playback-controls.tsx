@@ -23,10 +23,9 @@ interface PlaybackControlsProps {
     onRecord: () => void;
     onStop: () => void;
     isReady: boolean;
-    isMobile: boolean;
 }
 
-export function PlaybackControls({ isPlaying, isRecording, onPlayPause, onRecord, onStop, isReady, isMobile }: PlaybackControlsProps) {
+export function PlaybackControls({ isPlaying, isRecording, onPlayPause, onRecord, onStop, isReady }: PlaybackControlsProps) {
     
     const handleExit = () => {
         if (typeof window !== "undefined") {
@@ -55,27 +54,25 @@ export function PlaybackControls({ isPlaying, isRecording, onPlayPause, onRecord
             >
                  <Mic className="w-5 h-5 md:w-6 md:h-6" />
             </Button>
-            {!isMobile && (
-                 <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                        <Button size="icon" variant="outline" className="w-10 h-10 rounded-full" aria-label="Exit App">
-                            <Power className="w-5 h-5 md:w-6 md:h-6" />
-                        </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>End Meditation?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                Are you sure you want to break your meditation and leave the app?
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>No</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleExit}>Yes</AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-            )}
+            <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button size="icon" variant="outline" className="w-10 h-10 rounded-full" aria-label="Exit App">
+                        <Power className="w-5 h-5 md:w-6 md:h-6" />
+                    </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>End Meditation?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to break your meditation and leave the app?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>No</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleExit}>Yes</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
