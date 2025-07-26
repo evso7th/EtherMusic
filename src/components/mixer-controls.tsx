@@ -93,6 +93,13 @@ const InstrumentControls = ({
 
 export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange }: MixerControlsProps) {
     
+    const handleVolumeChange = (instrument: keyof MixerControlsProps['volumes'], value: number) => {
+        onVolumeChange({
+            ...volumes,
+            [instrument]: value
+        });
+    };
+
     const handleEffectChange = (instrument: 'melody' | 'bass' | 'drums', effect: 'reverb' | 'delay', value: number) => {
         onEffectChange({
             ...effects,
@@ -111,7 +118,7 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
                 volume={volumes.melody}
                 reverb={effects.melody.reverb}
                 delay={effects.melody.delay}
-                onVolumeChange={(v) => onVolumeChange({ ...volumes, melody: v })}
+                onVolumeChange={(v) => handleVolumeChange('melody', v)}
                 onReverbChange={(v) => handleEffectChange('melody', 'reverb', v)}
                 onDelayChange={(v) => handleEffectChange('melody', 'delay', v)}
             />
@@ -122,7 +129,7 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
                 volume={volumes.bass}
                 reverb={effects.bass.reverb}
                 delay={effects.bass.delay}
-                onVolumeChange={(v) => onVolumeChange({ ...volumes, bass: v })}
+                onVolumeChange={(v) => handleVolumeChange('bass', v)}
                 onReverbChange={(v) => handleEffectChange('bass', 'reverb', v)}
                 onDelayChange={(v) => handleEffectChange('bass', 'delay', v)}
             />
@@ -133,7 +140,7 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
                 volume={volumes.drums}
                 reverb={effects.drums.reverb}
                 delay={effects.drums.delay}
-                onVolumeChange={(v) => onVolumeChange({ ...volumes, drums: v })}
+                onVolumeChange={(v) => handleVolumeChange('drums', v)}
                 onReverbChange={(v) => handleEffectChange('drums', 'reverb', v)}
                 onDelayChange={(v) => handleEffectChange('drums', 'delay', v)}
             />
@@ -142,7 +149,7 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
                 label="Autopilot"
                 icon={Bot}
                 volume={volumes.autopilot}
-                onVolumeChange={(v) => onVolumeChange({ ...volumes, autopilot: v })}
+                onVolumeChange={(v) => handleVolumeChange('autopilot', v)}
                 showEffects={false}
             />
         </div>
