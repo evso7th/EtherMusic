@@ -237,6 +237,7 @@ export function ThereminPad({
                         backgroundColor: 'hsl(var(--muted) / 0.2)',
                         backgroundSize: '2rem 2rem',
                         backgroundImage: `
+                            linear-gradient(to top, hsl(var(--background) / 0.4), transparent),
                             linear-gradient(to right, hsl(var(--border) / 0.25) 1px, transparent 1px),
                             linear-gradient(to bottom, hsl(var(--border) / 0.25) 1px, transparent 1px)
                         `,
