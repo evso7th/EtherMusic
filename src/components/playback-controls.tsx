@@ -2,7 +2,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Play, Pause, Mic, StopCircle } from 'lucide-react';
+import { Play, Pause, Mic, StopCircle, Power } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
 interface PlaybackControlsProps {
@@ -15,6 +15,13 @@ interface PlaybackControlsProps {
 }
 
 export function PlaybackControls({ isPlaying, isRecording, onPlayPause, onRecord, onStop, isReady }: PlaybackControlsProps) {
+    
+    const handleExit = () => {
+        if (typeof window !== "undefined") {
+            window.close();
+        }
+    };
+
     return (
         <div className="flex items-center gap-1 md:gap-2">
              <Button onClick={onStop} size="icon" variant="outline" className="w-10 h-10 rounded-full" aria-label="Stop" disabled={!isReady}>
@@ -35,6 +42,9 @@ export function PlaybackControls({ isPlaying, isRecording, onPlayPause, onRecord
                 disabled={!isReady}
             >
                  <Mic className="w-5 h-5 md:w-6 md:h-6" />
+            </Button>
+            <Button onClick={handleExit} size="icon" variant="outline" className="w-10 h-10 rounded-full" aria-label="Exit App">
+                <Power className="w-5 h-5 md:w-6 md:h-6" />
             </Button>
         </div>
     );
