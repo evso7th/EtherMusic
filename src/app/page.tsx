@@ -400,7 +400,7 @@ export default function Home() {
 
 
         const drumUrls = {
-            C1: "/assets/sounds/kick.wav",
+            C1: "/assets/sounds/kick drum.wav",
             D1: "/assets/sounds/snare.wav",
             E1: "/assets/sounds/closed hi hat accented.wav",
             E2: "/assets/sounds/closed hi hat ghost.wav",
