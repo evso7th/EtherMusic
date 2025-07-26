@@ -79,13 +79,19 @@ function interpretLSystem(
     let currentTime = 0;
     let currentNoteIndex = initialNoteIndex;
     const noteIndexStack: number[] = [];
+    const MAX_TIME = 64; // 4 measures * 16 sixteenths
 
     for (const char of sequence) {
+        if (currentTime >= MAX_TIME) break;
+
         switch (char) {
             case 'F': // Play a note
             case 'G':
                 if (currentNoteIndex >= 0 && currentNoteIndex < freqs.length) {
-                    const time = `0:${Math.floor(currentTime / 4)}:${currentTime % 4}`;
+                    const m = Math.floor(currentTime / 16);
+                    const b = Math.floor((currentTime % 16) / 4);
+                    const s = currentTime % 4;
+                    const time = `${m}:${b}:${s}`;
                     notes.push({
                         time,
                         freq: freqs[currentNoteIndex],
