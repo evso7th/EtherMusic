@@ -14,7 +14,29 @@ type Frequencies = {
     melody: number[];
 };
 
-// --- Advanced L-System Music Engine ---
+// --- Helper Functions ---
+
+/**
+ * Generates prime numbers up to a given maximum using Sieve of Eratosthenes.
+ * @param max The upper bound for prime number generation.
+ * @returns An array of prime numbers.
+ */
+function getPrimes(max: number): number[] {
+    const sieve = new Array(max).fill(true);
+    sieve[0] = sieve[1] = false;
+    for (let i = 2; i * i < max; i++) {
+        if (sieve[i]) {
+            for (let j = i * i; j < max; j += i) {
+                sieve[j] = false;
+            }
+        }
+    }
+    return sieve.reduce((primes, isPrime, num) => {
+        if (isPrime) primes.push(num);
+        return primes;
+    }, [] as number[]);
+}
+
 
 /**
  * Generates a sequence string based on L-system rules.
@@ -165,6 +187,40 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
             // No melody, just the bass drone.
             break;
         }
+
+        case 'Primes': {
+            // Bass: A simple root-fifth progression to ground the melody
+            bassPattern.push({ time: '0:0:0', freq: baseNote, dur: '2m', vel: 0.2 });
+            if (fifthNote) {
+                bassPattern.push({ time: '2:0:0', freq: fifthNote, dur: '2m', vel: 0.15 });
+            }
+            
+            // Melody: Generated from prime numbers
+            const primes = getPrimes(64); 
+            let currentTime = 0; // in 16th notes
+            primes.forEach(prime => {
+                if (currentTime >= 64) return; // Stay within 4 measures
+
+                const m = Math.floor(currentTime / 16);
+                const b = Math.floor((currentTime % 16) / 4);
+                const s = currentTime % 4;
+                const time = `${m}:${b}:${s}`;
+                
+                const freq = freqs.melody[prime % freqs.melody.length];
+                
+                melodyPattern.push({
+                    time,
+                    freq,
+                    dur: '8n',
+                    vel: 0.5 + Math.random() * 0.2,
+                });
+
+                // The next note's time is advanced by a scaled prime value
+                currentTime += Math.floor(prime / 8) + 1; 
+            });
+            break;
+        }
+
 
         default:
             break;
