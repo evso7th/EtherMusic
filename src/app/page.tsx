@@ -267,7 +267,7 @@ export default function Home() {
         drums: { reverb: -60, delay: -60 },
         autopilot: { reverb: -60, delay: -60 },
     });
-    const [activePattern, setActivePattern] = useState<any>(beatPatterns.find(p => p.name === 'Air'));
+    const [activePattern, setActivePattern] = useState<any>(beatPatterns.find(p => p.name === 'Off'));
     const [melodyInstrument, setMelodyInstrument] = useState<MelodyInstrument>('synth');
 
     // --- New Harmony State ---
@@ -428,10 +428,10 @@ export default function Home() {
             const notes = (value as any).notes;
 
             const playNote = (note: string) => {
-                 if (note === 'C1') {
-                    kickSynth.current?.triggerAttackRelease('C1', '8n', time);
-                } else if (note === 'D1') {
-                    snareSynth.current?.triggerAttackRelease('16n', time);
+                 if (note === 'C1' && kickSynth.current) {
+                    kickSynth.current.triggerAttackRelease('C1', '8n', time);
+                } else if (note === 'D1' && snareSynth.current) {
+                    snareSynth.current.triggerAttackRelease('16n', time);
                 } else if (drumSamplers.current && drumSamplers.current[note]?.loaded) {
                     drumSamplers.current[note].start(time);
                 }
@@ -1023,5 +1023,3 @@ export default function Home() {
 }
 
 
-
-    
