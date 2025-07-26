@@ -157,6 +157,7 @@ export default function Home() {
     const [isReady, setIsReady] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
+    const [_, forceUpdate] = useState({});
     
     // Audio state
     const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
@@ -669,7 +670,7 @@ export default function Home() {
     }, [allowedFrequencies]);
 
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
-        if (!audioInitialized.current || isAutopilotOn) return;
+        if (!audioInitialized.current) return;
 
         const synth = type === 'melody' ? melodySynth.current : bassSynth.current;
         if (!synth) return;
@@ -704,11 +705,7 @@ export default function Home() {
                         synth.triggerAttack(quantizedFreq, undefined, data.volume);
                     }
                 }
-                // Update visual orbs for latch mode
-                setOrbs(currentOrbs => [
-                    ...currentOrbs.filter(orb => orb.type !== 'latch'),
-                    ...Array.from(newNotes.values()).map((note, index) => ({ id: 1000 + index, x: note.x, y: note.y, type: 'latch' }))
-                ]);
+                forceUpdate({});
             }
             return; 
         }
@@ -756,7 +753,7 @@ export default function Home() {
                 }
                 break;
         }
-    }, [isBassLatchOn, isPlaying, getClosestFrequency, isAutopilotOn]);
+    }, [isBassLatchOn, isPlaying, getClosestFrequency, forceUpdate]);
     
     const handleStartScreenInteraction = () => {
         if (backgroundAudioRef.current && backgroundAudioRef.current.paused) {
@@ -765,7 +762,8 @@ export default function Home() {
         }
     };
     
-    const bassOrbs = orbs.filter(orb => orb.type === 'bass' || orb.type === 'latch');
+    const latchedOrbs = Array.from(latchedBassNotes.current.values()).map((note, index) => ({ id: 1000 + index, x: note.x, y: note.y, type: 'latch' as const }));
+    const bassOrbs = orbs.filter(orb => orb.type === 'bass').concat(latchedOrbs);
     const melodyOrbs = orbs.filter(orb => orb.type === 'melody');
 
     if (!isAppStarted) {
@@ -847,7 +845,6 @@ export default function Home() {
                             onLatchToggle={handleLatchToggle}
                             orbs={bassOrbs}
                             isPolyphonic
-                            isDisabled={isAutopilotOn}
                         />
                         <MemoizedThereminPad
                             onInteraction={handleThereminInteraction}
@@ -865,7 +862,6 @@ export default function Home() {
                             onScaleChange={setMusicScale}
                             orbs={melodyOrbs}
                             isPolyphonic
-                            isDisabled={isAutopilotOn}
                         />
                     </div>
                     <div className="flex-shrink-0">
@@ -892,3 +888,5 @@ export default function Home() {
         </div>
     );
 }
+
+  

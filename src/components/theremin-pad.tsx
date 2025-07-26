@@ -2,7 +2,7 @@
 "use client";
 
 import type { PointerEvent } from 'react';
-import { useRef, useCallback, useState, memo } from 'react';
+import { useRef, useCallback, useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -59,7 +59,7 @@ const OrbComponent = ({ x, y, color, type }: { x: number, y: number, color: stri
     />
 );
 
-export const ThereminPad = memo(function ThereminPad({ 
+export function ThereminPad({ 
     type, 
     onInteraction, 
     frequencyRange, 
@@ -252,4 +252,6 @@ export const ThereminPad = memo(function ThereminPad({
             </CardContent>
         </Card>
     );
-});
+}
+
+  
