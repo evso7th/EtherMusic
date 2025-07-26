@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { MixerControls } from '@/components/mixer-controls';
-import { SlidersHorizontal, Drum, Zap, Bot, Wand2 } from 'lucide-react';
+import { SlidersHorizontal, Drum, Zap, Bot, Wand2, Power } from 'lucide-react';
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
@@ -31,8 +31,8 @@ interface BeatBoxControlsProps {
     tempos: Tempo[];
     activeTempo: Tempo;
     onTempoChange: (tempo: Tempo) => void;
-    volumes: { melody: number; bass: number; drums: number };
-    onVolumeChange: (volumes: { melody: number; bass: number; drums: number; }) => void;
+    volumes: { melody: number; bass: number; drums: number; autopilot: number };
+    onVolumeChange: (volumes: BeatBoxControlsProps['volumes']) => void;
     effects: {
         melody: { reverb: number, delay: number };
         bass: { reverb: number, delay: number };
@@ -44,6 +44,7 @@ interface BeatBoxControlsProps {
     autopilotStyles: AutopilotStyle[];
     activeAutopilotStyle: AutopilotStyle;
     onAutopilotStyleChange: (style: AutopilotStyle) => void;
+    isMobile: boolean;
 }
 
 export function BeatBoxControls({
@@ -62,17 +63,24 @@ export function BeatBoxControls({
     autopilotStyles,
     activeAutopilotStyle,
     onAutopilotStyleChange,
+    isMobile,
 }: BeatBoxControlsProps) {
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isTempoOpen, setIsTempoOpen] = useState(false);
     const [isStyleOpen, setIsStyleOpen] = useState(false);
+
+    const handleExit = () => {
+        if (typeof window !== "undefined") {
+            window.close();
+        }
+    };
 
     return (
         <Card className="bg-card/50">
             <CardContent className="p-2 md:p-4 flex justify-around items-center gap-1 md:gap-2">
                 <Dialog open={isBeatsOpen} onOpenChange={setIsBeatsOpen}>
                     <DialogTrigger asChild>
-                        <Button variant="outline" className="flex-1">
+                        <Button variant="outline" className="flex-1" size={isMobile ? 'sm' : 'default'}>
                             <Drum className="w-4 h-4 md:mr-2" />
                             <span className="hidden sm:inline">Beats</span>
                         </Button>
@@ -100,7 +108,7 @@ export function BeatBoxControls({
 
                 <Dialog open={isTempoOpen} onOpenChange={setIsTempoOpen}>
                     <DialogTrigger asChild>
-                         <Button variant="outline" className="flex-1">
+                         <Button variant="outline" className="flex-1" size={isMobile ? 'sm' : 'default'}>
                             <Zap className="w-4 h-4 md:mr-2" />
                             <span className="hidden sm:inline">Tempo</span>
                         </Button>
@@ -132,6 +140,7 @@ export function BeatBoxControls({
                     variant={isAutopilotOn ? 'default' : 'outline'}
                     onClick={onAutopilotToggle}
                     className="flex-1"
+                    size={isMobile ? 'sm' : 'default'}
                 >
                     <Bot className="w-4 h-4 md:mr-2" />
                     <span className="hidden sm:inline">Autopilot</span>
@@ -140,7 +149,7 @@ export function BeatBoxControls({
                 {isAutopilotOn && (
                      <Dialog open={isStyleOpen} onOpenChange={setIsStyleOpen}>
                         <DialogTrigger asChild>
-                            <Button variant="outline" className="flex-1">
+                            <Button variant="outline" className="flex-1" size={isMobile ? 'sm' : 'default'}>
                                 <Wand2 className="w-4 h-4 md:mr-2" />
                                 <span className="hidden sm:inline">Style</span>
                             </Button>
@@ -170,7 +179,7 @@ export function BeatBoxControls({
 
                 <Dialog>
                     <DialogTrigger asChild>
-                        <Button variant="outline" className="flex-1 px-2 md:px-4">
+                        <Button variant="outline" className="flex-1 px-2 md:px-4" size={isMobile ? 'sm' : 'default'}>
                             <SlidersHorizontal className="w-4 h-4 md:mr-2"/>
                              <span className="hidden sm:inline">Mixer</span>
                         </Button>
@@ -188,7 +197,13 @@ export function BeatBoxControls({
                     </DialogContent>
                 </Dialog>
 
-                <HelpGuide buttonVariant="outline" buttonClassName="flex-1" />
+                <HelpGuide buttonVariant="outline" buttonClassName="flex-1" size={isMobile ? 'sm' : 'default'}/>
+
+                {isMobile && (
+                     <Button onClick={handleExit} size="sm" variant="outline" className="flex-1" aria-label="Exit App">
+                        <Power className="w-4 h-4" />
+                    </Button>
+                )}
             </CardContent>
         </Card>
     );

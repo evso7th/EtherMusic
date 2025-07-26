@@ -831,6 +831,7 @@ export default function Home() {
                             onRecord={handleRecord}
                             onStop={handleStop}
                             isReady={isReady}
+                            isMobile={isMobile}
                         />
                     </div>
                 </header>
@@ -883,6 +884,7 @@ export default function Home() {
                             autopilotStyles={autopilotStyles}
                             activeAutopilotStyle={autopilotStyle}
                             onAutopilotStyleChange={setAutopilotStyle}
+                            isMobile={isMobile}
                         />
                     </div>
                 </main>

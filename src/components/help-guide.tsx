@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Button, type ButtonProps } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -76,17 +76,16 @@ Don't want to play yourself? Turn on the **Autopilot**!
 Enjoy the process and let the music you create reflect your inner state.
 `;
 
-interface HelpGuideProps {
-    buttonVariant?: "outline" | "link" | "default" | "destructive" | "secondary" | "ghost" | null | undefined;
+interface HelpGuideProps extends ButtonProps {
     buttonClassName?: string;
     showText?: boolean;
 }
 
-export function HelpGuide({ buttonVariant = "outline", buttonClassName, showText = true }: HelpGuideProps) {
+export function HelpGuide({ buttonVariant = "outline", buttonClassName, showText = true, size, ...props }: HelpGuideProps) {
     return (
         <Dialog>
             <DialogTrigger asChild>
-                <Button variant={buttonVariant} size="icon" className={cn("w-10 h-10", buttonClassName)}>
+                <Button variant={buttonVariant} size={size || "icon"} className={cn("w-10 h-10", buttonClassName)} {...props}>
                     <HelpCircle className="w-5 h-5" />
                     <span className={cn(
                         "sr-only",
