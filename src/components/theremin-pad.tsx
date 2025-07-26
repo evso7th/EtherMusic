@@ -185,7 +185,13 @@ export function ThereminPad({
                             </Select>
                         </div>
                     )}
-                     <Button onClick={() => setIsSettingsOpen(false)} className="w-full">Done</Button>
+                     <Button 
+                        onClick={() => setIsSettingsOpen(false)} 
+                        className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                        variant="outline"
+                    >
+                        Done
+                    </Button>
                 </div>
             </SheetContent>
         </Sheet>
