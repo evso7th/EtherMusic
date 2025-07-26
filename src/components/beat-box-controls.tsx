@@ -83,7 +83,7 @@ export function BeatBoxControls({
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isTempoOpen, setIsTempoOpen] = useState(false);
     const [isStyleOpen, setIsStyleOpen] = useState(false);
-    const [selectedCategory, setSelectedCategory] = useState<'Meditative' | 'Classic'>('Classic');
+    const [selectedCategory, setSelectedCategory] = useState<'Meditative' | 'Classic'>('Meditative');
 
     const handleExit = () => {
         if (typeof window !== "undefined") {
