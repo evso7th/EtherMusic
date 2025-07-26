@@ -134,10 +134,11 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
 
     switch (style) {
         case 'Ambient': {
-             // Bass: Long, sustained drone notes
-             bassPattern.push({ time: '0:0:0', freq: baseNote, dur: '4m', vel: 0.2 });
-             if (fifthNote) {
-                 bassPattern.push({ time: '2:0:0', freq: fifthNote, dur: '2m', vel: 0.15 });
+             // Bass: Rhythmic pulsing notes, creating a sense of movement.
+             for (let i = 0; i < 4; i++) {
+                const time = `${i}:0:0`;
+                const freq = i % 2 === 0 ? baseNote : (fifthNote || baseNote);
+                bassPattern.push({ time, freq, dur: '1m', vel: 0.4 });
              }
 
             // Melody: Slow, sparse notes using a simple L-system for gentle evolution
@@ -149,10 +150,14 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
 
         case 'House': 
         case 'Sequence': {
-             // Bass: A steady, pulsing root note, occasionally hitting the fifth
-            for (let i = 0; i < 4; i++) { // Loop over 4 measures
-                const measureTime = `${i}:0:0`;
-                bassPattern.push({ time: measureTime, freq: i % 2 === 0 ? baseNote : fifthNote, dur: '1m', vel: 0.3 });
+             // Bass: A steady, pulsing root note, occasionally hitting the fifth, but louder
+            for (let i = 0; i < 16; i++) { // Loop over 16 beats (4 measures)
+                const m = Math.floor(i / 4);
+                const b = i % 4;
+                const time = `${m}:${b}:0`;
+                // Hit the fifth on the third measure
+                const freq = m === 2 ? fifthNote : baseNote;
+                bassPattern.push({ time, freq, dur: '4n', vel: 0.5 });
             }
 
             // Melody: Classic arpeggiator-style sequence using the stack
@@ -185,20 +190,20 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
         }
 
         case 'Drone': {
-            // Bass: Two sustained notes for a classic drone
-            bassPattern.push({ time: '0:0:0', freq: baseNote, dur: '4m', vel: 0.2 });
+            // Bass: Two sustained notes for a classic drone, but louder.
+            bassPattern.push({ time: '0:0:0', freq: baseNote, dur: '4m', vel: 0.4 });
             if (fifthNote) {
-                bassPattern.push({ time: '0:0:0', freq: fifthNote, dur: '4m', vel: 0.15 });
+                bassPattern.push({ time: '0:0:0', freq: fifthNote, dur: '4m', vel: 0.35 });
             }
             // No melody, just the bass drone.
             break;
         }
 
         case 'Primes': {
-            // Bass: A simple root-fifth progression to ground the melody
-            bassPattern.push({ time: '0:0:0', freq: baseNote, dur: '2m', vel: 0.2 });
+            // Bass: A simple root-fifth progression to ground the melody, but louder.
+            bassPattern.push({ time: '0:0:0', freq: baseNote, dur: '2m', vel: 0.4 });
             if (fifthNote) {
-                bassPattern.push({ time: '2:0:0', freq: fifthNote, dur: '2m', vel: 0.15 });
+                bassPattern.push({ time: '2:0:0', freq: fifthNote, dur: '2m', vel: 0.35 });
             }
             
             // Melody: Generated from prime numbers

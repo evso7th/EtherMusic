@@ -536,7 +536,8 @@ export default function Home() {
     useEffect(() => {
         if (!isReady) return;
         const melodyFreqs = getScaleFrequencies(musicKey, musicScale, [3, 4, 5]);
-        const bassFreqs = getScaleFrequencies(musicKey, musicScale, [1, 2]);
+        // Lifted bass by one octave for better audibility in autopilot
+        const bassFreqs = getScaleFrequencies(musicKey, musicScale, [2, 3]);
         setAllowedFrequencies({bass: bassFreqs, melody: melodyFreqs});
     }, [musicKey, musicScale, isReady]);
 
