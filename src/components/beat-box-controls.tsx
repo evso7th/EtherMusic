@@ -142,12 +142,15 @@ export function BeatBoxControls({
                                     <Separator className="my-3" />
                                     <Button
                                         key={offPattern.name}
-                                        variant={activePattern.name === offPattern.name ? 'destructive' : 'outline'}
+                                        variant={'outline'}
                                         onClick={() => {
                                             onPatternChange(offPattern);
                                             setIsBeatsOpen(false);
                                         }}
-                                        className="w-full"
+                                        className={cn(
+                                            "w-full",
+                                            activePattern.name === offPattern.name && "border-destructive text-destructive hover:bg-destructive/10"
+                                        )}
                                     >
                                         {offPattern.name}
                                     </Button>
