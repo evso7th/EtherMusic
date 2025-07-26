@@ -157,7 +157,6 @@ export default function Home() {
     const [isReady, setIsReady] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
-    const [_, forceUpdate] = useState({});
     
     // Audio state
     const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
@@ -533,6 +532,7 @@ export default function Home() {
         autopilot.current.bassSynth?.releaseAll();
 
         activeNotes.current.clear();
+        setOrbs(orbs => orbs.filter(orb => orb.type !== 'latch'));
         latchedBassNotes.current.clear();
         setOrbs([]); // Clear all visual orbs
         setIsPlaying(false);
@@ -705,7 +705,10 @@ export default function Home() {
                         synth.triggerAttack(quantizedFreq, undefined, data.volume);
                     }
                 }
-                forceUpdate({});
+                setOrbs(orbs => {
+                    const latchedOrbs = Array.from(latchedBassNotes.current.entries()).map(([id, note]) => ({ id, x: note.x, y: note.y, type: 'latch' as const }));
+                    return [...orbs.filter(o => o.type !== 'latch'), ...latchedOrbs];
+                });
             }
             return; 
         }
@@ -753,7 +756,7 @@ export default function Home() {
                 }
                 break;
         }
-    }, [isBassLatchOn, isPlaying, getClosestFrequency, forceUpdate]);
+    }, [isBassLatchOn, isPlaying, getClosestFrequency]);
     
     const handleStartScreenInteraction = () => {
         if (backgroundAudioRef.current && backgroundAudioRef.current.paused) {
@@ -762,8 +765,7 @@ export default function Home() {
         }
     };
     
-    const latchedOrbs = Array.from(latchedBassNotes.current.values()).map((note, index) => ({ id: 1000 + index, x: note.x, y: note.y, type: 'latch' as const }));
-    const bassOrbs = orbs.filter(orb => orb.type === 'bass').concat(latchedOrbs);
+    const bassOrbs = orbs.filter(orb => orb.type === 'bass' || orb.type === 'latch');
     const melodyOrbs = orbs.filter(orb => orb.type === 'melody');
 
     if (!isAppStarted) {
@@ -791,7 +793,7 @@ export default function Home() {
                 </div>
                  <footer className="z-10 text-xs text-white/50 pb-4 text-center">
                     <p>Powered by theremin technology</p>
-                    <p>&copy; 2005, EVS</p>
+                    <p>&copy; 2025, EVS</p>
                 </footer>
             </div>
         )
@@ -888,5 +890,3 @@ export default function Home() {
         </div>
     );
 }
-
-  
