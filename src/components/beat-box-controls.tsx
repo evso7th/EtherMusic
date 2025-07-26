@@ -101,12 +101,14 @@ export function BeatBoxControls({
     
     const patternsToShow = selectedCategory === 'Classic' ? classicPatterns : meditativePatterns;
 
+    const isBeatsOn = activePattern && activePattern.name !== 'Off';
+
     return (
         <Card className="bg-card/50">
             <CardContent className="p-2 md:p-4 flex justify-around items-center gap-1 md:gap-2">
                 <Dialog open={isBeatsOpen} onOpenChange={setIsBeatsOpen}>
                     <DialogTrigger asChild>
-                        <Button variant="outline" className="flex-1" size={isMobile ? 'sm' : 'default'}>
+                        <Button variant={isBeatsOn ? 'default' : 'outline'} className="flex-1" size={isMobile ? 'sm' : 'default'}>
                             <Drum className="w-4 h-4 md:mr-2" />
                             <span className="hidden sm:inline">Beats</span>
                         </Button>
