@@ -303,6 +303,7 @@ export default function Home() {
     const drumSamplers = useRef<Record<string, Tone.Player> | null>(null);
     const channels = useRef<{ melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel, autopilot: Tone.Channel } | null>(null);
     const drumPart = useRef<Tone.Part | null>(null);
+    const synthPart = useRef<Tone.Part | null>(null);
     const recorder = useRef<Tone.Recorder | null>(null);
     const bassLFO = useRef<Tone.LFO | null>(null);
     const bassGain = useRef<Tone.Gain | null>(null);
@@ -424,27 +425,25 @@ export default function Home() {
         console.log('Drum samples loaded');
         setIsReady(true);
         
+        // Part for samplers
         drumPart.current = new Tone.Part((time, value) => {
-            const notesToPlay = (value as any).notes;
-
-            const playNote = (note: string) => {
-                 if (note === 'C1' && kickSynth.current) {
-                    kickSynth.current.triggerAttackRelease('C1', '8n', time);
-                } else if (note === 'D1' && snareSynth.current) {
-                    snareSynth.current.triggerAttackRelease('16n', time);
-                } else if (drumSamplers.current && drumSamplers.current[note]?.loaded) {
-                    drumSamplers.current[note].start(time);
-                }
-            }
-
-            if (Array.isArray(notesToPlay)) {
-                notesToPlay.forEach(playNote);
-            } else if (notesToPlay) {
-                playNote(notesToPlay);
+            if (drumSamplers.current && drumSamplers.current[value.note]?.loaded) {
+                drumSamplers.current[value.note].start(time);
             }
         }, []).start(0);
         drumPart.current.loop = true;
         drumPart.current.loopEnd = '1m';
+
+        // Part for synths
+        synthPart.current = new Tone.Part((time, value) => {
+            if (value.note === 'C1' && kickSynth.current) {
+                kickSynth.current.triggerAttackRelease('C1', '8n', time);
+            } else if (value.note === 'D1' && snareSynth.current) {
+                snareSynth.current.triggerAttackRelease('16n', time);
+            }
+        }, []).start(0);
+        synthPart.current.loop = true;
+        synthPart.current.loopEnd = '1m';
 
 
         // The single, permanent "conductor"
@@ -452,8 +451,9 @@ export default function Home() {
             conductorEventId.current = Tone.Transport.scheduleRepeat((time) => {
                 Tone.Draw.schedule(() => {
                     const currentPattern = activePatternRef.current;
-                    if (!drumPart.current || currentPattern.name === 'Off' || !currentPattern.patterns?.groove?.length) {
+                    if (!drumPart.current || !synthPart.current || currentPattern.name === 'Off' || !currentPattern.patterns?.groove?.length) {
                         drumPart.current?.clear();
+                        synthPart.current?.clear();
                         return;
                     }
                     
@@ -465,10 +465,23 @@ export default function Home() {
                         : groove[Math.floor(Math.random() * groove.length)];
         
                     drumPart.current?.clear();
+                    synthPart.current?.clear();
+
                     patternToPlay.forEach((notes: string | string[] | null, i: number) => {
                         if (notes) {
                             const noteTime = `0:${Math.floor(i/4)}:${i%4}`;
-                            drumPart.current?.add(noteTime, { notes });
+                            const playNote = (note: string) => {
+                                if (note === 'C1' || note === 'D1') {
+                                    synthPart.current?.add(noteTime, { note });
+                                } else {
+                                    drumPart.current?.add(noteTime, { note });
+                                }
+                            }
+                            if (Array.isArray(notes)) {
+                                notes.forEach(playNote);
+                            } else {
+                                playNote(notes);
+                            }
                         }
                     });
         
@@ -721,6 +734,9 @@ export default function Home() {
         measureCountRef.current = 0; // Reset measure count on pattern change
         if (drumPart.current) {
             drumPart.current.clear();
+        }
+         if (synthPart.current) {
+            synthPart.current.clear();
         }
 
     }, [activePattern, isReady]);
