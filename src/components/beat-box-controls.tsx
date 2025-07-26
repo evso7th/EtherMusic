@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
 import type { AutopilotStyle } from '@/app/page';
 import { Separator } from "./ui/separator";
+import { Switch } from "./ui/switch";
 
 
 type BeatPattern = {
@@ -82,6 +83,7 @@ export function BeatBoxControls({
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isTempoOpen, setIsTempoOpen] = useState(false);
     const [isStyleOpen, setIsStyleOpen] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState<'Meditative' | 'Classic'>('Classic');
 
     const handleExit = () => {
         if (typeof window !== "undefined") {
@@ -89,19 +91,15 @@ export function BeatBoxControls({
         }
     };
     
-    const groupedPatterns = useMemo(() => {
-        return patterns.reduce((acc, pattern) => {
-            const type = pattern.type || 'Classic';
-            if (type === 'System') return acc;
-            if (!acc[type]) {
-                acc[type] = [];
-            }
-            acc[type].push(pattern);
-            return acc;
-        }, {} as Record<string, BeatPattern[]>);
+    const { classicPatterns, meditativePatterns, offPattern } = useMemo(() => {
+        return {
+            classicPatterns: patterns.filter(p => p.type === 'Classic'),
+            meditativePatterns: patterns.filter(p => p.type === 'Meditative'),
+            offPattern: patterns.find(p => p.type === 'System'),
+        }
     }, [patterns]);
     
-    const offPattern = patterns.find(p => p.type === 'System');
+    const patternsToShow = selectedCategory === 'Classic' ? classicPatterns : meditativePatterns;
 
     return (
         <Card className="bg-card/50">
@@ -118,25 +116,31 @@ export function BeatBoxControls({
                             <DialogTitle>Beat Patterns</DialogTitle>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
-                            {Object.entries(groupedPatterns).map(([type, groupPatterns]) => (
-                                <div key={type}>
-                                    <h3 className="text-sm font-medium text-muted-foreground mb-2 px-1">{type}</h3>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {groupPatterns.map((pattern) => (
-                                            <Button
-                                                key={pattern.name}
-                                                variant={activePattern.name === pattern.name ? 'default' : 'outline'}
-                                                onClick={() => {
-                                                    onPatternChange(pattern);
-                                                    setIsBeatsOpen(false);
-                                                }}
-                                            >
-                                                {pattern.name}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
+                            <div className="flex items-center justify-center space-x-2">
+                                <Label htmlFor="category-switch" className={cn(selectedCategory !== 'Classic' && "text-muted-foreground")}>Classic</Label>
+                                <Switch 
+                                    id="category-switch"
+                                    checked={selectedCategory === 'Meditative'}
+                                    onCheckedChange={(checked) => setSelectedCategory(checked ? 'Meditative' : 'Classic')}
+                                />
+                                <Label htmlFor="category-switch" className={cn(selectedCategory !== 'Meditative' && "text-muted-foreground")}>Meditative</Label>
+                            </div>
+                           
+                            <div className="grid grid-cols-2 gap-2">
+                                {patternsToShow.map((pattern) => (
+                                    <Button
+                                        key={pattern.name}
+                                        variant={activePattern.name === pattern.name ? 'default' : 'outline'}
+                                        onClick={() => {
+                                            onPatternChange(pattern);
+                                            setIsBeatsOpen(false);
+                                        }}
+                                    >
+                                        {pattern.name}
+                                    </Button>
+                                ))}
+                            </div>
+                            
                             {offPattern && (
                                 <div>
                                     <Separator className="my-3" />
