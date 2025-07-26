@@ -235,12 +235,7 @@ export function ThereminPad({
                     onPointerLeave={handlePointerUp}
                     style={{
                         backgroundColor: 'hsl(var(--muted) / 0.2)',
-                        backgroundSize: '2rem 2rem',
-                        backgroundImage: `
-                            linear-gradient(to top, hsl(var(--background) / 0.4), transparent),
-                            linear-gradient(to right, hsl(var(--border) / 0.25) 1px, transparent 1px),
-                            linear-gradient(to bottom, hsl(var(--border) / 0.25) 1px, transparent 1px)
-                        `,
+                        backgroundImage: 'linear-gradient(to top, hsl(var(--background) / 0.4), transparent)',
                     }}
                 >
                     <div className="absolute inset-0 flex items-center justify-center text-5xl md:text-7xl font-bold text-foreground/10 pointer-events-none uppercase tracking-widest">
@@ -254,5 +249,3 @@ export function ThereminPad({
         </Card>
     );
 }
-
-  
