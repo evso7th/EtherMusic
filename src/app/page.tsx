@@ -16,10 +16,10 @@ import { generateAutopilotPattern } from '@/lib/music-engine';
 
 
 const housePatterns = {
-    groove: [
+    groove: [[
         ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2',
         ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2',
-    ],
+    ]],
     fills: [
         [
             'C1', 'E2', ['C1', 'E2'], 'E2', 'C1', 'E2', ['C1', 'E2'], 'E2',
@@ -29,10 +29,10 @@ const housePatterns = {
 };
 
 const trancePatterns = {
-    groove: [
+    groove: [[
         'C1', ['E1', 'E2'], 'E2', ['E1', 'E2'], 'C1', ['E1', 'E2'], 'E2', ['E1', 'E2'],
         'C1', ['E1', 'E2'], 'E2', ['E1', 'E2'], 'C1', ['E1', 'E2'], 'E2', ['E1', 'E2'],
-    ],
+    ]],
     fills: [
         [
             'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2',
@@ -42,10 +42,10 @@ const trancePatterns = {
 };
 
 const reggaePatterns = {
-    groove: [
+    groove: [[
         null, ['E1', 'E2'], ['C1','D1'], 'E2', null, ['E1', 'E2'], ['C1','D1'], 'E2',
         null, ['E1', 'E2'], ['C1','D1'], 'E2', null, ['E1', 'E2'], ['C1','D1'], 'E2',
-    ],
+    ]],
     fills: [
         [
             'G1', null, 'G2', null, 'G3', null, ['C1','D1'], null,
@@ -55,10 +55,10 @@ const reggaePatterns = {
 };
 
 const slowBluesPatterns = {
-    groove: [
+    groove: [[
         ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1', ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1',
         ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1', ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1',
-    ],
+    ]],
     fills: [
         [
             'G1', null, 'G1', 'G2', null, 'G2', 'G3', null,
@@ -68,10 +68,10 @@ const slowBluesPatterns = {
 };
 
 const rockPatterns = {
-    groove: [
+    groove: [[
         ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2',
         ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2'
-    ],
+    ]],
     fills: [
         [
             'G1', 'G1', 'G2', 'G2', 'G3', 'G3', ['F1', 'C1'], ['F1'],
@@ -87,8 +87,14 @@ const rockPatterns = {
 // --- New Meditative Patterns ---
 const airPattern = {
     groove: [
-        'C1', null, null, null, null, null, null, 'E2',
-        null, null, 'C1', null, null, 'E2', null, null,
+        [
+            'C1', null, null, null, null, null, null, 'E2',
+            null, null, 'C1', null, null, 'E2', null, null,
+        ],
+        [
+            null, 'E2', null, 'E1', null, 'E2', null, 'E1',
+            null, 'E2', null, 'F1', null, 'E2', null, 'E1',
+        ]
     ],
     fills: [
          [
@@ -104,8 +110,14 @@ const airPattern = {
 
 const earthPattern = {
     groove: [
-        'C1', null, 'E2', null, 'C1', null, 'E2', null,
-        'C1', null, 'E2', null, 'C1', null, 'E2', null,
+        [
+            'C1', null, 'E2', null, 'C1', null, 'E2', null,
+            'C1', null, 'E2', null, 'C1', null, 'E2', null,
+        ],
+        [
+            null, 'E1', null, 'E2', null, 'E1', null, 'E2',
+            null, 'E1', null, 'E2', null, 'E1', null, 'F1',
+        ]
     ],
     fills: [
         [
@@ -121,8 +133,14 @@ const earthPattern = {
 
 const waterPattern = {
     groove: [
-        'C1', 'E2', null, 'E1', null, 'E2', null, 'E1',
-        'C1', 'E2', null, 'E1', null, 'E2', null, 'E1',
+        [
+            'C1', 'E2', null, 'E1', null, 'E2', null, 'E1',
+            'C1', 'E2', null, 'E1', null, 'E2', null, 'E1',
+        ],
+        [
+            null, 'E2', 'E1', 'E2', null, 'E2', 'F1', 'E2',
+            null, 'E2', 'E1', 'E2', null, 'E2', 'F1', 'E2',
+        ]
     ],
     fills: [
         [
@@ -415,9 +433,10 @@ export default function Home() {
                     
                     const { groove, fills } = currentPattern.patterns;
                     const isFillMeasure = (measureCountRef.current % 4) === 3 && fills.length > 0;
+                    
                     const patternToPlay = isFillMeasure
                         ? fills[Math.floor(Math.random() * fills.length)]
-                        : groove;
+                        : groove[Math.floor(Math.random() * groove.length)];
         
                     drumPart.current?.clear();
                     patternToPlay.forEach((notes: string | string[] | null, i: number) => {
@@ -974,3 +993,6 @@ export default function Home() {
     );
 }
 
+
+
+    
