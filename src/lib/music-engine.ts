@@ -141,7 +141,7 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
              }
 
             // Melody: Slow, sparse notes using a simple L-system for gentle evolution
-            const sequence = generateLSystemSequence('F', { 'F': 'F-F++F-F' }, 2);
+            const sequence = generateLSystemSequence('F-F++F-F', { 'F': 'F-F++F-F' }, 2);
             const initialMelodyIndex = Math.floor(freqs.melody.length / 2);
             melodyPattern = interpretLSystem(sequence, freqs.melody, initialMelodyIndex, 16, '1m', 0.4);
             break;
@@ -157,7 +157,7 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
 
             // Melody: Classic arpeggiator-style sequence using the stack
             const rules = { 'A': 'F+F-F[A]F-F+F', 'F': 'G', 'G': 'F' };
-            const sequence = generateLSystemSequence('A', rules, 3);
+            const sequence = generateLSystemSequence('A-F+A', rules, 3);
             const initialMelodyIndex = Math.floor(freqs.melody.length / 3);
             melodyPattern = interpretLSystem(sequence, freqs.melody, initialMelodyIndex, 2, '16n', 0.5);
             break;
@@ -167,7 +167,7 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
             // No bass for a light, airy feel
             // Melody: Fast, fluttering notes using +/- for rapid pitch changes
             const rules = { 'A': 'F+F-F+F-F[--A]', 'F': 'G', 'G': 'A' };
-            const sequence = generateLSystemSequence('A', rules, 4);
+            const sequence = generateLSystemSequence('F+F-A', rules, 4);
              const initialMelodyIndex = Math.floor(freqs.melody.length / 2);
             melodyPattern = interpretLSystem(sequence, freqs.melody, initialMelodyIndex, 1, '32n', 0.3);
             break;
@@ -178,7 +178,7 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
              // Melody: High-pitched, sparse, using the stack for "cascading" effects
             const highFreqs = freqs.melody.slice(Math.floor(freqs.melody.length / 2));
             const rules = { 'A': 'G[+A]F[-A]G' , 'F': 'G', 'G': 'F'};
-            const sequence = generateLSystemSequence('A', rules, 3);
+            const sequence = generateLSystemSequence('G[+A]F', rules, 3);
             const initialMelodyIndex = Math.floor(highFreqs.length / 2);
             melodyPattern = interpretLSystem(sequence, highFreqs, initialMelodyIndex, 4, '8n', 0.6);
             break;

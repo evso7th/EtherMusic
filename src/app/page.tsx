@@ -84,32 +84,26 @@ const rockPatterns = {
     ]
 };
 
-// --- New Meditative Patterns ---
 const airPattern = {
     groove: [
-        // Sparse kick with hi-hats
         [
             'C1', null, 'E2', null, null, null, 'E2', null,
             'C1', null, 'E2', null, null, null, 'E2', 'E1',
         ],
-        // Purely hi-hats and cymbals
         [
             null, 'E2', 'E1', 'E2', null, 'E1', 'E2', 'E1',
             'F1', null, 'E2', null, null, 'E1', null, 'E2',
         ],
-        // More active hi-hats
          [
             'E2', 'E1', 'E2', 'E1', 'E2', 'E1', 'E2', 'E1',
             'E2', 'E1', 'E2', 'E1', 'E2', 'E1', 'F1', null,
         ]
     ],
     fills: [
-        // Cymbal crash fills
          [
             'E2', 'E1', 'E2', 'E1', 'E2', 'E1', 'E2', 'E1',
             'F1', null, 'F1', null, 'F1', null, 'F1', null,
         ],
-        // Quiet, sparse fill
         [
             null, null, null, 'E1', null, null, null, 'E2',
             null, null, null, 'E1', null, 'F1', null, null,
@@ -119,29 +113,24 @@ const airPattern = {
 
 const earthPattern = {
     groove: [
-        // Steady, grounding kick
         [
             'C1', null, 'E2', null, 'C1', null, 'E2', null,
             'C1', null, 'E2', null, 'C1', null, 'E2', null,
         ],
-        // Kick with off-beat hi-hat
         [
             'C1', 'E2', null, 'E2', 'C1', 'E2', null, 'E2',
             'C1', 'E2', null, 'E2', 'C1', 'E2', null, 'E2',
         ],
-        // Just the kick
         [
             'C1', null, null, null, 'C1', null, null, null,
             'C1', null, null, null, 'C1', null, null, null,
         ]
     ],
     fills: [
-        // Rolling tom fill
         [
             'G1', 'G1', 'G2', 'G2', 'G3', 'G3', 'C1', null,
             'C1', 'E2', 'G3', 'E2', 'G2', 'E2', 'G1', 'F1',
         ],
-         // Simple kick and snare fill
          [
             'C1', null, 'D1', null, 'C1', null, 'D1', null,
             'C1', 'D1', 'C1', 'D1', 'F1', null, null, null,
@@ -151,29 +140,24 @@ const earthPattern = {
 
 const waterPattern = {
     groove: [
-        // Flowing, continuous hi-hats with sparse kick
         [
             'C1', 'E2', 'E1', 'E2', 'E1', 'E2', 'E1', 'E2',
             null, 'E2', 'E1', 'E2', 'E1', 'E2', 'F1', 'E2',
         ],
-        // Ghost notes on hi-hat
         [
             'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2',
             'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1',
         ],
-         // Cymbal-heavy groove
-        [
+         [
             'F1', 'E2', null, 'E2', 'F1', 'E2', null, 'E2',
             'F1', 'E2', null, 'E2', 'F1', 'E2', null, 'E2',
         ]
     ],
     fills: [
-        // Splashy cymbal fill
         [
             'F1', 'E1', 'F1', 'E2', 'F1', 'E1', 'F1', 'E2',
             'F1', 'E1', 'F1', 'E2', 'F1', 'E1', 'F1', 'F1',
         ],
-         // Ethereal, empty fill
          [
             null, null, 'E1', null, null, 'E2', null, null,
             'F1', null, null, null, null, null, null, null,
@@ -379,7 +363,7 @@ export default function Home() {
 
 
         bassLFO.current = new Tone.LFO({
-            frequency: "4n",
+            frequency: Tone.Time("4n").toFrequency(),
             min: 0,
             max: 1,
         }).start();
@@ -764,6 +748,10 @@ export default function Home() {
         if (!isReady) return;
         const Tone = require('tone');
         Tone.Transport.bpm.value = activeTempo.bpm;
+        if (bassLFO.current) {
+            bassLFO.current.frequency.value = Tone.Time("4n").toFrequency();
+        }
+
     }, [activeTempo, isReady]);
 
     useEffect(() => {
@@ -1021,5 +1009,3 @@ export default function Home() {
 }
 
 
-
-    
