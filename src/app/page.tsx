@@ -17,8 +17,8 @@ import { generateAutopilotPattern } from '@/lib/music-engine';
 
 const housePatterns = {
     groove: [
-        ['C1', 'E2'], ['E1', 'E2'], ['D1', 'E2'], ['E1', 'E2'], ['C1', 'E2'], ['E1', 'E2'], ['D1', 'E2'], ['E1', 'E2'],
-        ['C1', 'E2'], ['E1', 'E2'], ['D1', 'E2'], ['E1', 'E2'], ['C1', 'E2'], ['E1', 'E2'], ['D1', 'E2'], ['E1', 'E2'],
+        ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2',
+        ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2',
     ],
     fills: [
         [
@@ -30,8 +30,8 @@ const housePatterns = {
 
 const trancePatterns = {
     groove: [
-        'C1', ['E1', 'E2'], ['D1', 'E2'], ['E1', 'E2'], 'C1', ['E1', 'E2'], ['D1', 'E2'], ['E1', 'E2'],
-        'C1', ['E1', 'E2'], ['D1', 'E2'], ['E1', 'E2'], 'C1', ['E1', 'E2'], ['D1', 'E2'], ['E1', 'E2'],
+        'C1', ['E1', 'E2'], 'E2', ['E1', 'E2'], 'C1', ['E1', 'E2'], 'E2', ['E1', 'E2'],
+        'C1', ['E1', 'E2'], 'E2', ['E1', 'E2'], 'C1', ['E1', 'E2'], 'E2', ['E1', 'E2'],
     ],
     fills: [
         [
@@ -43,8 +43,8 @@ const trancePatterns = {
 
 const reggaePatterns = {
     groove: [
-        null, ['E1', 'E2'], ['C1','D1'], ['E1', 'E2'], null, ['E1', 'E2'], ['C1','D1'], ['E1', 'E2'],
-        null, ['E1', 'E2'], ['C1','D1'], ['E1', 'E2'], null, ['E1', 'E2'], ['C1','D1'], ['E1', 'E2'],
+        null, ['E1', 'E2'], ['C1','D1'], 'E2', null, ['E1', 'E2'], ['C1','D1'], 'E2',
+        null, ['E1', 'E2'], ['C1','D1'], 'E2', null, ['E1', 'E2'], ['C1','D1'], 'E2',
     ],
     fills: [
         [
@@ -87,36 +87,51 @@ const rockPatterns = {
 // --- New Meditative Patterns ---
 const airPattern = {
     groove: [
-        null, null, 'D1', null, null, null, null, null,
-        'C1', null, null, null, null, null, 'D1', null,
+        'C1', null, null, null, null, null, null, 'E2',
+        null, null, 'C1', null, null, 'E2', null, null,
     ],
     fills: [
+         [
+            null, 'E2', 'E1', 'E2', null, 'E2', 'E1', 'E2',
+            'F1', null, null, null, null, 'E2', 'E1', 'E2',
+        ],
         [
-            null, 'G3', null, 'G3', null, 'G2', null, ['D1', 'F1']
+            null, null, 'E1', null, 'E2', null, 'E1', null,
+            'F1', null, 'E2', null, 'E1', null, 'E2', null,
         ]
     ]
 };
 
 const earthPattern = {
     groove: [
-        'C1', null, null, null, 'D1', null, null, null,
-        'C1', null, null, null, 'D1', null, 'G3', null,
+        'C1', null, 'E2', null, 'C1', null, 'E2', null,
+        'C1', null, 'E2', null, 'C1', null, 'E2', null,
     ],
     fills: [
         [
-            'C1', null, 'D1', null, 'C1', 'G3', 'D1', 'G2'
+            'C1', 'E2', 'E1', 'E2', 'C1', 'E2', 'E1', 'E2',
+            'C1', 'E1', 'E2', 'E1', 'C1', 'E2', 'F1', null,
+        ],
+         [
+            'C1', null, 'E1', null, 'C1', null, 'E2', null,
+            'F1', 'E2', 'E1', 'E2', null, null, null, null,
         ]
     ]
 };
 
 const waterPattern = {
     groove: [
-        'C1', null, 'D1', null, null, null, 'D1', null,
-        'C1', null, 'D1', null, 'G3', 'G3', 'D1', null,
+        'C1', 'E2', null, 'E1', null, 'E2', null, 'E1',
+        'C1', 'E2', null, 'E1', null, 'E2', null, 'E1',
     ],
     fills: [
         [
-            'C1', 'D1', 'C1', 'D1', 'G1', 'G2', 'G3', ['F1', 'D1']
+            'C1', 'E2', 'E1', 'E2', 'E1', 'E2', 'E1', 'E2',
+            'F1', 'E1', 'E2', 'E1', 'E2', 'E1', 'E2', 'E1',
+        ],
+         [
+            'C1', null, 'E1', 'E2', null, 'E1', null, 'E2',
+            'F1', null, 'E1', null, 'E2', null, 'E1', null,
         ]
     ]
 };
@@ -238,6 +253,8 @@ export default function Home() {
     const audioInitialized = useRef(false);
     const melodySynth = useRef<Tone.PolySynth | null>(null);
     const bassSynth = useRef<Tone.PolySynth | null>(null);
+    const kickSynth = useRef<Tone.MembraneSynth | null>(null);
+    const snareSynth = useRef<Tone.NoiseSynth | null>(null);
     const drumSamplers = useRef<Record<string, Tone.Player> | null>(null);
     const channels = useRef<{ melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel, autopilot: Tone.Channel } | null>(null);
     const drumPart = useRef<Tone.Part | null>(null);
@@ -322,9 +339,22 @@ export default function Home() {
             max: 1,
         }).start();
 
+        // --- Synths for Drums ---
+        kickSynth.current = new Tone.MembraneSynth({
+            pitchDecay: 0.02,
+            octaves: 6,
+            oscillator: { type: 'fmsine', partials: [1, 0.5, 0.2] },
+            envelope: { attack: 0.001, decay: 0.3, sustain: 0.01, release: 0.2, attackCurve: 'exponential' }
+        }).connect(channels.current.drums);
+        
+        snareSynth.current = new Tone.NoiseSynth({
+            noise: { type: 'pink' },
+            envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.1 }
+        }).connect(channels.current.drums);
+
+
         const drumUrls = {
-            C1: "/assets/sounds/kick drum.wav",
-            D1: "/assets/sounds/snare.wav",
+            // C1 and D1 are now synthesized
             E1: "/assets/sounds/closed hi hat accented.wav",
             E2: "/assets/sounds/closed hi hat ghost.wav",
             F1: "/assets/sounds/crash.wav",
@@ -352,10 +382,14 @@ export default function Home() {
         
         drumPart.current = new Tone.Part((time, value) => {
             const notes = (value as any).notes;
-            if (!notes || !drumSamplers.current) return;
+            if (!kickSynth.current || !snareSynth.current || !drumSamplers.current) return;
 
             const playNote = (note: string) => {
-                if (drumSamplers.current && drumSamplers.current[note]?.loaded) {
+                 if (note === 'C1') {
+                    kickSynth.current?.triggerAttackRelease('C1', '8n', time);
+                } else if (note === 'D1') {
+                    snareSynth.current?.triggerAttackRelease('16n', time);
+                } else if (drumSamplers.current && drumSamplers.current[note]?.loaded) {
                     drumSamplers.current[note].start(time);
                 }
             }
