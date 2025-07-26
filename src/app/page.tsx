@@ -168,14 +168,14 @@ const waterPattern = {
 const tibetPattern = {
     groove: [
         [
-            'C1', null, null, 'D1', null, null, 'C1', null,
-            null, 'D1', null, null, 'C1', null, 'C1', 'D1'
+            'C1', null, null, null, 'D1', null, null, null,
+            'C1', null, null, 'D1', null, null, null, null,
         ]
     ],
     fills: [
         [
-            'D1', 'D1', 'D1', 'D1', null, null, null, null,
-            'C1', null, 'C1', null, 'D1', 'D1', 'D1', 'D1',
+            'D1', null, 'D1', null, null, 'C1', null, null,
+            'C1', null, 'C1', null, 'D1', null, 'D1', null,
         ]
     ]
 };
@@ -399,7 +399,6 @@ export default function Home() {
 
 
         const drumUrls = {
-            // C1 and D1 are now synthesized
             E1: "/assets/sounds/closed hi hat accented.wav",
             E2: "/assets/sounds/closed hi hat ghost.wav",
             F1: "/assets/sounds/crash.wav",
@@ -786,7 +785,7 @@ export default function Home() {
             channels.current.bass.send('reverb', effects.bass.reverb);
             channels.current.bass.send('delay', effects.bass.delay);
             channels.current.drums.send('reverb', effects.drums.reverb);
-            channels.current.drums.send('delay', effects.drums.delay);
+            channels.current.drums.send('delay', effects.drums.reverb);
             channels.current.autopilot.send('reverb', effects.autopilot.reverb);
             channels.current.autopilot.send('delay', effects.autopilot.delay);
         }
