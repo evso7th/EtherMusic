@@ -15,6 +15,84 @@ import { HelpGuide } from '@/components/help-guide';
 import { generateAutopilotPattern } from '@/lib/music-engine';
 
 
+const airPattern = {
+    groove: [
+        [
+            null, 'E2', 'E1', 'E2', null, 'E1', 'E2', 'E1',
+            null, null, 'E2', null, null, 'E1', null, 'E2',
+        ],
+    ],
+    fills: [
+        [
+            null, 'F1', null, null, null, 'F1', null, null,
+            'E1', null, 'E2', null, 'E1', null, 'E2', null
+        ]
+    ]
+};
+
+const earthPattern = {
+    groove: [
+        [
+            'C1', null, null, null, 'C1', null, null, null,
+            'C1', null, null, null, 'C1', null, null, null,
+        ],
+    ],
+    fills: [
+        [
+            null, 'G1', null, 'G2', null, 'G3', null, 'C1',
+            null, 'E2', null, 'G3', null, 'G2', null, 'F1',
+        ]
+    ]
+};
+
+const waterPattern = {
+    groove: [
+        [
+            null, 'E2', 'E1', 'E2', null, 'E2', 'E1', 'E2',
+            null, 'E2', null, 'E2', 'E1', 'E2', 'F1', null,
+        ]
+    ],
+    fills: [
+        [
+            'F1', 'E1', null, 'E2', 'F1', null, 'F1', 'E2',
+            null, 'E1', 'F1', null, 'F1', 'E1', null, 'F1',
+        ]
+    ]
+};
+
+const tibetPattern = {
+    groove: [
+        [
+            'C1', null, null, null, null, 'D1', null, null,
+            null, 'C1', null, null, null, null, null, null,
+        ]
+    ],
+    fills: [
+        [
+            'D1', null, null, null, null, 'C1', null, null,
+            null, null, 'C1', null, null, null, 'D1', null,
+        ]
+    ]
+};
+
+
+const rockPatterns = {
+    groove: [[
+        ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2',
+        ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2'
+    ]],
+    fills: [
+        [
+            'G1', 'G1', 'G2', 'G2', 'G3', 'G3', ['F1', 'C1'], ['F1'],
+            'G1', 'G2', 'G3', null, 'F1', 'D1', ['F1', 'C1'], ['F1', 'D1'],
+        ],
+        [
+            'G1', 'E2', 'G1', 'E2', 'G2', 'E2', 'G2', 'E2',
+            'G3', 'E2', 'G3', 'E1', ['F1', 'D1'], 'C1', ['F1', 'C1'], 'C1'
+        ]
+    ]
+};
+
 const housePatterns = {
     groove: [[
         ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2',
@@ -66,92 +144,6 @@ const slowBluesPatterns = {
         ]
     ]
 };
-
-const rockPatterns = {
-    groove: [[
-        ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2',
-        ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2'
-    ]],
-    fills: [
-        [
-            'G1', 'G1', 'G2', 'G2', 'G3', 'G3', ['F1', 'C1'], ['F1'],
-            'G1', 'G2', 'G3', null, 'F1', 'D1', ['F1', 'C1'], ['F1', 'D1'],
-        ],
-        [
-            'G1', 'E2', 'G1', 'E2', 'G2', 'E2', 'G2', 'E2',
-            'G3', 'E2', 'G3', 'E1', ['F1', 'D1'], 'C1', ['F1', 'C1'], 'C1'
-        ]
-    ]
-};
-
-const airPattern = {
-    groove: [
-        [
-            null, 'E2', 'E1', 'E2', null, 'E1', 'E2', 'E1',
-            null, null, 'E2', null, null, 'E1', null, 'E2',
-        ],
-        [
-            'E2', 'E1', 'E2', null, 'E2', 'E1', null, 'E1',
-            null, 'E1', 'E2', 'E1', 'E2', null, 'F1', null,
-        ]
-    ],
-    fills: [
-        [
-            null, 'F1', null, null, null, 'F1', null, null,
-            'E1', null, 'E2', null, 'E1', null, 'E2', null
-        ]
-    ]
-};
-
-const earthPattern = {
-    groove: [
-        [
-            'C1', null, null, null, null, null, null, null,
-            'C1', null, null, null, null, null, null, null,
-        ],
-         [
-            'C1', null, 'E2', null, 'C1', null, null, null,
-            null, 'D1', null, null, 'F1', null, null, null,
-        ]
-    ],
-    fills: [
-        [
-            'G1', null, 'G2', null, 'G3', null, 'C1', null,
-            null, 'E2', 'G3', null, 'G2', null, 'G1', 'F1',
-        ]
-    ]
-};
-
-const waterPattern = {
-    groove: [
-        [
-            null, 'E2', 'E1', 'E2', null, 'E2', 'E1', 'E2',
-            null, 'E2', null, 'E2', 'E1', 'E2', 'F1', null,
-        ]
-    ],
-    fills: [
-        [
-            'F1', 'E1', null, 'E2', 'F1', null, 'F1', 'E2',
-            null, 'E1', 'F1', null, 'F1', 'E1', null, 'F1',
-        ]
-    ]
-};
-
-const tibetPattern = {
-    groove: [
-        [
-            'C1', null, null, null, null, 'D1', null, null,
-            null, 'C1', null, null, null, null, null, null,
-        ]
-    ],
-    fills: [
-        [
-            'D1', null, null, null, null, 'C1', null, null,
-            null, null, 'C1', null, null, null, 'D1', null,
-        ]
-    ]
-};
-
 
 export const beatPatterns = [
     { name: 'Air', patterns: airPattern, length: '1m', type: 'Meditative' },
@@ -414,7 +406,7 @@ export default function Home() {
             }
             if (Array.isArray(value.note)) {
                 value.note.forEach(playNote);
-            } else {
+            } else if (value.note) {
                 playNote(value.note);
             }
         }, []).start(0);
@@ -432,7 +424,7 @@ export default function Home() {
             }
             if (Array.isArray(value.note)) {
                 value.note.forEach(playNote);
-            } else {
+            } else if (value.note) {
                 playNote(value.note);
             }
         }, []).start(0);
@@ -1022,13 +1014,3 @@ export default function Home() {
         </div>
     );
 }
-
-
-
-    
-
-    
-
-
-
-
