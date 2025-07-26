@@ -88,16 +88,16 @@ const airPattern = {
     groove: [
         [
             null, 'E2', 'E1', 'E2', null, 'E1', 'E2', 'E1',
-            'F1', null, 'E2', null, null, 'E1', null, 'E2',
+            null, null, 'E2', null, null, 'E1', null, 'E2',
         ],
         [
-            'E2', 'E1', 'E2', 'E1', 'E2', 'E1', 'E2', 'E1',
-            'E2', 'E1', 'E2', 'E1', 'E2', 'E1', 'F1', null,
+            'E2', 'E1', 'E2', null, 'E2', 'E1', null, 'E1',
+            null, 'E1', 'E2', 'E1', 'E2', null, 'F1', null,
         ]
     ],
     fills: [
         [
-            'F1', null, 'F1', null, 'F1', null, 'F1', null,
+            null, 'F1', null, null, null, 'F1', null, null,
             'E1', null, 'E2', null, 'E1', null, 'E2', null
         ]
     ]
@@ -106,18 +106,18 @@ const airPattern = {
 const earthPattern = {
     groove: [
         [
-            'C1', null, null, null, 'C1', null, null, null,
-            'C1', null, null, null, 'C1', null, null, null,
+            'C1', null, null, null, null, null, null, null,
+            'C1', null, null, null, null, null, null, null,
         ],
          [
-            'C1', null, 'E2', null, 'C1', null, 'E2', null,
-            'C1', 'D1', 'C1', 'D1', 'F1', null, null, null,
+            'C1', null, 'E2', null, 'C1', null, null, null,
+            null, 'D1', null, null, 'F1', null, null, null,
         ]
     ],
     fills: [
         [
-            'G1', 'G1', 'G2', 'G2', 'G3', 'G3', 'C1', null,
-            'C1', 'E2', 'G3', 'E2', 'G2', 'E2', 'G1', 'F1',
+            'G1', null, 'G2', null, 'G3', null, 'C1', null,
+            null, 'E2', 'G3', null, 'G2', null, 'G1', 'F1',
         ]
     ]
 };
@@ -125,14 +125,14 @@ const earthPattern = {
 const waterPattern = {
     groove: [
         [
-            null, 'E2', 'E1', 'E2', 'E1', 'E2', 'E1', 'E2',
-            null, 'E2', 'E1', 'E2', 'E1', 'E2', 'F1', 'E2',
+            null, 'E2', 'E1', 'E2', null, 'E2', 'E1', 'E2',
+            null, 'E2', null, 'E2', 'E1', 'E2', 'F1', null,
         ]
     ],
     fills: [
         [
-            'F1', 'E1', 'F1', 'E2', 'F1', 'E1', 'F1', 'E2',
-            'F1', 'E1', 'F1', 'E2', 'F1', 'E1', 'F1', 'F1',
+            'F1', 'E1', null, 'E2', 'F1', null, 'F1', 'E2',
+            null, 'E1', 'F1', null, 'F1', 'E1', null, 'F1',
         ]
     ]
 };
@@ -140,14 +140,14 @@ const waterPattern = {
 const tibetPattern = {
     groove: [
         [
-            'C1', null, null, null, 'D1', null, null, null,
-            'C1', null, null, 'D1', null, null, null, null,
+            'C1', null, null, null, null, 'D1', null, null,
+            null, 'C1', null, null, null, null, null, null,
         ]
     ],
     fills: [
         [
-            'D1', null, 'D1', null, null, 'C1', null, null,
-            'C1', null, 'C1', null, 'D1', null, 'D1', null,
+            'D1', null, null, null, null, 'C1', null, null,
+            null, null, 'C1', null, null, null, 'D1', null,
         ]
     ]
 };
@@ -372,8 +372,6 @@ export default function Home() {
 
 
         const drumUrls = {
-            C1: "/assets/sounds/kick drum.wav",
-            D1: "/assets/sounds/snare.wav",
             E1: "/assets/sounds/closed hi hat accented.wav",
             E2: "/assets/sounds/closed hi hat ghost.wav",
             F1: "/assets/sounds/crash.wav",
@@ -385,6 +383,10 @@ export default function Home() {
         drumSamplers.current = {};
         const loadingPromises = Object.entries(drumUrls).map(([note, url]) => {
             return new Promise<void>((resolve) => {
+                if (!url) {
+                    resolve();
+                    return;
+                }
                 const player = new Tone.Player(url).connect(channels.current!.drums);
                 if (note === 'E1' || note === 'E2') {
                     player.volume.value = -3;
@@ -451,8 +453,17 @@ export default function Home() {
                     patternToPlay.forEach((notes: string | string[] | null, i: number) => {
                         if (notes) {
                             const noteTime = `0:${Math.floor(i/4)}:${i%4}`;
-                            drumPart.current?.add(noteTime, { note: notes });
-                            synthPart.current?.add(noteTime, { note: notes });
+                            const notesToAdd = Array.isArray(notes) ? notes : [notes];
+                            
+                            const samplerNotes = notesToAdd.filter(n => n !== 'C1' && n !== 'D1');
+                            const synthNotes = notesToAdd.filter(n => n === 'C1' || n === 'D1');
+
+                            if (samplerNotes.length > 0) {
+                                drumPart.current?.add(noteTime, { note: samplerNotes.length === 1 ? samplerNotes[0] : samplerNotes });
+                            }
+                            if (synthNotes.length > 0) {
+                                synthPart.current?.add(noteTime, { note: synthNotes.length === 1 ? synthNotes[0] : synthNotes });
+                            }
                         }
                     });
         
@@ -1015,3 +1026,4 @@ export default function Home() {
     
 
     
+
