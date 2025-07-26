@@ -27,7 +27,7 @@ import type { AutopilotStyle } from '@/app/page';
 
 type BeatPattern = {
     name: string;
-    sequence: (string | null)[];
+    patterns: any;
 };
 
 export type Tempo = {

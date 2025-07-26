@@ -84,8 +84,48 @@ const rockPatterns = {
     ]
 };
 
+// --- New Meditative Patterns ---
+const airPattern = {
+    groove: [
+        null, null, 'D1', null, null, null, null, null,
+        'C1', null, null, null, null, null, 'D1', null,
+    ],
+    fills: [
+        [
+            null, 'G3', null, 'G3', null, 'G2', null, ['D1', 'F1']
+        ]
+    ]
+};
+
+const earthPattern = {
+    groove: [
+        'C1', null, null, null, 'D1', null, null, null,
+        'C1', null, null, null, 'D1', null, 'G3', null,
+    ],
+    fills: [
+        [
+            'C1', null, 'D1', null, 'C1', 'G3', 'D1', 'G2'
+        ]
+    ]
+};
+
+const waterPattern = {
+    groove: [
+        'C1', null, 'D1', null, null, null, 'D1', null,
+        'C1', null, 'D1', null, 'G3', 'G3', 'D1', null,
+    ],
+    fills: [
+        [
+            'C1', 'D1', 'C1', 'D1', 'G1', 'G2', 'G3', ['F1', 'D1']
+        ]
+    ]
+};
+
 
 const beatPatterns = [
+    { name: 'Air', patterns: airPattern, length: '1m' },
+    { name: 'Earth', patterns: earthPattern, length: '1m' },
+    { name: 'Water', patterns: waterPattern, length: '1m' },
     { name: 'Rock', patterns: rockPatterns, length: '1m' },
     { name: 'House', patterns: housePatterns, length: '1m' },
     { name: 'Trance', patterns: trancePatterns, length: '1m' },
@@ -166,7 +206,7 @@ export default function Home() {
         bass: { reverb: -60, delay: -60 },
         drums: { reverb: -60, delay: -60 },
     });
-    const [activePattern, setActivePattern] = useState<any>(beatPatterns[5]);
+    const [activePattern, setActivePattern] = useState<any>(beatPatterns[beatPatterns.length - 1]);
     const [melodyInstrument, setMelodyInstrument] = useState<MelodyInstrument>('synth');
 
     // --- New Harmony State ---
