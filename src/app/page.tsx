@@ -17,8 +17,8 @@ import { generateAutopilotPattern } from '@/lib/music-engine';
 
 const housePatterns = {
     groove: [
-        'C1', 'E1', 'D1', 'E1', 'C1', 'E1', 'D1', 'E1',
-        'C1', 'E1', 'D1', 'E1', 'C1', 'E1', 'D1', 'E1',
+        ['C1', 'E2'], ['E1', 'E2'], ['D1', 'E2'], ['E1', 'E2'], ['C1', 'E2'], ['E1', 'E2'], ['D1', 'E2'], ['E1', 'E2'],
+        ['C1', 'E2'], ['E1', 'E2'], ['D1', 'E2'], ['E1', 'E2'], ['C1', 'E2'], ['E1', 'E2'], ['D1', 'E2'], ['E1', 'E2'],
     ],
     fills: [
         [
@@ -122,16 +122,16 @@ const waterPattern = {
 };
 
 
-const beatPatterns = [
-    { name: 'Air', patterns: airPattern, length: '1m' },
-    { name: 'Earth', patterns: earthPattern, length: '1m' },
-    { name: 'Water', patterns: waterPattern, length: '1m' },
-    { name: 'Rock', patterns: rockPatterns, length: '1m' },
-    { name: 'House', patterns: housePatterns, length: '1m' },
-    { name: 'Trance', patterns: trancePatterns, length: '1m' },
-    { name: 'Reggae', patterns: reggaePatterns, length: '1m' },
-    { name: 'Slow Blues', patterns: slowBluesPatterns, length: '1m' },
-    { name: 'Off', patterns: { groove: [], fills: [] }, length: '1m' },
+export const beatPatterns = [
+    { name: 'Air', patterns: airPattern, length: '1m', type: 'Meditative' },
+    { name: 'Earth', patterns: earthPattern, length: '1m', type: 'Meditative' },
+    { name: 'Water', patterns: waterPattern, length: '1m', type: 'Meditative' },
+    { name: 'Rock', patterns: rockPatterns, length: '1m', type: 'Classic' },
+    { name: 'House', patterns: housePatterns, length: '1m', type: 'Classic' },
+    { name: 'Trance', patterns: trancePatterns, length: '1m', type: 'Classic' },
+    { name: 'Reggae', patterns: reggaePatterns, length: '1m', type: 'Classic' },
+    { name: 'Slow Blues', patterns: slowBluesPatterns, length: '1m', type: 'Classic' },
+    { name: 'Off', patterns: { groove: [], fills: [] }, length: '1m', type: 'System' },
 ];
 
 
@@ -207,7 +207,7 @@ export default function Home() {
         drums: { reverb: -60, delay: -60 },
         autopilot: { reverb: -60, delay: -60 },
     });
-    const [activePattern, setActivePattern] = useState<any>(beatPatterns[beatPatterns.length - 1]);
+    const [activePattern, setActivePattern] = useState<any>(beatPatterns.find(p => p.name === 'Off'));
     const [melodyInstrument, setMelodyInstrument] = useState<MelodyInstrument>('synth');
 
     // --- New Harmony State ---
@@ -940,4 +940,3 @@ export default function Home() {
     );
 }
 
-    

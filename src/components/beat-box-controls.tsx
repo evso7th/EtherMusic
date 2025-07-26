@@ -19,15 +19,17 @@ import {
 } from "@/components/ui/alert-dialog"
 import { MixerControls } from '@/components/mixer-controls';
 import { SlidersHorizontal, Drum, Zap, Bot, Wand2, Power } from 'lucide-react';
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
 import type { AutopilotStyle } from '@/app/page';
+import { Separator } from "./ui/separator";
 
 
 type BeatPattern = {
     name: string;
     patterns: any;
+    type: 'Meditative' | 'Classic' | 'System';
 };
 
 export type Tempo = {
@@ -48,6 +50,7 @@ interface BeatBoxControlsProps {
         melody: { reverb: number, delay: number };
         bass: { reverb: number, delay: number };
         drums: { reverb: number, delay: number };
+        autopilot: { reverb: number, delay: number };
     };
     onEffectChange: (effects: BeatBoxControlsProps['effects']) => void;
     isAutopilotOn: boolean;
@@ -85,6 +88,20 @@ export function BeatBoxControls({
             window.close();
         }
     };
+    
+    const groupedPatterns = useMemo(() => {
+        return patterns.reduce((acc, pattern) => {
+            const type = pattern.type || 'Classic';
+            if (type === 'System') return acc;
+            if (!acc[type]) {
+                acc[type] = [];
+            }
+            acc[type].push(pattern);
+            return acc;
+        }, {} as Record<string, BeatPattern[]>);
+    }, [patterns]);
+    
+    const offPattern = patterns.find(p => p.type === 'System');
 
     return (
         <Card className="bg-card/50">
@@ -100,19 +117,42 @@ export function BeatBoxControls({
                         <DialogHeader>
                             <DialogTitle>Beat Patterns</DialogTitle>
                         </DialogHeader>
-                        <div className="grid grid-cols-2 gap-2 py-4">
-                            {patterns.map((pattern) => (
-                                <Button
-                                    key={pattern.name}
-                                    variant={activePattern.name === pattern.name ? 'default' : 'outline'}
-                                    onClick={() => {
-                                        onPatternChange(pattern);
-                                        setIsBeatsOpen(false);
-                                    }}
-                                >
-                                    {pattern.name}
-                                </Button>
+                        <div className="space-y-4 py-4">
+                            {Object.entries(groupedPatterns).map(([type, groupPatterns]) => (
+                                <div key={type}>
+                                    <h3 className="text-sm font-medium text-muted-foreground mb-2 px-1">{type}</h3>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {groupPatterns.map((pattern) => (
+                                            <Button
+                                                key={pattern.name}
+                                                variant={activePattern.name === pattern.name ? 'default' : 'outline'}
+                                                onClick={() => {
+                                                    onPatternChange(pattern);
+                                                    setIsBeatsOpen(false);
+                                                }}
+                                            >
+                                                {pattern.name}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                </div>
                             ))}
+                            {offPattern && (
+                                <div>
+                                    <Separator className="my-3" />
+                                    <Button
+                                        key={offPattern.name}
+                                        variant={activePattern.name === offPattern.name ? 'destructive' : 'outline'}
+                                        onClick={() => {
+                                            onPatternChange(offPattern);
+                                            setIsBeatsOpen(false);
+                                        }}
+                                        className="w-full"
+                                    >
+                                        {offPattern.name}
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     </DialogContent>
                 </Dialog>
