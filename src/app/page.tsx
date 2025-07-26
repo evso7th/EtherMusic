@@ -87,26 +87,18 @@ const rockPatterns = {
 const airPattern = {
     groove: [
         [
-            'C1', null, 'E2', null, null, null, 'E2', null,
-            'C1', null, 'E2', null, null, null, 'E2', 'E1',
-        ],
-        [
             null, 'E2', 'E1', 'E2', null, 'E1', 'E2', 'E1',
             'F1', null, 'E2', null, null, 'E1', null, 'E2',
         ],
-         [
+        [
             'E2', 'E1', 'E2', 'E1', 'E2', 'E1', 'E2', 'E1',
             'E2', 'E1', 'E2', 'E1', 'E2', 'E1', 'F1', null,
         ]
     ],
     fills: [
-         [
-            'E2', 'E1', 'E2', 'E1', 'E2', 'E1', 'E2', 'E1',
-            'F1', null, 'F1', null, 'F1', null, 'F1', null,
-        ],
         [
-            null, null, null, 'E1', null, null, null, 'E2',
-            null, null, null, 'E1', null, 'F1', null, null,
+            'F1', null, 'F1', null, 'F1', null, 'F1', null,
+            'E1', null, 'E2', null, 'E1', null, 'E2', null
         ]
     ]
 };
@@ -114,26 +106,18 @@ const airPattern = {
 const earthPattern = {
     groove: [
         [
-            'C1', null, 'E2', null, 'C1', null, 'E2', null,
-            'C1', null, 'E2', null, 'C1', null, 'E2', null,
-        ],
-        [
-            'C1', 'E2', null, 'E2', 'C1', 'E2', null, 'E2',
-            'C1', 'E2', null, 'E2', 'C1', 'E2', null, 'E2',
-        ],
-        [
             'C1', null, null, null, 'C1', null, null, null,
             'C1', null, null, null, 'C1', null, null, null,
+        ],
+         [
+            'C1', null, 'E2', null, 'C1', null, 'E2', null,
+            'C1', 'D1', 'C1', 'D1', 'F1', null, null, null,
         ]
     ],
     fills: [
         [
             'G1', 'G1', 'G2', 'G2', 'G3', 'G3', 'C1', null,
             'C1', 'E2', 'G3', 'E2', 'G2', 'E2', 'G1', 'F1',
-        ],
-         [
-            'C1', null, 'D1', null, 'C1', null, 'D1', null,
-            'C1', 'D1', 'C1', 'D1', 'F1', null, null, null,
         ]
     ]
 };
@@ -141,26 +125,14 @@ const earthPattern = {
 const waterPattern = {
     groove: [
         [
-            'C1', 'E2', 'E1', 'E2', 'E1', 'E2', 'E1', 'E2',
+            null, 'E2', 'E1', 'E2', 'E1', 'E2', 'E1', 'E2',
             null, 'E2', 'E1', 'E2', 'E1', 'E2', 'F1', 'E2',
-        ],
-        [
-            'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2',
-            'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1',
-        ],
-         [
-            'F1', 'E2', null, 'E2', 'F1', 'E2', null, 'E2',
-            'F1', 'E2', null, 'E2', 'F1', 'E2', null, 'E2',
         ]
     ],
     fills: [
         [
             'F1', 'E1', 'F1', 'E2', 'F1', 'E1', 'F1', 'E2',
             'F1', 'E1', 'F1', 'E2', 'F1', 'E1', 'F1', 'F1',
-        ],
-         [
-            null, null, 'E1', null, null, 'E2', null, null,
-            'F1', null, null, null, null, null, null, null,
         ]
     ]
 };
