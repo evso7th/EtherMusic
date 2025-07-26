@@ -400,6 +400,8 @@ export default function Home() {
 
 
         const drumUrls = {
+            C1: "/assets/sounds/kick.wav",
+            D1: "/assets/sounds/snare.wav",
             E1: "/assets/sounds/closed hi hat accented.wav",
             E2: "/assets/sounds/closed hi hat ghost.wav",
             F1: "/assets/sounds/crash.wav",
@@ -436,10 +438,17 @@ export default function Home() {
 
         // Part for synths
         synthPart.current = new Tone.Part((time, value) => {
-            if (value.note === 'C1' && kickSynth.current) {
-                kickSynth.current.triggerAttackRelease('C1', '8n', time);
-            } else if (value.note === 'D1' && snareSynth.current) {
-                snareSynth.current.triggerAttackRelease('16n', time);
+            const playNote = (note: string) => {
+                 if (note === 'C1' && kickSynth.current) {
+                    kickSynth.current.triggerAttackRelease('C1', '8n', time);
+                } else if (note === 'D1' && snareSynth.current) {
+                    snareSynth.current.triggerAttackRelease('16n', time);
+                }
+            }
+            if (Array.isArray(value.note)) {
+                value.note.forEach(playNote);
+            } else {
+                playNote(value.note);
             }
         }, []).start(0);
         synthPart.current.loop = true;
@@ -470,18 +479,8 @@ export default function Home() {
                     patternToPlay.forEach((notes: string | string[] | null, i: number) => {
                         if (notes) {
                             const noteTime = `0:${Math.floor(i/4)}:${i%4}`;
-                            const playNote = (note: string) => {
-                                if (note === 'C1' || note === 'D1') {
-                                    synthPart.current?.add(noteTime, { note });
-                                } else {
-                                    drumPart.current?.add(noteTime, { note });
-                                }
-                            }
-                            if (Array.isArray(notes)) {
-                                notes.forEach(playNote);
-                            } else {
-                                playNote(notes);
-                            }
+                            drumPart.current?.add(noteTime, { note: notes });
+                            synthPart.current?.add(noteTime, { note: notes });
                         }
                     });
         
@@ -1040,5 +1039,7 @@ export default function Home() {
 }
 
 
+
+    
 
     
