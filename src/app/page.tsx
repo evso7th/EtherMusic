@@ -372,6 +372,8 @@ export default function Home() {
 
 
         const drumUrls = {
+            C1: "/assets/sounds/kick drum.wav",
+            D1: "/assets/sounds/snare.wav",
             E1: "/assets/sounds/closed hi hat accented.wav",
             E2: "/assets/sounds/closed hi hat ghost.wav",
             F1: "/assets/sounds/crash.wav",
@@ -403,8 +405,15 @@ export default function Home() {
         
         // Part for samplers
         drumPart.current = new Tone.Part((time, value) => {
-            if (drumSamplers.current && drumSamplers.current[value.note]?.loaded) {
-                drumSamplers.current[value.note].start(time);
+             const playNote = (note: string) => {
+                if (drumSamplers.current && drumSamplers.current[note]?.loaded) {
+                    drumSamplers.current[note].start(time);
+                }
+            }
+            if (Array.isArray(value.note)) {
+                value.note.forEach(playNote);
+            } else {
+                playNote(value.note);
             }
         }, []).start(0);
         drumPart.current.loop = true;
@@ -453,17 +462,8 @@ export default function Home() {
                     patternToPlay.forEach((notes: string | string[] | null, i: number) => {
                         if (notes) {
                             const noteTime = `0:${Math.floor(i/4)}:${i%4}`;
-                            const notesToAdd = Array.isArray(notes) ? notes : [notes];
-                            
-                            const samplerNotes = notesToAdd.filter(n => n !== 'C1' && n !== 'D1');
-                            const synthNotes = notesToAdd.filter(n => n === 'C1' || n === 'D1');
-
-                            if (samplerNotes.length > 0) {
-                                drumPart.current?.add(noteTime, { note: samplerNotes.length === 1 ? samplerNotes[0] : samplerNotes });
-                            }
-                            if (synthNotes.length > 0) {
-                                synthPart.current?.add(noteTime, { note: synthNotes.length === 1 ? synthNotes[0] : synthNotes });
-                            }
+                            drumPart.current?.add(noteTime, { note: notes });
+                            synthPart.current?.add(noteTime, { note: notes });
                         }
                     });
         
@@ -907,7 +907,7 @@ export default function Home() {
                     <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
                 </div>
                 <MemoizedOrbitalAnimation isPlaying={false} tempo={activeTempo.bpm}/>
-                <audio ref={backgroundAudioRef} src="/assets/sounds/ethermusic_start.mp3" loop />
+                <audio ref={backgroundAudioRef} src="/assets/sounds/ethermusic_sample.mp3" loop />
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
                         <h1 className="text-5xl md:text-8xl lg:text-5xl xl:text-8xl font-bold text-primary sm:text-6xl" style={{fontSize: '48px'}}>EtherMusic</h1>
@@ -1026,4 +1026,5 @@ export default function Home() {
     
 
     
+
 
