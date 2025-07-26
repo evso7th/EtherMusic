@@ -69,7 +69,12 @@ export function PlaybackControls({ isPlaying, isRecording, onPlayPause, onRecord
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>No</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleExit}>Yes</AlertDialogAction>
+                        <AlertDialogAction 
+                            onClick={handleExit}
+                            className="bg-transparent border border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                        >
+                            Yes
+                        </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>

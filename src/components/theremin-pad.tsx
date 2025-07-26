@@ -134,9 +134,9 @@ export function ThereminPad({
     const renderMelodyControls = () => (
         <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
             <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 capitalize">
+                <Button variant="outline" size="sm" className="h-8 capitalize border-primary text-primary hover:bg-primary hover:text-primary-foreground">
                     <SlidersHorizontal className="w-4 h-4 mr-0 sm:mr-2" />
-                    <span className="hidden sm:inline">{activeInstrument || 'Settings'}</span>
+                    <span className="hidden sm:inline">Settings</span>
                 </Button>
             </SheetTrigger>
             <SheetContent>
