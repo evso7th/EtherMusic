@@ -42,6 +42,7 @@ export default {
         code: ['monospace'],
       },
       colors: {
+        'off-button': '#491768',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {

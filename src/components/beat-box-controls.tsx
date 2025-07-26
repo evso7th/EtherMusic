@@ -149,7 +149,7 @@ export function BeatBoxControls({
                                         }}
                                         className={cn(
                                             "w-full",
-                                            activePattern.name === offPattern.name && "border-destructive text-destructive hover:bg-destructive/10"
+                                            activePattern.name === offPattern.name && "border-off-button text-off-button hover:bg-off-button/10"
                                         )}
                                     >
                                         {offPattern.name}
