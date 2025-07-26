@@ -214,6 +214,8 @@ export function ThereminPad({
         </>
     );
 
+    const [title, subtitle] = padTitles[type].split(' ');
+
     return (
         <Card className={cn(
             "flex flex-col h-full bg-card/50 border-2 border-transparent transition-all duration-300",
@@ -238,8 +240,12 @@ export function ThereminPad({
                         backgroundImage: 'linear-gradient(to top, hsl(var(--background) / 0.4), transparent)',
                     }}
                 >
-                    <div className="absolute inset-0 flex items-center justify-center text-5xl md:text-7xl font-bold text-foreground/10 pointer-events-none uppercase tracking-widest">
-                        <span>{padTitles[type]}</span>
+                    <div className="absolute inset-0 flex items-center justify-center text-5xl md:text-7xl font-bold text-foreground/10 pointer-events-none uppercase tracking-widest text-center">
+                        <div>
+                            <span>{title}</span>
+                            <br />
+                            <span>{subtitle}</span>
+                        </div>
                     </div>
                      {orbs.map(orb => (
                         <OrbComponent key={orb.id} x={orb.x} y={orb.y} color={color} type={orb.type} />
