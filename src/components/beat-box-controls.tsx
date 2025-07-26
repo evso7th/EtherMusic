@@ -6,6 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { MixerControls } from '@/components/mixer-controls';
 import { SlidersHorizontal, Drum, Zap, Bot, Wand2, Power } from 'lucide-react';
 import { useState } from "react";
@@ -200,9 +211,25 @@ export function BeatBoxControls({
                 <HelpGuide buttonVariant="outline" buttonClassName="flex-1" size={isMobile ? 'sm' : 'default'}/>
 
                 {isMobile && (
-                     <Button onClick={handleExit} size="sm" variant="outline" className="flex-1" aria-label="Exit App">
-                        <Power className="w-4 h-4" />
-                    </Button>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button size="sm" variant="outline" className="flex-1" aria-label="Exit App">
+                                <Power className="w-4 h-4" />
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>End Meditation?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Are you sure you want to break your meditation and leave the app?
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>No</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleExit}>Yes</AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 )}
             </CardContent>
         </Card>
