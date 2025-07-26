@@ -436,9 +436,10 @@ export default function Home() {
                     drumSamplers.current[note].start(time);
                 }
             }
+
             if (Array.isArray(notes)) {
                 notes.forEach(playNote);
-            } else {
+            } else if (notes) {
                 playNote(notes);
             }
         }, []).start(0);
@@ -784,7 +785,7 @@ export default function Home() {
             channels.current.bass.send('reverb', effects.bass.reverb);
             channels.current.bass.send('delay', effects.bass.delay);
             channels.current.drums.send('reverb', effects.drums.reverb);
-            channels.current.drums.send('delay', effects.drums.reverb);
+            channels.current.drums.send('delay', effects.drums.delay);
             channels.current.autopilot.send('reverb', effects.autopilot.reverb);
             channels.current.autopilot.send('delay', effects.autopilot.delay);
         }
@@ -1023,3 +1024,5 @@ export default function Home() {
 }
 
 
+
+    
