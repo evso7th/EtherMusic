@@ -165,11 +165,27 @@ const waterPattern = {
     ]
 };
 
+const tibetPattern = {
+    groove: [
+        [
+            'C1', null, null, 'D1', null, null, 'C1', null,
+            null, 'D1', null, null, 'C1', null, 'C1', 'D1'
+        ]
+    ],
+    fills: [
+        [
+            'D1', 'D1', 'D1', 'D1', null, null, null, null,
+            'C1', null, 'C1', null, 'D1', 'D1', 'D1', 'D1',
+        ]
+    ]
+};
+
 
 export const beatPatterns = [
     { name: 'Air', patterns: airPattern, length: '1m', type: 'Meditative' },
     { name: 'Earth', patterns: earthPattern, length: '1m', type: 'Meditative' },
     { name: 'Water', patterns: waterPattern, length: '1m', type: 'Meditative' },
+    { name: 'Tibet', patterns: tibetPattern, length: '1m', type: 'Meditative' },
     { name: 'Rock', patterns: rockPatterns, length: '1m', type: 'Classic' },
     { name: 'House', patterns: housePatterns, length: '1m', type: 'Classic' },
     { name: 'Trance', patterns: trancePatterns, length: '1m', type: 'Classic' },
@@ -1009,3 +1025,5 @@ export default function Home() {
 }
 
 
+
+    
