@@ -359,6 +359,7 @@ export default function Home() {
 
         // --- Synths for Drums ---
         kickSynth.current = new Tone.MembraneSynth({
+            volume: 6,
             pitchDecay: 0.02,
             octaves: 6,
             oscillator: { type: 'fmsine', partials: [1, 0.5, 0.2] },
@@ -366,6 +367,7 @@ export default function Home() {
         }).connect(channels.current.drums);
         
         snareSynth.current = new Tone.NoiseSynth({
+            volume: 3,
             noise: { type: 'pink' },
             envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.1 }
         }).connect(channels.current.drums);
@@ -1026,5 +1028,6 @@ export default function Home() {
     
 
     
+
 
 
