@@ -425,7 +425,7 @@ export default function Home() {
         setIsReady(true);
         
         drumPart.current = new Tone.Part((time, value) => {
-            const notes = (value as any).notes;
+            const notesToPlay = (value as any).notes;
 
             const playNote = (note: string) => {
                  if (note === 'C1' && kickSynth.current) {
@@ -437,10 +437,10 @@ export default function Home() {
                 }
             }
 
-            if (Array.isArray(notes)) {
-                notes.forEach(playNote);
-            } else if (notes) {
-                playNote(notes);
+            if (Array.isArray(notesToPlay)) {
+                notesToPlay.forEach(playNote);
+            } else if (notesToPlay) {
+                playNote(notesToPlay);
             }
         }, []).start(0);
         drumPart.current.loop = true;
