@@ -336,12 +336,12 @@ export default function Home() {
             oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
         };
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 2; i++) {
             bassSynths.current.push(new Tone.Synth(bassSynthOptions).connect(bassGain.current));
         }
 
         const melodySynthOptions = { portamento: 0.02 };
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 4; i++) {
             melodySynths.current.push(new Tone.Synth(melodySynthOptions).connect(channels.current.melody));
         }
         
