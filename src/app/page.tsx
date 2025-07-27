@@ -214,6 +214,11 @@ const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
 const MemoizedThereminPad = memo(ThereminPad);
 
 
+type ActiveNote = {
+    type: 'melody' | 'bass';
+    synth: Tone.Synth;
+};
+
 export default function Home() {
     const { toast } = useToast();
     const isMobile = useIsMobile();
@@ -244,12 +249,9 @@ export default function Home() {
     const [isBassPulsating, setIsBassPulsating] = useState(false);
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
     
-    // --- Performance Refactoring ---
     // Use refs for high-frequency state to avoid re-renders
-    const latchedBassNotes = useRef<Map<number, { x: number; y: number; frequency: number; volume: number }>>(new Map());
-    const activeNotes = useRef(new Map<number, { type: 'melody' | 'bass'; freq: number; vol: number }>());
-    const audioCommandQueue = useRef<Map<number, { freq: number; vol: number }>>(new Map());
-    const animationFrameId = useRef<number>();
+    const latchedBassNotes = useRef<Map<number, { x: number; y: number; synth: Tone.Synth }>>(new Map());
+    const activeNotes = useRef<Map<number, ActiveNote>>(new Map());
     
     // Orb State
     const [orbs, setOrbs] = useState<Orb[]>([]);
@@ -258,10 +260,13 @@ export default function Home() {
     const [isAutopilotOn, setIsAutopilotOn] = useState(false);
     const [autopilotStyle, setAutopilotStyle] = useState<AutopilotStyle>('Ambient');
 
+    // --- NEW: Synth Pools ---
+    const melodySynths = useRef<Tone.Synth[]>([]);
+    const bassSynths = useRef<Tone.Synth[]>([]);
+    const autopilotSynths = useRef<{bass: Tone.PolySynth, melody: Tone.PolySynth} | null>(null);
+
     // Tone.js refs
     const audioInitialized = useRef(false);
-    const melodySynth = useRef<Tone.PolySynth | null>(null);
-    const bassSynth = useRef<Tone.PolySynth | null>(null);
     const kickSynth = useRef<Tone.MembraneSynth | null>(null);
     const snareSynth = useRef<Tone.NoiseSynth | null>(null);
     const drumSamplers = useRef<Record<string, Tone.Player> | null>(null);
@@ -273,7 +278,7 @@ export default function Home() {
     const bassGain = useRef<Tone.Gain | null>(null);
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
     const fx = useRef<{ reverb: Tone.Reverb, delay: Tone.FeedbackDelay } | null>(null);
-    const autopilot = useRef<{bass: Tone.Part | null, melody: Tone.Part | null, melodySynth?: Tone.PolySynth, bassSynth?: Tone.PolySynth}>({ bass: null, melody: null });
+    const autopilotParts = useRef<{bass: Tone.Part | null, melody: Tone.Part | null}>({ bass: null, melody: null });
     
     // Refs for stable callbacks
     const activePatternRef = useRef(activePattern);
@@ -324,24 +329,30 @@ export default function Home() {
         channels.current.autopilot.send("reverb", effects.autopilot.reverb);
         channels.current.autopilot.send("delay", effects.autopilot.delay);
 
-        // --- Synths for Pads ---
-        melodySynth.current = new Tone.PolySynth(Tone.Synth, { polyphony: 8, portamento: 0.02 }).connect(channels.current.melody);
-
+        // --- NEW: Create Synth Pools ---
         bassGain.current = new Tone.Gain(1).connect(channels.current.bass);
-        bassSynth.current = new Tone.PolySynth(Tone.Synth, {
-            polyphony: 8,
+        const bassSynthOptions = {
             portamento: 0.02,
             oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
-        }).connect(bassGain.current);
+        };
+        for (let i = 0; i < 4; i++) {
+            bassSynths.current.push(new Tone.Synth(bassSynthOptions).connect(bassGain.current));
+        }
+
+        const melodySynthOptions = { portamento: 0.02 };
+        for (let i = 0; i < 5; i++) {
+            melodySynths.current.push(new Tone.Synth(melodySynthOptions).connect(channels.current.melody));
+        }
         
         // --- Synths for Autopilot ---
-        autopilot.current.melodySynth = new Tone.PolySynth(Tone.Synth).connect(channels.current.autopilot);
-        autopilot.current.bassSynth = new Tone.PolySynth(Tone.Synth, {
-             oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
-             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
-        }).connect(channels.current.autopilot);
-
+        autopilotSynths.current = {
+            melody: new Tone.PolySynth(Tone.Synth).connect(channels.current.autopilot),
+            bass: new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
+                envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
+            }).connect(channels.current.autopilot)
+        };
 
         bassLFO.current = new Tone.LFO({
             frequency: Tone.Time("4n").toFrequency(),
@@ -467,17 +478,17 @@ export default function Home() {
         }
 
 
-        autopilot.current.bass = new Tone.Part((time, note) => {
-            autopilot.current.bassSynth?.triggerAttackRelease(note.freq, note.dur, time, note.vel);
+        autopilotParts.current.bass = new Tone.Part((time, note) => {
+            autopilotSynths.current?.bass?.triggerAttackRelease(note.freq, note.dur, time, note.vel);
         }, []).start(0);
-        autopilot.current.bass.loop = true;
-        autopilot.current.bass.loopEnd = '4m';
+        autopilotParts.current.bass.loop = true;
+        autopilotParts.current.bass.loopEnd = '4m';
 
-        autopilot.current.melody = new Tone.Part((time, note) => {
-             autopilot.current.melodySynth?.triggerAttackRelease(note.freq, note.dur, time, note.vel);
+        autopilotParts.current.melody = new Tone.Part((time, note) => {
+             autopilotSynths.current?.melody?.triggerAttackRelease(note.freq, note.dur, time, note.vel);
         }, []).start(0);
-        autopilot.current.melody.loop = true;
-        autopilot.current.melody.loopEnd = '4m';
+        autopilotParts.current.melody.loop = true;
+        autopilotParts.current.melody.loopEnd = '4m';
 
 
         recorder.current = new Tone.Recorder();
@@ -487,50 +498,6 @@ export default function Home() {
         
     }, [effects.autopilot, effects.bass, effects.drums, effects.melody, volumes.autopilot, volumes.bass, volumes.drums, volumes.melody]); 
     
-    // --- Performance Refactoring: RAF loop for audio commands ---
-    const processAudioQueue = useCallback(() => {
-        if (!audioCommandQueue.current.size || !audioInitialized.current) {
-            animationFrameId.current = requestAnimationFrame(processAudioQueue);
-            return;
-        }
-        
-        const Tone = require('tone');
-
-        audioCommandQueue.current.forEach((value, pointerId) => {
-            const activeNote = activeNotes.current.get(pointerId);
-            if (activeNote) {
-                const synth = activeNote.type === 'melody' ? melodySynth.current : bassSynth.current;
-                
-                if (synth) {
-                     // Separate commands for frequency and volume for better performance
-                    synth.set({ frequency: value.freq });
-                    
-                    // Directly set volume on the synth's output node for smoother changes.
-                    // Convert linear gain (0-1) to dB.
-                    if (synth.volume) {
-                        synth.volume.value = Tone.gainToDb(value.vol * value.vol); // square for more perceptual curve
-                    }
-
-                    activeNote.freq = value.freq;
-                    activeNote.vol = value.vol;
-                }
-            }
-        });
-
-        audioCommandQueue.current.clear();
-        animationFrameId.current = requestAnimationFrame(processAudioQueue);
-    }, []);
-
-    useEffect(() => {
-        if (isReady) {
-            animationFrameId.current = requestAnimationFrame(processAudioQueue);
-        }
-        return () => {
-            if (animationFrameId.current) {
-                cancelAnimationFrame(animationFrameId.current);
-            }
-        };
-    }, [isReady, processAudioQueue]);
 
     // Update allowed frequencies when key or scale changes
     useEffect(() => {
@@ -542,7 +509,7 @@ export default function Home() {
     }, [musicKey, musicScale, isReady]);
 
     useEffect(() => {
-        if (!isReady || !melodySynth.current || !autopilot.current.melodySynth) return;
+        if (!isReady || !autopilotSynths.current) return;
         
         let newOptions;
 
@@ -573,8 +540,8 @@ export default function Home() {
                 };
                 break;
         }
-        melodySynth.current.set(newOptions);
-        autopilot.current.melodySynth.set(newOptions);
+        melodySynths.current.forEach(synth => synth.set(newOptions));
+        autopilotSynths.current.melody.set(newOptions);
 
     }, [melodyInstrument, isReady]);
 
@@ -608,7 +575,7 @@ export default function Home() {
     
     const handlePlayPause = async () => {
         const Tone = await import('tone');
-        if (!isReady || !bassSynth.current) return;
+        if (!isReady) return;
 
         const willBePlaying = Tone.Transport.state !== 'started';
         setIsPlaying(willBePlaying);
@@ -619,18 +586,18 @@ export default function Home() {
             
             if (isBassLatchOn) {
                 latchedBassNotes.current.forEach(note => {
-                    bassSynth.current!.triggerAttack(note.frequency, undefined, note.volume);
+                    note.synth.triggerAttack(note.synth.frequency.value, undefined, note.synth.volume.value);
                 });
             }
         } else {
             Tone.Transport.pause();
             
             if (isBassLatchOn) {
-                 bassSynth.current.releaseAll();
+                 latchedBassNotes.current.forEach(note => note.synth.triggerRelease());
             }
             if (isAutopilotOn) {
-                autopilot.current.bassSynth?.releaseAll();
-                autopilot.current.melodySynth?.releaseAll();
+                autopilotSynths.current?.bass.releaseAll();
+                autopilotSynths.current?.melody.releaseAll();
             }
         }
     };
@@ -641,15 +608,14 @@ export default function Home() {
 
         Tone.Transport.stop();
         
-        melodySynth.current?.releaseAll();
-        bassSynth.current?.releaseAll();
-        autopilot.current.melodySynth?.releaseAll();
-        autopilot.current.bassSynth?.releaseAll();
+        activeNotes.current.forEach(note => note.synth.triggerRelease());
+        latchedBassNotes.current.forEach(note => note.synth.triggerRelease());
+        autopilotSynths.current?.melody.releaseAll();
+        autopilotSynths.current?.bass.releaseAll();
 
         activeNotes.current.clear();
-        setOrbs(orbs => orbs.filter(orb => orb.type !== 'latch'));
         latchedBassNotes.current.clear();
-        setOrbs([]); // Clear all visual orbs
+        setOrbs([]);
         setIsPlaying(false);
     }, [isReady]);
 
@@ -679,11 +645,11 @@ export default function Home() {
     const handleLatchToggle = useCallback((checked: boolean) => {
         setIsBassLatchOn(checked);
         if (!checked && latchedBassNotes.current.size > 0) {
-            bassSynth.current?.releaseAll();
+            latchedBassNotes.current.forEach(note => note.synth.triggerRelease());
             latchedBassNotes.current.clear();
             setOrbs(orbs => orbs.filter(orb => orb.type !== 'latch'));
         }
-    }, [bassSynth]);
+    }, []);
 
      const handleAutopilotToggle = () => {
         setIsAutopilotOn(prev => !prev);
@@ -720,8 +686,8 @@ export default function Home() {
     
     // Autopilot logic using the new music engine
     useEffect(() => {
-        const bassPart = autopilot.current.bass;
-        const melodyPart = autopilot.current.melody;
+        const bassPart = autopilotParts.current.bass;
+        const melodyPart = autopilotParts.current.melody;
 
         const regeneratePatterns = () => {
             if (!bassPart || !melodyPart || !allowedFrequencies.bass.length || !allowedFrequencies.melody.length) return;
@@ -745,8 +711,8 @@ export default function Home() {
         } else if (bassPart && melodyPart) {
             bassPart.stop(0).clear();
             melodyPart.stop(0).clear();
-            autopilot.current.bassSynth?.releaseAll();
-            autopilot.current.melodySynth?.releaseAll();
+            autopilotSynths.current?.bass.releaseAll();
+            autopilotSynths.current?.melody.releaseAll();
         }
 
     }, [isAutopilotOn, isPlaying, allowedFrequencies, autopilotStyle]);
@@ -794,21 +760,20 @@ export default function Home() {
     }, [allowedFrequencies]);
 
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
-        if (!audioInitialized.current) return;
+        if (!audioInitialized.current || !data) return;
 
-        const synth = type === 'melody' ? melodySynth.current : bassSynth.current;
-        if (!synth) return;
-
-        const pointerId = data?.pointerId ?? -1;
+        const Tone = require('tone');
+        const pointerId = data.pointerId;
+        const synthPool = type === 'melody' ? melodySynths.current : bassSynths.current;
         
         if (type === 'bass' && isBassLatchOn) {
-            if (state === 'down' && data) {
+            if (state === 'down') {
                 const quantizedFreq = getClosestFrequency(data.frequency, type);
-                const newNotes = latchedBassNotes.current;
+                const newLatchedNotes = latchedBassNotes.current;
                 const NOTE_PROXIMITY_THRESHOLD = 35;
                 let existingEntryKey;
                 
-                for (const [key, note] of newNotes.entries()) {
+                for (const [key, note] of newLatchedNotes.entries()) {
                      const distance = Math.sqrt(Math.pow(note.x - data.x, 2) + Math.pow(note.y - data.y, 2));
                      if (distance < NOTE_PROXIMITY_THRESHOLD) {
                         existingEntryKey = key;
@@ -817,16 +782,21 @@ export default function Home() {
                 }
 
                 if (existingEntryKey !== undefined) {
-                    const noteToRelease = newNotes.get(existingEntryKey);
+                    const noteToRelease = newLatchedNotes.get(existingEntryKey);
                     if (noteToRelease) {
-                        synth.triggerRelease([noteToRelease.frequency]);
+                        noteToRelease.synth.triggerRelease();
                     }
-                    newNotes.delete(existingEntryKey);
-                } else if (newNotes.size < 4) {
-                    const newKey = Date.now();
-                    newNotes.set(newKey, { x: data.x, y: data.y, frequency: quantizedFreq, volume: data.volume });
-                    if (isPlaying) {
-                        synth.triggerAttack(quantizedFreq, undefined, data.volume);
+                    newLatchedNotes.delete(existingEntryKey);
+                } else if (newLatchedNotes.size < bassSynths.current.length) {
+                    const assignedSynth = synthPool.find(s => !Array.from(newLatchedNotes.values()).some(n => n.synth === s) && !Array.from(activeNotes.current.values()).some(n => n.synth === s));
+                    if (assignedSynth) {
+                        const newKey = Date.now();
+                        assignedSynth.frequency.value = quantizedFreq;
+                        assignedSynth.volume.value = Tone.gainToDb(data.volume * data.volume);
+                        if (isPlaying) {
+                            assignedSynth.triggerAttack(quantizedFreq);
+                        }
+                        newLatchedNotes.set(newKey, { x: data.x, y: data.y, synth: assignedSynth });
                     }
                 }
                 setOrbs(orbs => {
@@ -834,51 +804,44 @@ export default function Home() {
                     return [...orbs.filter(o => o.type !== 'latch'), ...latchedOrbs];
                 });
             }
-            return; 
+            return;
         }
 
         switch (state) {
-            case 'down':
-                if (data) {
-                    const quantizedFreq = getClosestFrequency(data.frequency, type);
-                    if (quantizedFreq) {
-                        synth.triggerAttack(quantizedFreq, undefined, data.volume);
-                        activeNotes.current.set(pointerId, { type, freq: quantizedFreq, vol: data.volume });
-                        setOrbs(orbs => [...orbs, { id: pointerId, x: data.x, y: data.y, type }]);
-                    }
-                }
-                break;
-            case 'move':
-                if (data && activeNotes.current.has(pointerId)) {
-                    const quantizedFreq = getClosestFrequency(data.frequency, type);
-                    if (quantizedFreq) {
-                         audioCommandQueue.current.set(pointerId, { freq: quantizedFreq, vol: data.volume });
-                         setOrbs(orbs => orbs.map(orb => orb.id === pointerId ? { ...orb, x: data.x, y: data.y } : orb));
-                    }
-                }
-                break;
-            case 'up':
-                if (activeNotes.current.has(pointerId)) {
-                    const activeNote = activeNotes.current.get(pointerId);
-                    if (activeNote) {
-                        synth.triggerRelease([activeNote.freq]);
-                    }
-                    activeNotes.current.delete(pointerId);
-                    audioCommandQueue.current.delete(pointerId);
-                    setOrbs(orbs => orbs.filter(orb => orb.id !== pointerId));
+            case 'down': {
+                const activeSynths = new Set(Array.from(activeNotes.current.values()).map(n => n.synth));
+                const freeSynth = synthPool.find(s => !activeSynths.has(s));
 
-                    let hasMoreNotes = false;
-                    for (const note of activeNotes.current.values()) {
-                        if (note.type === type) {
-                            hasMoreNotes = true;
-                            break;
-                        }
-                    }
-                    if (!hasMoreNotes) {
-                        synth.releaseAll();
-                    }
+                if (freeSynth) {
+                    const quantizedFreq = getClosestFrequency(data.frequency, type);
+                    freeSynth.frequency.value = quantizedFreq;
+                    freeSynth.volume.value = Tone.gainToDb(data.volume * data.volume);
+                    freeSynth.triggerAttack(quantizedFreq);
+                    activeNotes.current.set(pointerId, { type, synth: freeSynth });
+                    setOrbs(orbs => [...orbs, { id: pointerId, x: data.x, y: data.y, type }]);
                 }
                 break;
+            }
+            case 'move': {
+                const activeNote = activeNotes.current.get(pointerId);
+                if (activeNote) {
+                    const quantizedFreq = getClosestFrequency(data.frequency, type);
+                    // Ramping provides smoother transitions than direct value setting
+                    activeNote.synth.frequency.rampTo(quantizedFreq, 0.01);
+                    activeNote.synth.volume.value = Tone.gainToDb(data.volume * data.volume);
+                    setOrbs(orbs => orbs.map(orb => orb.id === pointerId ? { ...orb, x: data.x, y: data.y } : orb));
+                }
+                break;
+            }
+            case 'up': {
+                const activeNote = activeNotes.current.get(pointerId);
+                if (activeNote) {
+                    activeNote.synth.triggerRelease();
+                    activeNotes.current.delete(pointerId);
+                    setOrbs(orbs => orbs.filter(orb => orb.id !== pointerId));
+                }
+                break;
+            }
         }
     }, [isBassLatchOn, isPlaying, getClosestFrequency]);
     
@@ -927,8 +890,7 @@ export default function Home() {
         return (
             <div className="absolute inset-0 bg-background flex items-center justify-center z-50">
                 <div className="text-center text-white">
-                    <p className="text-xl mb-4">loading your personal neuro meditation processor</p>
-                    <div className='preloader'>
+                     <div className='preloader'>
                         <div><div><div><div><div></div></div></div></div></div>
                     </div>
                 </div>
@@ -1015,3 +977,6 @@ export default function Home() {
         </div>
     );
 }
+
+
+    
