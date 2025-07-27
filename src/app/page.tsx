@@ -76,7 +76,7 @@ const tibetPattern = {
 };
 
 
-const rockPatterns = {
+const toccataPatterns = {
     groove: [[
         ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2',
         ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2'
@@ -93,7 +93,7 @@ const rockPatterns = {
     ]
 };
 
-const housePatterns = {
+const promenadePatterns = {
     groove: [[
         ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2',
         ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2',
@@ -106,7 +106,7 @@ const housePatterns = {
     ]
 };
 
-const trancePatterns = {
+const nocturnePatterns = {
     groove: [[
         'C1', ['E1', 'E2'], 'E2', ['E1', 'E2'], 'C1', ['E1', 'E2'], 'E2', ['E1', 'E2'],
         'C1', ['E1', 'E2'], 'E2', ['E1', 'E2'], 'C1', ['E1', 'E2'], 'E2', ['E1', 'E2'],
@@ -119,7 +119,7 @@ const trancePatterns = {
     ]
 };
 
-const reggaePatterns = {
+const scherzoPatterns = {
     groove: [[
         null, ['E1', 'E2'], ['C1','D1'], 'E2', null, ['E1', 'E2'], ['C1','D1'], 'E2',
         null, ['E1', 'E2'], ['C1','D1'], 'E2', null, ['E1', 'E2'], ['C1','D1'], 'E2',
@@ -132,7 +132,7 @@ const reggaePatterns = {
     ]
 };
 
-const slowBluesPatterns = {
+const ariaPatterns = {
     groove: [[
         ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1', ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1',
         ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1', ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1',
@@ -150,11 +150,11 @@ export const beatPatterns = [
     { name: 'Earth', patterns: earthPattern, length: '1m', type: 'Meditative' },
     { name: 'Water', patterns: waterPattern, length: '1m', type: 'Meditative' },
     { name: 'Tibet', patterns: tibetPattern, length: '1m', type: 'Meditative' },
-    { name: 'Rock', patterns: rockPatterns, length: '1m', type: 'Classic' },
-    { name: 'House', patterns: housePatterns, length: '1m', type: 'Classic' },
-    { name: 'Trance', patterns: trancePatterns, length: '1m', type: 'Classic' },
-    { name: 'Reggae', patterns: reggaePatterns, length: '1m', type: 'Classic' },
-    { name: 'Slow Blues', patterns: slowBluesPatterns, length: '1m', type: 'Classic' },
+    { name: 'Toccata', patterns: toccataPatterns, length: '1m', type: 'Classic' },
+    { name: 'Promenade', patterns: promenadePatterns, length: '1m', type: 'Classic' },
+    { name: 'Nocturne', patterns: nocturnePatterns, length: '1m', type: 'Classic' },
+    { name: 'Scherzo', patterns: scherzoPatterns, length: '1m', type: 'Classic' },
+    { name: 'Aria', patterns: ariaPatterns, length: '1m', type: 'Classic' },
     { name: 'Off', patterns: { groove: [], fills: [] }, length: '1m', type: 'System' },
 ];
 
@@ -176,8 +176,8 @@ export const musicKeys: MusicKey[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G',
 export type MusicScale = 'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentatonic';
 export const musicScales: MusicScale[] = ['Major', 'Minor', 'Major Pentatonic', 'Minor Pentatonic'];
 
-export type AutopilotStyle = 'Ambient' | 'House' | 'Wind' | 'Sequence' | 'Chimes' | 'Drone' | 'Primes';
-export const autopilotStyles: AutopilotStyle[] = ['Ambient', 'House', 'Wind', 'Sequence', 'Chimes', 'Drone', 'Primes'];
+export type AutopilotStyle = 'Ambient' | 'House' | 'Wind' | 'Sequence' | 'Chimes' | 'Drone' | 'Primes' | 'Toccata' | 'Promenade';
+export const autopilotStyles: AutopilotStyle[] = ['Ambient', 'House', 'Wind', 'Sequence', 'Chimes', 'Drone', 'Primes', 'Toccata', 'Promenade'];
 
 export type Orb = {
     id: number;
@@ -810,7 +810,7 @@ export default function Home() {
         switch (state) {
             case 'down': {
                 const activeSynths = new Set(Array.from(activeNotes.current.values()).map(n => n.synth));
-                const freeSynth = synthPool.find(s => !activeSynths.has(s));
+                const freeSynth = synthPool.find(s => !activeSynths.has(s) && !Array.from(latchedBassNotes.current.values()).some(n => n.synth === s));
 
                 if (freeSynth) {
                     const quantizedFreq = getClosestFrequency(data.frequency, type);

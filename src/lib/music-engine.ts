@@ -87,6 +87,8 @@ function interpretLSystem(
         switch (char) {
             case 'F': // Play a note
             case 'G':
+            case 'A':
+            case 'B':
                 if (currentNoteIndex >= 0 && currentNoteIndex < freqs.length) {
                     const m = Math.floor(currentTime / 16);
                     const b = Math.floor((currentTime % 16) / 4);
@@ -115,6 +117,7 @@ function interpretLSystem(
                     currentNoteIndex = noteIndexStack.pop()!;
                 }
                 break;
+            case 'X': // Rest
             default: // Other characters can be used as "rests" or for other logic
                 currentTime += timeStep;
                 break;
@@ -229,6 +232,46 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
                 // The next note's time is advanced by a scaled prime value
                 currentTime += Math.floor(prime / 8) + 1; 
             });
+            break;
+        }
+        
+        case 'Toccata': {
+            // Bass: sustained, deep, ominous root and fifth
+            bassPattern.push({ time: '0:0:0', freq: freqs.bass[0], dur: '2m', vel: 0.4 });
+            if (fifthNote) {
+                bassPattern.push({ time: '2:0:0', freq: fifthNote, dur: '2m', vel: 0.3 });
+            }
+            // Melody: Fast, cascading arpeggios, characteristic of a toccata
+            const rules = {
+                'A': 'GF-E-D-C-B-A', // Descending scale run
+                'B': '[+A][-A]', // Branching runs
+                'C': 'A-B-C'
+            };
+            const sequence = generateLSystemSequence('A-B', rules, 3);
+            const initialMelodyIndex = freqs.melody.length - 1; // Start high
+            melodyPattern = interpretLSystem(sequence, freqs.melody, initialMelodyIndex, 1, '32n', 0.6);
+            break;
+        }
+
+        case 'Promenade': {
+            // Bass: mimics the stately walk of the promenade theme
+             for (let i = 0; i < 8; i++) {
+                const m = Math.floor(i / 2);
+                const b = (i * 2) % 4;
+                const time = `${m}:${b}:0`;
+                const freq = i % 4 === 0 ? baseNote : (i % 4 === 2 ? fifthNote : freqs.bass[2]);
+                bassPattern.push({ time, freq, dur: '4n', vel: 0.45 });
+            }
+             
+            // Melody: L-system capturing the rhythmic and melodic character of Mussorgsky's theme
+            const rules = {
+                'A': 'FGXFGAX', // Main phrase
+                'B': 'GAGFEX' // Contrasting phrase
+            };
+            const sequence = generateLSystemSequence('AXABX', rules, 2);
+            const initialMelodyIndex = Math.floor(freqs.melody.length / 3);
+            // Slower time step to give it a walking pace
+            melodyPattern = interpretLSystem(sequence, freqs.melody, initialMelodyIndex, 2, '8n', 0.55);
             break;
         }
 
