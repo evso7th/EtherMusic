@@ -21,7 +21,6 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
-        {/* Yandex.Metrika counter */}
         <script
           type="text/javascript"
           dangerouslySetInnerHTML={{
@@ -37,7 +36,6 @@ export default function RootLayout({
             `,
           }}
         />
-        {/* /Yandex.Metrika counter */}
       </head>
       <body className="font-body antialiased">
         <noscript><div><img src="https://mc.yandex.ru/watch/103501558" style={{position:'absolute', left:'-9999px'}} alt="" /></div></noscript>
