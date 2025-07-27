@@ -137,11 +137,14 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
 
     switch (style) {
         case 'Ambient': {
-             // Bass: Rhythmic pulsing notes, creating a sense of movement.
-             for (let i = 0; i < 4; i++) {
-                const time = `${i}:0:0`;
-                const freq = i % 2 === 0 ? baseNote : (fifthNote || baseNote);
-                bassPattern.push({ time, freq, dur: '1m', vel: 0.4 });
+             // Bass: Soft, pulsing eighth-note riff between root and fifth.
+             for (let i = 0; i < 32; i++) { // 32 eighth notes over 4 measures
+                const m = Math.floor(i / 8);
+                const b = Math.floor((i % 8) / 2);
+                const s = (i % 2) * 2; // on 0 and 2
+                const time = `${m}:${b}:${s}`;
+                const freq = (i % 8 < 4) ? baseNote : (fifthNote || baseNote);
+                bassPattern.push({ time, freq, dur: '8n', vel: 0.3 });
              }
 
             // Melody: Slow, sparse notes using a simple L-system for gentle evolution
@@ -153,14 +156,14 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
 
         case 'House': 
         case 'Sequence': {
-             // Bass: A steady, pulsing root note, occasionally hitting the fifth, but louder
+             // Bass: A steady, pulsing quarter note, occasionally hitting the fifth.
             for (let i = 0; i < 16; i++) { // Loop over 16 beats (4 measures)
                 const m = Math.floor(i / 4);
                 const b = i % 4;
                 const time = `${m}:${b}:0`;
                 // Hit the fifth on the third measure
                 const freq = m === 2 ? fifthNote : baseNote;
-                bassPattern.push({ time, freq, dur: '4n', vel: 0.5 });
+                bassPattern.push({ time, freq, dur: '4n', vel: 0.6 });
             }
 
             // Melody: Classic arpeggiator-style sequence using the stack
@@ -193,20 +196,24 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
         }
 
         case 'Drone': {
-            // Bass: Two sustained notes for a classic drone, but louder.
-            bassPattern.push({ time: '0:0:0', freq: baseNote, dur: '4m', vel: 0.4 });
+            // Bass: Sustained root note with a rhythmic pulse on the fifth.
+            bassPattern.push({ time: '0:0:0', freq: baseNote, dur: '4m', vel: 0.5 });
             if (fifthNote) {
-                bassPattern.push({ time: '0:0:0', freq: fifthNote, dur: '4m', vel: 0.35 });
+                 for (let i = 0; i < 8; i++) { // every half note
+                    const m = Math.floor(i / 2);
+                    const b = (i % 2) * 2;
+                    bassPattern.push({ time: `${m}:${b}:0`, freq: fifthNote, dur: '8n', vel: 0.4 });
+                 }
             }
             // No melody, just the bass drone.
             break;
         }
 
         case 'Primes': {
-            // Bass: A simple root-fifth progression to ground the melody, but louder.
-            bassPattern.push({ time: '0:0:0', freq: baseNote, dur: '2m', vel: 0.4 });
+            // Bass: A simple root-fifth progression to ground the melody.
+            bassPattern.push({ time: '0:0:0', freq: baseNote, dur: '2m', vel: 0.5 });
             if (fifthNote) {
-                bassPattern.push({ time: '2:0:0', freq: fifthNote, dur: '2m', vel: 0.35 });
+                bassPattern.push({ time: '2:0:0', freq: fifthNote, dur: '2m', vel: 0.45 });
             }
             
             // Melody: Generated from prime numbers
@@ -236,11 +243,18 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
         }
         
         case 'Toccata': {
-            // Bass: sustained, deep, ominous root and fifth
-            bassPattern.push({ time: '0:0:0', freq: freqs.bass[0], dur: '2m', vel: 0.4 });
-            if (fifthNote) {
-                bassPattern.push({ time: '2:0:0', freq: fifthNote, dur: '2m', vel: 0.3 });
+            // Bass: Rhythmic, driving riff that outlines the harmony.
+            for (let i = 0; i < 16; i++) {
+                const m = Math.floor(i/4);
+                const b = i % 4;
+                const time = `${m}:${b}:0`;
+                if (i % 4 === 0) { // Downbeat
+                    bassPattern.push({ time, freq: baseNote, dur: '4n', vel: 0.7 });
+                } else if (i % 4 === 2 && fifthNote) { // Third beat
+                    bassPattern.push({ time, freq: fifthNote, dur: '4n', vel: 0.6 });
+                }
             }
+
             // Melody: Fast, cascading arpeggios, characteristic of a toccata
             const rules = {
                 'A': 'GF-E-D-C-B-A', // Descending scale run
@@ -254,13 +268,16 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
         }
 
         case 'Promenade': {
-            // Bass: mimics the stately walk of the promenade theme
+            // Bass: mimics the stately walk of the promenade theme with a classic I-V-IV progression
              for (let i = 0; i < 8; i++) {
                 const m = Math.floor(i / 2);
                 const b = (i * 2) % 4;
                 const time = `${m}:${b}:0`;
-                const freq = i % 4 === 0 ? baseNote : (i % 4 === 2 ? fifthNote : freqs.bass[2]);
-                bassPattern.push({ time, freq, dur: '4n', vel: 0.45 });
+                let freq = baseNote;
+                if (m === 1) freq = fifthNote;
+                if (m === 2) freq = freqs.bass[3] || baseNote; // IV chord
+                if (m === 3) freq = fifthNote;
+                bassPattern.push({ time, freq, dur: '4n', vel: 0.6 });
             }
              
             // Melody: L-system capturing the rhythmic and melodic character of Mussorgsky's theme
