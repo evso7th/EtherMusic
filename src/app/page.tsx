@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import type * as Tone from 'tone';
+import Image from 'next/image';
 import { Button } from "@/components/ui/button";
 import { ThereminPad } from '@/components/theremin-pad';
 import { BeatBoxControls, type Tempo } from '@/components/beat-box-controls';
@@ -904,9 +905,15 @@ export default function Home() {
             </div>
             <div className="relative z-10 flex flex-col h-full p-4 md:p-6 lg:p-8">
                 <header className="flex-shrink-0 flex items-center justify-between mb-4">
-                    <div>
-                        <h1 className="text-base md:text-4xl font-bold text-primary">EtherMusic</h1>
-                        <p className="hidden md:block text-xs text-white/80 font-light -mt-1 tracking-wide">Neuro Meditation Processor</p>
+                     <div>
+                        {isMobile ? (
+                            <Image src="/assets/images/icon.png" alt="EtherMusic Icon" width={40} height={40} />
+                        ) : (
+                            <>
+                                <h1 className="text-4xl font-bold text-primary">EtherMusic</h1>
+                                <p className="text-xs text-white/80 font-light -mt-1 tracking-wide">Neuro Meditation Processor</p>
+                             </>
+                        )}
                     </div>
                     <div className="flex items-center gap-1 md:gap-2">
                          <PlaybackControls
@@ -916,7 +923,6 @@ export default function Home() {
                             onRecord={handleRecord}
                             onStop={handleStop}
                             isReady={isReady}
-                            isMobile={isMobile}
                         />
                     </div>
                 </header>
