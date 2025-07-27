@@ -869,7 +869,8 @@ export default function Home() {
                 <audio ref={backgroundAudioRef} src="/assets/sounds/ethermusic_sample.mp3" loop />
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
-                        <h1 className="text-4xl md:text-5xl font-bold text-primary" style={{fontSize: isMobile ? '32px' : '48px'}}>EtherMusic</h1>
+                        <h1 className="text-4xl md:text-5xl font-bold text-primary">EtherMusic</h1>
+                        <p className="text-sm md:text-base text-white/80 font-light mt-2 tracking-wide">Neuro Meditation Processor</p>
                     </div>
                     <Button size="lg" onClick={handleStartApp}>
                         Start Meditation
@@ -904,8 +905,8 @@ export default function Home() {
             <div className="relative z-10 flex flex-col h-full p-4 md:p-6 lg:p-8">
                 <header className="flex-shrink-0 flex items-center justify-between mb-4">
                     <div>
-                        <h1 className="text-2xl md:text-4xl font-bold text-primary">EtherMusic</h1>
-                        <p className="text-xs text-white/80 font-light -mt-1 tracking-wide">Neuro Meditation Processor</p>
+                        <h1 className="text-base md:text-4xl font-bold text-primary">EtherMusic</h1>
+                        <p className="hidden md:block text-xs text-white/80 font-light -mt-1 tracking-wide">Neuro Meditation Processor</p>
                     </div>
                     <div className="flex items-center gap-1 md:gap-2">
                          <PlaybackControls
@@ -915,6 +916,7 @@ export default function Home() {
                             onRecord={handleRecord}
                             onStop={handleStop}
                             isReady={isReady}
+                            isMobile={isMobile}
                         />
                     </div>
                 </header>
@@ -975,6 +977,5 @@ export default function Home() {
         </div>
     );
 }
-
 
     
