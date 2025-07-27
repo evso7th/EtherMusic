@@ -259,32 +259,6 @@ export function BeatBoxControls({
 
                 <HelpGuide buttonVariant="outline" buttonClassName="flex-1" size={isMobile ? 'sm' : 'default'}/>
 
-                {isMobile && (
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                            <Button size="sm" variant="outline" className="flex-1" aria-label="Exit App">
-                                <Power className="w-4 h-4" />
-                            </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>End Meditation?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    Are you sure you want to break your meditation and leave the app?
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>No</AlertDialogCancel>
-                                <AlertDialogAction 
-                                    onClick={handleExit}
-                                    className="bg-transparent border border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                                >
-                                    Yes
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-                )}
             </CardContent>
         </Card>
     );

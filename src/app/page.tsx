@@ -217,6 +217,7 @@ const MemoizedThereminPad = memo(ThereminPad);
 type ActiveNote = {
     type: 'melody' | 'bass';
     synth: Tone.Synth;
+    initialFreq: number;
 };
 
 export default function Home() {
@@ -250,7 +251,7 @@ export default function Home() {
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
     
     // Use refs for high-frequency state to avoid re-renders
-    const latchedBassNotes = useRef<Map<number, { x: number; y: number; synth: Tone.Synth }>>(new Map());
+    const latchedBassNotes = useRef<Map<number, { x: number; y: number; synth: Tone.Synth, initialFreq: number }>>(new Map());
     const activeNotes = useRef<Map<number, ActiveNote>>(new Map());
     
     // Orb State
@@ -586,7 +587,7 @@ export default function Home() {
             
             if (isBassLatchOn) {
                 latchedBassNotes.current.forEach(note => {
-                    note.synth.triggerAttack(note.synth.frequency.value, undefined, note.synth.volume.value);
+                    note.synth.triggerAttack(note.initialFreq, undefined, note.synth.volume.value);
                 });
             }
         } else {
@@ -796,7 +797,7 @@ export default function Home() {
                         if (isPlaying) {
                             assignedSynth.triggerAttack(quantizedFreq);
                         }
-                        newLatchedNotes.set(newKey, { x: data.x, y: data.y, synth: assignedSynth });
+                        newLatchedNotes.set(newKey, { x: data.x, y: data.y, synth: assignedSynth, initialFreq: quantizedFreq });
                     }
                 }
                 setOrbs(orbs => {
@@ -817,7 +818,7 @@ export default function Home() {
                     freeSynth.frequency.value = quantizedFreq;
                     freeSynth.volume.value = Tone.gainToDb(data.volume * data.volume);
                     freeSynth.triggerAttack(quantizedFreq);
-                    activeNotes.current.set(pointerId, { type, synth: freeSynth });
+                    activeNotes.current.set(pointerId, { type, synth: freeSynth, initialFreq: quantizedFreq });
                     setOrbs(orbs => [...orbs, { id: pointerId, x: data.x, y: data.y, type }]);
                 }
                 break;
@@ -868,10 +869,7 @@ export default function Home() {
                 <audio ref={backgroundAudioRef} src="/assets/sounds/ethermusic_sample.mp3" loop />
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
-                        <h1 className="text-5xl md:text-8xl lg:text-5xl xl:text-8xl font-bold text-primary sm:text-6xl" style={{fontSize: '48px'}}>EtherMusic</h1>
-                        <p className="text-sm md:text-base text-white/80 font-light mt-2 tracking-wide" style={{fontSize: '14px'}}>
-                           Neuro Meditation Sound Processor
-                        </p>
+                        <h1 className="text-4xl md:text-5xl font-bold text-primary" style={{fontSize: isMobile ? '32px' : '48px'}}>EtherMusic</h1>
                     </div>
                     <Button size="lg" onClick={handleStartApp}>
                         Start Meditation
