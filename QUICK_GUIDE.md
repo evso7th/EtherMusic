@@ -21,30 +21,45 @@ There are two large, glowing pads with their names, `Bass Pad` and `Melody Pad`,
 ### Melody Pad (Right, Purple)
 
 *   This is for your main tune.
-*   You can play multiple notes at the same time (polyphonic).
+*   It's polyphonic, allowing you to play up to four notes at the same time.
 *   **Change Settings:** Use the `Settings` button at the top of the pad to open a panel where you can change the **Instrument** (`synth`, `organ`, `theremin`, `glass`), **Music Key**, and **Music Scale**. You can change any of these on the fly, even during playback!
 
 ### Bass Pad (Left, Blue)
 
-*   This is for your bass line. It's polyphonic, meaning you can play up to four notes at the same time to create chords.
+*   This is for your bass line. It's polyphonic, meaning you can play up to two notes at the same time to create chords.
 *   **Pulsate (`Zap` Icon):** Makes the sound throb in time with the beat. It affects all sounding bass notes and is great for rhythmic bass lines or pads.
 *   **Latch (`Anchor` Icon):** "Holds" notes for you. Tap the switch to turn Latch mode on.
     *   **To add a note:** Tap on the pad to start a note. A glowing orb will appear.
     *   **To remove a note:** Tap on an existing orb or in the same spot again to stop that specific note.
-    *   You can have up to four notes latched at once.
+    *   You can have up to two notes latched at once.
 
 ## Bottom Control Bar
 
 Here you control the rhythm section. You can change any of these settings on the fly, even during playback!
 
-*   **Beats:** Tap this to open a menu and choose a pre-made drum pattern (`Rock`, `House`, etc.). Select `Off` to have no drums.
+*   **Beats:** Tap this to open a menu and choose a pre-made drum pattern (`Toccata`, `Promenade`, etc.). Select `Off` to have no drums.
 *   **Tempo:** Tap this to open a slider that changes the speed of the beat (BPM - Beats Per Minute).
 *   **Mixer:** Tap this to open the volume controls. You can adjust the volume for the **Melody**, **Bass**, and **Drums** separately.
+
+## Autopilot Mode
+
+Don't want to play yourself? Turn on the **Autopilot**!
+*   **Autopilot (`Bot` Icon):** Turns on the automatic music generator. The app will start creating its own bass and melody lines based on your settings. You can still play along on the melody pad!
+*   **Style (`Wand` Icon):** When Autopilot is on, this button becomes active. Choose a style to change how the Autopilot generates music:
+    *   **Ambient:** Slow, evolving soundscapes.
+    *   **House:** Gentle, rhythmic patterns.
+    *   **Wind:** Light, airy, and spacious melodies.
+    *   **Sequence:** Hypnotic, repeating arpeggios.
+    *   **Chimes:** The sound of tinkling glass or metal chimes.
+    *   **Drone:** A deep, continuous, and immersive background tone.
+    *   **Toccata:** Virtuosic and dramatic patterns inspired by the works of J.S. Bach, featuring fast arpeggios and a powerful bassline.
+    *   **Promenade:** Stately and majestic themes reminiscent of Mussorgsky's "Pictures at an Exhibition," with a "walking" rhythm.
 
 ## Top Right Controls
 
 *   **Play/Pause:** Starts and stops the master clock and the drum sequence.
 *   **Stop:** Stops all sounds immediately.
 *   **Record (`Mic` Icon):** Press it to start recording your session. Press it again to stop. Your recording will be downloaded automatically as a `.webm` file.
+*   **Exit (`Power` Icon):** Opens a confirmation dialog to close the app.
 
 Enjoy the process and let the music you create reflect your inner state.
