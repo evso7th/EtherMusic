@@ -253,10 +253,10 @@ export class AudioEngine {
         
         // The LFO should modulate the gain of each individual synth to be effective
         this.bassSynths.forEach(synth => {
-            if (isPulsating && this.isPlaying) {
+            if (isPulsating && this.isPlaying && synth.output.gain) {
                 // The synth output is a GainNode, we connect the LFO to its 'gain' AudioParam
                 this.bassLFO.connect(synth.output.gain);
-            } else {
+            } else if (synth.output.gain){
                 this.bassLFO.disconnect(synth.output.gain);
                 // Ensure the gain is reset to 1 when pulsation is off
                 synth.output.gain.cancelScheduledValues();
@@ -301,11 +301,20 @@ export class AudioEngine {
 
     public updateNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}) {
         const activeNote = this.activeNotes.get(pointerId);
-        if (activeNote && activeNote.synth.output.gain) {
+        
+        if (activeNote) {
             const quantizedFreq = this.getClosestFrequency(freq, type);
             activeNote.synth.frequency.rampTo(quantizedFreq, 0.01);
-            // Ramp the volume of the synth's output gain node
-            activeNote.synth.output.gain.rampTo(vol * vol, 0.01);
+            
+            // For melody, we adjust the synth's main volume.
+            // For bass, we adjust the dedicated gain node for that synth.
+            const velocity = vol * vol;
+            if (activeNote.type === 'bass' && activeNote.synth.output.gain) {
+                 activeNote.synth.output.gain.rampTo(velocity, 0.01);
+            } else {
+                 activeNote.synth.set({ volume: Tone.gainToDb(velocity) });
+            }
+
             activeNote.x = pos.x;
             activeNote.y = pos.y;
             this.updateAndDispatchOrbs();
