@@ -237,15 +237,15 @@ export class AudioEngine {
     }
 
     public setBassPulsating(isPulsating: boolean) {
-        if (!this.isInitialized) return;
+        if (!this.isInitialized || !this.bassLFO || !this.bassGain) return;
         this.isBassPulsating = isPulsating;
         
         if (isPulsating) {
             this.bassLFO.connect(this.bassGain.gain);
         } else {
             this.bassLFO.disconnect(this.bassGain.gain);
-            this.bassGain.gain.cancelScheduledValues(Tone.now());
-            this.bassGain.gain.rampTo(1, 0.1); 
+            // When disconnecting, smoothly ramp to the original gain value
+            this.bassGain.gain.rampTo(1, 0.2); 
         }
     }
 
@@ -653,6 +653,7 @@ const beatPatternsData: { [key: string]: { groove: (string|string[]|null)[][], f
         fills: []
     }
 };
+
 
 
 
