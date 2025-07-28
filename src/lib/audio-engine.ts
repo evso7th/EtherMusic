@@ -147,7 +147,6 @@ export class AudioEngine {
     public setTempo(bpm: number) {
         if (!this.isInitialized) return;
         Tone.Transport.bpm.value = bpm;
-        this.latchEngine.setTempo(bpm);
     }
 
     public setVolumes(volumes: Record<string, number>) {
@@ -220,7 +219,7 @@ export class AudioEngine {
 
     public setBassPulsating(isPulsating: boolean) {
         if (!this.isInitialized) return;
-        this.latchEngine.setPulsating(isPulsating, this.isPlaying);
+        this.latchEngine.setPulsating(isPulsating);
     }
 
 
