@@ -14,20 +14,7 @@ import { ArrowRight } from 'lucide-react';
 import { HelpGuide } from '@/components/help-guide';
 import { AudioEngine } from '@/lib/audio-engine';
 import { AutopilotEngine } from '@/lib/autopilot-engine';
-
-
-export const beatPatterns = [
-    { name: 'Air', type: 'Meditative' },
-    { name: 'Earth', type: 'Meditative' },
-    { name: 'Water', type: 'Meditative' },
-    { name: 'Tibet', type: 'Meditative' },
-    { name: 'Toccata', type: 'Classic' },
-    { name: 'Promenade', type: 'Classic' },
-    { name: 'Nocturne', type: 'Classic' },
-    { name: 'Scherzo', type: 'Classic' },
-    { name: 'Aria', type: 'Classic' },
-    { name: 'Off', type: 'System' },
-];
+import { beatPatterns } from '@/lib/drum-machine';
 
 
 export const tempos: Tempo[] = [
@@ -379,6 +366,8 @@ export default function Home() {
         </div>
     );
 }
+
+    
 
     
 

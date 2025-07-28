@@ -3,6 +3,7 @@
 import * as Tone from 'tone';
 import type { MelodyInstrument, MusicKey, MusicScale, Orb } from '@/app/page';
 import { LatchEngine } from './latch-engine';
+import { DrumMachine } from './drum-machine';
 
 
 type ActiveNote = {
@@ -20,22 +21,17 @@ export class AudioEngine {
 
     // --- Engines ---
     private latchEngine!: LatchEngine;
+    private drumMachine!: DrumMachine;
 
     // --- Tone.js Objects ---
-    private channels!: { melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel, latch: Tone.Channel };
+    private channels!: { melody: Tone.Channel, bass: Tone.Channel, latch: Tone.Channel };
     public fx!: { reverb: Tone.Reverb, delay: Tone.FeedbackDelay };
     private melodySynths: Tone.Synth[] = [];
     private bassSynths: Tone.Synth[] = [];
     
-    private drumSamplers: Record<string, Tone.Player> = {};
-    private drumPart!: Tone.Part<{note: string | string[]}>;
-    private conductorEventId: number | null = null;
-    private measureCount = 0;
     private recorder!: Tone.Recorder;
     
     private bassGain!: Tone.Gain;
-
-    private currentBeatPatternName = 'Off';
     
     // --- Internal State ---
     private activeNotes = new Map<number, ActiveNote>();
@@ -68,28 +64,24 @@ export class AudioEngine {
         this.channels = {
             melody: new Tone.Channel(0).toDestination(),
             bass: new Tone.Channel(0).toDestination(),
-            drums: new Tone.Channel(0).toDestination(),
             latch: new Tone.Channel(0).toDestination(),
         };
         
-        // This is the crucial part that was broken. Re-connecting channels to FX.
+        // Connect channels to FX
         this.connectChannelsToFX();
         
         // --- Latch Engine ---
         this.latchEngine = new LatchEngine(this.channels.latch);
         
+        // --- Drum Machine ---
+        this.drumMachine = new DrumMachine(this.fx.reverb, this.fx.delay);
+        await this.drumMachine.initialize();
+
         // --- Bass Chain ---
         this.bassGain = new Tone.Gain(1).connect(this.channels.bass);
         
         // Synth Pools
         this.createSynthPools();
-        
-        // Drums
-        await this.loadDrumSamples();
-        this.setupDrumPart();
-        
-        // Conductor
-        this.startConductor();
         
         // Recorder
         this.recorder = new Tone.Recorder();
@@ -157,7 +149,7 @@ export class AudioEngine {
         this.channels.melody.volume.value = volumes.melody;
         this.channels.bass.volume.value = volumes.bass;
         this.channels.latch.volume.value = volumes.latch;
-        this.channels.drums.volume.value = volumes.drums;
+        this.drumMachine.setVolume(volumes.drums);
     }
 
     public setEffects(effects: Record<string, { reverb: number, delay: number }>) {
@@ -168,15 +160,12 @@ export class AudioEngine {
         this.channels.bass.send('delay', effects.bass.delay);
         this.channels.latch.send('reverb', effects.latch.reverb);
         this.channels.latch.send('delay', effects.latch.delay);
-        this.channels.drums.send('reverb', effects.drums.reverb);
-        this.channels.drums.send('delay', effects.drums.delay);
+        this.drumMachine.setEffects(effects.drums);
     }
     
     public setBeatPattern(patternName: string) {
         if (!this.isInitialized) return;
-        this.currentBeatPatternName = patternName;
-        this.measureCount = 0;
-        this.updateDrumAndConductor(patternName);
+        this.drumMachine.setBeatPattern(patternName);
     }
     
     public setMelodyInstrument(instrument: MelodyInstrument) {
@@ -307,98 +296,6 @@ export class AudioEngine {
         }
     }
 
-    private async loadDrumSamples() {
-        const drumUrls = {
-            C1: "/assets/sounds/kick drum.wav", D1: "/assets/sounds/snare.wav", E1: "/assets/sounds/closed hi hat accented.wav",
-            E2: "/assets/sounds/closed hi hat ghost.wav", F1: "/assets/sounds/crash.wav", G1: "/assets/sounds/high tom.wav",
-            G2: "/assets/sounds/mid tom.wav", G3: "/assets/sounds/low tom.wav",
-        };
-        
-        const loadingPromises = Object.entries(drumUrls).map(([note, url]) => {
-            return new Promise<void>((resolve) => {
-                const player = new Tone.Player(url).connect(this.channels.drums);
-                if (note === 'E1' || note === 'E2') player.volume.value = -3;
-                this.drumSamplers[note] = player;
-                Tone.loaded().then(() => resolve());
-            });
-        });
-        await Promise.all(loadingPromises);
-    }
-
-    private setupDrumPart() {
-        this.drumPart = new Tone.Part((time, value) => {
-            const playNote = (note: string) => {
-               if (this.drumSamplers[note]?.loaded) {
-                   this.drumSamplers[note].start(time);
-               }
-           }
-           if (Array.isArray(value.note)) {
-               value.note.forEach(playNote);
-           } else if (value.note) {
-               playNote(value.note);
-           }
-       }, []).start(0);
-       this.drumPart.loop = true;
-       this.drumPart.loopEnd = '1m';
-    }
-    
-    private updateDrumAndConductor(patternName: string) {
-        if (!this.drumPart) return;
-
-        this.drumPart.clear();
-        
-        if (patternName === 'Off') {
-            if (this.conductorEventId !== null) {
-                Tone.Transport.clear(this.conductorEventId);
-                this.conductorEventId = null;
-            }
-            return;
-        }
-        
-        this.startConductor();
-        this.scheduleNextDrumMeasure();
-    }
-
-    private startConductor() {
-        if (this.conductorEventId === null) {
-            this.conductorEventId = Tone.Transport.scheduleRepeat((time) => {
-                Tone.Draw.schedule(() => {
-                    this.scheduleNextDrumMeasure();
-                }, time);
-            }, '1m');
-        }
-    }
-    
-    private scheduleNextDrumMeasure() {
-        if (this.currentBeatPatternName === 'Off') {
-            this.drumPart.clear();
-            return;
-        }
-
-        const currentPatternData = beatPatternsData[this.currentBeatPatternName];
-        if (!currentPatternData || !currentPatternData.groove?.length) {
-            this.drumPart.clear();
-            return;
-        }
-    
-        const { groove, fills } = currentPatternData;
-        const isFillMeasure = (this.measureCount % 4) === 3 && fills && fills.length > 0;
-        
-        const patternToPlay = isFillMeasure
-            ? fills[Math.floor(Math.random() * fills.length)]
-            : groove[Math.floor(Math.random() * groove.length)];
-
-        this.drumPart.clear();
-        patternToPlay.forEach((notes, i) => {
-            if (notes) {
-                const noteTime = `0:${Math.floor(i/4)}:${i%4}`;
-                this.drumPart.add(noteTime, { note: notes });
-            }
-        });
-
-        this.measureCount++;
-    }
-    
     private getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]): number[] => {
         const scaleIntervals: { [key in MusicScale]: string[] } = {
             'Major': ['0', '2', '4', '5', '7', '9', '11'], 'Minor': ['0', '2', '3', '5', '7', '8', '10'],
@@ -436,139 +333,5 @@ export class AudioEngine {
         document.dispatchEvent(new CustomEvent('melody-orbs-updated', { detail: melodyOrbs }));
     }
 }
-
-
-const beatPatternsData: { [key: string]: { groove: (string|string[])[][], fills: (string|string[])[][] } } = {
-    Air: {
-        groove: [
-            [
-                [], ['E2'], ['E1'], ['E2'], [], ['E1'], ['E2'], ['E1'],
-                [], [], ['E2'], [], [], ['E1'], [], ['E2'],
-            ],
-        ],
-        fills: [
-            [
-                [], ['F1'], [], [], [], ['F1'], [], [],
-                ['E1'], [], ['E2'], [], ['E1'], [], ['E2'], []
-            ]
-        ]
-    },
-    Earth: {
-        groove: [
-            [
-                ['C1'], [], [], [], ['C1'], [], [], [],
-                ['C1'], [], [], [], ['C1'], [], [], [],
-            ],
-        ],
-        fills: [
-            [
-                [], ['G1'], [], ['G2'], [], ['G3'], [], ['C1'],
-                [], ['E2'], [], ['G3'], [], ['G2'], [], ['F1'],
-            ]
-        ]
-    },
-    Water: {
-        groove: [
-            [
-                [], ['E2'], ['E1'], ['E2'], [], ['E2'], ['E1'], ['E2'],
-                [], ['E2'], [], ['E2'], ['E1'], ['E2'], ['F1'], [],
-            ]
-        ],
-        fills: [
-            [
-                ['F1'], ['E1'], [], ['E2'], ['F1'], [], ['F1'], ['E2'],
-                [], ['E1'], ['F1'], [], ['F1'], ['E1'], [], ['F1'],
-            ]
-        ]
-    },
-    Tibet: {
-        groove: [
-            [
-                ['C1'], [], [], [], [], ['D1'], [], [],
-                [], ['C1'], [], [], [], [], [], [],
-            ]
-        ],
-        fills: [
-            [
-                ['D1'], [], [], [], [], ['C1'], [], [],
-                [], [], ['C1'], [], [], [], ['D1'], [],
-            ]
-        ]
-    },
-    Toccata: {
-        groove: [[
-            ['C1', 'E1'], ['E2'], ['D1', 'E1'], ['E2'], ['C1', 'E1'], ['E2'], ['D1', 'E1'], ['E2'],
-            ['C1', 'E1'], ['E2'], ['D1', 'E1'], ['E2'], ['C1', 'E1'], ['E2'], ['D1', 'E1'], ['E2']
-        ]],
-        fills: [
-            [
-                ['G1'], ['G1'], ['G2'], ['G2'], ['G3'], ['G3'], ['F1', 'C1'], ['F1'],
-                ['G1'], ['G2'], ['G3'], [], ['F1'], ['D1'], ['F1', 'C1'], ['F1', 'D1'],
-            ],
-            [
-                ['G1'], ['E2'], ['G1'], ['E2'], ['G2'], ['E2'], ['G2'], ['E2'],
-                ['G3'], ['E2'], ['G3'], ['E1'], ['F1', 'D1'], ['C1'], ['F1', 'C1'], ['C1']
-            ]
-        ]
-    },
-    Promenade: {
-        groove: [[
-            ['C1', 'E2'], ['E2'], ['C1', 'E2'], ['E2'], ['C1', 'E2'], ['E2'], ['C1', 'E2'], ['E2'],
-            ['C1', 'E2'], ['E2'], ['C1', 'E2'], ['E2'], ['C1', 'E2'], ['E2'], ['C1', 'E2'], ['E2'],
-        ]],
-        fills: [
-            [
-                ['C1'], ['E2'], ['C1', 'E2'], ['E2'], ['C1'], ['E2'], ['C1', 'E2'], ['E2'],
-                ['D1'], ['E2'], ['D1', 'E2'], ['E2'], ['D1'], ['E2'], ['D1', 'E2', 'F1'], ['F1'],
-            ]
-        ]
-    },
-    Nocturne: {
-        groove: [[
-            ['C1'], ['E1', 'E2'], ['E2'], ['E1', 'E2'], ['C1'], ['E1', 'E2'], ['E2'], ['E1', 'E2'],
-            ['C1'], ['E1', 'E2'], ['E2'], ['E1', 'E2'], ['C1'], ['E1', 'E2'], ['E2'], ['E1', 'E2'],
-        ]],
-        fills: [
-            [
-                ['E2'], ['E2'], ['E2'], ['E2'], ['E2'], ['E2'], ['E2'], ['E2'],
-                ['E1'], ['E1'], ['E1'], ['E1'], ['E1'], ['E1'], ['E1'], ['E1'],
-            ]
-        ]
-    },
-    Scherzo: {
-        groove: [[
-            [], ['E1', 'E2'], ['C1','D1'], ['E2'], [], ['E1', 'E2'], ['C1','D1'], ['E2'],
-            [], ['E1', 'E2'], ['C1','D1'], ['E2'], [], ['E1', 'E2'], ['C1','D1'], ['E2'],
-        ]],
-        fills: [
-            [
-                ['G1'], [], ['G2'], [], ['G3'], [], ['C1','D1'], [],
-                ['G1'], ['G1'], ['G2'], ['G2'], ['G3'], ['G3'], ['C1', 'D1', 'F1'], [],
-            ]
-        ]
-    },
-    Aria: {
-        groove: [[
-            ['C1', 'E2'], ['E1'], ['D1', 'E2'], ['E1'], ['C1', 'E2'], ['E1'], ['D1', 'E2'], ['E1'],
-            ['C1', 'E2'], ['E1'], ['D1', 'E2'], ['E1'], ['C1', 'E2'], ['E1'], ['D1', 'E2'], ['E1'],
-        ]],
-        fills: [
-            [
-                ['G1'], [], ['G1'], ['G2'], [], ['G2'], ['G3'], [],
-                ['G3'], ['D1', 'G3'], ['D1'], ['D1'], ['F1', 'D1'], ['C1'], ['D1'], ['C1']
-            ]
-        ]
-    },
-    Off: {
-        groove: [],
-        fills: []
-    }
-};
-
-
-
-    
-    
-
 
     
