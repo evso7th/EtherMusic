@@ -99,7 +99,7 @@ export function ThereminPad({
                 orbEl = document.createElement('div');
                 orbEl.className = cn(
                     'absolute top-0 left-0 rounded-full w-8 h-8 md:w-12 md:h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-100',
-                    orb.type === 'latch' && 'animate-pulse-primary'
+                    orb.type === 'latch' && isPulsating && 'animate-pulse-primary'
                 );
                  orbEl.style.backgroundColor = color;
                  orbEl.style.boxShadow = `0 0 20px ${color}, 0 0 30px ${color}`;
@@ -107,6 +107,10 @@ export function ThereminPad({
                 padRef.current.appendChild(orbEl);
                 orbsRef.current.set(orb.id, orbEl);
             }
+            orbEl.className = cn(
+                'absolute top-0 left-0 rounded-full w-8 h-8 md:w-12 md:h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-100',
+                orb.type === 'latch' && isPulsating && 'animate-pulse-primary'
+            );
              orbEl.style.transform = `translate(${orb.x}px, ${orb.y}px)`;
         }
 
@@ -117,7 +121,7 @@ export function ThereminPad({
                 orbsRef.current.delete(id);
             }
         }
-    }, [color]);
+    }, [color, isPulsating]);
     
     // Connect orb management to audio engine events
      useEffect(() => {
