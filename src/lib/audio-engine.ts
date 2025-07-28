@@ -404,8 +404,8 @@ export class AudioEngine {
         for (let i = 0; i < 2; i++) {
             this.bassSynths.push(new Tone.Synth(bassSynthOptions).connect(this.bassGain));
         }
-        // AP2 bass synths (DEBUG: 1 voice)
-        for (let i = 0; i < 1; i++) {
+        // AP2 bass synths
+        for (let i = 0; i < 2; i++) {
             this.autopilotBassSynths.push(new Tone.Synth(bassSynthOptions).connect(this.channels.autopilot));
         }
 
@@ -414,8 +414,8 @@ export class AudioEngine {
         for (let i = 0; i < 4; i++) {
             this.melodySynths.push(new Tone.Synth(melodySynthOptions).connect(this.channels.melody));
         }
-        // AP2 melody synths (DEBUG: 1 voice)
-        for (let i = 0; i < 1; i++) {
+        // AP2 melody synths
+        for (let i = 0; i < 4; i++) {
             this.autopilotMelodySynths.push(new Tone.Synth(melodySynthOptions).connect(this.channels.autopilot));
         }
     }
@@ -484,10 +484,17 @@ export class AudioEngine {
         this.autopilotV2Parts.melody.loop = true;
         this.autopilotV2Parts.melody.loopEnd = '4m';
     }
-
+    
     private findAndPlay(synthPool: Tone.Synth[], note: NoteEvent, time: number) {
-        // DEBUG: Always use the first synth in the pool and ignore if it's busy.
-        const synth = synthPool[0];
+        // Simple voice stealing: find a synth that is not currently playing.
+        let synth = synthPool.find(s => s.envelope.state === 'stopped');
+        
+        // If all synths are busy, just grab the first one. A more advanced
+        // implementation might find the one that has been silent the longest.
+        if (!synth) {
+            synth = synthPool[0];
+        }
+
         if (synth) {
             synth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
         }
