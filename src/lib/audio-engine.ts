@@ -22,7 +22,7 @@ export class AudioEngine {
     private latchEngine!: LatchEngine;
 
     // --- Tone.js Objects ---
-    private channels!: { melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel };
+    private channels!: { melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel, latch: Tone.Channel };
     public fx!: { reverb: Tone.Reverb, delay: Tone.FeedbackDelay };
     private melodySynths: Tone.Synth[] = [];
     private bassSynths: Tone.Synth[] = [];
@@ -69,11 +69,12 @@ export class AudioEngine {
             melody: new Tone.Channel(0).toDestination(),
             bass: new Tone.Channel(0).toDestination(),
             drums: new Tone.Channel(0).toDestination(),
+            latch: new Tone.Channel(0).toDestination(),
         };
         this.connectChannelsToFX();
         
         // --- Latch Engine ---
-        this.latchEngine = new LatchEngine(this.channels.bass);
+        this.latchEngine = new LatchEngine(this.channels.latch);
         
         // --- Bass Chain ---
         this.bassGain = new Tone.Gain(1).connect(this.channels.bass);
@@ -152,8 +153,8 @@ export class AudioEngine {
     public setVolumes(volumes: Record<string, number>) {
         if (!this.isInitialized || !this.channels) return;
         this.channels.melody.volume.value = volumes.melody;
-        this.bassGain.gain.value = Tone.dbToGain(volumes.bass);
-        this.latchEngine.setVolume(volumes.bass); // Both use the same slider
+        this.channels.bass.volume.value = volumes.bass;
+        this.channels.latch.volume.value = volumes.latch;
         this.channels.drums.volume.value = volumes.drums;
     }
 
@@ -163,6 +164,8 @@ export class AudioEngine {
         this.channels.melody.send('delay', effects.melody.delay);
         this.channels.bass.send('reverb', effects.bass.reverb);
         this.channels.bass.send('delay', effects.bass.delay);
+        this.channels.latch.send('reverb', effects.latch.reverb);
+        this.channels.latch.send('delay', effects.latch.delay);
         this.channels.drums.send('reverb', effects.drums.reverb);
         this.channels.drums.send('delay', effects.drums.delay);
     }
@@ -296,7 +299,7 @@ export class AudioEngine {
         } as const;
         
         for (let i = 0; i < 2; i++) {
-            const synth = new Tone.Synth(bassSynthOptions).connect(this.bassGain);
+            const synth = new Tone.Synth(bassSynthOptions).connect(this.channels.bass);
             this.bassSynths.push(synth);
         }
 

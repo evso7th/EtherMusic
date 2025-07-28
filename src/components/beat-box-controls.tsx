@@ -44,13 +44,14 @@ interface BeatBoxControlsProps {
     tempos: Tempo[];
     activeTempo: Tempo;
     onTempoChange: (tempo: Tempo) => void;
-    volumes: { melody: number; bass: number; drums: number; autopilot: number };
+    volumes: { melody: number; bass: number; drums: number; autopilot: number, latch: number };
     onVolumeChange: (volumes: BeatBoxControlsProps['volumes']) => void;
     effects: {
         melody: { reverb: number, delay: number };
         bass: { reverb: number, delay: number };
         drums: { reverb: number, delay: number };
         autopilot: { reverb: number, delay: number };
+        latch: { reverb: number, delay: number };
     };
     onEffectChange: (effects: BeatBoxControlsProps['effects']) => void;
     isAutopilotOn: boolean;

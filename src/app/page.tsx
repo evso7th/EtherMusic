@@ -71,12 +71,13 @@ export default function Home() {
     const [isPlaying, setIsPlaying] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
-    const [volumes, setVolumes] = useState({ melody: -9, bass: -6, drums: -9, autopilot: -9 });
+    const [volumes, setVolumes] = useState({ melody: -9, bass: -6, drums: -9, autopilot: -9, latch: -6 });
     const [effects, setEffects] = useState({
         melody: { reverb: -60, delay: -60 },
         bass: { reverb: -60, delay: -60 },
         drums: { reverb: -60, delay: -60 },
         autopilot: { reverb: -60, delay: -60 },
+        latch: { reverb: -60, delay: -60 },
     });
     const [activePattern, setActivePattern] = useState<(typeof beatPatterns)[number]>(beatPatterns.find(p => p.name === 'Off')!);
     const [melodyInstrument, setMelodyInstrument] = useState<MelodyInstrument>('synth');

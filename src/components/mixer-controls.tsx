@@ -3,7 +3,7 @@
 
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
-import { Music, Waves, Drum, Bot } from 'lucide-react';
+import { Music, Waves, Drum, Bot, Anchor } from 'lucide-react';
 import { Separator } from './ui/separator';
 
 interface MixerControlsProps {
@@ -12,6 +12,7 @@ interface MixerControlsProps {
         bass: number;
         drums: number;
         autopilot: number;
+        latch: number;
     };
     onVolumeChange: (volumes: MixerControlsProps['volumes']) => void;
     effects: {
@@ -19,6 +20,7 @@ interface MixerControlsProps {
         bass: { reverb: number, delay: number };
         drums: { reverb: number, delay: number };
         autopilot: { reverb: number, delay: number };
+        latch: { reverb: number, delay: number };
     };
     onEffectChange: (effects: MixerControlsProps['effects']) => void;
 }
@@ -101,7 +103,7 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
         });
     };
 
-    const handleEffectChange = (instrument: 'melody' | 'bass' | 'drums' | 'autopilot', effect: 'reverb' | 'delay', value: number) => {
+    const handleEffectChange = (instrument: 'melody' | 'bass' | 'drums' | 'autopilot' | 'latch', effect: 'reverb' | 'delay', value: number) => {
         onEffectChange({
             ...effects,
             [instrument]: {
@@ -134,6 +136,17 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
                 onVolumeChange={(v) => handleVolumeChange('bass', v)}
                 onReverbChange={(v) => handleEffectChange('bass', 'reverb', v)}
                 onDelayChange={(v) => handleEffectChange('bass', 'delay', v)}
+            />
+             <Separator />
+            <InstrumentControls 
+                label="Latch"
+                icon={Anchor}
+                volume={volumes.latch}
+                reverb={effects.latch.reverb}
+                delay={effects.latch.delay}
+                onVolumeChange={(v) => handleVolumeChange('latch', v)}
+                onReverbChange={(v) => handleEffectChange('latch', 'reverb', v)}
+                onDelayChange={(v) => handleEffectChange('latch', 'delay', v)}
             />
             <Separator />
             <InstrumentControls 
