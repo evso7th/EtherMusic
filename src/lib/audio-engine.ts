@@ -71,6 +71,8 @@ export class AudioEngine {
             drums: new Tone.Channel(0).toDestination(),
             latch: new Tone.Channel(0).toDestination(),
         };
+        
+        // This is the crucial part that was broken. Re-connecting channels to FX.
         this.connectChannelsToFX();
         
         // --- Latch Engine ---
@@ -563,3 +565,6 @@ const beatPatternsData: { [key: string]: { groove: (string|string[])[][], fills:
     }
 };
 
+
+
+    
