@@ -10,6 +10,7 @@ type LatchedNoteSynth = {
     synth: Tone.Synth;
     gain: Tone.Gain;
     lfo: Tone.LFO;
+    isConnected: boolean; // Track LFO connection state
 };
 
 type LatchedBassNote = {
@@ -43,20 +44,23 @@ export class LatchEngine {
             const gain = new Tone.Gain(1).connect(destination);
             const lfo = new Tone.LFO({
                 type: "sine",
-                frequency: "2n",
                 min: 0.2,
                 max: 1,
-            }).start();
+                frequency: "2n",
+            });
             
             const synth = new Tone.Synth(synthOptions).connect(gain);
-            this.synthPool.push({ synth, gain, lfo });
+            this.synthPool.push({ synth, gain, lfo, isConnected: false });
         }
     }
     
     public setVolume(db: number) {
         this.baseVolumeDb = db;
         this.latchedNotes.forEach(note => {
-            note.synthNode.gain.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
+            // Update gain only if not currently pulsating
+            if (!this.isPulsating) {
+                note.synthNode.gain.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
+            }
         });
     }
 
@@ -76,16 +80,19 @@ export class LatchEngine {
 
     private updatePulsationForNote(note: LatchedBassNote) {
         const { gain, lfo } = note.synthNode;
-        // Only pulsate if the main transport is running
         const shouldPulsate = this.isPulsating && Tone.Transport.state === 'started';
 
         if (shouldPulsate) {
-            if (!lfo.isCelled(gain.gain)) {
-                 lfo.connect(gain.gain);
+            if (!note.synthNode.isConnected) {
+                lfo.connect(gain.gain);
+                lfo.start();
+                note.synthNode.isConnected = true;
             }
         } else {
-            if (lfo.isCelled(gain.gain)) {
+            if (note.synthNode.isConnected) {
+                lfo.stop();
                 lfo.disconnect(gain.gain);
+                note.synthNode.isConnected = false;
             }
             // Return to base volume
             gain.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
@@ -105,18 +112,14 @@ export class LatchEngine {
         }
 
         if (existingEntryId !== undefined) {
-            const noteToRelease = this.latchedNotes.get(existingEntryId);
-            if(noteToRelease) {
-                this.releaseNote(noteToRelease);
-                this.latchedNotes.delete(existingEntryId);
-            }
+            this.releaseAndRemoveNote(existingEntryId);
         } else {
             const freeSynthNode = this.synthPool.find(node => 
                 !Array.from(this.latchedNotes.values()).some(n => n.synthNode === node)
             );
 
             if (freeSynthNode) {
-                const newId = Date.now();
+                const newId = Date.now() + Math.random();
                 const newNote: LatchedBassNote = {
                     id: newId, x: pos.x, y: pos.y,
                     initialFreq: quantizedFreq, volume: vol * vol,
@@ -130,16 +133,23 @@ export class LatchEngine {
     }
     
     private playNote(note: LatchedBassNote) {
+        note.synthNode.gain.gain.value = Tone.dbToGain(this.baseVolumeDb);
         note.synthNode.synth.triggerAttack(note.initialFreq, undefined, note.volume);
         this.updatePulsationForNote(note);
     }
     
-    private releaseNote(note: LatchedBassNote) {
-        const { synth, lfo, gain } = note.synthNode;
-        if (lfo.isCelled(gain.gain)) {
-            lfo.disconnect(gain.gain);
+    private releaseAndRemoveNote(noteId: number) {
+        const noteToRelease = this.latchedNotes.get(noteId);
+        if(noteToRelease) {
+            const { synth, lfo, gain } = noteToRelease.synthNode;
+            if (noteToRelease.synthNode.isConnected) {
+                lfo.stop();
+                lfo.disconnect(gain.gain);
+                noteToRelease.synthNode.isConnected = false;
+            }
+            synth.triggerRelease();
+            this.latchedNotes.delete(noteId);
         }
-        synth.triggerRelease();
     }
 
     // Called when main transport starts
@@ -149,13 +159,22 @@ export class LatchEngine {
     
     // Called when main transport pauses
     public pauseAll() {
-        this.latchedNotes.forEach(note => this.updatePulsationForNote(note));
+         this.latchedNotes.forEach(note => {
+            // Disconnect LFO to stop pulsation but keep the synth sounding
+             if (note.synthNode.isConnected) {
+                note.synthNode.lfo.stop();
+                note.synthNode.lfo.disconnect(note.synthNode.gain.gain);
+                note.synthNode.isConnected = false;
+                // return to base volume
+                note.synthNode.gain.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
+            }
+        });
     }
 
     // Called on main Stop button or when latch is turned off
     public stopAll(clearNotes = false) {
-        this.latchedNotes.forEach(note => {
-            this.releaseNote(note);
+        this.latchedNotes.forEach((note, id) => {
+            this.releaseAndRemoveNote(id);
         });
         if (clearNotes) {
             this.latchedNotes.clear();
