@@ -104,6 +104,7 @@ export default function Home() {
             apEngine.setHarmony(musicKey, musicScale);
             apEngine.setVolume(volumes.autopilot);
             apEngine.setEffects(effects.autopilot);
+            apEngine.setMelodyInstrument(melodyInstrument);
 
             setIsReady(true);
             console.log('Audio engines initialized and ready.');
@@ -144,6 +145,7 @@ export default function Home() {
 
     useEffect(() => {
         audioEngine.current?.setMelodyInstrument(melodyInstrument);
+        autopilotEngine.current?.setMelodyInstrument(melodyInstrument);
     }, [melodyInstrument]);
     
     useEffect(() => {
@@ -154,6 +156,7 @@ export default function Home() {
     useEffect(() => {
         if (isReady && !isPlaying) {
             handlePlayPause();
+            setIsPlaying(true);
         }
     }, [isReady]);
 
