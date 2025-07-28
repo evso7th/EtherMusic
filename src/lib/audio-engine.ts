@@ -24,13 +24,14 @@ const NOTE_PROXIMITY_THRESHOLD = 35;
 
 export class AudioEngine {
     public isInitialized = false;
+    private isPlaying = false;
 
     // --- Tone.js Objects ---
     private channels!: { melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel };
     public fx!: { reverb: Tone.Reverb, delay: Tone.FeedbackDelay };
     private melodySynths: Tone.Synth[] = [];
     private bassSynths: Tone.Synth[] = [];
-    private latchSynths: Tone.PolySynth<Tone.Synth>;
+    private latchSynths!: Tone.PolySynth<Tone.Synth>;
     
     private drumSamplers: Record<string, Tone.Player> = {};
     private drumPart!: Tone.Part<{note: string | string[]}>;
@@ -113,6 +114,7 @@ export class AudioEngine {
 
     public start() {
         if (!this.isInitialized || Tone.Transport.state === 'started') return;
+        this.isPlaying = true;
         Tone.Transport.start();
         this.latchedBassNotes.forEach(note => {
             this.latchSynths.triggerAttack(note.initialFreq, undefined, note.volume);
@@ -121,6 +123,7 @@ export class AudioEngine {
 
     public pause() {
         if (!this.isInitialized) return;
+        this.isPlaying = false;
         if (Tone.Transport.state === 'started') {
             Tone.Transport.pause();
         }
@@ -129,6 +132,7 @@ export class AudioEngine {
 
     public stop() {
         if (!this.isInitialized) return;
+        this.isPlaying = false;
         Tone.Transport.stop();
         
         // Stop real-time notes
@@ -244,6 +248,7 @@ export class AudioEngine {
             this.bassLFO.connect(this.latchSynths.volume);
         } else {
             this.bassLFO.disconnect(this.latchSynths.volume);
+            // Ensure volume is reset to 0 when pulsation is off
             this.latchSynths.volume.cancelScheduledValues();
             this.latchSynths.volume.rampTo(0, 0.1); 
         }
@@ -288,10 +293,11 @@ export class AudioEngine {
             activeNote.synth.frequency.rampTo(quantizedFreq, 0.01);
             
             const velocity = vol * vol;
-            if (activeNote.type === 'bass' && activeNote.synth.output.gain) {
-                 activeNote.synth.output.gain.rampTo(velocity, 0.01);
+            // Use the correct method to ramp volume for each synth type
+            if (activeNote.type === 'bass') {
+                 activeNote.synth.volume.rampTo(Tone.gainToDb(velocity), 0.01);
             } else {
-                 activeNote.synth.set({volume: Tone.gainToDb(velocity)});
+                 activeNote.synth.volume.rampTo(Tone.gainToDb(velocity), 0.01);
             }
     
             activeNote.x = pos.x;
@@ -328,11 +334,8 @@ export class AudioEngine {
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
         } as const;
         
-        const bassGain = new Tone.Gain(1).connect(this.channels.bass);
-
         for (let i = 0; i < 2; i++) {
-            const synth = new Tone.Synth(bassSynthOptions);
-            synth.output.gain = new Tone.Gain(1).connect(bassGain);
+            const synth = new Tone.Synth(bassSynthOptions).connect(this.channels.bass);
             this.bassSynths.push(synth);
         }
 
@@ -484,7 +487,8 @@ export class AudioEngine {
             this.latchedBassNotes.set(newId, {
                 id: newId,
                 x: pos.x, y: pos.y,
-                synth: this.bassSynths[0], // Placeholder, not used for sound
+                // This synth is just a placeholder to satisfy the type, sound is from latchSynths
+                synth: this.bassSynths[0], 
                 initialFreq: quantizedFreq,
                 volume: velocity
             });
@@ -644,3 +648,5 @@ const beatPatternsData: { [key: string]: { groove: (string|string[]|null)[][], f
         fills: []
     }
 };
+
+    
