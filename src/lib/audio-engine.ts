@@ -1,6 +1,5 @@
 
 import * as Tone from 'tone';
-import { beatPatternsData } from './music-engine';
 import type { MelodyInstrument, MusicKey, MusicScale, Orb } from '@/app/page';
 
 type ActiveNote = {
@@ -29,19 +28,7 @@ export class AudioEngine {
     private channels!: { melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel };
     public fx!: { reverb: Tone.Reverb, delay: Tone.FeedbackDelay };
     private melodySynths: Tone.Synth[] = [];
-    private bassSynths: Tone.Synth<{
-        oscillator: {
-            type: "fatsawtooth";
-            count: 3;
-            spread: 20;
-        };
-        envelope: {
-            attack: number;
-            decay: number;
-            sustain: number;
-            release: number;
-        };
-    }>[] = [];
+    private bassSynths: Tone.Synth[] = [];
     
     private drumSamplers: Record<string, Tone.Player> = {};
     private drumPart!: Tone.Part<{note: string | string[]}>;
@@ -120,12 +107,11 @@ export class AudioEngine {
         if (!this.isInitialized || Tone.Transport.state === 'started') return;
         Tone.Transport.start();
         this.isPlaying = true;
+
         if (this.isBassLatchOn) {
-            this.latchedBassNotes.forEach(note => {
-                note.synth.triggerAttack(note.initialFreq, undefined, note.volume);
-            });
+            // Latched notes are already triggered, they will resume automatically with the transport
         }
-        // Re-apply pulsation to all notes when play starts
+        
         this.setBassPulsating(this.isBassPulsating);
     }
 
@@ -134,6 +120,7 @@ export class AudioEngine {
         if (Tone.Transport.state === 'started') {
             Tone.Transport.pause();
             this.isPlaying = false;
+            // Release latched notes on pause so they can be re-triggered on play
             if (this.isBassLatchOn) {
                 this.latchedBassNotes.forEach(note => note.synth.triggerRelease());
             }
@@ -146,10 +133,11 @@ export class AudioEngine {
         this.isPlaying = false;
         
         this.activeNotes.forEach(note => note.synth.triggerRelease());
-        this.latchedBassNotes.forEach(note => note.synth.triggerRelease());
-        
         this.activeNotes.clear();
+        
+        this.latchedBassNotes.forEach(note => note.synth.triggerRelease());
         this.latchedBassNotes.clear();
+        
         this.updateAndDispatchOrbs();
     }
     
@@ -251,17 +239,17 @@ export class AudioEngine {
     public setBassPulsating(isPulsating: boolean) {
         if (!this.isInitialized || !this.bassLFO || !this.bassGain) return;
         this.isBassPulsating = isPulsating;
-        
+
         const synthsToAffect = new Set([
             ...this.bassSynths,
             ...Array.from(this.latchedBassNotes.values()).map(n => n.synth)
         ]);
 
         synthsToAffect.forEach(synth => {
-            if (isPulsating && this.isPlaying) {
-                if(synth.output.gain) this.bassLFO.connect(synth.output.gain);
-            } else {
-                if(synth.output.gain) {
+            if (synth.output && synth.output.gain) {
+                if (isPulsating && this.isPlaying) {
+                    this.bassLFO.connect(synth.output.gain);
+                } else {
                     this.bassLFO.disconnect(synth.output.gain);
                     synth.output.gain.cancelScheduledValues();
                     synth.output.gain.rampTo(1, 0.1);
@@ -269,6 +257,7 @@ export class AudioEngine {
             }
         });
     }
+
 
     public setBassLatch(isLatchOn: boolean) {
         if (!this.isInitialized) return;
@@ -311,9 +300,9 @@ export class AudioEngine {
             
             const velocity = vol * vol;
             if (activeNote.type === 'bass' && activeNote.synth.output.gain) {
-                 activeNote.synth.output.gain.rampTo(velocity, 0.01);
+                activeNote.synth.output.gain.rampTo(velocity, 0.01);
             } else {
-                 activeNote.synth.set({ volume: Tone.gainToDb(velocity) });
+                activeNote.synth.set({ volume: Tone.gainToDb(velocity) });
             }
 
             activeNote.x = pos.x;
@@ -504,9 +493,9 @@ export class AudioEngine {
                 const quantizedFreq = this.allowedFrequencies.bass[Math.floor(Math.random() * this.allowedFrequencies.bass.length)];
                 const velocity = vol * vol;
 
-                if (this.isPlaying) {
-                    assignedSynth.triggerAttack(quantizedFreq, undefined, velocity);
-                }
+                // Always trigger the attack. It will play if transport is running, or be ready if it's not.
+                assignedSynth.triggerAttack(quantizedFreq, undefined, velocity);
+
                 if (this.isBassPulsating && this.isPlaying && assignedSynth.output.gain) {
                     this.bassLFO.connect(assignedSynth.output.gain);
                 }
