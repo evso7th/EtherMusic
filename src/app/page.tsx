@@ -174,6 +174,9 @@ export default function Home() {
 
     // --- UI Event Handlers ---
     const handleStartApp = useCallback(async () => {
+        const audio = new Audio('/assets/sounds/transition.webm');
+        audio.play().catch(e => console.error("Error playing transition sound:", e));
+
         await initializeAudio();
         setIsAppStarted(true);
         
@@ -371,3 +374,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
