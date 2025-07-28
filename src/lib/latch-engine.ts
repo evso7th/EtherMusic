@@ -23,26 +23,11 @@ type LatchedBassNote = {
 export class LatchEngine {
     private isLatchOn = false;
     
-    private synthPool: LatchedNoteSynth[] = [];
+    private synthPool: LatchedNoteSynth[];
     private latchedNotes = new Map<number, LatchedBassNote>();
-    private readonly destination: Tone.ToneAudioNode;
 
-    constructor(destination: Tone.ToneAudioNode) {
-        this.destination = destination;
-        this.initialize();
-    }
-
-    private initialize() {
-        const synthOptions = {
-            oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
-            envelope: { attack: 0.2, decay: 0.1, sustain: 1, release: 0.8 },
-        } as const;
-
-        for (let i = 0; i < 2; i++) {
-            // The synth now connects directly to the Latch channel passed in the constructor.
-            const synth = new Tone.Synth(synthOptions).connect(this.destination);
-            this.synthPool.push({ synth });
-        }
+    constructor(synthPool: Tone.Synth[]) {
+        this.synthPool = synthPool.map(synth => ({ synth }));
     }
     
     public setLatch(isOn: boolean) {

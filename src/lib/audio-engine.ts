@@ -28,6 +28,7 @@ export class AudioEngine {
     public fx!: { reverb: Tone.Reverb, delay: Tone.FeedbackDelay };
     private melodySynths: Tone.Synth[] = [];
     private bassSynths: Tone.Synth[] = [];
+    private latchSynths: Tone.Synth[] = [];
     
     private recorder!: Tone.Recorder;
     
@@ -70,8 +71,11 @@ export class AudioEngine {
         // Connect channels to FX
         this.connectChannelsToFX();
         
+        // Synth Pools
+        this.createSynthPools();
+        
         // --- Latch Engine ---
-        this.latchEngine = new LatchEngine(this.channels.latch);
+        this.latchEngine = new LatchEngine(this.latchSynths);
         
         // --- Drum Machine ---
         this.drumMachine = new DrumMachine(this.fx.reverb, this.fx.delay);
@@ -79,9 +83,6 @@ export class AudioEngine {
 
         // --- Bass Chain ---
         this.bassGain = new Tone.Gain(1).connect(this.channels.bass);
-        
-        // Synth Pools
-        this.createSynthPools();
         
         // Recorder
         this.recorder = new Tone.Recorder();
@@ -293,6 +294,14 @@ export class AudioEngine {
         };
         for (let i = 0; i < 4; i++) {
             this.melodySynths.push(new Tone.Synth(melodySynthOptions).connect(this.channels.melody));
+        }
+
+        const latchSynthOptions = {
+            oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
+            envelope: { attack: 0.2, decay: 0.1, sustain: 1, release: 0.8 },
+        } as const;
+        for (let i = 0; i < 2; i++) {
+            this.latchSynths.push(new Tone.Synth(latchSynthOptions).connect(this.channels.latch));
         }
     }
 
