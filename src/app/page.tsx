@@ -85,7 +85,6 @@ export default function Home() {
     const [isBassPulsating, setIsBassPulsating] = useState(false);
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
     const [isAutopilotOn, setIsAutopilotOn] = useState(false);
-    const [isAutopilotV2On, setIsAutopilotV2On] = useState(false);
     const [autopilotStyle, setAutopilotStyle] = useState<AutopilotStyle>('Ambient');
     const [orbs, setOrbs] = useState<Orb[]>([]);
 
@@ -99,34 +98,43 @@ export default function Home() {
     const initializeAudio = useCallback(async () => {
         if (isReady) return;
 
-        const mainEngine = new AudioEngine();
-        await mainEngine.initialize();
-        audioEngine.current = mainEngine;
-        
-        // This is a bit of a hack to get the FX instances from the main engine
-        // @ts-ignore
-        const fx = mainEngine.fx; 
-        const apV2Engine = new AutopilotEngine();
-        if (fx) {
-            await apV2Engine.initialize(fx.reverb, fx.delay);
+        try {
+            const mainEngine = new AudioEngine();
+            await mainEngine.initialize();
+            audioEngine.current = mainEngine;
+            
+            // This is a bit of a hack to get the FX instances from the main engine
+            // @ts-ignore
+            const fx = mainEngine.fx; 
+            const apEngine = new AutopilotEngine();
+            if (fx) {
+                await apEngine.initialize(fx.reverb, fx.delay);
+            }
+            autopilotEngine.current = apEngine;
+            
+            // Sync initial state with the engines
+            mainEngine.setTempo(activeTempo.bpm);
+            mainEngine.setVolumes(volumes);
+            mainEngine.setEffects(effects);
+            mainEngine.setMelodyInstrument(melodyInstrument);
+            mainEngine.setHarmony(musicKey, musicScale);
+            mainEngine.setBeatPattern(activePattern.name);
+            
+            apEngine.setHarmony(musicKey, musicScale);
+            apEngine.setVolume(volumes.autopilot);
+            apEngine.setEffects(effects.autopilot);
+
+            setIsReady(true);
+            console.log('Audio engines initialized and ready.');
+        } catch(e) {
+            console.error("Failed to initialize audio engines:", e);
+            toast({
+                title: "Audio Error",
+                description: "Could not initialize the audio engine. Please refresh the page.",
+                variant: "destructive"
+            });
         }
-        autopilotEngine.current = apV2Engine;
-        
-        // Sync initial state with the engines
-        mainEngine.setTempo(activeTempo.bpm);
-        mainEngine.setVolumes(volumes);
-        mainEngine.setEffects(effects);
-        mainEngine.setMelodyInstrument(melodyInstrument);
-        mainEngine.setHarmony(musicKey, musicScale);
-        mainEngine.setBeatPattern(activePattern.name);
-        
-        apV2Engine.setHarmony(musicKey, musicScale);
-        apV2Engine.setVolume(volumes.autopilot);
-
-
-        setIsReady(true);
-        console.log('Audio engines initialized and ready.');
-    }, [isReady, activeTempo.bpm, volumes, effects, melodyInstrument, musicKey, musicScale, activePattern.name]);
+    }, [isReady, activeTempo.bpm, volumes, effects, melodyInstrument, musicKey, musicScale, activePattern.name, toast]);
     
 
     // --- State Sync with Audio Engine ---
@@ -142,6 +150,7 @@ export default function Home() {
 
     useEffect(() => {
         audioEngine.current?.setEffects(effects);
+        autopilotEngine.current?.setEffects(effects.autopilot);
     }, [effects]);
 
     useEffect(() => {
@@ -163,19 +172,11 @@ export default function Home() {
 
     useEffect(() => {
         if (!isReady) return;
-        audioEngine.current?.setAutopilot(isAutopilotOn, autopilotStyle);
+        autopilotEngine.current?.setAutopilot(isAutopilotOn, autopilotStyle);
         if (isAutopilotOn) {
             if (!isPlaying) setIsPlaying(true);
         }
     }, [isAutopilotOn, autopilotStyle, isReady, isPlaying]);
-    
-    useEffect(() => {
-        if (!isReady) return;
-        autopilotEngine.current?.setAutopilot(isAutopilotV2On, autopilotStyle);
-        if (isAutopilotV2On) {
-            if (!isPlaying) setIsPlaying(true);
-        }
-    }, [isAutopilotV2On, autopilotStyle, isReady, isPlaying]);
 
 
     // --- UI Event Handlers ---
@@ -221,7 +222,6 @@ export default function Home() {
         autopilotEngine.current?.setAutopilot(false, autopilotStyle);
         setIsPlaying(false);
         setIsAutopilotOn(false);
-        setIsAutopilotV2On(false);
         setOrbs([]);
     }, [isReady, autopilotStyle]);
 
@@ -239,11 +239,6 @@ export default function Home() {
     const handleAutopilotToggle = useCallback(() => {
         setIsAutopilotOn(v => !v);
     }, []);
-
-    const handleAutopilotV2Toggle = useCallback(() => {
-        setIsAutopilotV2On(v => !v);
-    }, []);
-
 
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isReady || !data) return;
@@ -338,12 +333,10 @@ export default function Home() {
                             isPlaying={isPlaying}
                             isRecording={isRecording}
                             isAutopilotOn={isAutopilotOn}
-                            isAutopilotV2On={isAutopilotV2On}
                             onPlayPause={handlePlayPause}
                             onRecord={handleRecord}
                             onStop={handleStop}
                             onAutopilotToggle={handleAutopilotToggle}
-                            onAutopilotV2Toggle={handleAutopilotV2Toggle}
                             isReady={isReady}
                         />
                     </div>
@@ -392,7 +385,7 @@ export default function Home() {
                             onVolumeChange={setVolumes}
                             effects={effects}
                             onEffectChange={setEffects}
-                            isAutopilotOn={isAutopilotOn || isAutopilotV2On}
+                            isAutopilotOn={isAutopilotOn}
                             autopilotStyles={autopilotStyles}
                             activeAutopilotStyle={autopilotStyle}
                             onAutopilotStyleChange={setAutopilotStyle}
