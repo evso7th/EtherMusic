@@ -88,17 +88,14 @@ export default function Home() {
     const [orbs, setOrbs] = useState<Orb[]>([]);
 
     // --- Audio Engine Ref ---
-    const audioEngine = useRef<AudioEngine | null>(null);
+    const audioEngine = useRef(new AudioEngine());
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
     
 
     // --- Engine Initialization ---
     const initializeAudio = useCallback(async () => {
-        if (audioEngine.current) return;
-        
-        const engine = new AudioEngine();
+        const engine = audioEngine.current;
         await engine.initialize();
-        audioEngine.current = engine;
         
         // Sync initial state with the engine
         engine.setTempo(activeTempo.bpm);
@@ -110,7 +107,11 @@ export default function Home() {
 
         setIsReady(true);
         console.log('Audio engine initialized and ready.');
-    }, [activeTempo.bpm, volumes, effects, melodyInstrument, musicKey, musicScale, activePattern.name]); 
+    }, [activeTempo.bpm, volumes, effects, melodyInstrument, musicKey, musicScale, activePattern.name]);
+    
+    useEffect(() => {
+        initializeAudio();
+    }, [initializeAudio]);
     
 
     // --- State Sync with Audio Engine ---
@@ -151,7 +152,6 @@ export default function Home() {
     // --- UI Event Handlers ---
     const handleStartApp = useCallback(async () => {
         setIsAppStarted(true);
-        await initializeAudio();
         
         if (isMobile) {
             try {
@@ -171,10 +171,7 @@ export default function Home() {
              backgroundAudioRef.current.pause();
              backgroundAudioRef.current.currentTime = 0;
         }
-
-        audioEngine.current?.start();
-        setIsPlaying(true);
-    }, [initializeAudio, isMobile]);
+    }, [isMobile]);
     
     const handlePlayPause = useCallback(async () => {
         if (!isReady) return;
