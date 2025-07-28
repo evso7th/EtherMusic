@@ -64,7 +64,7 @@ export default function Home() {
         bass: { reverb: -60, delay: -60 },
         drums: { reverb: -60, delay: -60 },
         autopilot: { reverb: -60, delay: -60 },
-        latch: { reverb: -60, delay: -60 },
+        latch: { reverb: -60, delay: -30 },
     });
     const [activePattern, setActivePattern] = useState<(typeof beatPatterns)[number]>(beatPatterns.find(p => p.name === 'Off')!);
     const [melodyInstrument, setMelodyInstrument] = useState<MelodyInstrument>('synth');
@@ -134,7 +134,7 @@ export default function Home() {
     }, [effects]);
 
     useEffect(() => {
-        audioEngine.current?.setBeatPattern(activePattern.name);
+        audioEngine.current?.drumMachine.setBeatPattern(activePattern.name);
     }, [activePattern]);
     
     useEffect(() => {
@@ -366,9 +366,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
-
-    
-
-    

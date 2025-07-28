@@ -21,7 +21,7 @@ export class AudioEngine {
 
     // --- Engines ---
     private latchEngine!: LatchEngine;
-    private drumMachine!: DrumMachine;
+    public drumMachine!: DrumMachine;
 
     // --- Tone.js Objects ---
     private channels!: { melody: Tone.Channel, bass: Tone.Channel, latch: Tone.Channel };
@@ -344,5 +344,3 @@ export class AudioEngine {
         document.dispatchEvent(new CustomEvent('melody-orbs-updated', { detail: melodyOrbs }));
     }
 }
-
-    
