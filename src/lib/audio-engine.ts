@@ -89,9 +89,7 @@ export class AudioEngine {
             frequency: "2n",
             min: -12,
             max: 6,      
-        });
-        this.bassLFO.loop = true;
-        this.bassLFO.start();
+        }).start();
         
         // Synth Pools
         this.createSynthPools();
@@ -658,3 +656,6 @@ const beatPatternsData: { [key: string]: { groove: (string|string[]|null)[][], f
 
 
 
+
+
+    
