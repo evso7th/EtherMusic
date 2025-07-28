@@ -400,14 +400,22 @@ export class AudioEngine {
             oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
         };
+        // Player bass synths
         for (let i = 0; i < 2; i++) {
             this.bassSynths.push(new Tone.Synth(bassSynthOptions).connect(this.bassGain));
+        }
+        // AP2 bass synths (DEBUG: 1 voice)
+        for (let i = 0; i < 1; i++) {
             this.autopilotBassSynths.push(new Tone.Synth(bassSynthOptions).connect(this.channels.autopilot));
         }
 
         const melodySynthOptions = { portamento: 0.02 };
+        // Player melody synths
         for (let i = 0; i < 4; i++) {
             this.melodySynths.push(new Tone.Synth(melodySynthOptions).connect(this.channels.melody));
+        }
+        // AP2 melody synths (DEBUG: 1 voice)
+        for (let i = 0; i < 1; i++) {
             this.autopilotMelodySynths.push(new Tone.Synth(melodySynthOptions).connect(this.channels.autopilot));
         }
     }
@@ -478,11 +486,10 @@ export class AudioEngine {
     }
 
     private findAndPlay(synthPool: Tone.Synth[], note: NoteEvent, time: number) {
-        // Find a synth that is not currently playing
-        const freeSynth = synthPool.find(s => s.envelope.state === 'stopped');
-
-        if (freeSynth) {
-            freeSynth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
+        // DEBUG: Always use the first synth in the pool and ignore if it's busy.
+        const synth = synthPool[0];
+        if (synth) {
+            synth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
         }
     }
     
