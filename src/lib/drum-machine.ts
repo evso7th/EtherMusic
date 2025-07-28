@@ -60,10 +60,11 @@ export class DrumMachine {
             G2: "/assets/sounds/mid tom.wav", G3: "/assets/sounds/low tom.wav",
         };
         
-        return new Promise<void>((resolve) => {
+        return new Promise<void>((resolve, reject) => {
              this.drumSamplers = new Tone.Players(drumUrls, () => {
                 if (!this.drumSamplers) {
                     console.error("Drum samplers failed to create.");
+                    reject(new Error("Drum samplers failed to create."));
                     return;
                 }
                 this.drumSamplers.player('E1').volume.value = -3;
@@ -157,14 +158,14 @@ const beatPatternsData: { [key: string]: { groove: (string|string[])[][], fills:
     Air: {
         groove: [
             [
-                [], ['E2'], ['E1'], ['E2'], [], ['E1'], ['E2'], ['E1'],
-                [], [], ['E2'], [], [], ['E1'], [], ['E2'],
+                [], [], ['E1'], [], [], [], [], [],
+                [], [], [], [], [], ['E2'], [], [],
             ],
         ],
         fills: [
             [
-                [], ['F1'], [], [], [], ['F1'], [], [],
-                ['E1'], [], ['E2'], [], ['E1'], [], ['E2'], []
+                [], [], [], [], [], [], ['F1'], [],
+                ['E1'], [], [], [], ['E1'], [], [], []
             ]
         ]
     },
@@ -185,14 +186,14 @@ const beatPatternsData: { [key: string]: { groove: (string|string[])[][], fills:
     Water: {
         groove: [
             [
-                [], ['E2'], ['E1'], ['E2'], [], ['E2'], ['E1'], ['E2'],
-                [], ['E2'], [], ['E2'], ['E1'], ['E2'], ['F1'], [],
+                [], ['E2'], [], [], [], [], ['E1'], [],
+                [], [], [], ['E2'], [], [], ['F1'], [],
             ]
         ],
         fills: [
             [
-                ['F1'], ['E1'], [], ['E2'], ['F1'], [], ['F1'], ['E2'],
-                [], ['E1'], ['F1'], [], ['F1'], ['E1'], [], ['F1'],
+                ['F1'], [], [], [], [], [], ['F1'], [],
+                [], ['E1'], ['F1'], [], [], ['E1'], [], ['F1'],
             ]
         ]
     },
