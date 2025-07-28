@@ -2,7 +2,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Play, Pause, Mic, StopCircle, Power, Bot } from 'lucide-react';
+import { Play, Pause, Mic, StopCircle, Power } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -19,22 +19,18 @@ import {
 interface PlaybackControlsProps {
     isPlaying: boolean;
     isRecording: boolean;
-    isAutopilotOn: boolean;
     onPlayPause: () => void;
     onRecord: () => void;
     onStop: () => void;
-    onAutopilotToggle: () => void;
     isReady: boolean;
 }
 
 export function PlaybackControls({ 
     isPlaying, 
     isRecording, 
-    isAutopilotOn,
     onPlayPause, 
     onRecord, 
     onStop,
-    onAutopilotToggle,
     isReady 
 }: PlaybackControlsProps) {
     
@@ -51,19 +47,6 @@ export function PlaybackControls({
             </Button>
             <Button onClick={onPlayPause} size="icon" className="w-10 h-10 rounded-full" aria-label={isPlaying ? "Pause" : "Play"} disabled={!isReady}>
                 {isPlaying ? <Pause className="w-5 h-5 md:w-6 md:h-6" /> : <Play className="w-5 h-5 md:w-6 md:h-6 ml-1" />}
-            </Button>
-            <Button 
-                onClick={onAutopilotToggle} 
-                variant={isAutopilotOn ? 'default' : 'outline'} 
-                size="icon" 
-                className={cn(
-                    'w-10 h-10 rounded-full transition-colors',
-                    isAutopilotOn && 'animate-pulse-primary'
-                )}
-                aria-label={isAutopilotOn ? "Stop Autopilot" : "Start Autopilot"} 
-                disabled={!isReady}
-            >
-                 <Bot className="w-5 h-5 md:w-6 md:h-6" />
             </Button>
             <Button 
                 onClick={onRecord} 

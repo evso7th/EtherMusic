@@ -2,7 +2,7 @@
 "use client";
 
 import type { PointerEvent } from 'react';
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -19,7 +19,6 @@ interface ThereminPadProps {
     frequencyRange: [number, number];
     color: string;
     isPolyphonic?: boolean;
-    orbs: Orb[];
     isDisabled?: boolean;
     // Melody specific
     instruments?: MelodyInstrument[];
@@ -44,28 +43,12 @@ const padTitles = {
     bass: "Bass Pad"
 }
 
-const OrbComponent = ({ x, y, color, type }: { x: number, y: number, color: string, type: Orb['type'] }) => (
-    <div
-        className={cn(
-            'absolute top-0 left-0 rounded-full w-8 h-8 md:w-12 md:h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-100',
-            type === 'latch' && 'animate-pulse-primary'
-        )}
-        style={{
-            backgroundColor: color,
-            animationDuration: '1s',
-            transform: `translate(${x}px, ${y}px)`,
-            boxShadow: `0 0 20px ${color}, 0 0 30px ${color}`
-        }}
-    />
-);
-
 export function ThereminPad({ 
     type, 
     onInteraction, 
     frequencyRange, 
     color,
     isPolyphonic = false,
-    orbs,
     isDisabled = false,
     isPulsating, 
     onPulsateToggle, 
@@ -82,6 +65,7 @@ export function ThereminPad({
     onLatchToggle,
 }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
+    const orbsRef = useRef<Map<number, HTMLDivElement>>(new Map());
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     
     const calculateInteraction = useCallback((event: PointerEvent<HTMLDivElement>) => {
@@ -102,6 +86,52 @@ export function ThereminPad({
         
         return { x, y, frequency, volume, pointerId: event.pointerId };
     }, [frequencyRange]);
+    
+    const manageOrbs = useCallback((orbs: Orb[]) => {
+        if (!padRef.current) return;
+        const currentOrbIds = new Set(orbs.map(orb => orb.id));
+
+        // Update existing or add new orbs
+        for (const orb of orbs) {
+            let orbEl = orbsRef.current.get(orb.id);
+            if (!orbEl) {
+                orbEl = document.createElement('div');
+                orbEl.className = cn(
+                    'absolute top-0 left-0 rounded-full w-8 h-8 md:w-12 md:h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-100',
+                    orb.type === 'latch' && 'animate-pulse-primary'
+                );
+                 orbEl.style.backgroundColor = color;
+                 orbEl.style.boxShadow = `0 0 20px ${color}, 0 0 30px ${color}`;
+                 orbEl.style.animationDuration = '1s';
+                padRef.current.appendChild(orbEl);
+                orbsRef.current.set(orb.id, orbEl);
+            }
+             orbEl.style.transform = `translate(${orb.x}px, ${orb.y}px)`;
+        }
+
+        // Remove old orbs
+        for (const [id, orbEl] of orbsRef.current.entries()) {
+            if (!currentOrbIds.has(id)) {
+                orbEl.remove();
+                orbsRef.current.delete(id);
+            }
+        }
+    }, [color]);
+    
+    // Connect orb management to audio engine events
+     useEffect(() => {
+        const eventName = `orbs-updated-${type}`;
+        const handler = (e: Event) => {
+            const customEvent = e as CustomEvent<Orb[]>;
+            manageOrbs(customEvent.detail);
+        };
+        
+        document.addEventListener(eventName, handler);
+        return () => {
+            document.removeEventListener(eventName, handler);
+        };
+    }, [type, manageOrbs]);
+
 
     const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (isDisabled) return;
@@ -253,9 +283,6 @@ export function ThereminPad({
                             <span>{subtitle}</span>
                         </div>
                     </div>
-                     {orbs.map(orb => (
-                        <OrbComponent key={orb.id} x={orb.x} y={orb.y} color={color} type={orb.type} />
-                     ))}
                 </div>
             </CardContent>
         </Card>

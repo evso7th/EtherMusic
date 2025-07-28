@@ -54,6 +54,7 @@ interface BeatBoxControlsProps {
     };
     onEffectChange: (effects: BeatBoxControlsProps['effects']) => void;
     isAutopilotOn: boolean;
+    onAutopilotToggle: (isOn: boolean) => void;
     autopilotStyles: AutopilotStyle[];
     activeAutopilotStyle: AutopilotStyle;
     onAutopilotStyleChange: (style: AutopilotStyle) => void;
@@ -72,6 +73,7 @@ export function BeatBoxControls({
     effects,
     onEffectChange,
     isAutopilotOn,
+    onAutopilotToggle,
     autopilotStyles,
     activeAutopilotStyle,
     onAutopilotStyleChange,
@@ -192,36 +194,43 @@ export function BeatBoxControls({
                         </div>
                     </DialogContent>
                 </Dialog>
-
-                {isAutopilotOn && (
-                     <Dialog open={isStyleOpen} onOpenChange={setIsStyleOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant="outline" className="flex-1" size={isMobile ? 'sm' : 'default'}>
-                                <Wand2 className="w-4 h-4 md:mr-2" />
-                                <span className="hidden sm:inline">Style</span>
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Autopilot Style</DialogTitle>
-                            </DialogHeader>
-                            <div className="grid grid-cols-3 gap-2 py-4">
+                
+                <Dialog open={isStyleOpen} onOpenChange={setIsStyleOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant={isAutopilotOn ? 'default' : 'outline'} className="flex-1" size={isMobile ? 'sm' : 'default'}>
+                            <Bot className="w-4 h-4 md:mr-2" />
+                            <span className="hidden sm:inline">Autopilot</span>
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Autopilot Style</DialogTitle>
+                        </DialogHeader>
+                        <div className='py-4 space-y-4'>
+                             <div className="flex items-center space-x-2">
+                                <Switch id="autopilot-switch" checked={isAutopilotOn} onCheckedChange={onAutopilotToggle} />
+                                <Label htmlFor="autopilot-switch">Autopilot On/Off</Label>
+                            </div>
+                            <div className={cn(
+                                "grid grid-cols-3 gap-2 transition-opacity",
+                                !isAutopilotOn && "opacity-50 pointer-events-none"
+                            )}>
                                 {autopilotStyles.map((style) => (
                                     <Button
                                         key={style}
                                         variant={activeAutopilotStyle === style ? 'default' : 'outline'}
                                         onClick={() => {
                                             onAutopilotStyleChange(style);
-                                            setIsStyleOpen(false);
                                         }}
+                                        disabled={!isAutopilotOn}
                                     >
                                         {style}
                                     </Button>
                                 ))}
                             </div>
-                        </DialogContent>
-                    </Dialog>
-                )}
+                        </div>
+                    </DialogContent>
+                </Dialog>
 
 
                 <Dialog>

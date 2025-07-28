@@ -42,7 +42,6 @@ export class AudioEngine {
     // --- Internal State ---
     private activeNotes = new Map<number, ActiveNote>();
     private latchedBassNotes = new Map<number, LatchedBassNote>();
-    private orbs: Orb[] = [];
     
     private allowedFrequencies = { bass: [] as number[], melody: [] as number[] };
     private isBassPulsating = false;
@@ -136,8 +135,7 @@ export class AudioEngine {
         
         this.activeNotes.clear();
         this.latchedBassNotes.clear();
-        this.orbs = [];
-        this.updateOrbs();
+        this.updateAndDispatchOrbs();
     }
     
     public toggleRecording(): boolean {
@@ -255,13 +253,13 @@ export class AudioEngine {
         if (!isLatchOn && this.latchedBassNotes.size > 0) {
             this.latchedBassNotes.forEach(note => note.synth.triggerRelease());
             this.latchedBassNotes.clear();
-            this.updateOrbs();
+            this.updateAndDispatchOrbs();
         }
     }
 
     // --- Theremin Interaction ---
 
-    public startNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}): Orb[] | undefined {
+    public startNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}) {
         if (type === 'bass' && this.isBassLatchOn) {
             this.handleLatchInteraction(pos);
         } else {
@@ -277,10 +275,10 @@ export class AudioEngine {
                 this.activeNotes.set(pointerId, { type, synth: freeSynth, initialFreq: quantizedFreq, x: pos.x, y: pos.y });
             }
         }
-        return this.updateOrbs();
+        this.updateAndDispatchOrbs();
     }
 
-    public updateNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}): Orb[] | undefined {
+    public updateNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}) {
         const activeNote = this.activeNotes.get(pointerId);
         if (activeNote) {
             const quantizedFreq = this.getClosestFrequency(freq, type);
@@ -288,14 +286,14 @@ export class AudioEngine {
             activeNote.synth.volume.value = Tone.gainToDb(vol * vol);
             activeNote.x = pos.x;
             activeNote.y = pos.y;
+            this.updateAndDispatchOrbs();
         }
-        return this.updateOrbs();
     }
 
-    public stopNote(type: 'melody' | 'bass', pointerId: number, pos: {x: number, y: number}): Orb[] | undefined {
+    public stopNote(type: 'melody' | 'bass', pointerId: number) {
         if (this.isBassLatchOn && type === 'bass') {
             // Latch notes are stopped in handleLatchInteraction on 'down' event
-            return this.orbs;
+            return;
         }
 
         const activeNote = this.activeNotes.get(pointerId);
@@ -303,7 +301,7 @@ export class AudioEngine {
             activeNote.synth.triggerRelease();
             this.activeNotes.delete(pointerId);
         }
-        return this.updateOrbs();
+        this.updateAndDispatchOrbs();
     }
 
 
@@ -485,23 +483,27 @@ export class AudioEngine {
         }
     }
 
-    private updateOrbs(): Orb[] {
+    private updateAndDispatchOrbs() {
         const activeOrbs = Array.from(this.activeNotes.entries()).map(([id, note]) => ({
             id: id,
             x: note.x,
             y: note.y,
-            type: note.type
+            type: note.type,
         }));
+        
         const latchedOrbs = Array.from(this.latchedBassNotes.entries()).map(([id, note]) => ({
             id: id,
             x: note.x,
             y: note.y,
-            type: 'latch' as const
+            type: 'latch' as const,
         }));
         
-        this.orbs = [...activeOrbs, ...latchedOrbs];
-        return this.orbs;
+        const allOrbs = [...activeOrbs, ...latchedOrbs];
+        
+        const bassOrbs = allOrbs.filter(orb => orb.type === 'bass' || orb.type === 'latch');
+        const melodyOrbs = allOrbs.filter(orb => orb.type === 'melody');
+        
+        document.dispatchEvent(new CustomEvent('orbs-updated-bass', { detail: bassOrbs }));
+        document.dispatchEvent(new CustomEvent('orbs-updated-melody', { detail: melodyOrbs }));
     }
 }
-
-    

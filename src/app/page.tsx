@@ -86,7 +86,6 @@ export default function Home() {
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
     const [isAutopilotOn, setIsAutopilotOn] = useState(false);
     const [autopilotStyle, setAutopilotStyle] = useState<AutopilotStyle>('Ambient');
-    const [orbs, setOrbs] = useState<Orb[]>([]);
 
     // --- Audio Engine Ref ---
     const audioEngine = useRef<AudioEngine>();
@@ -96,7 +95,7 @@ export default function Home() {
 
     // --- Engine Initialization ---
     const initializeAudio = useCallback(async () => {
-        if (isReady) return;
+        if (isReady || audioEngine.current) return;
 
         try {
             const mainEngine = new AudioEngine();
@@ -104,7 +103,6 @@ export default function Home() {
             audioEngine.current = mainEngine;
             
             const apEngine = new AutopilotEngine();
-            // @ts-ignore
             await apEngine.initialize(mainEngine.fx.reverb, mainEngine.fx.delay);
             autopilotEngine.current = apEngine;
             
@@ -218,7 +216,6 @@ export default function Home() {
         autopilotEngine.current?.setAutopilot(false, autopilotStyle);
         setIsPlaying(false);
         setIsAutopilotOn(false);
-        setOrbs([]);
     }, [isReady, autopilotStyle]);
 
     const handleRecord = useCallback(() => {
@@ -232,29 +229,17 @@ export default function Home() {
         }
     }, [isReady, toast]);
 
-    const handleAutopilotToggle = useCallback(() => {
-        setIsAutopilotOn(v => !v);
-    }, []);
-
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
-        if (!isReady || !data) return;
+        if (!isReady || !audioEngine.current) return;
 
-        const { pointerId, frequency, volume, x, y } = data;
         const engine = audioEngine.current;
-        if (!engine) return;
 
-        let newOrbs: Orb[] | undefined;
-
-        if (state === 'down') {
-            newOrbs = engine.startNote(type, pointerId, frequency, volume, {x, y});
-        } else if (state === 'move') {
-            newOrbs = engine.updateNote(type, pointerId, frequency, volume, {x, y});
-        } else if (state === 'up') {
-            newOrbs = engine.stopNote(type, pointerId, {x, y});
-        }
-        
-        if (newOrbs) {
-            setOrbs(newOrbs);
+        if (state === 'down' && data) {
+            engine.startNote(type, data.pointerId, data.frequency, data.volume, {x: data.x, y: data.y});
+        } else if (state === 'move' && data) {
+            engine.updateNote(type, data.pointerId, data.frequency, data.volume, {x: data.x, y: data.y});
+        } else if (state === 'up' && data) {
+            engine.stopNote(type, data.pointerId);
         }
     }, [isReady]);
     
@@ -264,10 +249,6 @@ export default function Home() {
             backgroundAudioRef.current.play().catch(error => console.error("Error playing background audio:", error));
         }
     }, []);
-    
-
-    const bassOrbs = orbs.filter(orb => orb.type === 'bass' || orb.type === 'latch');
-    const melodyOrbs = orbs.filter(orb => orb.type === 'melody');
 
     if (!isAppStarted) {
         return (
@@ -331,11 +312,9 @@ export default function Home() {
                          <PlaybackControls
                             isPlaying={isPlaying}
                             isRecording={isRecording}
-                            isAutopilotOn={isAutopilotOn}
                             onPlayPause={handlePlayPause}
                             onRecord={handleRecord}
                             onStop={handleStop}
-                            onAutopilotToggle={handleAutopilotToggle}
                             isReady={isReady}
                         />
                     </div>
@@ -351,7 +330,6 @@ export default function Home() {
                             onPulsateToggle={setIsBassPulsating}
                             isLatchOn={isBassLatchOn}
                             onLatchToggle={setIsBassLatchOn}
-                            orbs={bassOrbs}
                             isPolyphonic
                         />
                         <MemoizedThereminPad
@@ -368,7 +346,6 @@ export default function Home() {
                             musicScales={musicScales}
                             activeScale={musicScale}
                             onScaleChange={setMusicScale}
-                            orbs={melodyOrbs}
                             isPolyphonic
                         />
                     </div>
@@ -385,6 +362,7 @@ export default function Home() {
                             effects={effects}
                             onEffectChange={setEffects}
                             isAutopilotOn={isAutopilotOn}
+                            onAutopilotToggle={setIsAutopilotOn}
                             autopilotStyles={autopilotStyles}
                             activeAutopilotStyle={autopilotStyle}
                             onAutopilotStyleChange={setAutopilotStyle}
@@ -396,5 +374,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
