@@ -84,7 +84,6 @@ export default function Home() {
     const [isBassPulsating, setIsBassPulsating] = useState(false);
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
     const [isAutopilotOn, setIsAutopilotOn] = useState(false);
-    const [isAutopilotV2On, setIsAutopilotV2On] = useState(false);
     const [autopilotStyle, setAutopilotStyle] = useState<AutopilotStyle>('Ambient');
     const [orbs, setOrbs] = useState<Orb[]>([]);
 
@@ -150,19 +149,9 @@ export default function Home() {
         if (!isReady) return;
         audioEngine.current?.setAutopilot(isAutopilotOn, autopilotStyle);
         if (isAutopilotOn) {
-            setIsAutopilotV2On(false); 
             if (!isPlaying) setIsPlaying(true);
         }
     }, [isAutopilotOn, autopilotStyle, isReady, isPlaying]);
-
-    useEffect(() => {
-        if (!isReady) return;
-        audioEngine.current?.setAutopilotV2(isAutopilotV2On, autopilotStyle);
-        if (isAutopilotV2On) {
-            setIsAutopilotOn(false);
-            if (!isPlaying) setIsPlaying(true);
-        }
-    }, [isAutopilotV2On, autopilotStyle, isReady, isPlaying]);
 
 
     // --- UI Event Handlers ---
@@ -206,7 +195,6 @@ export default function Home() {
         audioEngine.current?.stop();
         setIsPlaying(false);
         setIsAutopilotOn(false);
-        setIsAutopilotV2On(false);
         setOrbs([]);
     }, [isReady]);
 
@@ -221,8 +209,8 @@ export default function Home() {
         }
     }, [isReady, toast]);
 
-    const handleAutopilotV2Toggle = useCallback(() => {
-        setIsAutopilotV2On(v => !v);
+    const handleAutopilotToggle = useCallback(() => {
+        setIsAutopilotOn(v => !v);
     }, []);
 
 
@@ -318,11 +306,11 @@ export default function Home() {
                          <PlaybackControls
                             isPlaying={isPlaying}
                             isRecording={isRecording}
-                            isAutopilotV2On={isAutopilotV2On}
+                            isAutopilotOn={isAutopilotOn}
                             onPlayPause={handlePlayPause}
                             onRecord={handleRecord}
                             onStop={handleStop}
-                            onAutopilotV2Toggle={handleAutopilotV2Toggle}
+                            onAutopilotToggle={handleAutopilotToggle}
                             isReady={isReady}
                         />
                     </div>
