@@ -174,6 +174,11 @@ export default function Home() {
 
     // --- UI Event Handlers ---
     const handleStartApp = useCallback(async () => {
+        if (backgroundAudioRef.current && !backgroundAudioRef.current.paused) {
+            backgroundAudioRef.current.pause();
+            backgroundAudioRef.current.currentTime = 0;
+        }
+
         const audio = new Audio('/assets/sounds/transition.webm');
         audio.play().catch(e => console.error("Error playing transition sound:", e));
 
@@ -192,11 +197,6 @@ export default function Home() {
             } catch (err) {
                  console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
             }
-        }
-        
-        if (backgroundAudioRef.current && !backgroundAudioRef.current.paused) {
-             backgroundAudioRef.current.pause();
-             backgroundAudioRef.current.currentTime = 0;
         }
     }, [isMobile, initializeAudio]);
     
@@ -245,7 +245,12 @@ export default function Home() {
         }
     }, [isReady]);
     
-    const handleStartScreenInteraction = useCallback(() => {
+    const handleStartScreenInteraction = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+        // Prevent background audio from playing if the button is clicked
+        if ((e.target as HTMLElement).closest('button')) {
+            return;
+        }
+
         if (backgroundAudioRef.current && backgroundAudioRef.current.paused) {
             backgroundAudioRef.current.volume = 0.3;
             backgroundAudioRef.current.play().catch(error => console.error("Error playing background audio:", error));
@@ -374,5 +379,7 @@ export default function Home() {
         </div>
     );
 }
+
+    
 
     
