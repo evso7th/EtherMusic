@@ -81,7 +81,7 @@ export class AudioEngine {
         
         // Bass LFO for Latch Synths - Configured for a "heartbeat" effect
         this.bassLFO = new Tone.LFO({
-            type: "pulse", // Creates a sharp on/off effect
+            type: "square", // Creates a sharp on/off effect
             frequency: "2n", // Pulsates every half note by default
             min: -Infinity,  // Go completely silent
             max: 0,          // Go to full volume (0 dB)
@@ -266,6 +266,12 @@ export class AudioEngine {
         if (freeSynth) {
             const quantizedFreq = this.getClosestFrequency(freq, type);
             const velocity = vol * vol; // Square the volume for a more responsive feel
+            
+            // For melody synths, we control volume via a gain node to avoid re-triggering envelopes
+            if(type === 'melody') {
+                freeSynth.volume.value = Tone.gainToDb(velocity);
+            }
+
             freeSynth.triggerAttack(quantizedFreq, undefined, velocity);
             this.activeNotes.set(pointerId, { type, synth: freeSynth, initialFreq: quantizedFreq, x: pos.x, y: pos.y });
             this.updateAndDispatchOrbs();
@@ -280,11 +286,11 @@ export class AudioEngine {
             activeNote.synth.frequency.rampTo(quantizedFreq, 0.01);
             
             const velocity = vol * vol;
+            
             if (activeNote.type === 'melody') {
-                activeNote.synth.volume.rampTo(Tone.gainToDb(velocity), 0.01);
+                 activeNote.synth.volume.rampTo(Tone.gainToDb(velocity), 0.01);
             } else if (activeNote.type === 'bass') {
-                // Bass synth volume is controlled via its dedicated gain node
-                activeNote.synth.volume.rampTo(Tone.gainToDb(velocity), 0.01);
+                 activeNote.synth.volume.rampTo(Tone.gainToDb(velocity), 0.01);
             }
     
             activeNote.x = pos.x;
