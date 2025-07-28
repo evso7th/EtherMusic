@@ -18,7 +18,7 @@ export const beatPatterns = [
 export class DrumMachine {
     private isInitialized = false;
     private channel: Tone.Channel;
-    private drumSamplers: Record<string, Tone.Player> = {};
+    private drumSamplers: Tone.Players | null = null;
     private drumPart!: Tone.Part<{note: string | string[]}>;
     private conductorEventId: number | null = null;
     private measureCount = 0;
@@ -60,22 +60,25 @@ export class DrumMachine {
             G2: "/assets/sounds/mid tom.wav", G3: "/assets/sounds/low tom.wav",
         };
         
-        const loadingPromises = Object.entries(drumUrls).map(([note, url]) => {
-            return new Promise<void>((resolve) => {
-                const player = new Tone.Player(url).connect(this.channel);
-                if (note === 'E1' || note === 'E2') player.volume.value = -3;
-                this.drumSamplers[note] = player;
-                Tone.loaded().then(() => resolve());
+        return new Promise<void>((resolve, reject) => {
+             this.drumSamplers = new Tone.Players(drumUrls, {
+                onload: () => {
+                    if (!this.drumSamplers) return;
+                    this.drumSamplers.player('E1').volume.value = -3;
+                    this.drumSamplers.player('E2').volume.value = -3;
+                    this.drumSamplers.connect(this.channel);
+                    resolve();
+                },
+                onerror: (error) => reject(error),
             });
         });
-        await Promise.all(loadingPromises);
     }
 
     private setupDrumPart() {
         this.drumPart = new Tone.Part((time, value) => {
             const playNote = (note: string) => {
-               if (this.drumSamplers[note]?.loaded) {
-                   this.drumSamplers[note].start(time);
+               if (this.drumSamplers?.has(note)) {
+                   this.drumSamplers.player(note).start(time);
                }
            }
            if (Array.isArray(value.note)) {
