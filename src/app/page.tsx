@@ -149,6 +149,13 @@ export default function Home() {
     useEffect(() => {
         audioEngine.current?.setBassLatch(isBassLatchOn);
     }, [isBassLatchOn]);
+    
+    // --- Auto-start playback when ready ---
+    useEffect(() => {
+        if (isReady && !isPlaying) {
+            handlePlayPause();
+        }
+    }, [isReady]);
 
     // --- UI Event Handlers ---
     const handleStartApp = useCallback(async () => {
@@ -369,6 +376,8 @@ export default function Home() {
         </div>
     );
 }
+
+    
 
     
 
