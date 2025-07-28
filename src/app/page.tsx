@@ -153,8 +153,8 @@ export default function Home() {
     useEffect(() => {
         if (!isReady) return;
         autopilotEngine.current?.setAutopilot(isAutopilotOn, autopilotStyle);
-        if (isAutopilotOn) {
-            if (!isPlaying) setIsPlaying(true);
+        if (isAutopilotOn && !isPlaying) {
+             handlePlayPause();
         }
     }, [isAutopilotOn, autopilotStyle, isReady, isPlaying]);
 
@@ -366,3 +366,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
