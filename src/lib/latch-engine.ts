@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import * as Tone from 'tone';
@@ -127,3 +128,4 @@ export class LatchEngine {
         document.dispatchEvent(new CustomEvent('latch-orbs-updated', { detail: latchedOrbs }));
     }
 }
+
