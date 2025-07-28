@@ -31,13 +31,13 @@ export class LatchEngine {
     }
 
     private initialize(destination: Tone.ToneAudioNode) {
-        this.gainNode = new Tone.Gain().connect(destination);
+        this.gainNode = new Tone.Gain(0).connect(destination); // Initial gain is 0, will be set by setVolume
         this.setVolume(this.baseVolumeDb);
 
         this.lfo = new Tone.LFO({
             type: "sine",
             frequency: "2n",
-            min: 0.2, // Modulate between 20% and 100% of the gain
+            min: 0.2, 
             max: 1,
         }).start();
 
@@ -52,20 +52,21 @@ export class LatchEngine {
     }
 
     public setTempo(bpm: number) {
-        // Frequency is automatically synced to transport tempo, so no action needed here
-        // unless you want to change the subdivision ('2n', '4n', etc.)
+        // Frequency is automatically synced to transport tempo
     }
     
     public setVolume(db: number) {
         this.baseVolumeDb = db;
-        // The gain node's gain is the *target* for the LFO, not the direct value
-        this.gainNode.gain.rampTo(Tone.dbToGain(db), 0.1);
+        // Don't ramp if pulsating, as LFO is controlling it.
+        if (!this.isPulsating || !this.isPlaying) {
+            this.gainNode.gain.rampTo(Tone.dbToGain(db), 0.1);
+        }
     }
 
     public setLatch(isOn: boolean) {
         this.isLatchOn = isOn;
         if (!isOn && this.latchedNotes.size > 0) {
-            this.stopAll(true); // Stop and clear all notes
+            this.stopAll(true);
         }
     }
 
@@ -73,11 +74,10 @@ export class LatchEngine {
         this.isPulsating = isPulsating;
         this.isPlaying = isTransportPlaying;
 
-        if (this.isPulsating && this.isPlaying) {
+        if (this.isPulsating && this.isPlaying && this.latchedNotes.size > 0) {
             this.lfo.connect(this.gainNode.gain);
         } else {
             this.lfo.disconnect(this.gainNode.gain);
-            // After disconnecting, ensure gain returns to the set base volume
             this.gainNode.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.2); 
         }
     }
@@ -98,6 +98,11 @@ export class LatchEngine {
             const noteToRelease = this.latchedNotes.get(existingEntryId);
             noteToRelease?.synth.triggerRelease();
             this.latchedNotes.delete(existingEntryId);
+             if (this.latchedNotes.size === 0 && this.isPulsating) {
+                this.lfo.disconnect(this.gainNode.gain);
+                this.gainNode.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
+            }
+
         } else {
             const activeLatchSynths = new Set(Array.from(this.latchedNotes.values()).map(n => n.synth));
             const assignedSynth = this.synths.find(s => !activeLatchSynths.has(s));
@@ -111,9 +116,11 @@ export class LatchEngine {
                 };
                 this.latchedNotes.set(newId, newNote);
                 
-                // If transport is already playing, start the new note immediately.
                 if (this.isPlaying) {
                     assignedSynth.triggerAttack(newNote.initialFreq, undefined, newNote.volume);
+                    if (this.isPulsating && !this.lfo.isCelled(this.gainNode.gain)) {
+                        this.lfo.connect(this.gainNode.gain);
+                    }
                 }
             }
         }
@@ -122,6 +129,8 @@ export class LatchEngine {
 
     public startAll() {
         this.isPlaying = true;
+        if (this.latchedNotes.size === 0) return;
+
         this.latchedNotes.forEach(note => {
             note.synth.triggerAttack(note.initialFreq, undefined, note.volume);
         });
@@ -135,6 +144,7 @@ export class LatchEngine {
         this.latchedNotes.forEach(note => note.synth.triggerRelease());
         if(this.isPulsating) {
             this.lfo.disconnect(this.gainNode.gain);
+            this.gainNode.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
         }
     }
 
@@ -143,11 +153,11 @@ export class LatchEngine {
         this.latchedNotes.forEach(note => note.synth.triggerRelease());
         if(this.isPulsating) {
             this.lfo.disconnect(this.gainNode.gain);
+            this.gainNode.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
         }
         if (clearNotes) {
             this.latchedNotes.clear();
         }
-        // Dispatch orbs to show they are "off" or gone
         this.dispatchOrbs(); 
     }
 
