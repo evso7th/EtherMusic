@@ -87,8 +87,8 @@ export class AudioEngine {
         this.bassLFO = new Tone.LFO({
             type: "sine",
             frequency: "2n",
-            min: -12,
-            max: 6,      
+            min: 0,
+            max: 1,      
         }).start();
         
         // Synth Pools
@@ -242,8 +242,7 @@ export class AudioEngine {
             this.bassLFO.connect(this.bassGain.gain);
         } else {
             this.bassLFO.disconnect(this.bassGain.gain);
-            // When disconnecting, smoothly ramp to the original gain value
-            this.bassGain.gain.rampTo(1, 0.2); 
+            this.bassGain.gain.rampTo(1, 0.2);
         }
     }
 

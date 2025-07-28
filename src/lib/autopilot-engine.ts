@@ -159,5 +159,4 @@ export class AutopilotEngine {
         return allFrequencies.sort((a,b) => a - b);
     };
 }
-
     
