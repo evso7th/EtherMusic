@@ -7,6 +7,8 @@ type ActiveNote = {
     type: 'melody' | 'bass';
     synth: Tone.Synth;
     initialFreq: number;
+    x: number;
+    y: number;
 };
 
 type LatchedBassNote = {
@@ -135,6 +137,7 @@ export class AudioEngine {
         this.activeNotes.clear();
         this.latchedBassNotes.clear();
         this.orbs = [];
+        this.updateOrbs();
     }
     
     public toggleRecording(): boolean {
@@ -271,20 +274,22 @@ export class AudioEngine {
                 freeSynth.frequency.value = quantizedFreq;
                 freeSynth.volume.value = Tone.gainToDb(vol * vol);
                 freeSynth.triggerAttack(quantizedFreq);
-                this.activeNotes.set(pointerId, { type, synth: freeSynth, initialFreq: quantizedFreq });
+                this.activeNotes.set(pointerId, { type, synth: freeSynth, initialFreq: quantizedFreq, x: pos.x, y: pos.y });
             }
         }
         return this.updateOrbs();
     }
 
-    public updateNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}) {
+    public updateNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}): Orb[] | undefined {
         const activeNote = this.activeNotes.get(pointerId);
         if (activeNote) {
             const quantizedFreq = this.getClosestFrequency(freq, type);
             activeNote.synth.frequency.rampTo(quantizedFreq, 0.01);
             activeNote.synth.volume.value = Tone.gainToDb(vol * vol);
-            // Orb position is updated in the React component to avoid returning new orb array on every move event
+            activeNote.x = pos.x;
+            activeNote.y = pos.y;
         }
+        return this.updateOrbs();
     }
 
     public stopNote(type: 'melody' | 'bass', pointerId: number, pos: {x: number, y: number}): Orb[] | undefined {
@@ -483,10 +488,8 @@ export class AudioEngine {
     private updateOrbs(): Orb[] {
         const activeOrbs = Array.from(this.activeNotes.entries()).map(([id, note]) => ({
             id: id,
-            // x, y positions are managed by the component state for move events
-            // We just provide the initial creation/deletion info
-            x: 0, 
-            y: 0,
+            x: note.x,
+            y: note.y,
             type: note.type
         }));
         const latchedOrbs = Array.from(this.latchedBassNotes.entries()).map(([id, note]) => ({
@@ -496,10 +499,9 @@ export class AudioEngine {
             type: 'latch' as const
         }));
         
-        // This logic is flawed because x/y are not tracked here.
-        // The UI component is now responsible for orb positions.
-        // This method should just return the current structure.
         this.orbs = [...activeOrbs, ...latchedOrbs];
         return this.orbs;
     }
 }
+
+    

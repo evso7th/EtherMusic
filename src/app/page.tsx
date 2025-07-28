@@ -103,13 +103,9 @@ export default function Home() {
             await mainEngine.initialize();
             audioEngine.current = mainEngine;
             
-            // This is a bit of a hack to get the FX instances from the main engine
-            // @ts-ignore
-            const fx = mainEngine.fx; 
             const apEngine = new AutopilotEngine();
-            if (fx) {
-                await apEngine.initialize(fx.reverb, fx.delay);
-            }
+            // @ts-ignore
+            await apEngine.initialize(mainEngine.fx.reverb, mainEngine.fx.delay);
             autopilotEngine.current = apEngine;
             
             // Sync initial state with the engines
@@ -247,15 +243,18 @@ export default function Home() {
         const engine = audioEngine.current;
         if (!engine) return;
 
+        let newOrbs: Orb[] | undefined;
+
         if (state === 'down') {
-            const newOrbs = engine.startNote(type, pointerId, frequency, volume, {x, y});
-            if (newOrbs) setOrbs(newOrbs);
+            newOrbs = engine.startNote(type, pointerId, frequency, volume, {x, y});
         } else if (state === 'move') {
-            engine.updateNote(type, pointerId, frequency, volume, {x, y});
-             setOrbs(prevOrbs => prevOrbs.map(orb => orb.id === pointerId ? { ...orb, x, y } : orb));
+            newOrbs = engine.updateNote(type, pointerId, frequency, volume, {x, y});
         } else if (state === 'up') {
-            const newOrbs = engine.stopNote(type, pointerId, {x, y});
-            if (newOrbs) setOrbs(newOrbs);
+            newOrbs = engine.stopNote(type, pointerId, {x, y});
+        }
+        
+        if (newOrbs) {
+            setOrbs(newOrbs);
         }
     }, [isReady]);
     
@@ -397,3 +396,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
