@@ -1,7 +1,14 @@
 
 import * as Tone from 'tone';
 import { beatPatternsData, generateAutopilotPattern } from './music-engine';
-import type { MelodyInstrument, MusicKey, MusicScale, AutopilotStyle, Orb, NoteEvent } from '@/app/page';
+import type { MelodyInstrument, MusicKey, MusicScale, AutopilotStyle, Orb } from '@/app/page';
+
+type NoteEvent = {
+    time: string;
+    freq: number;
+    dur: string;
+    vel: number;
+};
 
 type ActiveNote = {
     type: 'melody' | 'bass';
