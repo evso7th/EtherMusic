@@ -9,7 +9,7 @@ const NOTE_PROXIMITY_THRESHOLD = 35;
 type LatchedNoteSynth = {
     synth: Tone.Synth;
     lfo: Tone.LFO;
-    volumeControl: Tone.Multiply; // Use Tone.Multiply for proper amplitude modulation
+    volumeControl: Tone.Multiply; 
 };
 
 type LatchedBassNote = {
@@ -45,13 +45,11 @@ export class LatchEngine {
             const synth = new Tone.Synth(synthOptions);
             const lfo = new Tone.LFO({
                 type: "sine",
-                min: 0.2, // Don't go to full silence
+                min: 0.2,
                 max: 1,
-                frequency: "4n", // A quarter note pulse
-            }).start();
+                frequency: "4n",
+            });
             
-            // Correct architecture: Synth -> VolumeControl -> Destination
-            // LFO modulates the VolumeControl
             const volumeControl = new Tone.Multiply(Tone.dbToGain(this.baseVolumeDb)).connect(this.destination);
             synth.connect(volumeControl);
 
@@ -63,7 +61,6 @@ export class LatchEngine {
         this.baseVolumeDb = db;
         const gain = Tone.dbToGain(db);
         this.latchedNotes.forEach(note => {
-            // Set the base volume on the Multiply node
              note.synthNode.volumeControl.factor.rampTo(gain, 0.1);
         });
     }
@@ -87,10 +84,14 @@ export class LatchEngine {
         const gain = Tone.dbToGain(this.baseVolumeDb);
         
         if (this.isPulsating) {
-            // LFO modulates the factor of the Multiply node
             lfo.connect(volumeControl.factor);
+            if (lfo.state !== 'started') {
+                lfo.start();
+            }
         } else {
-            // Disconnect LFO and set volume to the constant base level
+            if (lfo.state === 'started') {
+                lfo.stop();
+            }
             lfo.disconnect(volumeControl.factor);
             volumeControl.factor.value = gain;
         }
@@ -140,14 +141,9 @@ export class LatchEngine {
     }
     
     private playNote(note: LatchedBassNote) {
-        // Set initial volume
         const gain = Tone.dbToGain(this.baseVolumeDb);
         note.synthNode.volumeControl.factor.value = gain;
-
-        // Trigger synth
         note.synthNode.synth.triggerAttack(note.initialFreq, undefined, note.volume);
-
-        // Apply pulsation if it's on
         this.updatePulsationForNote(note);
     }
     
@@ -155,7 +151,9 @@ export class LatchEngine {
         const noteToRelease = this.latchedNotes.get(noteId);
         if(noteToRelease) {
             const { synth, lfo, volumeControl } = noteToRelease.synthNode;
-            // Disconnect LFO before stopping synth
+            if (lfo.state === 'started') {
+                lfo.stop();
+            }
             lfo.disconnect(volumeControl.factor);
             synth.triggerRelease();
             this.latchedNotes.delete(noteId);
