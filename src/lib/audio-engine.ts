@@ -301,7 +301,7 @@ export class AudioEngine {
 
     public updateNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}) {
         const activeNote = this.activeNotes.get(pointerId);
-        if (activeNote) {
+        if (activeNote && activeNote.synth.output.gain) {
             const quantizedFreq = this.getClosestFrequency(freq, type);
             activeNote.synth.frequency.rampTo(quantizedFreq, 0.01);
             // Ramp the volume of the synth's output gain node
