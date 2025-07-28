@@ -2,7 +2,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Play, Pause, Mic, StopCircle, Power, Bot } from 'lucide-react';
+import { Play, Pause, Mic, StopCircle, Power, Bot, Wand2 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -80,7 +80,7 @@ export function PlaybackControls({
                 aria-label={isAutopilotV2On ? "Stop AP2" : "Start AP2"} 
                 disabled={!isReady}
             >
-                 <Bot className="w-5 h-5 md:w-6 md:h-6" />
+                 <Wand2 className="w-5 h-5 md:w-6 md:h-6" />
             </Button>
             <Button 
                 onClick={onRecord} 
