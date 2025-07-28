@@ -79,11 +79,12 @@ export class AudioEngine {
         // Synth Pools
         this.createSynthPools();
         
-        // Bass LFO for Latch Synths
+        // Bass LFO for Latch Synths - Configured for a "heartbeat" effect
         this.bassLFO = new Tone.LFO({
-            frequency: Tone.Time("4n").toFrequency(),
-            min: 0.1, // Don't go completely silent
-            max: 1,
+            type: "pulse", // Creates a sharp on/off effect
+            frequency: "2n", // Pulsates every half note by default
+            min: -Infinity,  // Go completely silent
+            max: 0,          // Go to full volume (0 dB)
         }).start();
 
         // Drums
@@ -103,6 +104,7 @@ export class AudioEngine {
     public start() {
         if (!this.isInitialized || Tone.Transport.state === 'started') return;
         Tone.Transport.start();
+        this.latchedBassNotes.forEach(note => note.synth.triggerAttack(note.initialFreq, undefined, note.volume));
     }
 
     public pause() {
@@ -110,6 +112,7 @@ export class AudioEngine {
         if (Tone.Transport.state === 'started') {
             Tone.Transport.pause();
         }
+        this.latchedBassNotes.forEach(note => note.synth.triggerRelease());
     }
 
     public stop() {
@@ -122,7 +125,6 @@ export class AudioEngine {
         
         // Stop latched notes
         this.latchedBassNotes.forEach(note => note.synth.triggerRelease());
-        this.latchedBassNotes.clear();
         
         this.updateAndDispatchOrbs();
     }
@@ -151,7 +153,7 @@ export class AudioEngine {
         if (!this.isInitialized) return;
         Tone.Transport.bpm.value = bpm;
         if (this.bassLFO) {
-            this.bassLFO.frequency.value = Tone.Time("4n").toFrequency();
+            this.bassLFO.frequency.value = Tone.Time("2n").toFrequency();
         }
     }
 
@@ -234,7 +236,7 @@ export class AudioEngine {
                 this.bassLFO.disconnect(synth.volume);
                 // Ensure the volume is reset when pulsation is turned off
                 synth.volume.cancelScheduledValues();
-                synth.volume.rampTo(0, 0.1); // Ramp to 0 dB (normal volume)
+                synth.volume.rampTo(0, 0.1); // Ramp to 0 dB (normal full volume)
             }
         });
     }
@@ -263,7 +265,7 @@ export class AudioEngine {
 
         if (freeSynth) {
             const quantizedFreq = this.getClosestFrequency(freq, type);
-            const velocity = vol * vol;
+            const velocity = vol * vol; // Square the volume for a more responsive feel
             freeSynth.triggerAttack(quantizedFreq, undefined, velocity);
             this.activeNotes.set(pointerId, { type, synth: freeSynth, initialFreq: quantizedFreq, x: pos.x, y: pos.y });
             this.updateAndDispatchOrbs();
@@ -278,13 +280,13 @@ export class AudioEngine {
             activeNote.synth.frequency.rampTo(quantizedFreq, 0.01);
             
             const velocity = vol * vol;
-            if (activeNote.type === 'bass') {
-                 // For regular bass notes, we set the volume on the synth directly.
-                 activeNote.synth.volume.rampTo(Tone.gainToDb(velocity), 0.01);
-            } else {
-                 activeNote.synth.volume.rampTo(Tone.gainToDb(velocity), 0.01);
+            if (activeNote.type === 'melody') {
+                activeNote.synth.volume.rampTo(Tone.gainToDb(velocity), 0.01);
+            } else if (activeNote.type === 'bass') {
+                // Bass synth volume is controlled via its dedicated gain node
+                activeNote.synth.volume.rampTo(Tone.gainToDb(velocity), 0.01);
             }
-
+    
             activeNote.x = pos.x;
             activeNote.y = pos.y;
             this.updateAndDispatchOrbs();
@@ -317,7 +319,6 @@ export class AudioEngine {
         const bassSynthOptions = {
             oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
-            volume: 0 // Start with volume 0 for regular bass synths
         } as const;
 
         // Pool for regular bass playing
@@ -332,7 +333,6 @@ export class AudioEngine {
 
         const melodySynthOptions = { 
             portamento: 0.02,
-            volume: 0 
         };
         for (let i = 0; i < 4; i++) {
             this.melodySynths.push(new Tone.Synth(melodySynthOptions).connect(this.channels.melody));
@@ -484,10 +484,6 @@ export class AudioEngine {
                 // Apply pulsation if it's on
                 if (this.isBassPulsating) {
                     this.bassLFO.connect(assignedSynth.volume);
-                } else {
-                    // Make sure volume is at 0 dB (normal) if not pulsating
-                    assignedSynth.volume.cancelScheduledValues();
-                    assignedSynth.volume.value = 0;
                 }
 
                 this.latchedBassNotes.set(newKey, { x: pos.x, y: pos.y, synth: assignedSynth, initialFreq: quantizedFreq, volume: velocity });
