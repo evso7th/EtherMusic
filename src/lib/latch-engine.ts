@@ -43,9 +43,8 @@ export class LatchEngine {
         } as const;
 
         for (let i = 0; i < 2; i++) {
-            const synth = new Tone.Synth(synthOptions);
             const gain = new Tone.Gain(Tone.dbToGain(this.baseVolumeDb)).connect(this.destination);
-            synth.connect(gain);
+            const synth = new Tone.Synth(synthOptions).connect(gain);
             
             const lfo = new Tone.LFO({
                 type: "sine",
@@ -53,7 +52,7 @@ export class LatchEngine {
                 max: 1,
                 frequency: "4n",
             });
-            lfo.connect(gain.gain);
+            // LFO will be connected/disconnected on demand
 
             this.synthPool.push({ synth, lfo, gain });
         }
@@ -61,9 +60,11 @@ export class LatchEngine {
     
     public setVolume(db: number) {
         this.baseVolumeDb = db;
-        const gainValue = Tone.dbToGain(db);
         this.latchedNotes.forEach(note => {
-             note.synthNode.gain.gain.value = gainValue;
+             // Only update gain if not pulsating, otherwise LFO controls it
+            if (!this.isPulsating) {
+                 note.synthNode.gain.gain.value = Tone.dbToGain(this.baseVolumeDb);
+            }
         });
     }
 
@@ -75,6 +76,7 @@ export class LatchEngine {
     }
     
     public setPulsating(isPulsating: boolean) {
+        if (this.isPulsating === isPulsating) return;
         this.isPulsating = isPulsating;
         this.latchedNotes.forEach(note => {
             this.updatePulsationForNote(note);
@@ -83,17 +85,19 @@ export class LatchEngine {
 
     private updatePulsationForNote(note: LatchedBassNote) {
         const { lfo, gain } = note.synthNode;
-        const baseGain = Tone.dbToGain(this.baseVolumeDb);
+        const baseGainValue = Tone.dbToGain(this.baseVolumeDb);
         
         if (this.isPulsating) {
+            lfo.connect(gain.gain);
             if (lfo.state !== 'started') {
                  lfo.start();
             }
         } else {
-             if (lfo.state === 'started') {
+            if (lfo.state === 'started') {
                 lfo.stop();
             }
-            gain.gain.rampTo(baseGain, 0.1);
+            lfo.disconnect(gain.gain);
+            gain.gain.rampTo(baseGainValue, 0.1);
         }
     }
     
@@ -148,7 +152,9 @@ export class LatchEngine {
                     isPlaying: false
                 };
                 this.latchedNotes.set(newId, newNote);
-                this.playNote(newNote);
+                 if (Tone.Transport.state === 'started') {
+                    this.playNote(newNote);
+                }
             }
         }
         this.dispatchOrbs();
@@ -156,7 +162,7 @@ export class LatchEngine {
     
     private playNote(note: LatchedBassNote) {
         if (note.isPlaying) return;
-        note.synthNode.synth.triggerAttack(note.initialFreq, undefined, note.volume);
+        note.synthNode.synth.triggerAttack(note.initialFreq);
         this.updatePulsationForNote(note);
         note.isPlaying = true;
     }
@@ -164,9 +170,6 @@ export class LatchEngine {
      private pauseNote(note: LatchedBassNote) {
         if (!note.isPlaying) return;
         note.synthNode.synth.triggerRelease();
-        if (note.synthNode.lfo.state === 'started') {
-            note.synthNode.lfo.stop();
-        }
         note.isPlaying = false;
     }
 
