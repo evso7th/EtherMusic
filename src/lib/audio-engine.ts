@@ -258,6 +258,9 @@ export class AudioEngine {
         if (!isLatchOn && this.latchedBassNotes.size > 0) {
             this.latchedBassNotes.forEach(note => {
                 note.synth.triggerRelease();
+                if (this.isBassPulsating) {
+                    this.bassLFO.disconnect(note.synth.volume);
+                }
             });
             this.latchedBassNotes.clear();
             this.updateAndDispatchOrbs();
@@ -293,11 +296,7 @@ export class AudioEngine {
             activeNote.synth.frequency.rampTo(quantizedFreq, 0.01);
             
             const velocity = vol * vol;
-            if (activeNote.type === 'bass') {
-                 activeNote.synth.volume.rampTo(Tone.gainToDb(velocity), 0.01);
-            } else {
-                 activeNote.synth.set({volume: Tone.gainToDb(velocity)});
-            }
+            activeNote.synth.volume.rampTo(Tone.gainToDb(velocity), 0.01);
     
             activeNote.x = pos.x;
             activeNote.y = pos.y;
@@ -485,6 +484,9 @@ export class AudioEngine {
             const noteToRelease = this.latchedBassNotes.get(existingEntryId);
             if (noteToRelease) {
                 noteToRelease.synth.triggerRelease();
+                if (this.isBassPulsating) {
+                    this.bassLFO.disconnect(noteToRelease.synth.volume);
+                }
             }
             this.latchedBassNotes.delete(existingEntryId);
         } else {
@@ -494,6 +496,10 @@ export class AudioEngine {
             if (assignedSynth) {
                 const newId = Date.now();
                 const velocity = vol * vol;
+                
+                if (this.isBassPulsating) {
+                    this.bassLFO.connect(assignedSynth.volume);
+                }
                 
                 assignedSynth.triggerAttack(quantizedFreq, undefined, velocity);
 
@@ -659,3 +665,4 @@ const beatPatternsData: { [key: string]: { groove: (string|string[]|null)[][], f
         fills: []
     }
 };
+
