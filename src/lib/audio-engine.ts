@@ -122,10 +122,11 @@ export class AudioEngine {
         this.isPlaying = true;
         if (this.isBassLatchOn) {
             this.latchedBassNotes.forEach(note => {
-                // The volume is a signal, so we can't just read it. We stored it separately.
                 note.synth.triggerAttack(note.initialFreq, undefined, note.volume);
             });
         }
+        // Re-apply pulsation to all notes when play starts
+        this.setBassPulsating(this.isBassPulsating);
     }
 
     public pause() {
@@ -251,20 +252,23 @@ export class AudioEngine {
         if (!this.isInitialized || !this.bassLFO || !this.bassGain) return;
         this.isBassPulsating = isPulsating;
         
-        // The LFO should modulate the gain of each individual synth to be effective
-        this.bassSynths.forEach(synth => {
-            if (isPulsating && this.isPlaying && synth.output.gain) {
-                // The synth output is a GainNode, we connect the LFO to its 'gain' AudioParam
-                this.bassLFO.connect(synth.output.gain);
-            } else if (synth.output.gain){
-                this.bassLFO.disconnect(synth.output.gain);
-                // Ensure the gain is reset to 1 when pulsation is off
-                synth.output.gain.cancelScheduledValues();
-                synth.output.gain.rampTo(1, 0.1);
+        const synthsToAffect = new Set([
+            ...this.bassSynths,
+            ...Array.from(this.latchedBassNotes.values()).map(n => n.synth)
+        ]);
+
+        synthsToAffect.forEach(synth => {
+            if (isPulsating && this.isPlaying) {
+                if(synth.output.gain) this.bassLFO.connect(synth.output.gain);
+            } else {
+                if(synth.output.gain) {
+                    this.bassLFO.disconnect(synth.output.gain);
+                    synth.output.gain.cancelScheduledValues();
+                    synth.output.gain.rampTo(1, 0.1);
+                }
             }
         });
     }
-
 
     public setBassLatch(isLatchOn: boolean) {
         if (!this.isInitialized) return;
@@ -289,8 +293,7 @@ export class AudioEngine {
             if (freeSynth) {
                 const quantizedFreq = this.getClosestFrequency(freq, type);
                 freeSynth.frequency.value = quantizedFreq;
-                // Use the 'velocity' parameter of triggerAttack, which is a value between 0 and 1.
-                const velocity = vol * vol; // Square the volume for a more perceptual curve
+                const velocity = vol * vol;
                 freeSynth.triggerAttack(quantizedFreq, undefined, velocity);
                 this.activeNotes.set(pointerId, { type, synth: freeSynth, initialFreq: quantizedFreq, x: pos.x, y: pos.y });
             }
@@ -306,8 +309,6 @@ export class AudioEngine {
             const quantizedFreq = this.getClosestFrequency(freq, type);
             activeNote.synth.frequency.rampTo(quantizedFreq, 0.01);
             
-            // For melody, we adjust the synth's main volume.
-            // For bass, we adjust the dedicated gain node for that synth.
             const velocity = vol * vol;
             if (activeNote.type === 'bass' && activeNote.synth.output.gain) {
                  activeNote.synth.output.gain.rampTo(velocity, 0.01);
@@ -323,7 +324,6 @@ export class AudioEngine {
 
     public stopNote(type: 'melody' | 'bass', pointerId: number) {
         if (this.isBassLatchOn && type === 'bass') {
-            // Latch notes are stopped in handleLatchInteraction on 'down' event
             return;
         }
 
@@ -350,13 +350,11 @@ export class AudioEngine {
             oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
         } as const;
-        // Player bass synths
         for (let i = 0; i < 2; i++) {
             this.bassSynths.push(new Tone.Synth(bassSynthOptions).connect(this.bassGain));
         }
 
         const melodySynthOptions = { portamento: 0.02 };
-        // Player melody synths
         for (let i = 0; i < 4; i++) {
             this.melodySynths.push(new Tone.Synth(melodySynthOptions).connect(this.channels.melody));
         }
@@ -503,12 +501,14 @@ export class AudioEngine {
                 const newKey = Date.now();
                 if(this.allowedFrequencies.bass.length === 0) return;
                 
-                // For latch mode, we pick a random frequency from the available bass scale
                 const quantizedFreq = this.allowedFrequencies.bass[Math.floor(Math.random() * this.allowedFrequencies.bass.length)];
                 const velocity = vol * vol;
 
                 if (this.isPlaying) {
                     assignedSynth.triggerAttack(quantizedFreq, undefined, velocity);
+                }
+                if (this.isBassPulsating && this.isPlaying && assignedSynth.output.gain) {
+                    this.bassLFO.connect(assignedSynth.output.gain);
                 }
                 this.latchedBassNotes.set(newKey, { x: pos.x, y: pos.y, synth: assignedSynth, initialFreq: quantizedFreq, volume: velocity });
             }
