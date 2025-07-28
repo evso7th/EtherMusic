@@ -40,6 +40,7 @@ export class AudioEngine {
     private measureCount = 0;
     private recorder!: Tone.Recorder;
     private bassLFO!: Tone.LFO;
+    private bassGain!: Tone.Gain;
     private currentBeatPatternName = 'Off';
     
     // --- Internal State ---
@@ -78,6 +79,8 @@ export class AudioEngine {
             drums: new Tone.Channel(0).toDestination(),
         };
         this.connectChannelsToFX();
+
+        this.bassGain = new Tone.Gain(1).connect(this.channels.bass);
         
         // Synth Pools
         this.createSynthPools();
@@ -170,7 +173,7 @@ export class AudioEngine {
     public setVolumes(volumes: Record<string, number>) {
         if (!this.isInitialized || !this.channels) return;
         this.channels.melody.volume.value = volumes.melody;
-        this.channels.bass.volume.value = volumes.bass; // This affects all bass synths
+        this.bassGain.gain.value = Tone.dbToGain(volumes.bass);
         this.channels.drums.volume.value = volumes.drums;
     }
 
@@ -238,14 +241,13 @@ export class AudioEngine {
         if (!this.isInitialized) return;
         this.isBassPulsating = isPulsating;
     
-        // Apply/remove LFO to already active latch synths
-        this.latchedBassNotes.forEach(note => {
+        this.latchSynths.forEach(synth => {
             if (isPulsating) {
-                this.bassLFO.connect(note.synth.volume);
+                this.bassLFO.connect(synth.volume);
             } else {
-                this.bassLFO.disconnect(note.synth.volume);
+                this.bassLFO.disconnect(synth.volume);
                 // Ramp back to full volume when pulsation is turned off
-                note.synth.volume.rampTo(0, 0.1); 
+                synth.volume.rampTo(0, 0.1); 
             }
         });
     }
@@ -256,9 +258,6 @@ export class AudioEngine {
         if (!isLatchOn && this.latchedBassNotes.size > 0) {
             this.latchedBassNotes.forEach(note => {
                 note.synth.triggerRelease();
-                if (this.isBassPulsating) {
-                    this.bassLFO.disconnect(note.synth.volume);
-                }
             });
             this.latchedBassNotes.clear();
             this.updateAndDispatchOrbs();
@@ -335,7 +334,7 @@ export class AudioEngine {
         } as const;
         
         for (let i = 0; i < 2; i++) {
-            const synth = new Tone.Synth(bassSynthOptions).connect(this.channels.bass);
+            const synth = new Tone.Synth(bassSynthOptions).connect(this.bassGain);
             this.bassSynths.push(synth);
         }
 
@@ -344,7 +343,7 @@ export class AudioEngine {
              envelope: { attack: 0.2, decay: 0.1, sustain: 0.9, release: 0.8 },
         } as const;
         for (let i = 0; i < 2; i++) {
-            this.latchSynths.push(new Tone.Synth(latchSynthOptions).connect(this.channels.bass));
+            this.latchSynths.push(new Tone.Synth(latchSynthOptions).connect(this.bassGain));
         }
 
 
@@ -486,9 +485,6 @@ export class AudioEngine {
             const noteToRelease = this.latchedBassNotes.get(existingEntryId);
             if (noteToRelease) {
                 noteToRelease.synth.triggerRelease();
-                if (this.isBassPulsating) {
-                    this.bassLFO.disconnect(noteToRelease.synth.volume);
-                }
             }
             this.latchedBassNotes.delete(existingEntryId);
         } else {
@@ -498,10 +494,6 @@ export class AudioEngine {
             if (assignedSynth) {
                 const newId = Date.now();
                 const velocity = vol * vol;
-                
-                if (this.isBassPulsating) {
-                    this.bassLFO.connect(assignedSynth.volume);
-                }
                 
                 assignedSynth.triggerAttack(quantizedFreq, undefined, velocity);
 
