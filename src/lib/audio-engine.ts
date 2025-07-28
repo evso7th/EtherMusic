@@ -31,7 +31,7 @@ export class AudioEngine {
 
     // --- Tone.js Objects ---
     private channels!: { melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel, autopilot: Tone.Channel };
-    private fx!: { reverb: Tone.Reverb, delay: Tone.FeedbackDelay };
+    public fx!: { reverb: Tone.Reverb, delay: Tone.FeedbackDelay };
     private melodySynths: Tone.Synth[] = [];
     private bassSynths: Tone.Synth[] = [];
     
@@ -141,7 +141,7 @@ export class AudioEngine {
     }
 
     public pause() {
-        if (!this.isInitialized || this.isAutopilotOn) return;
+        if (!this.isInitialized || (this.isAutopilotOn && Tone.Transport.state === 'started')) return;
         Tone.Transport.pause();
         this.isPlaying = false;
         if (this.isBassLatchOn) {
@@ -307,7 +307,6 @@ export class AudioEngine {
             this.autopilotParts.melody.stop(0).clear();
             this.autopilotSynths.bass.releaseAll();
             this.autopilotSynths.melody.releaseAll();
-            if (Tone.Transport.state === 'started') this.pause();
         }
     }
 

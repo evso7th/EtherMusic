@@ -90,24 +90,27 @@ export default function Home() {
     const [orbs, setOrbs] = useState<Orb[]>([]);
 
     // --- Audio Engine Ref ---
-    const audioEngine = useRef(new AudioEngine());
-    const autopilotEngine = useRef(new AutopilotEngine());
+    const audioEngine = useRef<AudioEngine>();
+    const autopilotEngine = useRef<AutopilotEngine>();
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
     
 
     // --- Engine Initialization ---
     const initializeAudio = useCallback(async () => {
-        const mainEngine = audioEngine.current;
-        if (mainEngine.isInitialized) return;
+        if (isReady) return;
+
+        const mainEngine = new AudioEngine();
         await mainEngine.initialize();
+        audioEngine.current = mainEngine;
         
         // This is a bit of a hack to get the FX instances from the main engine
         // @ts-ignore
         const fx = mainEngine.fx; 
+        const apV2Engine = new AutopilotEngine();
         if (fx) {
-             // @ts-ignore
-            await autopilotEngine.current.initialize(fx.reverb, fx.delay);
+            await apV2Engine.initialize(fx.reverb, fx.delay);
         }
+        autopilotEngine.current = apV2Engine;
         
         // Sync initial state with the engines
         mainEngine.setTempo(activeTempo.bpm);
@@ -117,13 +120,13 @@ export default function Home() {
         mainEngine.setHarmony(musicKey, musicScale);
         mainEngine.setBeatPattern(activePattern.name);
         
-        autopilotEngine.current.setHarmony(musicKey, musicScale);
-        autopilotEngine.current.setVolume(volumes.autopilot);
+        apV2Engine.setHarmony(musicKey, musicScale);
+        apV2Engine.setVolume(volumes.autopilot);
 
 
         setIsReady(true);
         console.log('Audio engines initialized and ready.');
-    }, [activeTempo.bpm, volumes, effects, melodyInstrument, musicKey, musicScale, activePattern.name]);
+    }, [isReady, activeTempo.bpm, volumes, effects, melodyInstrument, musicKey, musicScale, activePattern.name]);
     
 
     // --- State Sync with Audio Engine ---
@@ -215,7 +218,6 @@ export default function Home() {
     const handleStop = useCallback(async () => {
         if (!isReady) return;
         audioEngine.current?.stop();
-        // Also stop the V2 autopilot
         autopilotEngine.current?.setAutopilot(false, autopilotStyle);
         setIsPlaying(false);
         setIsAutopilotOn(false);
@@ -236,13 +238,11 @@ export default function Home() {
 
     const handleAutopilotToggle = useCallback(() => {
         setIsAutopilotOn(v => !v);
-        if (isAutopilotV2On) setIsAutopilotV2On(false);
-    }, [isAutopilotV2On]);
+    }, []);
 
     const handleAutopilotV2Toggle = useCallback(() => {
         setIsAutopilotV2On(v => !v);
-        if (isAutopilotOn) setIsAutopilotOn(false);
-    }, [isAutopilotOn]);
+    }, []);
 
 
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
