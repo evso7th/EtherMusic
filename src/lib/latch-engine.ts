@@ -2,6 +2,7 @@
 "use client";
 
 import * as Tone from 'tone';
+import { Orb } from '@/app/page';
 
 const NOTE_PROXIMITY_THRESHOLD = 35;
 
@@ -18,13 +19,11 @@ type LatchedBassNote = {
     synthNode: LatchedNoteSynth;
     initialFreq: number;
     volume: number;
-    isPlaying: boolean;
 };
 
 export class LatchEngine {
     private isLatchOn = false;
     private isPulsating = false;
-    private isTransportPlaying = false;
     
     private synthPool: LatchedNoteSynth[] = [];
     private latchedNotes = new Map<number, LatchedBassNote>();
@@ -44,13 +43,12 @@ export class LatchEngine {
             const gain = new Tone.Gain(1).connect(destination);
             const lfo = new Tone.LFO({
                 type: "sine",
-                frequency: "2n", // Sync with transport
+                frequency: "2n",
                 min: 0.2,
                 max: 1,
-            }).start(); // Start LFO immediately
+            }).start();
             
             const synth = new Tone.Synth(synthOptions).connect(gain);
-
             this.synthPool.push({ synth, gain, lfo });
         }
     }
@@ -78,7 +76,10 @@ export class LatchEngine {
 
     private updatePulsationForNote(note: LatchedBassNote) {
         const { gain, lfo } = note.synthNode;
-        if (this.isPulsating && note.isPlaying) {
+        // Only pulsate if the main transport is running
+        const shouldPulsate = this.isPulsating && Tone.Transport.state === 'started';
+
+        if (shouldPulsate) {
             if (!lfo.isCelled(gain.gain)) {
                  lfo.connect(gain.gain);
             }
@@ -86,6 +87,7 @@ export class LatchEngine {
             if (lfo.isCelled(gain.gain)) {
                 lfo.disconnect(gain.gain);
             }
+            // Return to base volume
             gain.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
         }
     }
@@ -119,13 +121,9 @@ export class LatchEngine {
                     id: newId, x: pos.x, y: pos.y,
                     initialFreq: quantizedFreq, volume: vol * vol,
                     synthNode: freeSynthNode,
-                    isPlaying: false
                 };
                 this.latchedNotes.set(newId, newNote);
-                
-                if (this.isTransportPlaying) {
-                   this.playNote(newNote);
-                }
+                this.playNote(newNote);
             }
         }
         this.dispatchOrbs();
@@ -133,37 +131,29 @@ export class LatchEngine {
     
     private playNote(note: LatchedBassNote) {
         note.synthNode.synth.triggerAttack(note.initialFreq, undefined, note.volume);
-        note.isPlaying = true;
         this.updatePulsationForNote(note);
     }
     
     private releaseNote(note: LatchedBassNote) {
-        note.synthNode.synth.triggerRelease();
-        note.isPlaying = false;
-        this.updatePulsationForNote(note);
+        const { synth, lfo, gain } = note.synthNode;
+        if (lfo.isCelled(gain.gain)) {
+            lfo.disconnect(gain.gain);
+        }
+        synth.triggerRelease();
     }
 
+    // Called when main transport starts
     public startAll() {
-        this.isTransportPlaying = true;
-        if (this.latchedNotes.size === 0) return;
-        this.latchedNotes.forEach(note => {
-            if(!note.isPlaying) {
-                this.playNote(note);
-            }
-        });
+        this.latchedNotes.forEach(note => this.updatePulsationForNote(note));
     }
     
+    // Called when main transport pauses
     public pauseAll() {
-        this.isTransportPlaying = false;
-        this.latchedNotes.forEach(note => {
-            if(note.isPlaying) {
-                this.releaseNote(note);
-            }
-        });
+        this.latchedNotes.forEach(note => this.updatePulsationForNote(note));
     }
 
+    // Called on main Stop button or when latch is turned off
     public stopAll(clearNotes = false) {
-        this.isTransportPlaying = false;
         this.latchedNotes.forEach(note => {
             this.releaseNote(note);
         });
@@ -174,7 +164,7 @@ export class LatchEngine {
     }
 
     private dispatchOrbs() {
-        const latchedOrbs = Array.from(this.latchedNotes.values()).map(note => ({
+        const latchedOrbs: Orb[] = Array.from(this.latchedNotes.values()).map(note => ({
             id: note.id,
             x: note.x,
             y: note.y,
