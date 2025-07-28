@@ -24,7 +24,7 @@ export class AudioEngine {
     public drumMachine!: DrumMachine;
 
     // --- Tone.js Objects ---
-    private channels!: { melody: Tone.Channel, bass: Tone.Channel, latch: Tone.Channel };
+    private channels!: { melody: Tone.Channel, bass: Tone.Channel, latch: Tone.Channel, drums: Tone.Channel };
     public fx!: { reverb: Tone.Reverb, delay: Tone.FeedbackDelay };
     private melodySynths: Tone.Synth[] = [];
     private bassSynths: Tone.Synth[] = [];
@@ -66,6 +66,7 @@ export class AudioEngine {
             melody: new Tone.Channel(0).toDestination(),
             bass: new Tone.Channel(0).toDestination(),
             latch: new Tone.Channel(0).toDestination(),
+            drums: new Tone.Channel(0).toDestination(),
         };
         
         // Connect channels to FX
@@ -78,7 +79,7 @@ export class AudioEngine {
         this.latchEngine = new LatchEngine(this.latchSynths);
         
         // --- Drum Machine ---
-        this.drumMachine = new DrumMachine(this.fx.reverb, this.fx.delay);
+        this.drumMachine = new DrumMachine(this.channels.drums);
         await this.drumMachine.initialize();
 
         // --- Bass Chain ---
@@ -272,12 +273,10 @@ export class AudioEngine {
     // --- PRIVATE METHODS ---
 
     private connectChannelsToFX() {
-        this.channels.melody.connect(this.fx.reverb);
-        this.channels.melody.connect(this.fx.delay);
-        this.channels.bass.connect(this.fx.reverb);
-        this.channels.bass.connect(this.fx.delay);
-        this.channels.latch.connect(this.fx.reverb);
-        this.channels.latch.connect(this.fx.delay);
+        for (const channel of Object.values(this.channels)) {
+            channel.connect(this.fx.reverb);
+            channel.connect(this.fx.delay);
+        }
     }
     
     private createSynthPools() {

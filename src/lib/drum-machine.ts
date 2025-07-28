@@ -1,4 +1,5 @@
 
+
 import * as Tone from 'tone';
 
 export const beatPatterns = [
@@ -16,30 +17,21 @@ export const beatPatterns = [
 
 export class DrumMachine {
     private isInitialized = false;
-    private channel!: Tone.Channel;
+    private channel: Tone.Channel;
     private drumSamplers: Record<string, Tone.Player> = {};
     private drumPart!: Tone.Part<{note: string | string[]}>;
     private conductorEventId: number | null = null;
     private measureCount = 0;
     private currentBeatPatternName = 'Off';
-    private fxReverb: Tone.Reverb;
-    private fxDelay: Tone.FeedbackDelay;
-
-    constructor(fxReverb: Tone.Reverb, fxDelay: Tone.FeedbackDelay) {
-        this.fxReverb = fxReverb;
-        this.fxDelay = fxDelay;
+   
+    constructor(outputChannel: Tone.Channel) {
+        this.channel = outputChannel;
     }
 
     public async initialize() {
         if (this.isInitialized) return;
-
-        this.channel = new Tone.Channel(0).toDestination();
-        this.channel.connect(this.fxReverb);
-        this.channel.connect(this.fxDelay);
-
         await this.loadDrumSamples();
         this.setupDrumPart();
-
         this.isInitialized = true;
     }
 
