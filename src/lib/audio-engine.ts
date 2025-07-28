@@ -29,6 +29,7 @@ export class AudioEngine {
     public fx!: { reverb: Tone.Reverb, delay: Tone.FeedbackDelay };
     private melodySynths: Tone.Synth[] = [];
     private bassSynths: Tone.Synth[] = [];
+    private latchSynths: Tone.Synth[] = []; // Dedicated synths for Latch mode
     
     private drumSamplers: Record<string, Tone.Player> = {};
     private drumPart!: Tone.Part<{note: string | string[]}>;
@@ -36,7 +37,6 @@ export class AudioEngine {
     private measureCount = 0;
     private recorder!: Tone.Recorder;
     private bassLFO!: Tone.LFO;
-    private bassGain!: Tone.Gain;
     private currentBeatPatternName = 'Off';
     
     // --- Internal State ---
@@ -46,7 +46,6 @@ export class AudioEngine {
     private allowedFrequencies = { bass: [] as number[], melody: [] as number[] };
     private isBassPulsating = false;
     private isBassLatchOn = false;
-    private isPlaying = false;
     private musicKey: MusicKey = 'C';
     private musicScale: MusicScale = 'Major Pentatonic';
 
@@ -60,7 +59,6 @@ export class AudioEngine {
             await Tone.start();
         } catch (e) {
             console.error("Tone.start() failed:", e);
-            // Don't proceed if Tone.js cannot start
             return;
         }
 
@@ -79,13 +77,12 @@ export class AudioEngine {
         this.connectChannelsToFX();
         
         // Synth Pools
-        this.bassGain = new Tone.Gain(1).connect(this.channels.bass);
         this.createSynthPools();
         
-        // Bass LFO
+        // Bass LFO for Latch Synths
         this.bassLFO = new Tone.LFO({
             frequency: Tone.Time("4n").toFrequency(),
-            min: 0,
+            min: 0.1, // Don't go completely silent
             max: 1,
         }).start();
 
@@ -106,35 +103,24 @@ export class AudioEngine {
     public start() {
         if (!this.isInitialized || Tone.Transport.state === 'started') return;
         Tone.Transport.start();
-        this.isPlaying = true;
-
-        if (this.isBassLatchOn) {
-            // Latched notes are already triggered, they will resume automatically with the transport
-        }
-        
-        this.setBassPulsating(this.isBassPulsating);
     }
 
     public pause() {
         if (!this.isInitialized) return;
         if (Tone.Transport.state === 'started') {
             Tone.Transport.pause();
-            this.isPlaying = false;
-            // Release latched notes on pause so they can be re-triggered on play
-            if (this.isBassLatchOn) {
-                this.latchedBassNotes.forEach(note => note.synth.triggerRelease());
-            }
         }
     }
 
     public stop() {
         if (!this.isInitialized) return;
         Tone.Transport.stop();
-        this.isPlaying = false;
         
+        // Stop real-time notes
         this.activeNotes.forEach(note => note.synth.triggerRelease());
         this.activeNotes.clear();
         
+        // Stop latched notes
         this.latchedBassNotes.forEach(note => note.synth.triggerRelease());
         this.latchedBassNotes.clear();
         
@@ -172,7 +158,7 @@ export class AudioEngine {
     public setVolumes(volumes: Record<string, number>) {
         if (!this.isInitialized || !this.channels) return;
         this.channels.melody.volume.value = volumes.melody;
-        this.channels.bass.volume.value = volumes.bass;
+        this.channels.bass.volume.value = volumes.bass; // This affects both regular and latched bass synths
         this.channels.drums.volume.value = volumes.drums;
     }
 
@@ -189,7 +175,7 @@ export class AudioEngine {
     public setBeatPattern(patternName: string) {
         if (!this.isInitialized) return;
         this.currentBeatPatternName = patternName;
-        this.measureCount = 0; // Reset measure count on pattern change
+        this.measureCount = 0;
         this.updateDrumAndConductor(patternName);
     }
     
@@ -237,27 +223,21 @@ export class AudioEngine {
     }
 
     public setBassPulsating(isPulsating: boolean) {
-        if (!this.isInitialized || !this.bassLFO || !this.bassGain) return;
+        if (!this.isInitialized || !this.bassLFO) return;
         this.isBassPulsating = isPulsating;
-
-        const synthsToAffect = new Set([
-            ...this.bassSynths,
-            ...Array.from(this.latchedBassNotes.values()).map(n => n.synth)
-        ]);
-
-        synthsToAffect.forEach(synth => {
-            if (synth.output && synth.output.gain) {
-                if (isPulsating && this.isPlaying) {
-                    this.bassLFO.connect(synth.output.gain);
-                } else {
-                    this.bassLFO.disconnect(synth.output.gain);
-                    synth.output.gain.cancelScheduledValues();
-                    synth.output.gain.rampTo(1, 0.1);
-                }
+    
+        // Affect ONLY the dedicated latch synths
+        this.latchSynths.forEach(synth => {
+            if (isPulsating) {
+                this.bassLFO.connect(synth.volume);
+            } else {
+                this.bassLFO.disconnect(synth.volume);
+                // Ensure the volume is reset when pulsation is turned off
+                synth.volume.cancelScheduledValues();
+                synth.volume.rampTo(0, 0.1); // Ramp to 0 dB (normal volume)
             }
         });
     }
-
 
     public setBassLatch(isLatchOn: boolean) {
         if (!this.isInitialized) return;
@@ -274,22 +254,21 @@ export class AudioEngine {
     public startNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}) {
         if (type === 'bass' && this.isBassLatchOn) {
             this.handleLatchInteraction(pos, vol);
-        } else {
-            const synthPool = type === 'melody' ? this.melodySynths : this.bassSynths;
-            const activeSynths = new Set(Array.from(this.activeNotes.values()).map(n => n.synth));
-            const freeSynth = synthPool.find(s => !activeSynths.has(s) && !Array.from(this.latchedBassNotes.values()).some(n => n.synth === s));
-
-            if (freeSynth) {
-                const quantizedFreq = this.getClosestFrequency(freq, type);
-                freeSynth.frequency.value = quantizedFreq;
-                const velocity = vol * vol;
-                freeSynth.triggerAttack(quantizedFreq, undefined, velocity);
-                this.activeNotes.set(pointerId, { type, synth: freeSynth, initialFreq: quantizedFreq, x: pos.x, y: pos.y });
-            }
+            return;
         }
-        this.updateAndDispatchOrbs();
-    }
 
+        const synthPool = type === 'melody' ? this.melodySynths : this.bassSynths;
+        const activeSynths = new Set(Array.from(this.activeNotes.values()).map(n => n.synth));
+        const freeSynth = synthPool.find(s => !activeSynths.has(s));
+
+        if (freeSynth) {
+            const quantizedFreq = this.getClosestFrequency(freq, type);
+            const velocity = vol * vol;
+            freeSynth.triggerAttack(quantizedFreq, undefined, velocity);
+            this.activeNotes.set(pointerId, { type, synth: freeSynth, initialFreq: quantizedFreq, x: pos.x, y: pos.y });
+            this.updateAndDispatchOrbs();
+        }
+    }
 
     public updateNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}) {
         const activeNote = this.activeNotes.get(pointerId);
@@ -299,10 +278,11 @@ export class AudioEngine {
             activeNote.synth.frequency.rampTo(quantizedFreq, 0.01);
             
             const velocity = vol * vol;
-            if (activeNote.type === 'bass' && activeNote.synth.output.gain) {
-                activeNote.synth.output.gain.rampTo(velocity, 0.01);
+            if (activeNote.type === 'bass') {
+                 // For regular bass notes, we set the volume on the synth directly.
+                 activeNote.synth.volume.rampTo(Tone.gainToDb(velocity), 0.01);
             } else {
-                activeNote.synth.set({ volume: Tone.gainToDb(velocity) });
+                 activeNote.synth.volume.rampTo(Tone.gainToDb(velocity), 0.01);
             }
 
             activeNote.x = pos.x;
@@ -320,10 +300,9 @@ export class AudioEngine {
         if (activeNote) {
             activeNote.synth.triggerRelease();
             this.activeNotes.delete(pointerId);
+            this.updateAndDispatchOrbs();
         }
-        this.updateAndDispatchOrbs();
     }
-
 
     // --- PRIVATE METHODS ---
 
@@ -338,12 +317,23 @@ export class AudioEngine {
         const bassSynthOptions = {
             oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
+            volume: 0 // Start with volume 0 for regular bass synths
         } as const;
+
+        // Pool for regular bass playing
         for (let i = 0; i < 2; i++) {
-            this.bassSynths.push(new Tone.Synth(bassSynthOptions).connect(this.bassGain));
+            this.bassSynths.push(new Tone.Synth(bassSynthOptions).connect(this.channels.bass));
+        }
+        
+        // Dedicated pool for Latch mode
+        for (let i = 0; i < 2; i++) {
+            this.latchSynths.push(new Tone.Synth(bassSynthOptions).connect(this.channels.bass));
         }
 
-        const melodySynthOptions = { portamento: 0.02 };
+        const melodySynthOptions = { 
+            portamento: 0.02,
+            volume: 0 
+        };
         for (let i = 0; i < 4; i++) {
             this.melodySynths.push(new Tone.Synth(melodySynthOptions).connect(this.channels.melody));
         }
@@ -397,13 +387,9 @@ export class AudioEngine {
             return;
         }
         
-        // Always run conductor if a pattern is selected
         this.startConductor();
-        
-        // Immediately schedule the first measure
         this.scheduleNextDrumMeasure();
     }
-
 
     private startConductor() {
         if (this.conductorEventId === null) {
@@ -481,11 +467,11 @@ export class AudioEngine {
             const noteToRelease = this.latchedBassNotes.get(existingEntryKey);
             noteToRelease?.synth.triggerRelease();
             this.latchedBassNotes.delete(existingEntryKey);
-        } else if (this.latchedBassNotes.size < this.bassSynths.length) {
-            const assignedSynth = this.bassSynths.find(s => 
-                !Array.from(this.latchedBassNotes.values()).some(n => n.synth === s) && 
-                !Array.from(this.activeNotes.values()).some(n => n.synth === s)
-            );
+        } else if (this.latchedBassNotes.size < this.latchSynths.length) {
+            // Find a free latch synth
+            const latchedActiveSynths = new Set(Array.from(this.latchedBassNotes.values()).map(n => n.synth));
+            const assignedSynth = this.latchSynths.find(s => !latchedActiveSynths.has(s));
+
             if (assignedSynth) {
                 const newKey = Date.now();
                 if(this.allowedFrequencies.bass.length === 0) return;
@@ -493,12 +479,17 @@ export class AudioEngine {
                 const quantizedFreq = this.allowedFrequencies.bass[Math.floor(Math.random() * this.allowedFrequencies.bass.length)];
                 const velocity = vol * vol;
 
-                // Always trigger the attack. It will play if transport is running, or be ready if it's not.
                 assignedSynth.triggerAttack(quantizedFreq, undefined, velocity);
 
-                if (this.isBassPulsating && this.isPlaying && assignedSynth.output.gain) {
-                    this.bassLFO.connect(assignedSynth.output.gain);
+                // Apply pulsation if it's on
+                if (this.isBassPulsating) {
+                    this.bassLFO.connect(assignedSynth.volume);
+                } else {
+                    // Make sure volume is at 0 dB (normal) if not pulsating
+                    assignedSynth.volume.cancelScheduledValues();
+                    assignedSynth.volume.value = 0;
                 }
+
                 this.latchedBassNotes.set(newKey, { x: pos.x, y: pos.y, synth: assignedSynth, initialFreq: quantizedFreq, volume: velocity });
             }
         }
@@ -529,3 +520,131 @@ export class AudioEngine {
         document.dispatchEvent(new CustomEvent('orbs-updated-melody', { detail: melodyOrbs }));
     }
 }
+
+
+const beatPatternsData: { [key: string]: { groove: (string|string[]|null)[][], fills: (string|string[]|null)[][] } } = {
+    Air: {
+        groove: [
+            [
+                null, 'E2', 'E1', 'E2', null, 'E1', 'E2', 'E1',
+                null, null, 'E2', null, null, 'E1', null, 'E2',
+            ],
+        ],
+        fills: [
+            [
+                null, 'F1', null, null, null, 'F1', null, null,
+                'E1', null, 'E2', null, 'E1', null, 'E2', null
+            ]
+        ]
+    },
+    Earth: {
+        groove: [
+            [
+                'C1', null, null, null, 'C1', null, null, null,
+                'C1', null, null, null, 'C1', null, null, null,
+            ],
+        ],
+        fills: [
+            [
+                null, 'G1', null, 'G2', null, 'G3', null, 'C1',
+                null, 'E2', null, 'G3', null, 'G2', null, 'F1',
+            ]
+        ]
+    },
+    Water: {
+        groove: [
+            [
+                null, 'E2', 'E1', 'E2', null, 'E2', 'E1', 'E2',
+                null, 'E2', null, 'E2', 'E1', 'E2', 'F1', null,
+            ]
+        ],
+        fills: [
+            [
+                'F1', 'E1', null, 'E2', 'F1', null, 'F1', 'E2',
+                null, 'E1', 'F1', null, 'F1', 'E1', null, 'F1',
+            ]
+        ]
+    },
+    Tibet: {
+        groove: [
+            [
+                'C1', null, null, null, null, 'D1', null, null,
+                null, 'C1', null, null, null, null, null, null,
+            ]
+        ],
+        fills: [
+            [
+                'D1', null, null, null, null, 'C1', null, null,
+                null, null, 'C1', null, null, null, 'D1', null,
+            ]
+        ]
+    },
+    Toccata: {
+        groove: [[
+            ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2',
+            ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2'
+        ]],
+        fills: [
+            [
+                'G1', 'G1', 'G2', 'G2', 'G3', 'G3', ['F1', 'C1'], ['F1'],
+                'G1', 'G2', 'G3', null, 'F1', 'D1', ['F1', 'C1'], ['F1', 'D1'],
+            ],
+            [
+                'G1', 'E2', 'G1', 'E2', 'G2', 'E2', 'G2', 'E2',
+                'G3', 'E2', 'G3', 'E1', ['F1', 'D1'], 'C1', ['F1', 'C1'], 'C1'
+            ]
+        ]
+    },
+    Promenade: {
+        groove: [[
+            ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2',
+            ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2',
+        ]],
+        fills: [
+            [
+                'C1', 'E2', ['C1', 'E2'], 'E2', 'C1', 'E2', ['C1', 'E2'], 'E2',
+                'D1', 'E2', ['D1', 'E2'], 'E2', 'D1', 'E2', ['D1', 'E2', 'F1'], 'F1',
+            ]
+        ]
+    },
+    Nocturne: {
+        groove: [[
+            'C1', ['E1', 'E2'], 'E2', ['E1', 'E2'], 'C1', ['E1', 'E2'], 'E2', ['E1', 'E2'],
+            'C1', ['E1', 'E2'], 'E2', ['E1', 'E2'], 'C1', ['E1', 'E2'], 'E2', ['E1', 'E2'],
+        ]],
+        fills: [
+            [
+                'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2',
+                'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1',
+            ]
+        ]
+    },
+    Scherzo: {
+        groove: [[
+            null, ['E1', 'E2'], ['C1','D1'], 'E2', null, ['E1', 'E2'], ['C1','D1'], 'E2',
+            null, ['E1', 'E2'], ['C1','D1'], 'E2', null, ['E1', 'E2'], ['C1','D1'], 'E2',
+        ]],
+        fills: [
+            [
+                'G1', null, 'G2', null, 'G3', null, ['C1','D1'], null,
+                'G1', 'G1', 'G2', 'G2', 'G3', 'G3', ['C1', 'D1', 'F1'], null,
+            ]
+        ]
+    },
+    Aria: {
+        groove: [[
+            ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1', ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1',
+            ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1', ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1',
+        ]],
+        fills: [
+            [
+                'G1', null, 'G1', 'G2', null, 'G2', 'G3', null,
+                'G3', ['D1', 'G3'], 'D1', 'D1', ['F1', 'D1'], 'C1', 'D1', 'C1'
+            ]
+        ]
+    },
+    Off: {
+        groove: [],
+        fills: []
+    }
+};
