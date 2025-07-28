@@ -272,10 +272,12 @@ export class AudioEngine {
     // --- PRIVATE METHODS ---
 
     private connectChannelsToFX() {
-        Object.values(this.channels).forEach(channel => {
-            channel.connect(this.fx.reverb);
-            channel.connect(this.fx.delay);
-        });
+        this.channels.melody.connect(this.fx.reverb);
+        this.channels.melody.connect(this.fx.delay);
+        this.channels.bass.connect(this.fx.reverb);
+        this.channels.bass.connect(this.fx.delay);
+        this.channels.latch.connect(this.fx.reverb);
+        this.channels.latch.connect(this.fx.delay);
     }
     
     private createSynthPools() {
