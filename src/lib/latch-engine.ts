@@ -9,7 +9,7 @@ const NOTE_PROXIMITY_THRESHOLD = 35;
 type LatchedNoteSynth = {
     synth: Tone.Synth;
     lfo: Tone.LFO;
-    volumeControl: Tone.Multiply; 
+    volumeControl: Tone.Multiply;
 };
 
 type LatchedBassNote = {
@@ -48,7 +48,7 @@ export class LatchEngine {
                 min: 0.2,
                 max: 1,
                 frequency: "4n",
-            });
+            }).start();
             
             const volumeControl = new Tone.Multiply(Tone.dbToGain(this.baseVolumeDb)).connect(this.destination);
             synth.connect(volumeControl);
@@ -60,15 +60,15 @@ export class LatchEngine {
     public setVolume(db: number) {
         this.baseVolumeDb = db;
         const gain = Tone.dbToGain(db);
-        this.latchedNotes.forEach(note => {
-             note.synthNode.volumeControl.factor.rampTo(gain, 0.1);
+        this.synthPool.forEach(node => {
+             node.volumeControl.factor.rampTo(gain, 0.1);
         });
     }
 
     public setLatch(isOn: boolean) {
         this.isLatchOn = isOn;
         if (!isOn && this.latchedNotes.size > 0) {
-            this.stopAll(true);
+            this.stopAll();
         }
     }
 
@@ -81,29 +81,20 @@ export class LatchEngine {
 
     private updatePulsationForNote(note: LatchedBassNote) {
         const { lfo, volumeControl } = note.synthNode;
-        const gain = Tone.dbToGain(this.baseVolumeDb);
+        const baseGain = Tone.dbToGain(this.baseVolumeDb);
         
         if (this.isPulsating) {
             lfo.connect(volumeControl.factor);
-            if (lfo.state !== 'started') {
-                lfo.start();
-            }
         } else {
-            if (lfo.state === 'started') {
-                lfo.stop();
-            }
             lfo.disconnect(volumeControl.factor);
-            volumeControl.factor.value = gain;
+            volumeControl.factor.rampTo(baseGain, 0.1);
         }
     }
     
-    public stopAll(clearNotes = false) {
+    public stopAll() {
         this.latchedNotes.forEach((note, id) => {
             this.releaseAndRemoveNote(id);
         });
-        if (clearNotes) {
-            this.latchedNotes.clear();
-        }
         this.dispatchOrbs(); 
     }
 
@@ -141,8 +132,6 @@ export class LatchEngine {
     }
     
     private playNote(note: LatchedBassNote) {
-        const gain = Tone.dbToGain(this.baseVolumeDb);
-        note.synthNode.volumeControl.factor.value = gain;
         note.synthNode.synth.triggerAttack(note.initialFreq, undefined, note.volume);
         this.updatePulsationForNote(note);
     }
@@ -151,9 +140,6 @@ export class LatchEngine {
         const noteToRelease = this.latchedNotes.get(noteId);
         if(noteToRelease) {
             const { synth, lfo, volumeControl } = noteToRelease.synthNode;
-            if (lfo.state === 'started') {
-                lfo.stop();
-            }
             lfo.disconnect(volumeControl.factor);
             synth.triggerRelease();
             this.latchedNotes.delete(noteId);

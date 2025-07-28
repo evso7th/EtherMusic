@@ -97,21 +97,17 @@ export function ThereminPad({
             let orbEl = orbsRef.current.get(orb.id);
             if (!orbEl) {
                 orbEl = document.createElement('div');
-                orbEl.className = cn(
-                    'absolute top-0 left-0 rounded-full w-8 h-8 md:w-12 md:h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-100',
-                    orb.type === 'latch' && isPulsating && 'animate-pulse-primary'
-                );
-                 orbEl.style.backgroundColor = color;
-                 orbEl.style.boxShadow = `0 0 20px ${color}, 0 0 30px ${color}`;
-                 orbEl.style.animationDuration = '1s';
+                orbEl.style.backgroundColor = color;
+                orbEl.style.boxShadow = `0 0 20px ${color}, 0 0 30px ${color}`;
+                orbEl.style.animationDuration = '1s';
                 padRef.current.appendChild(orbEl);
                 orbsRef.current.set(orb.id, orbEl);
             }
             orbEl.className = cn(
                 'absolute top-0 left-0 rounded-full w-8 h-8 md:w-12 md:h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-100',
-                orb.type === 'latch' && isPulsating && 'animate-pulse-primary'
+                orb.type === 'latch' && isPulsating && 'animate-pulse-accent'
             );
-             orbEl.style.transform = `translate(${orb.x}px, ${orb.y}px)`;
+            orbEl.style.transform = `translate(${orb.x}px, ${orb.y}px)`;
         }
 
         // Remove old orbs
