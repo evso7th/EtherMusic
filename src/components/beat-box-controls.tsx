@@ -54,7 +54,6 @@ interface BeatBoxControlsProps {
     };
     onEffectChange: (effects: BeatBoxControlsProps['effects']) => void;
     isAutopilotOn: boolean;
-    onAutopilotToggle: (isOn: boolean) => void;
     autopilotStyles: AutopilotStyle[];
     activeAutopilotStyle: AutopilotStyle;
     onAutopilotStyleChange: (style: AutopilotStyle) => void;
@@ -73,7 +72,6 @@ export function BeatBoxControls({
     effects,
     onEffectChange,
     isAutopilotOn,
-    onAutopilotToggle,
     autopilotStyles,
     activeAutopilotStyle,
     onAutopilotStyleChange,
@@ -194,16 +192,6 @@ export function BeatBoxControls({
                         </div>
                     </DialogContent>
                 </Dialog>
-                
-                <Button
-                    variant={isAutopilotOn ? 'default' : 'outline'}
-                    onClick={() => onAutopilotToggle(!isAutopilotOn)}
-                    className="flex-1"
-                    size={isMobile ? 'sm' : 'default'}
-                >
-                    <Bot className="w-4 h-4 md:mr-2" />
-                    <span className="hidden sm:inline">Autopilot</span>
-                </Button>
 
                 {isAutopilotOn && (
                      <Dialog open={isStyleOpen} onOpenChange={setIsStyleOpen}>

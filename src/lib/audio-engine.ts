@@ -35,7 +35,7 @@ export class AudioEngine {
     private melodySynths: Tone.Synth[] = [];
     private bassSynths: Tone.Synth[] = [];
     
-    // Autopilot
+    // Autopilot (Polyphonic V1)
     private autopilotSynths!: { bass: Tone.PolySynth, melody: Tone.PolySynth };
     private autopilotParts!: { bass: Tone.Part<NoteEvent>, melody: Tone.Part<NoteEvent> };
     
@@ -65,13 +65,16 @@ export class AudioEngine {
 
     // --- PUBLIC API ---
 
-    /**
-     * Initializes the entire audio engine. Must be called once.
-     */
     public async initialize() {
         if (this.isInitialized) return;
 
-        await Tone.start();
+        try {
+            await Tone.start();
+        } catch (e) {
+            console.error("Tone.start() failed:", e);
+            // Don't proceed if Tone.js cannot start
+            return;
+        }
 
         // Master FX
         this.fx = {

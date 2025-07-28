@@ -20,10 +20,12 @@ interface PlaybackControlsProps {
     isPlaying: boolean;
     isRecording: boolean;
     isAutopilotOn: boolean;
+    isAutopilotV2On: boolean;
     onPlayPause: () => void;
     onRecord: () => void;
     onStop: () => void;
     onAutopilotToggle: () => void;
+    onAutopilotV2Toggle: () => void;
     isReady: boolean;
 }
 
@@ -31,10 +33,12 @@ export function PlaybackControls({
     isPlaying, 
     isRecording, 
     isAutopilotOn,
+    isAutopilotV2On,
     onPlayPause, 
     onRecord, 
     onStop,
-    onAutopilotToggle, 
+    onAutopilotToggle,
+    onAutopilotV2Toggle, 
     isReady 
 }: PlaybackControlsProps) {
     
@@ -61,6 +65,19 @@ export function PlaybackControls({
                     isAutopilotOn && 'animate-pulse-primary'
                 )}
                 aria-label={isAutopilotOn ? "Stop Autopilot" : "Start Autopilot"} 
+                disabled={!isReady}
+            >
+                 <Bot className="w-5 h-5 md:w-6 md:h-6" />
+            </Button>
+             <Button 
+                onClick={onAutopilotV2Toggle} 
+                variant={isAutopilotV2On ? 'default' : 'outline'} 
+                size="icon" 
+                className={cn(
+                    'w-10 h-10 rounded-full transition-colors',
+                    isAutopilotV2On && 'animate-pulse-primary'
+                )}
+                aria-label={isAutopilotV2On ? "Stop AP2" : "Start AP2"} 
                 disabled={!isReady}
             >
                  <Bot className="w-5 h-5 md:w-6 md:h-6" />
