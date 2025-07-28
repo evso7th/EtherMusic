@@ -8,7 +8,6 @@ const NOTE_PROXIMITY_THRESHOLD = 35;
 
 type LatchedNoteSynth = {
     synth: Tone.Synth;
-    lfo: Tone.LFO;
     gain: Tone.Gain;
 };
 
@@ -29,6 +28,7 @@ export class LatchEngine {
     private latchedNotes = new Map<number, LatchedBassNote>();
     private baseVolumeDb = -9;
     private readonly destination: Tone.ToneAudioNode;
+    private pulsationPattern!: Tone.Pattern<number | null>;
 
     constructor(destination: Tone.ToneAudioNode) {
         this.destination = destination;
@@ -44,26 +44,29 @@ export class LatchEngine {
         for (let i = 0; i < 2; i++) {
             const gain = new Tone.Gain(1).connect(this.destination);
             const synth = new Tone.Synth(synthOptions).connect(gain);
-            
-            const lfo = new Tone.LFO({
-                type: "square", // Use square wave for a sharp on/off pulse
-                min: 0,       // Modulate from silent
-                max: 1,       // To full volume
-                frequency: "4n",
-            });
-            lfo.connect(gain.gain);
-            
-            this.synthPool.push({ synth, lfo, gain });
+            this.synthPool.push({ synth, gain });
         }
+        
+        // Heartbeat pattern: thump-thump... pause
+        const pattern = [1, 0.7, null, null, 1, 0.7, null, null];
+        
+        this.pulsationPattern = new Tone.Pattern((time, value) => {
+            this.latchedNotes.forEach(note => {
+                const targetVolume = value !== null ? Tone.dbToGain(this.baseVolumeDb) * value : 0;
+                note.synthNode.gain.gain.rampTo(targetVolume, 0.02, time);
+            });
+        }, pattern, "upDown");
+
+        this.pulsationPattern.interval = "8n";
     }
     
     public setVolume(db: number) {
         this.baseVolumeDb = db;
-        this.latchedNotes.forEach(note => {
-             if (!this.isPulsating) {
+        if (!this.isPulsating) {
+            this.latchedNotes.forEach(note => {
                 note.synthNode.gain.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
-             }
-        });
+            });
+        }
     }
 
     public setLatch(isOn: boolean) {
@@ -77,19 +80,18 @@ export class LatchEngine {
         if (this.isPulsating === isPulsating) return;
         this.isPulsating = isPulsating;
         
-        const quarterNoteFrequency = Tone.Transport.bpm.value / 60;
-
-        this.latchedNotes.forEach(note => {
-            const { lfo, gain } = note.synthNode;
-            lfo.frequency.value = quarterNoteFrequency * 2; // 8th note rhythm
-
-            if (this.isPulsating) {
-                lfo.start();
-            } else {
-                lfo.stop();
-                gain.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
+        if (this.isPulsating) {
+            if (Tone.Transport.state !== 'started') {
+                 Tone.Transport.start();
             }
-        });
+            this.pulsationPattern.start(0);
+        } else {
+            this.pulsationPattern.stop();
+            // Restore all notes to their base volume
+            this.latchedNotes.forEach(note => {
+                note.synthNode.gain.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
+            });
+        }
     }
     
     public handleInteraction(pos: { x: number; y: number }, vol: number, quantizedFreq: number) {
@@ -126,28 +128,25 @@ export class LatchEngine {
     }
 
     private playNote(note: LatchedBassNote) {
-        note.synthNode.gain.gain.value = Tone.dbToGain(this.baseVolumeDb);
+        // Set initial volume, respecting pulsation if active
+        const initialGain = this.isPulsating ? 0 : Tone.dbToGain(this.baseVolumeDb);
+        note.synthNode.gain.gain.value = initialGain;
         note.synthNode.synth.triggerAttack(note.initialFreq);
-        
-        if (this.isPulsating) {
-             const quarterNoteFrequency = Tone.Transport.bpm.value / 60;
-             note.synthNode.lfo.frequency.value = quarterNoteFrequency * 2; // "4n"
-             note.synthNode.lfo.start();
-        }
     }
     
     public startAll() {
-        this.latchedNotes.forEach(note => this.playNote(note));
+       // This is handled by the pattern now
     }
     
     public pauseAll() {
-         this.latchedNotes.forEach((note) => {
+        this.pulsationPattern.stop();
+        this.latchedNotes.forEach((note) => {
             note.synthNode.synth.triggerRelease();
-            note.synthNode.lfo.stop();
         });
     }
 
     public stopAll() {
+        this.pulsationPattern.stop();
         this.latchedNotes.forEach((note, id) => {
             this.releaseAndRemoveNote(id);
         });
@@ -158,7 +157,6 @@ export class LatchEngine {
         const noteToRelease = this.latchedNotes.get(noteId);
         if(noteToRelease) {
             noteToRelease.synthNode.synth.triggerRelease();
-            noteToRelease.synthNode.lfo.stop();
             this.latchedNotes.delete(noteId);
         }
     }
