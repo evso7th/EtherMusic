@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import type { PointerEvent } from 'react';
@@ -120,15 +121,37 @@ export function ThereminPad({
     
     // Connect orb management to audio engine events
      useEffect(() => {
-        const eventName = `orbs-updated-${type}`;
-        const handler = (e: Event) => {
-            const customEvent = e as CustomEvent<Orb[]>;
-            manageOrbs(customEvent.detail);
+        const eventMap = {
+            bass: ['bass-orbs-updated', 'latch-orbs-updated'],
+            melody: ['melody-orbs-updated']
         };
+
+        const handlers: { [key: string]: (e: Event) => void } = {};
         
-        document.addEventListener(eventName, handler);
+        const allOrbLists: { [key: string]: Orb[] } = {};
+
+        const combinedHandler = () => {
+             const allOrbs = Object.values(allOrbLists).flat();
+             manageOrbs(allOrbs);
+        };
+
+        const createHandler = (listId: string) => (e: Event) => {
+            const customEvent = e as CustomEvent<Orb[]>;
+            allOrbLists[listId] = customEvent.detail;
+            combinedHandler();
+        };
+
+        const eventNames = eventMap[type];
+
+        eventNames.forEach(eventName => {
+            handlers[eventName] = createHandler(eventName);
+            document.addEventListener(eventName, handlers[eventName]);
+        });
+        
         return () => {
-            document.removeEventListener(eventName, handler);
+             eventNames.forEach(eventName => {
+                document.removeEventListener(eventName, handlers[eventName]);
+            });
         };
     }, [type, manageOrbs]);
 
@@ -288,3 +311,4 @@ export function ThereminPad({
         </Card>
     );
 }
+

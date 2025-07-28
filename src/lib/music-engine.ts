@@ -268,15 +268,14 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
         }
 
         case 'Promenade': {
-            // Bass: mimics the stately walk of the promenade theme with a classic I-V-IV progression
+            // Bass: mimics the stately walk of the promenade theme with a classic I-V-I progression
              for (let i = 0; i < 8; i++) {
                 const m = Math.floor(i / 2);
                 const b = (i * 2) % 4;
                 const time = `${m}:${b}:0`;
                 let freq = baseNote;
-                if (m === 1) freq = fifthNote;
-                if (m === 2) freq = freqs.bass[3] || baseNote; // IV chord
-                if (m === 3) freq = fifthNote;
+                if (m === 1 || m === 3) freq = fifthNote;
+                if (m === 2) freq = baseNote;
                 bassPattern.push({ time, freq, dur: '4n', vel: 0.6 });
             }
              
@@ -340,130 +339,3 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
 
     return { bassPattern, melodyPattern: loopedMelody };
 }
-
-export const beatPatternsData: { [key: string]: { groove: (string|string[]|null)[][], fills: (string|string[]|null)[][] } } = {
-    Air: {
-        groove: [
-            [
-                null, 'E2', 'E1', 'E2', null, 'E1', 'E2', 'E1',
-                null, null, 'E2', null, null, 'E1', null, 'E2',
-            ],
-        ],
-        fills: [
-            [
-                null, 'F1', null, null, null, 'F1', null, null,
-                'E1', null, 'E2', null, 'E1', null, 'E2', null
-            ]
-        ]
-    },
-    Earth: {
-        groove: [
-            [
-                'C1', null, null, null, 'C1', null, null, null,
-                'C1', null, null, null, 'C1', null, null, null,
-            ],
-        ],
-        fills: [
-            [
-                null, 'G1', null, 'G2', null, 'G3', null, 'C1',
-                null, 'E2', null, 'G3', null, 'G2', null, 'F1',
-            ]
-        ]
-    },
-    Water: {
-        groove: [
-            [
-                null, 'E2', 'E1', 'E2', null, 'E2', 'E1', 'E2',
-                null, 'E2', null, 'E2', 'E1', 'E2', 'F1', null,
-            ]
-        ],
-        fills: [
-            [
-                'F1', 'E1', null, 'E2', 'F1', null, 'F1', 'E2',
-                null, 'E1', 'F1', null, 'F1', 'E1', null, 'F1',
-            ]
-        ]
-    },
-    Tibet: {
-        groove: [
-            [
-                'C1', null, null, null, null, 'D1', null, null,
-                null, 'C1', null, null, null, null, null, null,
-            ]
-        ],
-        fills: [
-            [
-                'D1', null, null, null, null, 'C1', null, null,
-                null, null, 'C1', null, null, null, 'D1', null,
-            ]
-        ]
-    },
-    Toccata: {
-        groove: [[
-            ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2',
-            ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2', ['C1', 'E1'], 'E2', ['D1', 'E1'], 'E2'
-        ]],
-        fills: [
-            [
-                'G1', 'G1', 'G2', 'G2', 'G3', 'G3', ['F1', 'C1'], ['F1'],
-                'G1', 'G2', 'G3', null, 'F1', 'D1', ['F1', 'C1'], ['F1', 'D1'],
-            ],
-            [
-                'G1', 'E2', 'G1', 'E2', 'G2', 'E2', 'G2', 'E2',
-                'G3', 'E2', 'G3', 'E1', ['F1', 'D1'], 'C1', ['F1', 'C1'], 'C1'
-            ]
-        ]
-    },
-    Promenade: {
-        groove: [[
-            ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2',
-            ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2', ['C1', 'E2'], 'E2',
-        ]],
-        fills: [
-            [
-                'C1', 'E2', ['C1', 'E2'], 'E2', 'C1', 'E2', ['C1', 'E2'], 'E2',
-                'D1', 'E2', ['D1', 'E2'], 'E2', 'D1', 'E2', ['D1', 'E2', 'F1'], 'F1',
-            ]
-        ]
-    },
-    Nocturne: {
-        groove: [[
-            'C1', ['E1', 'E2'], 'E2', ['E1', 'E2'], 'C1', ['E1', 'E2'], 'E2', ['E1', 'E2'],
-            'C1', ['E1', 'E2'], 'E2', ['E1', 'E2'], 'C1', ['E1', 'E2'], 'E2', ['E1', 'E2'],
-        ]],
-        fills: [
-            [
-                'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2', 'E2',
-                'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1', 'E1',
-            ]
-        ]
-    },
-    Scherzo: {
-        groove: [[
-            null, ['E1', 'E2'], ['C1','D1'], 'E2', null, ['E1', 'E2'], ['C1','D1'], 'E2',
-            null, ['E1', 'E2'], ['C1','D1'], 'E2', null, ['E1', 'E2'], ['C1','D1'], 'E2',
-        ]],
-        fills: [
-            [
-                'G1', null, 'G2', null, 'G3', null, ['C1','D1'], null,
-                'G1', 'G1', 'G2', 'G2', 'G3', 'G3', ['C1', 'D1', 'F1'], null,
-            ]
-        ]
-    },
-    Aria: {
-        groove: [[
-            ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1', ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1',
-            ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1', ['C1', 'E2'], 'E1', ['D1', 'E2'], 'E1',
-        ]],
-        fills: [
-            [
-                'G1', null, 'G1', 'G2', null, 'G2', 'G3', null,
-                'G3', ['D1', 'G3'], 'D1', 'D1', ['F1', 'D1'], 'C1', 'D1', 'C1'
-            ]
-        ]
-    },
-    Off: {
-        groove: [],
-        fills: []
-    }
-};
