@@ -85,9 +85,9 @@ export class AudioEngine {
 
         // LFO for pulsation effect
         this.bassLFO = new Tone.LFO({
-            type: "square",
+            type: "sine",
             frequency: "2n",
-            min: -100,
+            min: -12,
             max: 6,      
         });
         this.bassLFO.loop = true;
@@ -653,6 +653,7 @@ const beatPatternsData: { [key: string]: { groove: (string|string[]|null)[][], f
         fills: []
     }
 };
+
 
 
 
