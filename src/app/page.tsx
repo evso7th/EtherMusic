@@ -83,7 +83,6 @@ export default function Home() {
     const [melodyInstrument, setMelodyInstrument] = useState<MelodyInstrument>('synth');
     const [musicKey, setMusicKey] = useState<MusicKey>('C');
     const [musicScale, setMusicScale] = useState<MusicScale>('Major Pentatonic');
-    const [isBassPulsating, setIsBassPulsating] = useState(false);
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
     const [isAutopilotOn, setIsAutopilotOn] = useState(false);
     const [autopilotStyle, setAutopilotStyle] = useState<AutopilotStyle>('Ambient');
@@ -135,8 +134,7 @@ export default function Home() {
     // --- State Sync with Audio Engine ---
     useEffect(() => {
         audioEngine.current?.setTempo(activeTempo.bpm);
-        audioEngine.current?.setBassPulsating(isBassPulsating && isPlaying);
-    }, [activeTempo, isBassPulsating, isPlaying]);
+    }, [activeTempo]);
 
     useEffect(() => {
         audioEngine.current?.setVolumes(volumes);
@@ -327,8 +325,6 @@ export default function Home() {
                             type="bass"
                             frequencyRange={[55, 440]}
                             color="hsl(var(--accent))"
-                            isPulsating={isBassPulsating}
-                            onPulsateToggle={setIsBassPulsating}
                             isLatchOn={isBassLatchOn}
                             onLatchToggle={setIsBassLatchOn}
                             isPolyphonic

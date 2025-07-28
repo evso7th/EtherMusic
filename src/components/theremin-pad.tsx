@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Zap, Anchor, SlidersHorizontal } from 'lucide-react';
+import { Anchor, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { MelodyInstrument, MusicKey, MusicScale, Orb } from '@/app/page';
@@ -32,8 +32,6 @@ interface ThereminPadProps {
     activeScale?: MusicScale;
     onScaleChange?: (scale: MusicScale) => void;
     // Bass specific
-    isPulsating?: boolean;
-    onPulsateToggle?: (isPulsating: boolean) => void;
     isLatchOn?: boolean;
     onLatchToggle?: (checked: boolean) => void;
 }
@@ -51,8 +49,6 @@ export function ThereminPad({
     color,
     isPolyphonic = false,
     isDisabled = false,
-    isPulsating, 
-    onPulsateToggle, 
     instruments, 
     activeInstrument, 
     onInstrumentChange,
@@ -104,8 +100,7 @@ export function ThereminPad({
                 orbsRef.current.set(orb.id, orbEl);
             }
             orbEl.className = cn(
-                'absolute top-0 left-0 rounded-full w-8 h-8 md:w-12 md:h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-100',
-                orb.type === 'latch' && isPulsating && 'animate-pulse-accent'
+                'absolute top-0 left-0 rounded-full w-8 h-8 md:w-12 md:h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-100'
             );
             orbEl.style.transform = `translate(${orb.x}px, ${orb.y}px)`;
         }
@@ -117,7 +112,7 @@ export function ThereminPad({
                 orbsRef.current.delete(id);
             }
         }
-    }, [color, isPulsating]);
+    }, [color]);
     
     // Connect orb management to audio engine events
      useEffect(() => {
@@ -258,18 +253,6 @@ export function ThereminPad({
                     <Label htmlFor="latch-mode" className="flex items-center gap-1 text-xs"><Anchor className="w-3 h-3" /> Latch</Label>
                 </div>
             )}
-            {onPulsateToggle && (
-                 <Button
-                    variant={isPulsating ? 'default' : 'outline'}
-                    size="icon"
-                    onClick={() => onPulsateToggle(!isPulsating)}
-                    className={cn('transition-all w-8 h-8', isPulsating && 'animate-pulse-accent')}
-                    style={{ '--accent': 'hsl(var(--accent))' } as React.CSSProperties}
-
-                 >
-                     <Zap className="w-4 h-4" />
-                 </Button>
-            )}
         </>
     );
 
@@ -311,8 +294,3 @@ export function ThereminPad({
         </Card>
     );
 }
-
-
-
-
-

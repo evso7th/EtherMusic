@@ -220,12 +220,6 @@ export class AudioEngine {
         };
     }
 
-    public setBassPulsating(isPulsating: boolean) {
-        if (!this.isInitialized) return;
-        this.latchEngine.setPulsating(isPulsating);
-    }
-
-
     public setBassLatch(isLatchOn: boolean) {
         if (!this.isInitialized) return;
         this.isBassLatchOn = isLatchOn;
