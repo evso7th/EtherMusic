@@ -547,7 +547,7 @@ export default function Home() {
 
     }, [melodyInstrument, isReady]);
 
-    const handleStartApp = async () => {
+    const handleStartApp = useCallback(async () => {
         setIsAppStarted(true);
         await initializeAudio();
         
@@ -573,9 +573,9 @@ export default function Home() {
         const Tone = await import('tone');
         setIsPlaying(true);
         Tone.Transport.start();
-    }
+    }, [initializeAudio, isMobile]);
     
-    const handlePlayPause = async () => {
+    const handlePlayPause = useCallback(async () => {
         const Tone = await import('tone');
         if (!isReady) return;
 
@@ -602,7 +602,7 @@ export default function Home() {
                 autopilotSynths.current?.melody.releaseAll();
             }
         }
-    };
+    }, [isReady, isBassLatchOn, isAutopilotOn]);
 
     const handleStop = useCallback(async () => {
         const Tone = await import('tone');
@@ -621,7 +621,7 @@ export default function Home() {
         setIsPlaying(false);
     }, [isReady]);
 
-    const handleRecord = () => {
+    const handleRecord = useCallback(() => {
         if (!recorder.current) return;
         if (!isRecording) {
             recorder.current.start();
@@ -638,11 +638,11 @@ export default function Home() {
             });
             setIsRecording(false);
         }
-    };
+    }, [isRecording, toast]);
 
-    const handlePulsateToggle = () => {
+    const handlePulsateToggle = useCallback(() => {
         setIsBassPulsating(prev => !prev);
-    }
+    }, []);
 
     const handleLatchToggle = useCallback((checked: boolean) => {
         setIsBassLatchOn(checked);
@@ -653,9 +653,9 @@ export default function Home() {
         }
     }, []);
 
-     const handleAutopilotToggle = () => {
+     const handleAutopilotToggle = useCallback(() => {
         setIsAutopilotOn(prev => !prev);
-    };
+    }, []);
 
     useEffect(() => {
         if (!bassLFO.current || !bassGain.current) return;
@@ -847,12 +847,12 @@ export default function Home() {
         }
     }, [isBassLatchOn, isPlaying, getClosestFrequency]);
     
-    const handleStartScreenInteraction = () => {
+    const handleStartScreenInteraction = useCallback(() => {
         if (backgroundAudioRef.current && backgroundAudioRef.current.paused) {
             backgroundAudioRef.current.volume = 0.3;
             backgroundAudioRef.current.play().catch(error => console.error("Error playing background audio:", error));
         }
-    };
+    }, []);
     
     const bassOrbs = orbs.filter(orb => orb.type === 'bass' || orb.type === 'latch');
     const melodyOrbs = orbs.filter(orb => orb.type === 'melody');
