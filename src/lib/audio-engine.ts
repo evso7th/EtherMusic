@@ -14,7 +14,7 @@ type LatchedBassNote = {
     id: number;
     x: number;
     y: number;
-    synth: Tone.Synth;
+    synth: Tone.Synth; // This is a reference to a synth from the pool
     initialFreq: number;
     volume: number;
 };
@@ -40,6 +40,7 @@ export class AudioEngine {
     private recorder!: Tone.Recorder;
     private bassLFO!: Tone.LFO;
     private currentBeatPatternName = 'Off';
+    private bassGain!: Tone.Gain;
     
     // --- Internal State ---
     private activeNotes = new Map<number, ActiveNote>();
@@ -77,6 +78,7 @@ export class AudioEngine {
             drums: new Tone.Channel(0).toDestination(),
         };
         this.connectChannelsToFX();
+        this.bassGain = new Tone.Gain(1).connect(this.channels.bass);
         
         // Synth Pools
         this.createSynthPools();
@@ -96,8 +98,9 @@ export class AudioEngine {
             frequency: "2n", // Pulsates every half note by default
             min: -100,  // Go completely silent
             max: 0,          // Go to full volume (0 dB)
-        }).start();
-
+        });
+        this.bassLFO.loop = true;
+        
         // Drums
         await this.loadDrumSamples();
         this.setupDrumPart();
@@ -246,6 +249,7 @@ export class AudioEngine {
     
         if (isPulsating) {
             this.bassLFO.connect(this.latchSynths.volume);
+            this.bassLFO.start();
         } else {
             this.bassLFO.disconnect(this.latchSynths.volume);
             // Ensure volume is reset to 0 when pulsation is off
@@ -293,11 +297,10 @@ export class AudioEngine {
             activeNote.synth.frequency.rampTo(quantizedFreq, 0.01);
             
             const velocity = vol * vol;
-            // Use the correct method to ramp volume for each synth type
             if (activeNote.type === 'bass') {
                  activeNote.synth.volume.rampTo(Tone.gainToDb(velocity), 0.01);
             } else {
-                 activeNote.synth.volume.rampTo(Tone.gainToDb(velocity), 0.01);
+                 activeNote.synth.set({volume: Tone.gainToDb(velocity)});
             }
     
             activeNote.x = pos.x;
@@ -335,7 +338,7 @@ export class AudioEngine {
         } as const;
         
         for (let i = 0; i < 2; i++) {
-            const synth = new Tone.Synth(bassSynthOptions).connect(this.channels.bass);
+            const synth = new Tone.Synth(bassSynthOptions).connect(this.bassGain);
             this.bassSynths.push(synth);
         }
 
@@ -649,4 +652,5 @@ const beatPatternsData: { [key: string]: { groove: (string|string[]|null)[][], f
     }
 };
 
+    
     
