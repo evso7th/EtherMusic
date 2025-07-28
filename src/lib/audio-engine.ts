@@ -1,7 +1,7 @@
 
 import * as Tone from 'tone';
 import { beatPatternsData, generateAutopilotPattern } from './music-engine';
-import type { MelodyInstrument, MusicKey, MusicScale, AutopilotStyle, Orb } from '@/app/page';
+import type { MelodyInstrument, MusicKey, MusicScale, AutopilotStyle, Orb, NoteEvent } from '@/app/page';
 
 type ActiveNote = {
     type: 'melody' | 'bass';
@@ -29,13 +29,14 @@ export class AudioEngine {
     private bassSynths: Tone.Synth[] = [];
     private autopilotSynths!: { bass: Tone.PolySynth, melody: Tone.PolySynth };
     private drumSamplers: Record<string, Tone.Player> = {};
-    private drumPart!: Tone.Part;
+    private drumPart!: Tone.Part<{note: string | string[]}>;
     private conductorEventId: number | null = null;
     private measureCount = 0;
     private recorder!: Tone.Recorder;
     private bassLFO!: Tone.LFO;
     private bassGain!: Tone.Gain;
-    private autopilotParts!: { bass: Tone.Part, melody: Tone.Part };
+    private autopilotParts!: { bass: Tone.Part<NoteEvent>, melody: Tone.Part<NoteEvent> };
+    private currentBeatPatternName = 'Off';
     
     // --- Internal State ---
     private activeNotes = new Map<number, ActiveNote>();
@@ -203,21 +204,9 @@ export class AudioEngine {
     
     public setBeatPattern(patternName: string) {
         if (!this.isInitialized) return;
-        this.measureCount = 0;
-        const pattern = beatPatternsData[patternName];
-        if (this.drumPart && pattern) {
-             this.drumPart.clear();
-             const { groove, fills } = pattern;
-             if (patternName !== 'Off' && groove.length > 0) {
-                 const patternToPlay = groove[Math.floor(Math.random() * groove.length)];
-                 patternToPlay.forEach((notes, i) => {
-                    if (notes) {
-                        const noteTime = `0:${Math.floor(i/4)}:${i%4}`;
-                        this.drumPart.add(noteTime, { note: notes });
-                    }
-                });
-             }
-        }
+        this.currentBeatPatternName = patternName;
+        this.measureCount = 0; // Reset measure count on pattern change
+        this.updateDrumAndConductor(patternName);
     }
     
     public setMelodyInstrument(instrument: MelodyInstrument) {
@@ -429,45 +418,66 @@ export class AudioEngine {
         this.autopilotParts.melody.loop = true;
         this.autopilotParts.melody.loopEnd = '4m';
     }
+    
+    private updateDrumAndConductor(patternName: string) {
+        if (!this.drumPart) return;
+
+        this.drumPart.clear();
+        
+        if (patternName === 'Off') {
+            if (this.conductorEventId !== null) {
+                Tone.Transport.clear(this.conductorEventId);
+                this.conductorEventId = null;
+            }
+            return;
+        }
+        
+        // Always run conductor if a pattern is selected
+        this.startConductor();
+        
+        // Immediately schedule the first measure
+        this.scheduleNextDrumMeasure();
+    }
+
 
     private startConductor() {
         if (this.conductorEventId === null) {
             this.conductorEventId = Tone.Transport.scheduleRepeat((time) => {
                 Tone.Draw.schedule(() => {
-                    const patternName = Object.keys(beatPatternsData).find(key => 
-                        beatPatternsData[key] === this.drumPart.get(0)?.value
-                    ) || 'Off';
-
-                    if (patternName === 'Off') {
-                        this.drumPart.clear();
-                        return;
-                    }
-                    
-                    const currentPatternData = beatPatternsData[patternName];
-                    if (!currentPatternData || !currentPatternData.groove?.length) {
-                        this.drumPart.clear();
-                        return;
-                    }
-
-                    const { groove, fills } = currentPatternData;
-                    const isFillMeasure = (this.measureCount % 4) === 3 && fills.length > 0;
-                    
-                    const patternToPlay = isFillMeasure
-                        ? fills[Math.floor(Math.random() * fills.length)]
-                        : groove[Math.floor(Math.random() * groove.length)];
-        
-                    this.drumPart.clear();
-                    patternToPlay.forEach((notes, i) => {
-                        if (notes) {
-                            const noteTime = `0:${Math.floor(i/4)}:${i%4}`;
-                            this.drumPart.add(noteTime, { note: notes });
-                        }
-                    });
-        
-                    this.measureCount++;
+                    this.scheduleNextDrumMeasure();
                 }, time);
             }, '1m');
         }
+    }
+    
+    private scheduleNextDrumMeasure() {
+        if (this.currentBeatPatternName === 'Off') {
+            this.drumPart.clear();
+            return;
+        }
+
+        const currentPatternData = beatPatternsData[this.currentBeatPatternName];
+        if (!currentPatternData || !currentPatternData.groove?.length) {
+            this.drumPart.clear();
+            return;
+        }
+    
+        const { groove, fills } = currentPatternData;
+        const isFillMeasure = (this.measureCount % 4) === 3 && fills && fills.length > 0;
+        
+        const patternToPlay = isFillMeasure
+            ? fills[Math.floor(Math.random() * fills.length)]
+            : groove[Math.floor(Math.random() * groove.length)];
+
+        this.drumPart.clear();
+        patternToPlay.forEach((notes, i) => {
+            if (notes) {
+                const noteTime = `0:${Math.floor(i/4)}:${i%4}`;
+                this.drumPart.add(noteTime, { note: notes });
+            }
+        });
+
+        this.measureCount++;
     }
     
     private regenerateAutopilotPatterns() {
