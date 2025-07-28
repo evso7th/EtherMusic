@@ -50,7 +50,7 @@ export class LatchEngine {
         const pattern = [1, 0.7, null, null, 1, 0.7, null, null];
         
         this.pulsationPattern = new Tone.Pattern((time, value) => {
-            if (!this.isPulsating) return;
+            // No need to check isPulsating here, as the pattern is started/stopped directly
             this.latchedNotes.forEach(note => {
                 // Modulate based on the note's individual volume
                 const targetVolume = value !== null ? note.volume * value : 0;
@@ -59,6 +59,10 @@ export class LatchEngine {
         }, pattern, "upDown");
 
         this.pulsationPattern.interval = "8n";
+        
+        // Ensure the transport is configured to loop for the pattern to work reliably
+        Tone.Transport.loop = true;
+        Tone.Transport.loopEnd = '1m';
     }
     
     // This is now for the master channel, not individual notes
@@ -79,13 +83,13 @@ export class LatchEngine {
         this.isPulsating = isPulsating;
         
         if (this.isPulsating) {
-            if (Tone.Transport.state !== 'started') {
+             if (Tone.Transport.state !== 'started') {
                  Tone.Transport.start();
-            }
-            this.pulsationPattern.start(0);
+             }
+             this.pulsationPattern.start(0);
         } else {
             this.pulsationPattern.stop();
-            // Restore all notes to their base volume
+            // Restore all notes to their base volume when pulsation stops
             this.latchedNotes.forEach(note => {
                 note.synthNode.gain.gain.rampTo(note.volume, 0.1);
             });
@@ -134,7 +138,10 @@ export class LatchEngine {
     }
     
     public startAll() {
-       // This is handled by the pattern now
+        if (this.isPulsating) {
+            this.pulsationPattern.start(0);
+        }
+        this.latchedNotes.forEach(this.playNote.bind(this));
     }
     
     public pauseAll() {
