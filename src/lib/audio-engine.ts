@@ -288,7 +288,11 @@ export class AudioEngine {
             activeNote.synth.frequency.rampTo(quantizedFreq, 0.01);
             
             const velocity = vol * vol;
-            activeNote.synth.set({volume: Tone.gainToDb(velocity)});
+            if (activeNote.type === 'bass' && activeNote.synth.output.gain) {
+                 activeNote.synth.output.gain.rampTo(velocity, 0.01);
+            } else {
+                 activeNote.synth.set({volume: Tone.gainToDb(velocity)});
+            }
     
             activeNote.x = pos.x;
             activeNote.y = pos.y;
@@ -323,9 +327,13 @@ export class AudioEngine {
             oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
         } as const;
+        
+        const bassGain = new Tone.Gain(1).connect(this.channels.bass);
 
         for (let i = 0; i < 2; i++) {
-            this.bassSynths.push(new Tone.Synth(bassSynthOptions).connect(this.channels.bass));
+            const synth = new Tone.Synth(bassSynthOptions);
+            synth.output.gain = new Tone.Gain(1).connect(bassGain);
+            this.bassSynths.push(synth);
         }
 
         const melodySynthOptions = { 
@@ -471,7 +479,6 @@ export class AudioEngine {
         } else if (this.latchedBassNotes.size < 2) {
             const newId = Date.now();
             const velocity = vol * vol;
-
             this.latchSynths.triggerAttack(quantizedFreq, undefined, velocity);
 
             this.latchedBassNotes.set(newId, {
