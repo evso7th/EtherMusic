@@ -14,9 +14,11 @@ type LatchedBassNote = {
     id: number;
     x: number;
     y: number;
+    synth: Tone.Synth;
     initialFreq: number;
     volume: number;
 };
+
 
 const NOTE_PROXIMITY_THRESHOLD = 35;
 
@@ -30,7 +32,7 @@ export class AudioEngine {
     public fx!: { reverb: Tone.Reverb, delay: Tone.FeedbackDelay };
     private melodySynths: Tone.Synth[] = [];
     private bassSynths: Tone.Synth[] = [];
-    private latchSynths!: Tone.PolySynth<Tone.Synth>;
+    private latchSynths: Tone.Synth[] = [];
     
     private drumSamplers: Record<string, Tone.Player> = {};
     private drumPart!: Tone.Part<{note: string | string[]}>;
@@ -80,15 +82,6 @@ export class AudioEngine {
         // Synth Pools
         this.createSynthPools();
         
-        // Latch-specific synth
-        this.latchSynths = new Tone.PolySynth(Tone.Synth, {
-             maxPolyphony: 2,
-             voice: {
-                 oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
-                 envelope: { attack: 0.2, decay: 0.1, sustain: 0.9, release: 0.8 },
-             }
-        }).connect(this.channels.bass);
-        
         // Bass LFO for Latch Synths - Configured for a "heartbeat" effect
         this.bassLFO = new Tone.LFO({
             type: "square", // Creates a sharp on/off effect
@@ -118,7 +111,7 @@ export class AudioEngine {
         this.isPlaying = true;
         Tone.Transport.start();
         this.latchedBassNotes.forEach(note => {
-            this.latchSynths.triggerAttack(note.initialFreq, undefined, note.volume);
+            note.synth.triggerAttack(note.initialFreq, undefined, note.volume);
         });
     }
 
@@ -128,7 +121,7 @@ export class AudioEngine {
         if (Tone.Transport.state === 'started') {
             Tone.Transport.pause();
         }
-        this.latchSynths.releaseAll();
+        this.latchedBassNotes.forEach(note => note.synth.triggerRelease());
     }
 
     public stop() {
@@ -141,7 +134,7 @@ export class AudioEngine {
         this.activeNotes.clear();
         
         // Stop latched notes
-        this.latchSynths.releaseAll();
+        this.latchedBassNotes.forEach(note => note.synth.triggerRelease());
         
         this.updateAndDispatchOrbs();
     }
@@ -177,7 +170,7 @@ export class AudioEngine {
     public setVolumes(volumes: Record<string, number>) {
         if (!this.isInitialized || !this.channels) return;
         this.channels.melody.volume.value = volumes.melody;
-        this.channels.bass.volume.value = volumes.bass; // This affects both regular and latched bass synths
+        this.channels.bass.volume.value = volumes.bass; // This affects all bass synths
         this.channels.drums.volume.value = volumes.drums;
     }
 
@@ -242,23 +235,31 @@ export class AudioEngine {
     }
 
     public setBassPulsating(isPulsating: boolean) {
-        if (!this.isInitialized || !this.bassLFO || !this.latchSynths) return;
+        if (!this.isInitialized) return;
         this.isBassPulsating = isPulsating;
     
-        if (this.isBassPulsating) {
-            this.bassLFO.connect(this.latchSynths.volume);
-        } else {
-            this.bassLFO.disconnect(this.latchSynths.volume);
-            this.latchSynths.volume.cancelScheduledValues();
-            this.latchSynths.volume.rampTo(0, 0.1); 
-        }
+        // Apply/remove LFO to already active latch synths
+        this.latchedBassNotes.forEach(note => {
+            if (isPulsating) {
+                this.bassLFO.connect(note.synth.volume);
+            } else {
+                this.bassLFO.disconnect(note.synth.volume);
+                // Ramp back to full volume when pulsation is turned off
+                note.synth.volume.rampTo(0, 0.1); 
+            }
+        });
     }
 
     public setBassLatch(isLatchOn: boolean) {
         if (!this.isInitialized) return;
         this.isBassLatchOn = isLatchOn;
         if (!isLatchOn && this.latchedBassNotes.size > 0) {
-            this.latchSynths.releaseAll();
+            this.latchedBassNotes.forEach(note => {
+                note.synth.triggerRelease();
+                if (this.isBassPulsating) {
+                    this.bassLFO.disconnect(note.synth.volume);
+                }
+            });
             this.latchedBassNotes.clear();
             this.updateAndDispatchOrbs();
         }
@@ -337,6 +338,15 @@ export class AudioEngine {
             const synth = new Tone.Synth(bassSynthOptions).connect(this.channels.bass);
             this.bassSynths.push(synth);
         }
+
+        const latchSynthOptions = {
+             oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
+             envelope: { attack: 0.2, decay: 0.1, sustain: 0.9, release: 0.8 },
+        } as const;
+        for (let i = 0; i < 2; i++) {
+            this.latchSynths.push(new Tone.Synth(latchSynthOptions).connect(this.channels.bass));
+        }
+
 
         const melodySynthOptions = { 
             portamento: 0.02,
@@ -475,20 +485,32 @@ export class AudioEngine {
         if (existingEntryId !== undefined) {
             const noteToRelease = this.latchedBassNotes.get(existingEntryId);
             if (noteToRelease) {
-                this.latchSynths.triggerRelease(noteToRelease.initialFreq);
+                noteToRelease.synth.triggerRelease();
+                if (this.isBassPulsating) {
+                    this.bassLFO.disconnect(noteToRelease.synth.volume);
+                }
             }
             this.latchedBassNotes.delete(existingEntryId);
-        } else if (this.latchedBassNotes.size < 2) {
-            const newId = Date.now();
-            const velocity = vol * vol;
-            this.latchSynths.triggerAttack(quantizedFreq, undefined, velocity);
+        } else {
+            const activeLatchSynths = new Set(Array.from(this.latchedBassNotes.values()).map(n => n.synth));
+            const assignedSynth = this.latchSynths.find(s => !activeLatchSynths.has(s));
 
-            this.latchedBassNotes.set(newId, {
-                id: newId,
-                x: pos.x, y: pos.y,
-                initialFreq: quantizedFreq,
-                volume: velocity
-            });
+            if (assignedSynth) {
+                const newId = Date.now();
+                const velocity = vol * vol;
+                
+                if (this.isBassPulsating) {
+                    this.bassLFO.connect(assignedSynth.volume);
+                }
+                
+                assignedSynth.triggerAttack(quantizedFreq, undefined, velocity);
+
+                this.latchedBassNotes.set(newId, {
+                    id: newId, x: pos.x, y: pos.y,
+                    initialFreq: quantizedFreq, volume: velocity,
+                    synth: assignedSynth,
+                });
+            }
         }
          this.updateAndDispatchOrbs();
     }
@@ -645,10 +667,3 @@ const beatPatternsData: { [key: string]: { groove: (string|string[]|null)[][], f
         fills: []
     }
 };
-
-    
-    
-
-    
-
-    
