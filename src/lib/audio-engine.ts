@@ -255,12 +255,12 @@ export class AudioEngine {
         this.bassSynths.forEach(synth => {
             if (isPulsating && this.isPlaying) {
                 // The synth output is a GainNode, we connect the LFO to its 'gain' AudioParam
-                this.bassLFO.connect(synth.get().output.gain);
+                this.bassLFO.connect(synth.output.gain);
             } else {
-                this.bassLFO.disconnect(synth.get().output.gain);
+                this.bassLFO.disconnect(synth.output.gain);
                 // Ensure the gain is reset to 1 when pulsation is off
-                synth.get().output.gain.cancelScheduledValues();
-                synth.get().output.gain.rampTo(1, 0.1);
+                synth.output.gain.cancelScheduledValues();
+                synth.output.gain.rampTo(1, 0.1);
             }
         });
     }
@@ -305,7 +305,7 @@ export class AudioEngine {
             const quantizedFreq = this.getClosestFrequency(freq, type);
             activeNote.synth.frequency.rampTo(quantizedFreq, 0.01);
             // Ramp the volume of the synth's output gain node
-            activeNote.synth.get().output.gain.rampTo(vol * vol, 0.01);
+            activeNote.synth.output.gain.rampTo(vol * vol, 0.01);
             activeNote.x = pos.x;
             activeNote.y = pos.y;
             this.updateAndDispatchOrbs();
