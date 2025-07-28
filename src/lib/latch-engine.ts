@@ -17,7 +17,7 @@ type LatchedBassNote = {
     y: number;
     synthNode: LatchedNoteSynth;
     initialFreq: number;
-    volume: number;
+    volume: number; // Volume from 0.0 to 1.0
 };
 
 export class LatchEngine {
@@ -26,7 +26,6 @@ export class LatchEngine {
     
     private synthPool: LatchedNoteSynth[] = [];
     private latchedNotes = new Map<number, LatchedBassNote>();
-    private baseVolumeDb = -9;
     private readonly destination: Tone.ToneAudioNode;
     private pulsationPattern!: Tone.Pattern<number | null>;
 
@@ -51,8 +50,10 @@ export class LatchEngine {
         const pattern = [1, 0.7, null, null, 1, 0.7, null, null];
         
         this.pulsationPattern = new Tone.Pattern((time, value) => {
+            if (!this.isPulsating) return;
             this.latchedNotes.forEach(note => {
-                const targetVolume = value !== null ? Tone.dbToGain(this.baseVolumeDb) * value : 0;
+                // Modulate based on the note's individual volume
+                const targetVolume = value !== null ? note.volume * value : 0;
                 note.synthNode.gain.gain.rampTo(targetVolume, 0.02, time);
             });
         }, pattern, "upDown");
@@ -60,13 +61,10 @@ export class LatchEngine {
         this.pulsationPattern.interval = "8n";
     }
     
+    // This is now for the master channel, not individual notes
     public setVolume(db: number) {
-        this.baseVolumeDb = db;
-        if (!this.isPulsating) {
-            this.latchedNotes.forEach(note => {
-                note.synthNode.gain.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
-            });
-        }
+        // This function seems to be unused now that volume is per-note,
+        // but we'll leave it in case it's needed for a master control later.
     }
 
     public setLatch(isOn: boolean) {
@@ -89,7 +87,7 @@ export class LatchEngine {
             this.pulsationPattern.stop();
             // Restore all notes to their base volume
             this.latchedNotes.forEach(note => {
-                note.synthNode.gain.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
+                note.synthNode.gain.gain.rampTo(note.volume, 0.1);
             });
         }
     }
@@ -117,7 +115,8 @@ export class LatchEngine {
                 const newId = Date.now() + Math.random();
                 const newNote: LatchedBassNote = {
                     id: newId, x: pos.x, y: pos.y,
-                    initialFreq: quantizedFreq, volume: vol,
+                    initialFreq: quantizedFreq, 
+                    volume: vol, // Use the passed-in volume
                     synthNode: freeSynthNode,
                 };
                 this.latchedNotes.set(newId, newNote);
@@ -128,8 +127,8 @@ export class LatchEngine {
     }
 
     private playNote(note: LatchedBassNote) {
-        // Set initial volume, respecting pulsation if active
-        const initialGain = this.isPulsating ? 0 : Tone.dbToGain(this.baseVolumeDb);
+        // Set initial volume based on the note's own volume property.
+        const initialGain = this.isPulsating ? 0 : note.volume;
         note.synthNode.gain.gain.value = initialGain;
         note.synthNode.synth.triggerAttack(note.initialFreq);
     }
