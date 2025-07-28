@@ -100,6 +100,7 @@ export class AudioEngine {
             max: 0,          // Go to full volume (0 dB)
         });
         this.bassLFO.loop = true;
+        this.bassLFO.start();
         
         // Drums
         await this.loadDrumSamples();
@@ -119,6 +120,7 @@ export class AudioEngine {
         if (!this.isInitialized || Tone.Transport.state === 'started') return;
         this.isPlaying = true;
         Tone.Transport.start();
+        this.latchSynths.releaseAll();
         this.latchedBassNotes.forEach(note => {
             this.latchSynths.triggerAttack(note.initialFreq, undefined, note.volume);
         });
@@ -244,18 +246,18 @@ export class AudioEngine {
     }
 
     public setBassPulsating(isPulsating: boolean) {
-        if (!this.isInitialized || !this.bassLFO) return;
+        if (!this.isInitialized || !this.bassLFO || !this.latchSynths) return;
         this.isBassPulsating = isPulsating;
     
-        if (isPulsating) {
-            this.bassLFO.connect(this.latchSynths.volume);
-            this.bassLFO.start();
-        } else {
-            this.bassLFO.disconnect(this.latchSynths.volume);
-            // Ensure volume is reset to 0 when pulsation is off
-            this.latchSynths.volume.cancelScheduledValues();
-            this.latchSynths.volume.rampTo(0, 0.1); 
-        }
+        (this.latchSynths.voices as Tone.Synth<Tone.SynthOptions>[]).forEach(voice => {
+            if (isPulsating) {
+                this.bassLFO.connect(voice.volume);
+            } else {
+                this.bassLFO.disconnect(voice.volume);
+                voice.volume.cancelScheduledValues();
+                voice.volume.rampTo(0, 0.1);
+            }
+        });
     }
 
     public setBassLatch(isLatchOn: boolean) {
