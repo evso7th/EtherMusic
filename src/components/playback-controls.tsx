@@ -2,7 +2,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Play, Pause, Mic, StopCircle, Power } from 'lucide-react';
+import { Play, Pause, Mic, StopCircle, Power, Bot } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -19,13 +19,24 @@ import {
 interface PlaybackControlsProps {
     isPlaying: boolean;
     isRecording: boolean;
+    isAutopilotV2On: boolean;
     onPlayPause: () => void;
     onRecord: () => void;
     onStop: () => void;
+    onAutopilotV2Toggle: () => void;
     isReady: boolean;
 }
 
-export function PlaybackControls({ isPlaying, isRecording, onPlayPause, onRecord, onStop, isReady }: PlaybackControlsProps) {
+export function PlaybackControls({ 
+    isPlaying, 
+    isRecording, 
+    isAutopilotV2On,
+    onPlayPause, 
+    onRecord, 
+    onStop,
+    onAutopilotV2Toggle, 
+    isReady 
+}: PlaybackControlsProps) {
     
     const handleExit = () => {
         if (typeof window !== "undefined") {
@@ -40,6 +51,19 @@ export function PlaybackControls({ isPlaying, isRecording, onPlayPause, onRecord
             </Button>
             <Button onClick={onPlayPause} size="icon" className="w-10 h-10 rounded-full" aria-label={isPlaying ? "Pause" : "Play"} disabled={!isReady}>
                 {isPlaying ? <Pause className="w-5 h-5 md:w-6 md:h-6" /> : <Play className="w-5 h-5 md:w-6 md:h-6 ml-1" />}
+            </Button>
+            <Button 
+                onClick={onAutopilotV2Toggle} 
+                variant={isAutopilotV2On ? 'default' : 'outline'} 
+                size="icon" 
+                className={cn(
+                    'w-10 h-10 rounded-full transition-colors',
+                    isAutopilotV2On && 'animate-pulse-primary'
+                )}
+                aria-label={isAutopilotV2On ? "Stop AP2" : "Start AP2"} 
+                disabled={!isReady}
+            >
+                 <Bot className="w-5 h-5 md:w-6 md:h-6" />
             </Button>
             <Button 
                 onClick={onRecord} 
@@ -81,5 +105,3 @@ export function PlaybackControls({ isPlaying, isRecording, onPlayPause, onRecord
         </div>
     );
 }
-
-    

@@ -27,14 +27,23 @@ const NOTE_PROXIMITY_THRESHOLD = 35;
 
 
 export class AudioEngine {
-    private isInitialized = false;
+    public isInitialized = false;
 
     // --- Tone.js Objects ---
     private channels!: { melody: Tone.Channel, bass: Tone.Channel, drums: Tone.Channel, autopilot: Tone.Channel };
     private fx!: { reverb: Tone.Reverb, delay: Tone.FeedbackDelay };
     private melodySynths: Tone.Synth[] = [];
     private bassSynths: Tone.Synth[] = [];
+    
+    // V1 Autopilot
     private autopilotSynths!: { bass: Tone.PolySynth, melody: Tone.PolySynth };
+    private autopilotParts!: { bass: Tone.Part<NoteEvent>, melody: Tone.Part<NoteEvent> };
+    
+    // V2 Autopilot (monosynth pool)
+    private autopilotMelodySynths: Tone.Synth[] = [];
+    private autopilotBassSynths: Tone.Synth[] = [];
+    private autopilotV2Parts!: { bass: Tone.Part<NoteEvent>, melody: Tone.Part<NoteEvent> };
+    
     private drumSamplers: Record<string, Tone.Player> = {};
     private drumPart!: Tone.Part<{note: string | string[]}>;
     private conductorEventId: number | null = null;
@@ -42,7 +51,6 @@ export class AudioEngine {
     private recorder!: Tone.Recorder;
     private bassLFO!: Tone.LFO;
     private bassGain!: Tone.Gain;
-    private autopilotParts!: { bass: Tone.Part<NoteEvent>, melody: Tone.Part<NoteEvent> };
     private currentBeatPatternName = 'Off';
     
     // --- Internal State ---
@@ -55,6 +63,7 @@ export class AudioEngine {
     private isBassLatchOn = false;
     private isPlaying = false;
     private isAutopilotOn = false;
+    private isAutopilotV2On = false;
     private autopilotStyle: AutopilotStyle = 'Ambient';
     private musicKey: MusicKey = 'C';
     private musicScale: MusicScale = 'Major Pentatonic';
@@ -89,7 +98,7 @@ export class AudioEngine {
         this.bassGain = new Tone.Gain(1).connect(this.channels.bass);
         this.createSynthPools();
         
-        // Autopilot Synths
+        // V1 Autopilot Synths (Poly)
         this.autopilotSynths = {
             melody: new Tone.PolySynth(Tone.Synth).connect(this.channels.autopilot),
             bass: new Tone.PolySynth(Tone.Synth, {
@@ -109,8 +118,9 @@ export class AudioEngine {
         await this.loadDrumSamples();
         this.setupDrumPart();
         
-        // Autopilot Parts
+        // Autopilot Parts (V1 and V2)
         this.setupAutopilotParts();
+        this.setupAutopilotV2Parts();
 
         // Conductor
         this.startConductor();
@@ -123,7 +133,7 @@ export class AudioEngine {
     }
 
     public start() {
-        if (!this.isInitialized) return;
+        if (!this.isInitialized || Tone.Transport.state === 'started') return;
         Tone.Transport.start();
         this.isPlaying = true;
         if (this.isBassLatchOn) {
@@ -134,15 +144,11 @@ export class AudioEngine {
     }
 
     public pause() {
-        if (!this.isInitialized) return;
+        if (!this.isInitialized || this.isAutopilotOn || this.isAutopilotV2On) return;
         Tone.Transport.pause();
         this.isPlaying = false;
         if (this.isBassLatchOn) {
             this.latchedBassNotes.forEach(note => note.synth.triggerRelease());
-        }
-        if (this.isAutopilotOn) {
-            this.autopilotSynths.bass.releaseAll();
-            this.autopilotSynths.melody.releaseAll();
         }
     }
 
@@ -153,8 +159,11 @@ export class AudioEngine {
         
         this.activeNotes.forEach(note => note.synth.triggerRelease());
         this.latchedBassNotes.forEach(note => note.synth.triggerRelease());
+        
         this.autopilotSynths.melody.releaseAll();
         this.autopilotSynths.bass.releaseAll();
+        this.autopilotMelodySynths.forEach(s => s.triggerRelease());
+        this.autopilotBassSynths.forEach(s => s.triggerRelease());
 
         this.activeNotes.clear();
         this.latchedBassNotes.clear();
@@ -248,6 +257,7 @@ export class AudioEngine {
         }
         this.melodySynths.forEach(synth => synth.set(newOptions));
         this.autopilotSynths.melody.set(newOptions);
+        this.autopilotMelodySynths.forEach(synth => synth.set(newOptions));
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
@@ -258,8 +268,8 @@ export class AudioEngine {
             bass: this.getScaleFrequencies(key, scale, [2, 3]),
             melody: this.getScaleFrequencies(key, scale, [3, 4, 5]),
         };
-        // If autopilot is on, regenerate patterns with new harmony
-        if (this.isAutopilotOn) {
+        // If an autopilot is on, regenerate patterns with new harmony
+        if (this.isAutopilotOn || this.isAutopilotV2On) {
             this.regenerateAutopilotPatterns();
         }
     }
@@ -294,16 +304,40 @@ export class AudioEngine {
         this.autopilotStyle = style;
         
         if (isOn) {
+            if (this.isAutopilotV2On) this.setAutopilotV2(false, style);
             this.regenerateAutopilotPatterns();
-            this.autopilotParts.bass?.start(0);
-            this.autopilotParts.melody?.start(0);
+            this.autopilotParts.bass.start(0);
+            this.autopilotParts.melody.start(0);
+            if (Tone.Transport.state !== 'started') this.start();
         } else {
             this.autopilotParts.bass.stop(0).clear();
             this.autopilotParts.melody.stop(0).clear();
             this.autopilotSynths.bass.releaseAll();
             this.autopilotSynths.melody.releaseAll();
+            if (Tone.Transport.state === 'started' && !this.isAutopilotV2On) this.pause();
         }
     }
+    
+    public setAutopilotV2(isOn: boolean, style: AutopilotStyle) {
+        if (!this.isInitialized) return;
+        this.isAutopilotV2On = isOn;
+        this.autopilotStyle = style;
+
+        if (isOn) {
+            if (this.isAutopilotOn) this.setAutopilot(false, style);
+            this.regenerateAutopilotPatterns();
+            this.autopilotV2Parts.bass.start(0);
+            this.autopilotV2Parts.melody.start(0);
+            if (Tone.Transport.state !== 'started') this.start();
+        } else {
+            this.autopilotV2Parts.bass.stop(0).clear();
+            this.autopilotV2Parts.melody.stop(0).clear();
+            this.autopilotBassSynths.forEach(s => s.triggerRelease());
+            this.autopilotMelodySynths.forEach(s => s.triggerRelease());
+            if (Tone.Transport.state === 'started' && !this.isAutopilotOn) this.pause();
+        }
+    }
+
 
     // --- Theremin Interaction ---
 
@@ -368,11 +402,13 @@ export class AudioEngine {
         };
         for (let i = 0; i < 2; i++) {
             this.bassSynths.push(new Tone.Synth(bassSynthOptions).connect(this.bassGain));
+            this.autopilotBassSynths.push(new Tone.Synth(bassSynthOptions).connect(this.channels.autopilot));
         }
 
         const melodySynthOptions = { portamento: 0.02 };
         for (let i = 0; i < 4; i++) {
             this.melodySynths.push(new Tone.Synth(melodySynthOptions).connect(this.channels.melody));
+            this.autopilotMelodySynths.push(new Tone.Synth(melodySynthOptions).connect(this.channels.autopilot));
         }
     }
 
@@ -415,15 +451,39 @@ export class AudioEngine {
         this.autopilotParts = {
             bass: new Tone.Part((time, note) => {
                 this.autopilotSynths.bass?.triggerAttackRelease(note.freq, note.dur, time, note.vel);
-            }, []).start(0),
+            }, []),
             melody: new Tone.Part((time, note) => {
                 this.autopilotSynths.melody?.triggerAttackRelease(note.freq, note.dur, time, note.vel);
-            }, []).start(0)
+            }, [])
         };
         this.autopilotParts.bass.loop = true;
         this.autopilotParts.bass.loopEnd = '4m';
         this.autopilotParts.melody.loop = true;
         this.autopilotParts.melody.loopEnd = '4m';
+    }
+
+    private setupAutopilotV2Parts() {
+        this.autopilotV2Parts = {
+            bass: new Tone.Part((time, note) => {
+                this.findAndPlay(this.autopilotBassSynths, note, time);
+            }, []),
+            melody: new Tone.Part((time, note) => {
+                this.findAndPlay(this.autopilotMelodySynths, note, time);
+            }, [])
+        };
+        this.autopilotV2Parts.bass.loop = true;
+        this.autopilotV2Parts.bass.loopEnd = '4m';
+        this.autopilotV2Parts.melody.loop = true;
+        this.autopilotV2Parts.melody.loopEnd = '4m';
+    }
+
+    private findAndPlay(synthPool: Tone.Synth[], note: NoteEvent, time: number) {
+        // Find a synth that is not currently playing
+        const freeSynth = synthPool.find(s => s.envelope.state === 'stopped');
+
+        if (freeSynth) {
+            freeSynth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
+        }
     }
     
     private updateDrumAndConductor(patternName: string) {
@@ -488,18 +548,23 @@ export class AudioEngine {
     }
     
     private regenerateAutopilotPatterns() {
-        if (!this.isInitialized || !this.autopilotParts.bass || !this.autopilotParts.melody) return;
+        if (!this.isInitialized) return;
         
-        this.autopilotParts.bass.clear();
-        this.autopilotParts.melody.clear();
+        const currentParts = this.isAutopilotV2On ? this.autopilotV2Parts : this.autopilotParts;
+        if (!currentParts?.bass || !currentParts?.melody) return;
+
+        currentParts.bass.clear();
+        currentParts.melody.clear();
+
+        if (this.allowedFrequencies.bass.length === 0 || this.allowedFrequencies.melody.length === 0) return;
 
         const { bassPattern, melodyPattern } = generateAutopilotPattern(
             this.autopilotStyle,
             this.allowedFrequencies
         );
 
-        bassPattern.forEach(note => this.autopilotParts.bass.add(note.time, note));
-        melodyPattern.forEach(note => this.autopilotParts.melody.add(note.time, note));
+        bassPattern.forEach(note => currentParts.bass.add(note.time, note));
+        melodyPattern.forEach(note => currentParts.melody.add(note.time, note));
     }
     
     private getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]): number[] => {
@@ -544,14 +609,9 @@ export class AudioEngine {
                 !Array.from(this.activeNotes.values()).some(n => n.synth === s)
             );
             if (assignedSynth) {
-                // Determine frequency and volume from position, similar to main interaction handler
-                // This requires access to the pad's dimensions or normalized values, which we don't have here.
-                // A simplified approach: use a default frequency or one derived from the position.
-                // For now, let's use a placeholder calculation.
                 const newKey = Date.now();
-                // A real implementation would need to calculate freq/vol from x/y based on pad dimensions
-                const dummyFreq = this.allowedFrequencies.bass[Math.floor(Math.random() * this.allowedFrequencies.bass.length)];
-                const quantizedFreq = dummyFreq;
+                if(this.allowedFrequencies.bass.length === 0) return;
+                const quantizedFreq = this.allowedFrequencies.bass[Math.floor(Math.random() * this.allowedFrequencies.bass.length)];
                 
                 assignedSynth.frequency.value = quantizedFreq;
                 if (this.isPlaying) {

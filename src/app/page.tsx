@@ -84,6 +84,7 @@ export default function Home() {
     const [isBassPulsating, setIsBassPulsating] = useState(false);
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
     const [isAutopilotOn, setIsAutopilotOn] = useState(false);
+    const [isAutopilotV2On, setIsAutopilotV2On] = useState(false);
     const [autopilotStyle, setAutopilotStyle] = useState<AutopilotStyle>('Ambient');
     const [orbs, setOrbs] = useState<Orb[]>([]);
 
@@ -95,6 +96,7 @@ export default function Home() {
     // --- Engine Initialization ---
     const initializeAudio = useCallback(async () => {
         const engine = audioEngine.current;
+        if (engine.isInitialized) return;
         await engine.initialize();
         
         // Sync initial state with the engine
@@ -145,8 +147,22 @@ export default function Home() {
     }, [isBassLatchOn]);
 
     useEffect(() => {
+        if (!isReady) return;
         audioEngine.current?.setAutopilot(isAutopilotOn, autopilotStyle);
-    }, [isAutopilotOn, autopilotStyle]);
+        if (isAutopilotOn) {
+            setIsAutopilotV2On(false); 
+            if (!isPlaying) setIsPlaying(true);
+        }
+    }, [isAutopilotOn, autopilotStyle, isReady, isPlaying]);
+
+    useEffect(() => {
+        if (!isReady) return;
+        audioEngine.current?.setAutopilotV2(isAutopilotV2On, autopilotStyle);
+        if (isAutopilotV2On) {
+            setIsAutopilotOn(false);
+            if (!isPlaying) setIsPlaying(true);
+        }
+    }, [isAutopilotV2On, autopilotStyle, isReady, isPlaying]);
 
 
     // --- UI Event Handlers ---
@@ -189,6 +205,8 @@ export default function Home() {
         if (!isReady) return;
         audioEngine.current?.stop();
         setIsPlaying(false);
+        setIsAutopilotOn(false);
+        setIsAutopilotV2On(false);
         setOrbs([]);
     }, [isReady]);
 
@@ -202,6 +220,10 @@ export default function Home() {
             toast({ title: "Recording Stopped", description: "Your recording has been downloaded." });
         }
     }, [isReady, toast]);
+
+    const handleAutopilotV2Toggle = useCallback(() => {
+        setIsAutopilotV2On(v => !v);
+    }, []);
 
 
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
@@ -296,9 +318,11 @@ export default function Home() {
                          <PlaybackControls
                             isPlaying={isPlaying}
                             isRecording={isRecording}
+                            isAutopilotV2On={isAutopilotV2On}
                             onPlayPause={handlePlayPause}
                             onRecord={handleRecord}
                             onStop={handleStop}
+                            onAutopilotV2Toggle={handleAutopilotV2Toggle}
                             isReady={isReady}
                         />
                     </div>
