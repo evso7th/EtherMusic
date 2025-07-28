@@ -39,7 +39,6 @@ export class AudioEngine {
     private recorder!: Tone.Recorder;
     private bassLFO!: Tone.LFO;
     private currentBeatPatternName = 'Off';
-    private bassGain!: Tone.Gain;
     
     // --- Internal State ---
     private activeNotes = new Map<number, ActiveNote>();
@@ -77,7 +76,6 @@ export class AudioEngine {
             drums: new Tone.Channel(0).toDestination(),
         };
         this.connectChannelsToFX();
-        this.bassGain = new Tone.Gain(1).connect(this.channels.bass);
         
         // Synth Pools
         this.createSynthPools();
@@ -247,15 +245,13 @@ export class AudioEngine {
         if (!this.isInitialized || !this.bassLFO || !this.latchSynths) return;
         this.isBassPulsating = isPulsating;
     
-        (this.latchSynths.voices as Tone.Synth<Tone.SynthOptions>[]).forEach(voice => {
-            if (isPulsating) {
-                this.bassLFO.connect(voice.volume);
-            } else {
-                this.bassLFO.disconnect(voice.volume);
-                voice.volume.cancelScheduledValues();
-                voice.volume.rampTo(0, 0.1);
-            }
-        });
+        if (this.isBassPulsating) {
+            this.bassLFO.connect(this.latchSynths.volume);
+        } else {
+            this.bassLFO.disconnect(this.latchSynths.volume);
+            this.latchSynths.volume.cancelScheduledValues();
+            this.latchSynths.volume.rampTo(0, 0.1); 
+        }
     }
 
     public setBassLatch(isLatchOn: boolean) {
@@ -338,7 +334,7 @@ export class AudioEngine {
         } as const;
         
         for (let i = 0; i < 2; i++) {
-            const synth = new Tone.Synth(bassSynthOptions).connect(this.bassGain);
+            const synth = new Tone.Synth(bassSynthOptions).connect(this.channels.bass);
             this.bassSynths.push(synth);
         }
 
@@ -651,6 +647,8 @@ const beatPatternsData: { [key: string]: { groove: (string|string[]|null)[][], f
 };
 
     
+    
+
     
 
     
