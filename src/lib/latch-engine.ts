@@ -57,10 +57,7 @@ export class LatchEngine {
     public setVolume(db: number) {
         this.baseVolumeDb = db;
         this.latchedNotes.forEach(note => {
-            // Update gain only if not currently pulsating
-            if (!this.isPulsating) {
-                note.synthNode.gain.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
-            }
+            note.synthNode.gain.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
         });
     }
 
@@ -79,24 +76,48 @@ export class LatchEngine {
     }
 
     private updatePulsationForNote(note: LatchedBassNote) {
-        const { gain, lfo } = note.synthNode;
+        const { gain, lfo, isConnected } = note.synthNode;
         const shouldPulsate = this.isPulsating && Tone.Transport.state === 'started';
 
         if (shouldPulsate) {
-            if (!note.synthNode.isConnected) {
+            if (!isConnected) {
                 lfo.connect(gain.gain);
                 lfo.start();
                 note.synthNode.isConnected = true;
             }
         } else {
-            if (note.synthNode.isConnected) {
+            if (isConnected) {
                 lfo.stop();
                 lfo.disconnect(gain.gain);
                 note.synthNode.isConnected = false;
             }
-            // Return to base volume
             gain.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
         }
+    }
+    
+    public startAll() {
+        this.latchedNotes.forEach(note => this.updatePulsationForNote(note));
+    }
+    
+    public pauseAll() {
+         this.latchedNotes.forEach(note => {
+             if (note.synthNode.isConnected) {
+                note.synthNode.lfo.stop();
+                note.synthNode.lfo.disconnect(note.synthNode.gain.gain);
+                note.synthNode.isConnected = false;
+                note.synthNode.gain.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
+            }
+        });
+    }
+
+    public stopAll(clearNotes = false) {
+        this.latchedNotes.forEach((note, id) => {
+            this.releaseAndRemoveNote(id);
+        });
+        if (clearNotes) {
+            this.latchedNotes.clear();
+        }
+        this.dispatchOrbs(); 
     }
 
     public handleInteraction(pos: { x: number; y: number }, vol: number, quantizedFreq: number) {
@@ -141,8 +162,8 @@ export class LatchEngine {
     private releaseAndRemoveNote(noteId: number) {
         const noteToRelease = this.latchedNotes.get(noteId);
         if(noteToRelease) {
-            const { synth, lfo, gain } = noteToRelease.synthNode;
-            if (noteToRelease.synthNode.isConnected) {
+            const { synth, lfo, gain, isConnected } = noteToRelease.synthNode;
+            if (isConnected) {
                 lfo.stop();
                 lfo.disconnect(gain.gain);
                 noteToRelease.synthNode.isConnected = false;
@@ -150,36 +171,6 @@ export class LatchEngine {
             synth.triggerRelease();
             this.latchedNotes.delete(noteId);
         }
-    }
-
-    // Called when main transport starts
-    public startAll() {
-        this.latchedNotes.forEach(note => this.updatePulsationForNote(note));
-    }
-    
-    // Called when main transport pauses
-    public pauseAll() {
-         this.latchedNotes.forEach(note => {
-            // Disconnect LFO to stop pulsation but keep the synth sounding
-             if (note.synthNode.isConnected) {
-                note.synthNode.lfo.stop();
-                note.synthNode.lfo.disconnect(note.synthNode.gain.gain);
-                note.synthNode.isConnected = false;
-                // return to base volume
-                note.synthNode.gain.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
-            }
-        });
-    }
-
-    // Called on main Stop button or when latch is turned off
-    public stopAll(clearNotes = false) {
-        this.latchedNotes.forEach((note, id) => {
-            this.releaseAndRemoveNote(id);
-        });
-        if (clearNotes) {
-            this.latchedNotes.clear();
-        }
-        this.dispatchOrbs(); 
     }
 
     private dispatchOrbs() {
