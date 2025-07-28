@@ -15,6 +15,14 @@ import { HelpGuide } from '@/components/help-guide';
 import { AudioEngine } from '@/lib/audio-engine';
 import { AutopilotEngine } from '@/lib/autopilot-engine';
 import { beatPatterns } from '@/lib/drum-machine';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 
 export const tempos: Tempo[] = [
@@ -158,7 +166,7 @@ export default function Home() {
             handlePlayPause();
             setIsPlaying(true);
         }
-    }, [isReady]);
+    }, [isReady, isPlaying]);
 
     // --- UI Event Handlers ---
     const handleStartApp = useCallback(async () => {
@@ -307,7 +315,29 @@ export default function Home() {
                 <header className="flex-shrink-0 flex items-center justify-between mb-4">
                      <div>
                         {isMobile ? (
-                            <Image src="/assets/images/icon.png" alt="EtherMusic Icon" width={40} height={40} />
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <button>
+                                        <Image src="/assets/images/icon.png" alt="EtherMusic Icon" width={40} height={40} />
+                                    </button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>What is This?</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="text-sm text-muted-foreground space-y-4 py-4">
+                                        <p>
+                                            It's a virtual music box, a "Neuro Meditation Sound Processor." Think of it as an instrument that anyone can play, regardless of musical ability. You don't need to learn notes or chords. Just move your fingers and listen to what happens.
+                                        </p>
+                                        <p>
+                                            Our application is at the intersection of a creative tool, a meditation aid, and a digital wellness gadget. It is not for professional musicians, but for a wide audience that appreciates ambient music, mindfulness, and is looking for new forms of self-expression and relaxation.
+                                        </p>
+                                         <p>
+                                            Enjoy the process and let the music you create reflect your inner state.
+                                        </p>
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
                         ) : (
                             <>
                                 <h1 className="text-4xl font-bold text-primary">EtherMusic</h1>
@@ -379,6 +409,8 @@ export default function Home() {
         </div>
     );
 }
+
+    
 
     
 
