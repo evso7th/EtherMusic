@@ -22,7 +22,6 @@ export class AutopilotEngine {
 
 
     // --- Internal State ---
-    private allowedFrequencies = { bass: [] as number[], melody: [] as number[] };
     private isAutopilotOn = false;
     private autopilotStyle: AutopilotStyle = 'Ambient';
     private musicKey: MusicKey = 'C';
@@ -56,10 +55,7 @@ export class AutopilotEngine {
         if (!this.isInitialized) return;
         this.musicKey = key;
         this.musicScale = scale;
-        this.allowedFrequencies = {
-            bass: this.getScaleFrequencies(key, scale, [2, 3]),
-            melody: this.getScaleFrequencies(key, scale, [3, 4, 5]),
-        };
+        
         if (this.isAutopilotOn) {
             this.regeneratePatterns();
         }
@@ -74,7 +70,6 @@ export class AutopilotEngine {
             this.regeneratePatterns();
             this.parts.bass.start(0);
             this.parts.melody.start(0);
-            if (Tone.Transport.state !== 'started') Tone.Transport.start();
         } else {
             this.parts.bass.stop(0).clear();
             this.parts.melody.stop(0).clear();
@@ -132,11 +127,16 @@ export class AutopilotEngine {
         this.parts.bass.clear();
         this.parts.melody.clear();
 
-        if (this.allowedFrequencies.bass.length === 0 || this.allowedFrequencies.melody.length === 0) return;
+        const freqs = {
+            bass: this.getScaleFrequencies(this.musicKey, this.musicScale, [2, 3]),
+            melody: this.getScaleFrequencies(this.musicKey, this.musicScale, [3, 4, 5]),
+        };
+
+        if (freqs.bass.length === 0 || freqs.melody.length === 0) return;
 
         const { bassPattern, melodyPattern } = generateAutopilotPattern(
             this.autopilotStyle,
-            this.allowedFrequencies
+            freqs
         );
 
         bassPattern.forEach(note => this.parts.bass.add(note.time, note));
@@ -159,4 +159,6 @@ export class AutopilotEngine {
         return allFrequencies.sort((a,b) => a - b);
     };
 }
+    
+
     

@@ -150,15 +150,6 @@ export default function Home() {
         audioEngine.current?.setBassLatch(isBassLatchOn);
     }, [isBassLatchOn]);
 
-    useEffect(() => {
-        if (!isReady) return;
-        autopilotEngine.current?.setAutopilot(isAutopilotOn, autopilotStyle);
-        if (isAutopilotOn && !isPlaying) {
-             handlePlayPause();
-        }
-    }, [isAutopilotOn, autopilotStyle, isReady, isPlaying]);
-
-
     // --- UI Event Handlers ---
     const handleStartApp = useCallback(async () => {
         if (backgroundAudioRef.current && !backgroundAudioRef.current.paused) {
@@ -198,6 +189,18 @@ export default function Home() {
         }
         setIsPlaying(willBePlaying);
     }, [isReady, isPlaying]);
+
+    useEffect(() => {
+        if (!isReady || !autopilotEngine.current) return;
+        
+        autopilotEngine.current.setAutopilot(isAutopilotOn, autopilotStyle);
+
+        // If autopilot is turned on and music is not playing, start it.
+        if (isAutopilotOn && !isPlaying) {
+            handlePlayPause();
+        }
+    }, [isAutopilotOn, autopilotStyle, isReady, isPlaying, handlePlayPause]);
+
 
     const handleStop = useCallback(async () => {
         if (!isReady) return;
@@ -366,5 +369,7 @@ export default function Home() {
         </div>
     );
 }
+
+    
 
     
