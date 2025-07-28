@@ -24,19 +24,21 @@ export class LatchEngine {
     private gainNode!: Tone.Gain;
     private lfo!: Tone.LFO;
     private latchedNotes = new Map<number, LatchedBassNote>();
+    private baseVolumeDb = -6; // Default volume
 
     constructor(destination: Tone.ToneAudioNode) {
         this.initialize(destination);
     }
 
     private initialize(destination: Tone.ToneAudioNode) {
-        this.gainNode = new Tone.Gain(1).connect(destination);
+        this.gainNode = new Tone.Gain().connect(destination);
+        this.setVolume(this.baseVolumeDb);
 
         this.lfo = new Tone.LFO({
             type: "sine",
             frequency: "2n",
-            min: -24,
-            max: 0,
+            min: 0.2, // Modulate between 20% and 100% of the gain
+            max: 1,
         }).start();
 
         const synthOptions = {
@@ -50,19 +52,20 @@ export class LatchEngine {
     }
 
     public setTempo(bpm: number) {
-        this.lfo.frequency.value = Tone.Time("2n").toFrequency();
+        // Frequency is automatically synced to transport tempo, so no action needed here
+        // unless you want to change the subdivision ('2n', '4n', etc.)
     }
     
     public setVolume(db: number) {
-         this.gainNode.gain.rampTo(Tone.dbToGain(db), 0.1);
+        this.baseVolumeDb = db;
+        // The gain node's gain is the *target* for the LFO, not the direct value
+        this.gainNode.gain.rampTo(Tone.dbToGain(db), 0.1);
     }
 
     public setLatch(isOn: boolean) {
         this.isLatchOn = isOn;
         if (!isOn && this.latchedNotes.size > 0) {
-            this.latchedNotes.forEach(note => note.synth.triggerRelease());
-            this.latchedNotes.clear();
-            this.dispatchOrbs();
+            this.stopAll(true); // Stop and clear all notes
         }
     }
 
@@ -74,8 +77,8 @@ export class LatchEngine {
             this.lfo.connect(this.gainNode.gain);
         } else {
             this.lfo.disconnect(this.gainNode.gain);
-            // Ensure gain returns to the set volume, not just 1
-            this.gainNode.gain.rampTo(this.gainNode.gain.value, 0.2); 
+            // After disconnecting, ensure gain returns to the set base volume
+            this.gainNode.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.2); 
         }
     }
 
@@ -101,17 +104,17 @@ export class LatchEngine {
 
             if (assignedSynth) {
                 const newId = Date.now();
-                const velocity = vol * vol;
-                
-                if (this.isPlaying) {
-                    assignedSynth.triggerAttack(quantizedFreq, undefined, velocity);
-                }
-
-                this.latchedNotes.set(newId, {
+                const newNote = {
                     id: newId, x: pos.x, y: pos.y,
-                    initialFreq: quantizedFreq, volume: velocity,
+                    initialFreq: quantizedFreq, volume: vol * vol,
                     synth: assignedSynth,
-                });
+                };
+                this.latchedNotes.set(newId, newNote);
+                
+                // If transport is already playing, start the new note immediately.
+                if (this.isPlaying) {
+                    assignedSynth.triggerAttack(newNote.initialFreq, undefined, newNote.volume);
+                }
             }
         }
         this.dispatchOrbs();
@@ -135,13 +138,16 @@ export class LatchEngine {
         }
     }
 
-    public stopAll() {
+    public stopAll(clearNotes = false) {
         this.isPlaying = false;
         this.latchedNotes.forEach(note => note.synth.triggerRelease());
         if(this.isPulsating) {
             this.lfo.disconnect(this.gainNode.gain);
         }
-        // Do not clear notes on stop, but update orbs to show they are "off"
+        if (clearNotes) {
+            this.latchedNotes.clear();
+        }
+        // Dispatch orbs to show they are "off" or gone
         this.dispatchOrbs(); 
     }
 
