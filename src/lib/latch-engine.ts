@@ -19,7 +19,6 @@ type LatchedBassNote = {
     synthNode: LatchedNoteSynth;
     initialFreq: number;
     volume: number;
-    isPlaying: boolean;
 };
 
 export class LatchEngine {
@@ -47,15 +46,14 @@ export class LatchEngine {
             gain.gain.value = Tone.dbToGain(this.baseVolumeDb);
             const synth = new Tone.Synth(synthOptions).connect(gain);
             
+            // LFO will be started/stopped manually
             const lfo = new Tone.LFO({
                 type: "sine",
                 min: 0.2,
                 max: 1,
-                frequency: "4n",
+                frequency: Tone.Transport.bpm.value / 60 * 2, // Default to 4n based on initial tempo
             });
-            
-            // This is the critical part for tempo-synced LFOs
-            lfo.sync();
+            lfo.connect(gain.gain);
             
             this.synthPool.push({ synth, lfo, gain });
         }
@@ -64,9 +62,7 @@ export class LatchEngine {
     public setVolume(db: number) {
         this.baseVolumeDb = db;
         this.latchedNotes.forEach(note => {
-            if (!this.isPulsating) {
-                note.synthNode.gain.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
-            }
+            note.synthNode.gain.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
         });
     }
 
@@ -81,22 +77,19 @@ export class LatchEngine {
         if (this.isPulsating === isPulsating) return;
         this.isPulsating = isPulsating;
 
-        this.latchedNotes.forEach(note => {
-            this.updatePulsationForNote(note);
-        });
-    }
+        const quarterNoteFrequency = Tone.Transport.bpm.value / 60;
 
-    private updatePulsationForNote(note: LatchedBassNote) {
-        const { lfo, gain } = note.synthNode;
-        const baseGainValue = Tone.dbToGain(this.baseVolumeDb);
-        
-        if (this.isPulsating) {
-            lfo.connect(gain.gain);
-            // .sync() means we don't need to call .start() manually, it follows the transport
-        } else {
-            lfo.disconnect(gain.gain);
-            gain.gain.rampTo(baseGainValue, 0.1);
-        }
+        this.latchedNotes.forEach(note => {
+            const { lfo, gain } = note.synthNode;
+            lfo.frequency.value = quarterNoteFrequency * 2; // "4n"
+            
+            if (this.isPulsating) {
+                lfo.start();
+            } else {
+                lfo.stop();
+                gain.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
+            }
+        });
     }
     
     public handleInteraction(pos: { x: number; y: number }, vol: number, quantizedFreq: number) {
@@ -124,7 +117,6 @@ export class LatchEngine {
                     id: newId, x: pos.x, y: pos.y,
                     initialFreq: quantizedFreq, volume: vol,
                     synthNode: freeSynthNode,
-                    isPlaying: true,
                 };
                 this.latchedNotes.set(newId, newNote);
                 this.playNote(newNote);
@@ -135,8 +127,11 @@ export class LatchEngine {
 
     private playNote(note: LatchedBassNote) {
         note.synthNode.synth.triggerAttack(note.initialFreq);
-        note.isPlaying = true;
-        this.updatePulsationForNote(note);
+        if (this.isPulsating) {
+             const quarterNoteFrequency = Tone.Transport.bpm.value / 60;
+             note.synthNode.lfo.frequency.value = quarterNoteFrequency * 2;
+             note.synthNode.lfo.start();
+        }
     }
     
     public stopAll() {
@@ -150,9 +145,7 @@ export class LatchEngine {
         const noteToRelease = this.latchedNotes.get(noteId);
         if(noteToRelease) {
             noteToRelease.synthNode.synth.triggerRelease();
-            noteToRelease.isPlaying = false;
-            // Disconnect LFO when note is removed to be safe
-            noteToRelease.synthNode.lfo.disconnect(noteToRelease.synthNode.gain.gain);
+            noteToRelease.synthNode.lfo.stop();
             this.latchedNotes.delete(noteId);
         }
     }
