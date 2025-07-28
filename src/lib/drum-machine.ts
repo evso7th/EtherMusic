@@ -60,10 +60,10 @@ export class DrumMachine {
             G2: "/assets/sounds/mid tom.wav", G3: "/assets/sounds/low tom.wav",
         };
         
-        return new Promise<void>((resolve, reject) => {
+        return new Promise<void>((resolve) => {
              this.drumSamplers = new Tone.Players(drumUrls, () => {
                 if (!this.drumSamplers) {
-                    reject(new Error("Drum samplers failed to create."));
+                    console.error("Drum samplers failed to create.");
                     return;
                 }
                 this.drumSamplers.player('E1').volume.value = -3;
@@ -78,7 +78,10 @@ export class DrumMachine {
         this.drumPart = new Tone.Part((time, value) => {
             const playNote = (note: string) => {
                if (this.drumSamplers?.has(note)) {
-                   this.drumSamplers.player(note).start(time);
+                    // Add a very small, inaudible offset to prevent "Start time must be strictly greater" error
+                    // when multiple notes of the same type are scheduled at the exact same time by the Part.
+                    const offset = Math.random() * 0.0001;
+                    this.drumSamplers.player(note).start(time, offset);
                }
            }
            if (Array.isArray(value.note)) {
