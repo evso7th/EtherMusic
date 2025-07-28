@@ -61,16 +61,16 @@ export class DrumMachine {
         };
         
         return new Promise<void>((resolve, reject) => {
-             this.drumSamplers = new Tone.Players(drumUrls, {
-                onload: () => {
-                    if (!this.drumSamplers) return;
-                    this.drumSamplers.player('E1').volume.value = -3;
-                    this.drumSamplers.player('E2').volume.value = -3;
-                    this.drumSamplers.connect(this.channel);
-                    resolve();
-                },
-                onerror: (error) => reject(error),
-            });
+             this.drumSamplers = new Tone.Players(drumUrls, () => {
+                if (!this.drumSamplers) {
+                    reject(new Error("Drum samplers failed to create."));
+                    return;
+                }
+                this.drumSamplers.player('E1').volume.value = -3;
+                this.drumSamplers.player('E2').volume.value = -3;
+                this.drumSamplers.connect(this.channel);
+                resolve();
+            }).toDestination();
         });
     }
 
