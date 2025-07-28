@@ -19,7 +19,6 @@ type LatchedBassNote = {
     synthNode: LatchedNoteSynth;
     initialFreq: number;
     volume: number;
-    isPlaying: boolean;
 };
 
 export class LatchEngine {
@@ -43,7 +42,8 @@ export class LatchEngine {
         } as const;
 
         for (let i = 0; i < 2; i++) {
-            const gain = new Tone.Gain(Tone.dbToGain(this.baseVolumeDb)).connect(this.destination);
+            const gain = new Tone.Gain(1).connect(this.destination);
+            gain.gain.value = Tone.dbToGain(this.baseVolumeDb);
             const synth = new Tone.Synth(synthOptions).connect(gain);
             
             const lfo = new Tone.LFO({
@@ -53,7 +53,6 @@ export class LatchEngine {
                 frequency: "4n",
             });
             // LFO will be connected/disconnected on demand
-
             this.synthPool.push({ synth, lfo, gain });
         }
     }
@@ -61,9 +60,9 @@ export class LatchEngine {
     public setVolume(db: number) {
         this.baseVolumeDb = db;
         this.latchedNotes.forEach(note => {
-             // Only update gain if not pulsating, otherwise LFO controls it
+            // Only update gain if not pulsating, otherwise LFO controls it
             if (!this.isPulsating) {
-                 note.synthNode.gain.gain.value = Tone.dbToGain(this.baseVolumeDb);
+                note.synthNode.gain.gain.rampTo(Tone.dbToGain(this.baseVolumeDb), 0.1);
             }
         });
     }
@@ -78,6 +77,9 @@ export class LatchEngine {
     public setPulsating(isPulsating: boolean) {
         if (this.isPulsating === isPulsating) return;
         this.isPulsating = isPulsating;
+
+        if (Tone.Transport.state !== 'started') return;
+
         this.latchedNotes.forEach(note => {
             this.updatePulsationForNote(note);
         });
@@ -90,7 +92,7 @@ export class LatchEngine {
         if (this.isPulsating) {
             lfo.connect(gain.gain);
             if (lfo.state !== 'started') {
-                 lfo.start();
+                lfo.start();
             }
         } else {
             if (lfo.state === 'started') {
@@ -103,17 +105,14 @@ export class LatchEngine {
     
     public startAll() {
         this.latchedNotes.forEach(note => {
-            if(!note.isPlaying) {
-                this.playNote(note);
-            }
+            this.playNote(note);
+            this.updatePulsationForNote(note);
         });
     }
     
     public pauseAll() {
-         this.latchedNotes.forEach(note => {
-            if(note.isPlaying) {
-                this.pauseNote(note);
-            }
+        this.latchedNotes.forEach(note => {
+            this.pauseNote(note);
         });
     }
 
@@ -149,34 +148,32 @@ export class LatchEngine {
                     id: newId, x: pos.x, y: pos.y,
                     initialFreq: quantizedFreq, volume: vol,
                     synthNode: freeSynthNode,
-                    isPlaying: false
                 };
                 this.latchedNotes.set(newId, newNote);
-                 if (Tone.Transport.state === 'started') {
-                    this.playNote(newNote);
-                }
+                this.playNote(newNote);
             }
         }
         this.dispatchOrbs();
     }
     
     private playNote(note: LatchedBassNote) {
-        if (note.isPlaying) return;
         note.synthNode.synth.triggerAttack(note.initialFreq);
-        this.updatePulsationForNote(note);
-        note.isPlaying = true;
+        if (Tone.Transport.state === 'started') {
+            this.updatePulsationForNote(note);
+        }
     }
     
-     private pauseNote(note: LatchedBassNote) {
-        if (!note.isPlaying) return;
+    private pauseNote(note: LatchedBassNote) {
         note.synthNode.synth.triggerRelease();
-        note.isPlaying = false;
     }
 
     private releaseAndRemoveNote(noteId: number) {
         const noteToRelease = this.latchedNotes.get(noteId);
         if(noteToRelease) {
             this.pauseNote(noteToRelease);
+            if (noteToRelease.synthNode.lfo.state === 'started') {
+                 noteToRelease.synthNode.lfo.stop();
+            }
             this.latchedNotes.delete(noteId);
         }
     }
