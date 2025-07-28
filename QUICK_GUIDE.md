@@ -27,7 +27,6 @@ There are two large, glowing pads with their names, `Bass Pad` and `Melody Pad`,
 ### Bass Pad (Left, Blue)
 
 *   This is for your bass line. It's polyphonic, meaning you can play up to two notes at the same time to create chords.
-*   **Pulsate (`Zap` Icon):** Makes the sound throb in time with the beat. It affects all sounding bass notes and is great for rhythmic bass lines or pads.
 *   **Latch (`Anchor` Icon):** "Holds" notes for you. Tap the switch to turn Latch mode on.
     *   **To add a note:** Tap on the pad to start a note. A glowing orb will appear.
     *   **To remove a note:** Tap on an existing orb or in the same spot again to stop that specific note.
@@ -39,7 +38,7 @@ Here you control the rhythm section. You can change any of these settings on the
 
 *   **Beats:** Tap this to open a menu and choose a pre-made drum pattern (`Toccata`, `Promenade`, etc.). Select `Off` to have no drums.
 *   **Tempo:** Tap this to open a slider that changes the speed of the beat (BPM - Beats Per Minute).
-*   **Mixer:** Tap this to open the volume controls. You can adjust the volume for the **Melody**, **Bass**, and **Drums** separately.
+*   **Mixer:** Tap this to open the volume controls. You can adjust the volume for the **Melody**, **Bass**, **Latch**, and **Drums** separately.
 
 ## Autopilot Mode
 
@@ -59,7 +58,7 @@ Don't want to play yourself? Turn on the **Autopilot**!
 
 *   **Play/Pause:** Starts and stops the master clock and the drum sequence.
 *   **Stop:** Stops all sounds immediately.
-*   **Record (`Mic` Icon):** Press it to start recording your session. Press it again to stop. Your recording will be downloaded automatically as a `.webm` file.
+*   **Record (`Circle` Icon):** Press it to start recording your session. Press it again to stop. Your recording will be downloaded automatically as a `.webm` file.
 *   **Exit (`Power` Icon):** Opens a confirmation dialog to close the app.
 
 Enjoy the process and let the music you create reflect your inner state.

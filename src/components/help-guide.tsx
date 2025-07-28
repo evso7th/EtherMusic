@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Button, type ButtonProps } from "@/components/ui/button";
@@ -42,7 +41,6 @@ There are two large, glowing pads. They are your main instruments.
 ### Bass Pad (Left, Blue)
 
 *   This is for your bass line. It's polyphonic, so you can play up to four notes at the same time to create chords.
-*   **Pulsate (\`Zap\` Icon):** Makes the sound throb in time with the beat. It affects all sounding bass notes.
 *   **Latch (\`Anchor\` Icon):** "Holds" notes for you. Tap the switch to turn Latch mode on.
     *   **To add a note:** Tap on the pad. A glowing orb will appear.
     *   **To remove a note:** Tap on an existing orb to stop that specific note.
@@ -53,7 +51,7 @@ Here you control the rhythm and atmosphere.
 
 *   **Beats:** Choose a pre-made drum pattern or select \`Off\` for no drums.
 *   **Tempo:** Select a tempo from a list of descriptive names, from slow \`Largo\` to moderate \`Moderato\`.
-*   **Mixer:** This is your command center for sound. Adjust the **Volume**, **Reverb** (space), and **Delay** (echo) for the Melody, Bass, and Drums separately.
+*   **Mixer:** This is your command center for sound. Adjust the **Volume**, **Reverb** (space), and **Delay** (echo) for the Melody, Bass, Latch, and Drums separately.
 
 ### Autopilot Mode
 
@@ -71,7 +69,7 @@ Don't want to play yourself? Turn on the **Autopilot**!
 
 *   **Play/Pause:** Starts and stops the master clock, drums, and Autopilot.
 *   **Stop:** Stops all sounds immediately.
-*   **Record (\`Mic\` Icon):** Press to start recording your session. Press again to stop. Your recording will be downloaded automatically as a \`.webm\` file.
+*   **Record (\`Circle\` Icon):** Press to start recording your session. Press again to stop. Your recording will be downloaded automatically as a \`.webm\` file.
 
 Enjoy the process and let the music you create reflect your inner state.
 `;
