@@ -29,7 +29,6 @@ import { Switch } from "./ui/switch";
 
 type BeatPattern = {
     name: string;
-    patterns: any;
     type: 'Meditative' | 'Classic' | 'System';
 };
 
@@ -55,7 +54,7 @@ interface BeatBoxControlsProps {
     };
     onEffectChange: (effects: BeatBoxControlsProps['effects']) => void;
     isAutopilotOn: boolean;
-    onAutopilotToggle: () => void;
+    onAutopilotToggle: (isOn: boolean) => void;
     autopilotStyles: AutopilotStyle[];
     activeAutopilotStyle: AutopilotStyle;
     onAutopilotStyleChange: (style: AutopilotStyle) => void;
@@ -198,7 +197,7 @@ export function BeatBoxControls({
                 
                 <Button
                     variant={isAutopilotOn ? 'default' : 'outline'}
-                    onClick={onAutopilotToggle}
+                    onClick={() => onAutopilotToggle(!isAutopilotOn)}
                     className="flex-1"
                     size={isMobile ? 'sm' : 'default'}
                 >

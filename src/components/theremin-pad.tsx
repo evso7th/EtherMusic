@@ -33,7 +33,7 @@ interface ThereminPadProps {
     onScaleChange?: (scale: MusicScale) => void;
     // Bass specific
     isPulsating?: boolean;
-    onPulsateToggle?: () => void;
+    onPulsateToggle?: (isPulsating: boolean) => void;
     isLatchOn?: boolean;
     onLatchToggle?: (checked: boolean) => void;
 }
@@ -209,7 +209,7 @@ export function ThereminPad({
                  <Button
                     variant={isPulsating ? 'default' : 'outline'}
                     size="icon"
-                    onClick={onPulsateToggle}
+                    onClick={() => onPulsateToggle(!isPulsating)}
                     className={cn('transition-all w-8 h-8', isPulsating && 'animate-pulse-accent')}
                     style={{ '--accent': 'hsl(var(--accent))' } as React.CSSProperties}
 
