@@ -9,7 +9,6 @@ const NOTE_PROXIMITY_THRESHOLD = 35;
 
 type LatchedNoteSynth = {
     synth: Tone.Synth;
-    gain: Tone.Gain;
 };
 
 type LatchedBassNote = {
@@ -40,9 +39,9 @@ export class LatchEngine {
         } as const;
 
         for (let i = 0; i < 2; i++) {
-            const gain = new Tone.Gain(1).connect(this.destination);
-            const synth = new Tone.Synth(synthOptions).connect(gain);
-            this.synthPool.push({ synth, gain });
+            // The synth now connects directly to the Latch channel passed in the constructor.
+            const synth = new Tone.Synth(synthOptions).connect(this.destination);
+            this.synthPool.push({ synth });
         }
     }
     
@@ -77,7 +76,7 @@ export class LatchEngine {
                 const newNote: LatchedBassNote = {
                     id: newId, x: pos.x, y: pos.y,
                     initialFreq: quantizedFreq, 
-                    volume: vol, // Use the passed-in volume
+                    volume: vol,
                     synthNode: freeSynthNode,
                 };
                 this.latchedNotes.set(newId, newNote);
@@ -88,9 +87,9 @@ export class LatchEngine {
     }
 
     private playNote(note: LatchedBassNote) {
-        // Set initial volume based on the note's own volume property.
-        note.synthNode.gain.gain.value = note.volume;
-        note.synthNode.synth.triggerAttack(note.initialFreq);
+        // The synth's own volume is controlled by the velocity parameter in triggerAttack.
+        // The overall channel volume is controlled by the mixer.
+        note.synthNode.synth.triggerAttack(note.initialFreq, undefined, note.volume);
     }
     
     public startAll() {
@@ -128,4 +127,3 @@ export class LatchEngine {
         document.dispatchEvent(new CustomEvent('latch-orbs-updated', { detail: latchedOrbs }));
     }
 }
-
