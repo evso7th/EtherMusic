@@ -2,7 +2,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Play, Pause, Mic, StopCircle, Power } from 'lucide-react';
+import { Play, Pause, Circle, StopCircle, Power } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -50,7 +50,7 @@ export function PlaybackControls({
             </Button>
             <Button 
                 onClick={onRecord} 
-                variant={isRecording ? 'default' : 'outline'} 
+                variant={isRecording ? 'destructive' : 'outline'} 
                 size="icon" 
                 className={cn(
                     'w-10 h-10 rounded-full transition-colors',
@@ -59,7 +59,7 @@ export function PlaybackControls({
                 aria-label={isRecording ? "Stop Recording" : "Record"} 
                 disabled={!isReady}
             >
-                 <Mic className="w-5 h-5 md:w-6 md:h-6" />
+                 <Circle className="w-5 h-5 md:w-6 md:h-6" />
             </Button>
             <AlertDialog>
                 <AlertDialogTrigger asChild>
