@@ -54,7 +54,7 @@ export class LatchEngine {
     }
     
     public setVolume(db: number) {
-         this.gainNode.gain.value = Tone.dbToGain(db);
+         this.gainNode.gain.rampTo(Tone.dbToGain(db), 0.1);
     }
 
     public setLatch(isOn: boolean) {
@@ -70,11 +70,12 @@ export class LatchEngine {
         this.isPulsating = isPulsating;
         this.isPlaying = isTransportPlaying;
 
-        if (this.isPulsating) {
+        if (this.isPulsating && this.isPlaying) {
             this.lfo.connect(this.gainNode.gain);
         } else {
             this.lfo.disconnect(this.gainNode.gain);
-            this.gainNode.gain.rampTo(1, 0.2);
+            // Ensure gain returns to the set volume, not just 1
+            this.gainNode.gain.rampTo(this.gainNode.gain.value, 0.2); 
         }
     }
 
@@ -137,11 +138,11 @@ export class LatchEngine {
     public stopAll() {
         this.isPlaying = false;
         this.latchedNotes.forEach(note => note.synth.triggerRelease());
-        // Do not clear notes on stop, only on latch toggle off
         if(this.isPulsating) {
             this.lfo.disconnect(this.gainNode.gain);
         }
-        this.dispatchOrbs(); // Orbs might still be visible
+        // Do not clear notes on stop, but update orbs to show they are "off"
+        this.dispatchOrbs(); 
     }
 
     private dispatchOrbs() {
