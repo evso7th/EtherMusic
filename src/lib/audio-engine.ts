@@ -14,7 +14,6 @@ type LatchedBassNote = {
     id: number;
     x: number;
     y: number;
-    synth: Tone.Synth; // This is a reference to a synth from the pool
     initialFreq: number;
     volume: number;
 };
@@ -120,7 +119,6 @@ export class AudioEngine {
         if (!this.isInitialized || Tone.Transport.state === 'started') return;
         this.isPlaying = true;
         Tone.Transport.start();
-        this.latchSynths.releaseAll();
         this.latchedBassNotes.forEach(note => {
             this.latchSynths.triggerAttack(note.initialFreq, undefined, note.volume);
         });
@@ -492,8 +490,6 @@ export class AudioEngine {
             this.latchedBassNotes.set(newId, {
                 id: newId,
                 x: pos.x, y: pos.y,
-                // This synth is just a placeholder to satisfy the type, sound is from latchSynths
-                synth: this.bassSynths[0], 
                 initialFreq: quantizedFreq,
                 volume: velocity
             });
@@ -655,4 +651,6 @@ const beatPatternsData: { [key: string]: { groove: (string|string[]|null)[][], f
 };
 
     
+    
+
     
