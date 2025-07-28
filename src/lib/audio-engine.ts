@@ -81,17 +81,17 @@ export class AudioEngine {
         this.connectChannelsToFX();
         
         // --- Bass Chain ---
-        // Final gain node for overall bass volume control from the mixer
         this.bassGain = new Tone.Gain(1).connect(this.channels.bass);
 
         // LFO for pulsation effect
         this.bassLFO = new Tone.LFO({
             type: "square",
             frequency: "2n",
-            min: -100, // Effectively silence
-            max: 6,      // Boost to compensate for volume perception loss
+            min: -100,
+            max: 6,      
         });
         this.bassLFO.loop = true;
+        this.bassLFO.start();
         
         // Synth Pools
         this.createSynthPools();
@@ -113,7 +113,6 @@ export class AudioEngine {
     public start() {
         if (!this.isInitialized || Tone.Transport.state === 'started') return;
         this.isPlaying = true;
-        this.bassLFO.start();
         Tone.Transport.start();
         this.latchedBassNotes.forEach(note => {
             note.synth.triggerAttack(note.initialFreq, undefined, note.volume);
@@ -133,13 +132,10 @@ export class AudioEngine {
         if (!this.isInitialized) return;
         this.isPlaying = false;
         Tone.Transport.stop();
-        this.bassLFO.stop();
         
-        // Stop real-time notes
         this.activeNotes.forEach(note => note.synth.triggerRelease());
         this.activeNotes.clear();
         
-        // Stop latched notes
         this.latchedBassNotes.forEach(note => note.synth.triggerRelease());
         
         this.updateAndDispatchOrbs();
@@ -243,12 +239,10 @@ export class AudioEngine {
     public setBassPulsating(isPulsating: boolean) {
         if (!this.isInitialized) return;
         this.isBassPulsating = isPulsating;
-
+        
         if (isPulsating) {
             this.bassLFO.connect(this.bassGain.gain);
-            if(this.isPlaying) this.bassLFO.start();
         } else {
-            // Disconnect and smoothly ramp back to the original gain value.
             this.bassLFO.disconnect(this.bassGain.gain);
             this.bassGain.gain.cancelScheduledValues(Tone.now());
             this.bassGain.gain.rampTo(1, 0.1); 
@@ -659,4 +653,5 @@ const beatPatternsData: { [key: string]: { groove: (string|string[]|null)[][], f
         fills: []
     }
 };
+
 
