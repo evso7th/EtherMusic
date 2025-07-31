@@ -7,6 +7,7 @@ import { DisableContextMenu } from '@/components/disable-context-menu';
 export const metadata: Metadata = {
   title: 'EtherMusic',
   description: 'A virtual music box with two theremins and a beat-box.',
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({

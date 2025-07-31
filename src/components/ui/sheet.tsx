@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -62,6 +63,7 @@ const SheetContent = React.forwardRef<
     <SheetPrimitive.Content
       ref={ref}
       className={cn(sheetVariants({ side }), className)}
+      style={{ willChange: 'transform, opacity' }}
       {...props}
     >
       {children}

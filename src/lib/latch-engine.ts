@@ -1,21 +1,16 @@
 
-
 "use client";
 
 import * as Tone from 'tone';
-import { Orb } from '@/app/page';
+import type { OrbManager } from './orb-manager';
 
 const NOTE_PROXIMITY_THRESHOLD = 35;
-
-type LatchedNoteSynth = {
-    synth: Tone.Synth;
-};
 
 type LatchedBassNote = {
     id: number;
     x: number;
     y: number;
-    synthNode: LatchedNoteSynth;
+    synth: Tone.Synth;
     initialFreq: number;
     volume: number; // Volume from 0.0 to 1.0
 };
@@ -23,16 +18,23 @@ type LatchedBassNote = {
 export class LatchEngine {
     private isLatchOn = false;
     
-    private synthPool: LatchedNoteSynth[];
+    private synthPool: Tone.Synth[];
+    private orbManager: OrbManager;
     private latchedNotes = new Map<number, LatchedBassNote>();
 
-    constructor(synthPool: Tone.Synth[]) {
-        this.synthPool = synthPool.map(synth => ({ synth }));
+    constructor(synthPool: Tone.Synth[], orbManager: OrbManager) {
+        this.synthPool = synthPool;
+        this.orbManager = orbManager;
     }
     
     public setLatch(isOn: boolean) {
+        const wasOn = this.isLatchOn;
         this.isLatchOn = isOn;
-        if (!isOn && this.latchedNotes.size > 0) {
+        
+        if (!wasOn && isOn) {
+            // just turned on, nothing to do
+        } else if (wasOn && !isOn) {
+            // just turned off
             this.stopAll();
         }
     }
@@ -52,29 +54,27 @@ export class LatchEngine {
         if (existingEntryId !== undefined) {
             this.releaseAndRemoveNote(existingEntryId);
         } else {
-            const freeSynthNode = this.synthPool.find(node => 
-                !Array.from(this.latchedNotes.values()).some(n => n.synthNode === node)
+            const freeSynth = this.synthPool.find(synth => 
+                !Array.from(this.latchedNotes.values()).some(n => n.synth === synth)
             );
 
-            if (freeSynthNode) {
+            if (freeSynth) {
                 const newId = Date.now() + Math.random();
                 const newNote: LatchedBassNote = {
                     id: newId, x: pos.x, y: pos.y,
                     initialFreq: quantizedFreq, 
                     volume: vol,
-                    synthNode: freeSynthNode,
+                    synth: freeSynth,
                 };
                 this.latchedNotes.set(newId, newNote);
                 this.playNote(newNote);
+                this.orbManager.addOrb(newId, 'latch', pos.x, pos.y);
             }
         }
-        this.dispatchOrbs();
     }
 
     private playNote(note: LatchedBassNote) {
-        // The synth's own volume is controlled by the velocity parameter in triggerAttack.
-        // The overall channel volume is controlled by the mixer.
-        note.synthNode.synth.triggerAttack(note.initialFreq, undefined, note.volume);
+        note.synth.triggerAttack(note.initialFreq, undefined, note.volume);
     }
     
     public startAll() {
@@ -83,7 +83,7 @@ export class LatchEngine {
     
     public pauseAll() {
         this.latchedNotes.forEach((note) => {
-            note.synthNode.synth.triggerRelease();
+            note.synth.triggerRelease();
         });
     }
 
@@ -91,24 +91,14 @@ export class LatchEngine {
         this.latchedNotes.forEach((note, id) => {
             this.releaseAndRemoveNote(id);
         });
-        this.dispatchOrbs(); 
     }
 
     private releaseAndRemoveNote(noteId: number) {
         const noteToRelease = this.latchedNotes.get(noteId);
         if(noteToRelease) {
-            noteToRelease.synthNode.synth.triggerRelease();
+            noteToRelease.synth.triggerRelease();
             this.latchedNotes.delete(noteId);
+            this.orbManager.removeOrb(noteId);
         }
-    }
-
-    private dispatchOrbs() {
-        const latchedOrbs: Orb[] = Array.from(this.latchedNotes.values()).map(note => ({
-            id: note.id,
-            x: note.x,
-            y: note.y,
-            type: 'latch' as const,
-        }));
-        document.dispatchEvent(new CustomEvent('latch-orbs-updated', { detail: latchedOrbs }));
     }
 }

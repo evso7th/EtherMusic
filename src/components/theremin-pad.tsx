@@ -3,7 +3,7 @@
 "use client";
 
 import type { PointerEvent } from 'react';
-import { useRef, useCallback, useState, useEffect } from 'react';
+import { useRef, useCallback, useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Anchor, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { MelodyInstrument, MusicKey, MusicScale, Orb } from '@/app/page';
+import type { MelodyInstrument, MusicKey, MusicScale } from '@/app/page';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 interface ThereminPadProps {
@@ -62,7 +62,6 @@ export function ThereminPad({
     onLatchToggle,
 }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
-    const orbsRef = useRef<Map<number, HTMLDivElement>>(new Map());
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     
     const calculateInteraction = useCallback((event: PointerEvent<HTMLDivElement>) => {
@@ -84,71 +83,6 @@ export function ThereminPad({
         return { x, y, frequency, volume, pointerId: event.pointerId };
     }, [frequencyRange]);
     
-    const manageOrbs = useCallback((orbs: Orb[]) => {
-        if (!padRef.current) return;
-        const currentOrbIds = new Set(orbs.map(orb => orb.id));
-
-        // Update existing or add new orbs
-        for (const orb of orbs) {
-            let orbEl = orbsRef.current.get(orb.id);
-            if (!orbEl) {
-                orbEl = document.createElement('div');
-                orbEl.style.backgroundColor = color;
-                orbEl.style.boxShadow = `0 0 20px ${color}, 0 0 30px ${color}`;
-                padRef.current.appendChild(orbEl);
-                orbsRef.current.set(orb.id, orbEl);
-            }
-            orbEl.className = cn(
-                'absolute top-0 left-0 rounded-full w-8 h-8 md:w-12 md:h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity opacity-100',
-            );
-            orbEl.style.transform = `translate(${orb.x}px, ${orb.y}px)`;
-        }
-
-        // Remove old orbs
-        for (const [id, orbEl] of orbsRef.current.entries()) {
-            if (!currentOrbIds.has(id)) {
-                orbEl.remove();
-                orbsRef.current.delete(id);
-            }
-        }
-    }, [color]);
-    
-    // Connect orb management to audio engine events
-     useEffect(() => {
-        const eventMap = {
-            bass: ['bass-orbs-updated', 'latch-orbs-updated'],
-            melody: ['melody-orbs-updated']
-        };
-
-        const handlers: { [key: string]: (e: Event) => void } = {};
-        
-        const allOrbLists: { [key: string]: Orb[] } = {};
-
-        const combinedHandler = () => {
-             const allOrbs = Object.values(allOrbLists).flat();
-             manageOrbs(allOrbs);
-        };
-
-        const createHandler = (listId: string) => (e: Event) => {
-            const customEvent = e as CustomEvent<Orb[]>;
-            allOrbLists[listId] = customEvent.detail;
-            combinedHandler();
-        };
-
-        const eventNames = eventMap[type];
-
-        eventNames.forEach(eventName => {
-            handlers[eventName] = createHandler(eventName);
-            document.addEventListener(eventName, handlers[eventName]);
-        });
-        
-        return () => {
-             eventNames.forEach(eventName => {
-                document.removeEventListener(eventName, handlers[eventName]);
-            });
-        };
-    }, [type, manageOrbs]);
-
 
     const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (isDisabled) return;
@@ -258,11 +192,14 @@ export function ThereminPad({
     const [title, subtitle] = padTitles[type].split(' ');
 
     return (
-        <Card className={cn(
-            "flex flex-col h-full bg-card/50 border-2 border-transparent transition-all duration-300",
-            (isLatchOn && type === 'bass') && "border-accent ring-4 ring-accent/50",
-            isDisabled && "opacity-50 pointer-events-none"
-        )}>
+        <Card 
+            className={cn(
+                "flex flex-col h-full bg-card/50 border-2 border-transparent transition-all duration-300",
+                (isLatchOn && type === 'bass') && "border-accent ring-4 ring-accent/50",
+                isDisabled && "opacity-50 pointer-events-none"
+            )}
+            style={{ willChange: 'border-color, box-shadow' }}
+        >
             <CardHeader className="flex-shrink-0 flex flex-row items-center justify-end p-2">
                 <div className="flex items-center gap-2">
                    {type === 'melody' ? renderMelodyControls() : renderBassControls()}
@@ -271,7 +208,8 @@ export function ThereminPad({
             <CardContent className="flex-grow p-0">
                 <div
                     ref={padRef}
-                    className="w-full h-full relative overflow-hidden cursor-crosshair touch-none"
+                    className="w-full h-full relative overflow-hidden cursor-crosshair touch-none theremin-pad"
+                    id={`theremin-pad-${type}`}
                     onPointerDown={handlePointerDown}
                     onPointerMove={handlePointerMove}
                     onPointerUp={handlePointerUp}

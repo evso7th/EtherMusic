@@ -1,5 +1,4 @@
 
-
 import * as Tone from 'tone';
 
 export const beatPatterns = [
@@ -7,6 +6,7 @@ export const beatPatterns = [
     { name: 'Earth', type: 'Meditative' },
     { name: 'Water', type: 'Meditative' },
     { name: 'Tibet', type: 'Meditative' },
+    { name: 'Space', type: 'Meditative' },
     { name: 'Toccata', type: 'Classic' },
     { name: 'Promenade', type: 'Classic' },
     { name: 'Nocturne', type: 'Classic' },
@@ -19,9 +19,7 @@ export class DrumMachine {
     private isInitialized = false;
     private channel: Tone.Channel;
     private drumSamplers: Tone.Players | null = null;
-    private drumPart!: Tone.Part<{note: string | string[]}>;
-    private conductorEventId: number | null = null;
-    private measureCount = 0;
+    private drumPart: Tone.Part<{note: string | string[]}> | null = null;
     private currentBeatPatternName = 'Off';
    
     constructor(outputChannel: Tone.Channel) {
@@ -31,13 +29,12 @@ export class DrumMachine {
     public async initialize() {
         if (this.isInitialized) return;
         await this.loadDrumSamples();
-        this.setupDrumPart();
         this.isInitialized = true;
     }
 
     public setVolume(volume: number) {
-        if (!this.isInitialized) return;
-        this.channel.volume.value = volume;
+        if (!this.isInitialized || !this.drumSamplers) return;
+        this.drumSamplers.volume.value = volume;
     }
 
     public setEffects(effects: { reverb: number, delay: number }) {
@@ -49,8 +46,24 @@ export class DrumMachine {
     public setBeatPattern(patternName: string) {
         if (!this.isInitialized) return;
         this.currentBeatPatternName = patternName;
-        this.measureCount = 0;
-        this.updateDrumAndConductor(patternName);
+        
+        if (this.drumPart) {
+            this.drumPart.stop(0).dispose();
+            this.drumPart = null;
+        }
+
+        if (patternName === 'Off') {
+            this.drumSamplers?.stopAll();
+            return;
+        }
+        
+        this.createAndStartPart(patternName);
+    }
+    
+    public stop() {
+        if (!this.isInitialized) return;
+        this.drumPart?.stop(0).clear();
+        this.drumSamplers?.stopAll();
     }
     
     private async loadDrumSamples() {
@@ -69,20 +82,40 @@ export class DrumMachine {
                 }
                 this.drumSamplers.player('E1').volume.value = -3;
                 this.drumSamplers.player('E2').volume.value = -3;
+                this.drumSamplers.player('F1').volume.value = -12;
                 this.drumSamplers.connect(this.channel);
                 resolve();
             }).toDestination();
         });
     }
 
-    private setupDrumPart() {
+    private createAndStartPart(patternName: string) {
+        const patternData = beatPatternsData[patternName];
+        if (!patternData || !patternData.groove?.length) {
+            return;
+        }
+        
+        const events: {time: string, note: string | string[]}[] = [];
+        
+        // We'll schedule 4 measures
+        for (let measure = 0; measure < 4; measure++) {
+            const isFillMeasure = (measure % 4 === 3) && patternData.fills && patternData.fills.length > 0;
+            const patternToPlay = isFillMeasure
+                ? patternData.fills[Math.floor(Math.random() * patternData.fills.length)]
+                : patternData.groove[Math.floor(Math.random() * patternData.groove.length)];
+
+            patternToPlay.forEach((notes, i) => {
+                if (notes) {
+                    const time = `${measure}:${Math.floor(i / 4)}:${i % 4}`;
+                    events.push({ time, note: notes });
+                }
+            });
+        }
+        
         this.drumPart = new Tone.Part((time, value) => {
-            const playNote = (note: string) => {
+             const playNote = (note: string) => {
                if (this.drumSamplers?.has(note)) {
-                    // Add a very small, inaudible offset to prevent "Start time must be strictly greater" error
-                    // when multiple notes of the same type are scheduled at the exact same time by the Part.
-                    const offset = Math.random() * 0.0001;
-                    this.drumSamplers.player(note).start(time, offset);
+                    this.drumSamplers.player(note).start(time);
                }
            }
            if (Array.isArray(value.note)) {
@@ -90,66 +123,10 @@ export class DrumMachine {
            } else if (value.note) {
                playNote(value.note);
            }
-       }, []).start(0);
-       this.drumPart.loop = true;
-       this.drumPart.loopEnd = '1m';
-    }
-    
-    private updateDrumAndConductor(patternName: string) {
-        if (!this.drumPart) return;
+        }, events).start(0);
 
-        this.drumPart.clear();
-        
-        if (patternName === 'Off') {
-            if (this.conductorEventId !== null) {
-                Tone.Transport.clear(this.conductorEventId);
-                this.conductorEventId = null;
-            }
-            return;
-        }
-        
-        this.startConductor();
-        this.scheduleNextDrumMeasure();
-    }
-
-    private startConductor() {
-        if (this.conductorEventId === null) {
-            this.conductorEventId = Tone.Transport.scheduleRepeat((time) => {
-                Tone.Draw.schedule(() => {
-                    this.scheduleNextDrumMeasure();
-                }, time);
-            }, '1m');
-        }
-    }
-    
-    private scheduleNextDrumMeasure() {
-        if (this.currentBeatPatternName === 'Off') {
-            this.drumPart.clear();
-            return;
-        }
-
-        const currentPatternData = beatPatternsData[this.currentBeatPatternName];
-        if (!currentPatternData || !currentPatternData.groove?.length) {
-            this.drumPart.clear();
-            return;
-        }
-    
-        const { groove, fills } = currentPatternData;
-        const isFillMeasure = (this.measureCount % 4) === 3 && fills && fills.length > 0;
-        
-        const patternToPlay = isFillMeasure
-            ? fills[Math.floor(Math.random() * fills.length)]
-            : groove[Math.floor(Math.random() * groove.length)];
-
-        this.drumPart.clear();
-        patternToPlay.forEach((notes, i) => {
-            if (notes) {
-                const noteTime = `0:${Math.floor(i/4)}:${i%4}`;
-                this.drumPart.add(noteTime, { note: notes });
-            }
-        });
-
-        this.measureCount++;
+        this.drumPart.loop = true;
+        this.drumPart.loopEnd = '4m';
     }
 }
 
@@ -208,6 +185,24 @@ const beatPatternsData: { [key: string]: { groove: (string|string[])[][], fills:
             [
                 ['D1'], [], [], [], [], ['C1'], [], [],
                 [], [], ['C1'], [], [], [], ['D1'], [],
+            ]
+        ]
+    },
+    Space: {
+        groove: [
+            [
+                ['C1'], [], [], [], [], [], [], [],
+                [], [], [], [], ['E2'], [], [], [],
+            ],
+            [
+                [], [], [], [], [], [], [], [],
+                ['C1'], [], [], [], [], [], [], [],
+            ]
+        ],
+        fills: [
+            [
+                [], [], [], ['F1'], [], [], [], [],
+                [], [], [], [], [], [], [], [],
             ]
         ]
     },
@@ -280,6 +275,3 @@ const beatPatternsData: { [key: string]: { groove: (string|string[])[][], fills:
         fills: []
     }
 };
-
-    
-    

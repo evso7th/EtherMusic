@@ -15,6 +15,7 @@ import { HelpGuide } from '@/components/help-guide';
 import { AudioEngine } from '@/lib/audio-engine';
 import { AutopilotEngine } from '@/lib/autopilot-engine';
 import { beatPatterns } from '@/lib/drum-machine';
+import { OrbManager } from '@/lib/orb-manager';
 import {
   Dialog,
   DialogContent,
@@ -42,23 +43,27 @@ export const musicKeys: MusicKey[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G',
 export type MusicScale = 'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentatonic';
 export const musicScales: MusicScale[] = ['Major', 'Minor', 'Major Pentatonic', 'Minor Pentatonic'];
 
-export type AutopilotStyle = 'Ambient' | 'House' | 'Wind' | 'Sequence' | 'Chimes' | 'Drone' | 'Primes' | 'Toccata' | 'Promenade';
-export const autopilotStyles: AutopilotStyle[] = ['Ambient', 'House', 'Wind', 'Sequence', 'Chimes', 'Drone', 'Primes', 'Toccata', 'Promenade'];
-
-export type Orb = {
-    id: number;
-    x: number;
-    y: number;
-    type: 'melody' | 'bass' | 'latch';
-};
+export type AutopilotStyle = 'Ambient' | 'House' | 'Wind' | 'Sequence' | 'Chimes' | 'Drone' | 'Primes' | 'Space' | 'Toccata' | 'Promenade';
+export const autopilotStyles: AutopilotStyle[] = ['Ambient', 'House', 'Wind', 'Sequence', 'Chimes', 'Drone', 'Primes', 'Space', 'Toccata', 'Promenade'];
 
 
 const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
 const MemoizedThereminPad = memo(ThereminPad);
 
+const Preloader = () => (
+    <div className="absolute inset-0 bg-background flex items-center justify-center z-50">
+        <div className="text-center text-white">
+            <div className='preloader'>
+                <div><div><div><div><div></div></div></div></div></div>
+            </div>
+        </div>
+    </div>
+);
+
 export default function Home() {
     const { toast } = useToast();
     const isMobile = useIsMobile();
+    const [isClient, setIsClient] = useState(false);
     const [isAppStarted, setIsAppStarted] = useState(false);
     const [isReady, setIsReady] = useState(false);
     
@@ -72,7 +77,7 @@ export default function Home() {
         bass: { reverb: -60, delay: -60 },
         drums: { reverb: -60, delay: -60 },
         autopilot: { reverb: -60, delay: -60 },
-        latch: { reverb: -60, delay: -30 },
+        latch: { reverb: -60, delay: -60 },
     });
     const [activePattern, setActivePattern] = useState<(typeof beatPatterns)[number]>(beatPatterns.find(p => p.name === 'Off')!);
     const [melodyInstrument, setMelodyInstrument] = useState<MelodyInstrument>('synth');
@@ -82,18 +87,27 @@ export default function Home() {
     const [isAutopilotOn, setIsAutopilotOn] = useState(false);
     const [autopilotStyle, setAutopilotStyle] = useState<AutopilotStyle>('Ambient');
 
-    // --- Audio Engine Ref ---
+    // --- Engine Ref ---
     const audioEngine = useRef<AudioEngine>();
     const autopilotEngine = useRef<AutopilotEngine>();
+    const orbManager = useRef<OrbManager>();
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
     
 
     // --- Engine Initialization ---
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
+
     const initializeAudio = useCallback(async () => {
         if (isReady || audioEngine.current) return;
+        
+        if (!orbManager.current) {
+            orbManager.current = new OrbManager();
+        }
 
         try {
-            const mainEngine = new AudioEngine();
+            const mainEngine = new AudioEngine(orbManager.current);
             await mainEngine.initialize();
             audioEngine.current = mainEngine;
             
@@ -170,19 +184,19 @@ export default function Home() {
 
     // --- UI Event Handlers ---
     const handleStartApp = useCallback(async () => {
+        // Stop and reset background audio if it's playing
         if (backgroundAudioRef.current && !backgroundAudioRef.current.paused) {
             backgroundAudioRef.current.pause();
             backgroundAudioRef.current.currentTime = 0;
         }
-
+    
+        // Play transition sound
         const audio = new Audio('/assets/sounds/transition.webm');
         audio.play().catch(e => console.error("Error playing transition sound:", e));
-
-        await initializeAudio();
-        setIsAppStarted(true);
-        
+    
+        // Immediately try to enter fullscreen on mobile, before any async operations
         if (isMobile) {
-            try {
+             try {
                 if (document.documentElement.requestFullscreen) {
                     await document.documentElement.requestFullscreen();
                 } else if ((document.documentElement as any).webkitRequestFullscreen) {
@@ -191,9 +205,16 @@ export default function Home() {
                     await (document.documentElement as any).msRequestFullscreen();
                 }
             } catch (err) {
-                 console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                 console.error(`Error attempting to enable full-screen mode: ${(err as Error).message} (${(err as Error).name})`);
             }
         }
+    
+        // Set the app as started to show the preloader
+        setIsAppStarted(true);
+    
+        // Now, initialize the audio engines
+        await initializeAudio();
+    
     }, [isMobile, initializeAudio]);
     
     const handlePlayPause = useCallback(async () => {
@@ -265,6 +286,10 @@ export default function Home() {
         }
     }, []);
 
+    if (!isClient) {
+        return <Preloader />;
+    }
+
     if (!isAppStarted) {
         return (
             <div 
@@ -295,15 +320,7 @@ export default function Home() {
     }
 
     if (isAppStarted && !isReady) {
-        return (
-            <div className="absolute inset-0 bg-background flex items-center justify-center z-50">
-                <div className="text-center text-white">
-                     <div className='preloader'>
-                        <div><div><div><div><div></div></div></div></div></div>
-                    </div>
-                </div>
-            </div>
-        )
+        return <Preloader />;
     }
 
     return (
@@ -409,11 +426,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
-
-    
-
-    
-
-    

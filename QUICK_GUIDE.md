@@ -1,3 +1,4 @@
+
 # EtherMusic Quick Guide
 
 Welcome to EtherMusic! This is a simple guide to get you started on making cool sounds.
@@ -54,6 +55,7 @@ Don't want to play yourself? Turn on the **Autopilot**!
     *   **Drone:** A deep, continuous, and immersive background tone.
     *   **Toccata:** Virtuosic and dramatic patterns inspired by the works of J.S. Bach, featuring fast arpeggios and a powerful bassline.
     *   **Promenade:** Stately and majestic themes reminiscent of Mussorgsky's "Pictures at an Exhibition," with a "walking" rhythm.
+    *   **Space:** A slow, pulsing arpeggio in the style of Jean-Michel Jarre, with occasional "meteor" sound effects.
 
 ## Top Right Controls
 

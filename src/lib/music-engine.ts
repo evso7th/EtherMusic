@@ -241,6 +241,58 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
             });
             break;
         }
+
+        case 'Space': {
+            // Bass: Very sparse, low notes. A deep hum.
+            bassPattern.push({ time: '0:0:0', freq: freqs.bass[0], dur: '4m', vel: 0.4 });
+            bassPattern.push({ time: '2:0:0', freq: freqs.bass[1] || freqs.bass[0], dur: '2m', vel: 0.35 });
+
+            // Melody: Evolving arpeggio in the style of Jarre
+            const totalSixteenths = 64; // 4 measures
+            const arpNotes = [0, 2, 4, 7, 9, 7, 4, 2].map(i => freqs.melody[i % freqs.melody.length]); // A simple major pentatonic arpeggio pattern
+            
+            for (let i = 0; i < totalSixteenths; i+=2) { // Play a note every 8th note
+                const m = Math.floor(i / 16);
+                const b = Math.floor((i % 16) / 4);
+                const s = i % 4;
+                melodyPattern.push({
+                    time: `${m}:${b}:${s}`,
+                    freq: arpNotes[Math.floor(i/2) % arpNotes.length],
+                    dur: '4n', // Longer notes for a "pad" like effect
+                    vel: 0.3 + Math.sin(i * Math.PI / 16) * 0.1 // Gently pulsate volume
+                });
+            }
+
+            // Generate a few "meteor" effects (less frequently)
+            for (let i = 0; i < 3; i++) { // Reduced from 5 to 3
+                const meteorLength = Math.floor(Math.random() * 2) + 2; // 2 or 3 notes
+                let currentVolume = 0.8;
+                const startingIndex = Math.floor(freqs.melody.length * 0.6) + Math.floor(Math.random() * (freqs.melody.length * 0.4 - meteorLength));
+                let currentNoteIndex = startingIndex;
+                
+                // Ensure meteors are spaced out, not more than 1 per second (1 second at 120bpm is 8 sixteenths)
+                let timeSixteenth = i * 21 + Math.floor(Math.random() * 5); // Base time + random offset
+
+                for (let j = 0; j < meteorLength; j++) {
+                     if (currentNoteIndex >= freqs.melody.length) continue;
+                    const m = Math.floor(timeSixteenth / 16);
+                    const b = Math.floor((timeSixteenth % 16) / 4);
+                    const s = timeSixteenth % 4;
+                    
+                    melodyPattern.push({
+                        time: `${m}:${b}:${s}`,
+                        freq: freqs.melody[currentNoteIndex],
+                        dur: '32n',
+                        vel: currentVolume
+                    });
+                    
+                    currentNoteIndex++; 
+                    currentVolume *= 0.6;
+                    timeSixteenth += 1;
+                }
+            }
+            break;
+        }
         
         case 'Toccata': {
             // Bass: Rhythmic, driving riff that outlines the harmony.
@@ -337,5 +389,9 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
     // Looping melody to fill 4 measures.
     const loopedMelody = loopPattern(melodyPattern, 4);
 
-    return { bassPattern, melodyPattern: loopedMelody };
+    // Remove duplicates from the final melody pattern
+    const finalMelody = Array.from(new Map(loopedMelody.map(n => [n.time, n])).values());
+
+
+    return { bassPattern, melodyPattern: finalMelody };
 }

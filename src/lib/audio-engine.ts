@@ -1,10 +1,10 @@
 
 
 import * as Tone from 'tone';
-import type { MelodyInstrument, MusicKey, MusicScale, Orb } from '@/app/page';
+import type { MelodyInstrument, MusicKey, MusicScale } from '@/app/page';
 import { LatchEngine } from './latch-engine';
 import { DrumMachine } from './drum-machine';
-
+import { OrbManager } from './orb-manager';
 
 type ActiveNote = {
     type: 'melody' | 'bass';
@@ -18,6 +18,7 @@ type ActiveNote = {
 export class AudioEngine {
     public isInitialized = false;
     private isPlaying = false;
+    private orbManager: OrbManager;
 
     // --- Engines ---
     private latchEngine!: LatchEngine;
@@ -42,6 +43,10 @@ export class AudioEngine {
     private musicKey: MusicKey = 'C';
     private musicScale: MusicScale = 'Major Pentatonic';
 
+
+    constructor(orbManager: OrbManager) {
+        this.orbManager = orbManager;
+    }
 
     // --- PUBLIC API ---
 
@@ -76,7 +81,7 @@ export class AudioEngine {
         this.createSynthPools();
         
         // --- Latch Engine ---
-        this.latchEngine = new LatchEngine(this.latchSynths);
+        this.latchEngine = new LatchEngine(this.latchSynths, this.orbManager);
         
         // --- Drum Machine ---
         this.drumMachine = new DrumMachine(this.channels.drums);
@@ -115,10 +120,11 @@ export class AudioEngine {
         
         this.activeNotes.forEach(note => note.synth.triggerRelease());
         this.activeNotes.clear();
+        this.orbManager.removeAllOrbs('melody');
+        this.orbManager.removeAllOrbs('bass');
         
         this.latchEngine.stopAll();
-        
-        this.updateAndDispatchOrbs();
+        this.drumMachine.stop();
     }
     
     public toggleRecording(): boolean {
@@ -237,7 +243,7 @@ export class AudioEngine {
             const velocity = vol * vol;
             freeSynth.triggerAttack(quantizedFreq, undefined, velocity);
             this.activeNotes.set(pointerId, { type, synth: freeSynth, initialFreq: quantizedFreq, x: pos.x, y: pos.y });
-            this.updateAndDispatchOrbs();
+            this.orbManager.addOrb(pointerId, type, pos.x, pos.y);
         }
     }
 
@@ -253,7 +259,7 @@ export class AudioEngine {
     
             activeNote.x = pos.x;
             activeNote.y = pos.y;
-            this.updateAndDispatchOrbs();
+            this.orbManager.updateOrb(pointerId, pos.x, pos.y);
         }
     }
 
@@ -266,7 +272,7 @@ export class AudioEngine {
         if (activeNote) {
             activeNote.synth.triggerRelease();
             this.activeNotes.delete(pointerId);
-            this.updateAndDispatchOrbs();
+            this.orbManager.removeOrb(pointerId);
         }
     }
 
@@ -326,20 +332,5 @@ export class AudioEngine {
         const freqs = type === 'bass' ? this.allowedFrequencies.bass : this.allowedFrequencies.melody;
         if (freqs.length === 0) return targetFreq;
         return freqs.reduce((prev, curr) => (Math.abs(curr - targetFreq) < Math.abs(prev - targetFreq) ? curr : prev));
-    }
-
-
-    private updateAndDispatchOrbs() {
-        // Dispatch only momentary bass orbs, not latched ones
-        const bassOrbs = Array.from(this.activeNotes.entries())
-            .filter(([id, note]) => note.type === 'bass')
-            .map(([id, note]) => ({ id, x: note.x, y: note.y, type: 'bass' as const }));
-
-        const melodyOrbs = Array.from(this.activeNotes.entries())
-            .filter(([id, note]) => note.type === 'melody')
-            .map(([id, note]) => ({ id, x: note.x, y: note.y, type: 'melody' as const }));
-        
-        document.dispatchEvent(new CustomEvent('bass-orbs-updated', { detail: bassOrbs }));
-        document.dispatchEvent(new CustomEvent('melody-orbs-updated', { detail: melodyOrbs }));
     }
 }
