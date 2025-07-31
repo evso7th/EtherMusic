@@ -77,22 +77,20 @@ export class AutopilotEngine {
                 melodyEvents.forEach(e => this.melodyPart?.add(this.nextPatternTime + e.time, e));
                 bassEvents.forEach(e => this.bassPart?.add(this.nextPatternTime + e.time, e));
 
-                // If this is the very first pattern, and transport just started,
-                // we might need to nudge the start time.
-                if (this.nextPatternTime < Tone.Transport.seconds) {
-                    this.nextPatternTime = Tone.Time('@4m').toSeconds();
-                }
-
-                // Schedule the next pattern request
-                this.nextPatternTime += Tone.Time('4m').toSeconds();
+                // Schedule the next pattern request for the end of the current pattern
+                const patternDuration = Tone.Time('4m').toSeconds();
+                this.nextPatternTime += patternDuration;
                 this.requestNextPattern();
+
             }, this.nextPatternTime);
         }
     }
     
     private requestNextPattern() {
         if (this.isAutopilotOn && Tone.Transport.state === 'started' && this.worker) {
-            this.postMessage({ type: 'generate' });
+            Tone.Transport.scheduleOnce(() => {
+                 this.postMessage({ type: 'generate' });
+            }, this.nextPatternTime);
         }
     }
 
@@ -134,6 +132,12 @@ export class AutopilotEngine {
             this.bassPart?.clear();
             this.melodySynths.forEach(s => s.triggerRelease());
             this.bassSynths.forEach(s => s.triggerRelease());
+             // Cancel all future scheduled events related to autopilot
+            let currentEvent = Tone.Transport.get(this.nextPatternTime);
+            while(currentEvent){
+                Tone.Transport.clear(currentEvent.id);
+                currentEvent = Tone.Transport.get(this.nextPatternTime);
+            }
         }
     }
 
