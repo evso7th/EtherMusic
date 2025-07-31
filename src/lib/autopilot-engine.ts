@@ -22,6 +22,9 @@ type AutopilotPatternData = {
     fills: PatternNote[][];
 };
 
+const ALL_KEYS: MusicKey[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const ALL_SCALES: MusicScale[] = ['Major', 'Minor', 'Major Pentatonic', 'Minor Pentatonic'];
+
 export class AutopilotEngine {
     public isInitialized = false;
 
@@ -31,12 +34,16 @@ export class AutopilotEngine {
     private parts!: { bass: Tone.Part<NoteEvent>, melody: Tone.Part<NoteEvent> };
     private channel!: Tone.Channel;
     private regenerationLoop!: Tone.Loop;
+    private modulationLoop!: Tone.Loop;
 
     // --- Internal State ---
     private isAutopilotOn = false;
     private autopilotStyle: AutopilotStyle = 'Ambient';
-    private musicKey: MusicKey = 'C';
-    private musicScale: MusicScale = 'Major Pentatonic';
+    private userKey: MusicKey = 'C';
+    private userScale: MusicScale = 'Major Pentatonic';
+    private currentKey: MusicKey = 'C';
+    private currentScale: MusicScale = 'Major Pentatonic';
+
     private freqs = {
         bass: [] as number[],
         melody: [] as number[],
@@ -59,6 +66,14 @@ export class AutopilotEngine {
             }, time);
         }, '4m').start(0);
 
+        // This loop handles modulation and transposition
+        this.modulationLoop = new Tone.Loop(time => {
+            Tone.Draw.schedule(() => {
+                this.evolveHarmony();
+            }, time);
+        }, '8m').start(0);
+
+
         this.isInitialized = true;
     }
     
@@ -75,8 +90,11 @@ export class AutopilotEngine {
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
         if (!this.isInitialized) return;
-        this.musicKey = key;
-        this.musicScale = scale;
+        this.userKey = key;
+        this.userScale = scale;
+        // On manual change, reset autopilot harmony to user's choice
+        this.currentKey = key;
+        this.currentScale = scale;
         this.updateFrequencies();
         if (this.isAutopilotOn) {
             this.regeneratePatterns();
@@ -91,14 +109,18 @@ export class AutopilotEngine {
         
         if (isOn) {
             if (!wasOn) { // Just turned on
+                this.currentKey = this.userKey;
+                this.currentScale = this.userScale;
                 this.updateFrequencies();
                 this.regeneratePatterns();
             }
             this.regenerationLoop.start();
+            this.modulationLoop.start();
             this.parts.bass.start();
             this.parts.melody.start();
         } else {
             this.regenerationLoop.stop();
+            this.modulationLoop.stop();
             this.parts.bass.stop().clear();
             this.parts.melody.stop().clear();
             this.melodySynths.forEach(s => s.triggerRelease());
@@ -137,6 +159,24 @@ export class AutopilotEngine {
                 break;
         }
         this.melodySynths.forEach(synth => synth.set(newOptions));
+    }
+
+    private evolveHarmony() {
+        if (!this.isAutopilotOn) return;
+
+        const decision = Math.random();
+
+        if (decision < 0.4) { // 40% chance to transpose
+            const currentKeyIndex = ALL_KEYS.indexOf(this.currentKey);
+            const nextKeyIndex = (currentKeyIndex + (Math.random() > 0.5 ? 1 : -1) + ALL_KEYS.length) % ALL_KEYS.length;
+            this.currentKey = ALL_KEYS[nextKeyIndex];
+        } else if (decision < 0.6) { // 20% chance to modulate scale
+            const availableScales = ALL_SCALES.filter(s => s !== this.currentScale);
+            this.currentScale = availableScales[Math.floor(Math.random() * availableScales.length)];
+        }
+        // 40% chance to do nothing, keeping it stable
+        
+        this.updateFrequencies();
     }
 
 
@@ -224,8 +264,8 @@ export class AutopilotEngine {
     
     private updateFrequencies() {
         this.freqs = {
-            bass: this.getScaleFrequencies(this.musicKey, this.musicScale, [2, 3]),
-            melody: this.getScaleFrequencies(this.musicKey, this.musicScale, [3, 4, 5]),
+            bass: this.getScaleFrequencies(this.currentKey, this.currentScale, [2, 3]),
+            melody: this.getScaleFrequencies(this.currentKey, this.currentScale, [3, 4, 5]),
         };
     }
 
@@ -250,7 +290,7 @@ export class AutopilotEngine {
 const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } = {
     Ambient: {
         groove: [
-            [[-1, 1, '1m'], [0, 8, '2m'], [16, 5, '2m']],
+            [[-1, 1, '2m'], [0, 8, '2m'], [16, 5, '2m']],
         ],
         fills: [
             [[48, 10, '1m'], [56, 3, '1m']],
