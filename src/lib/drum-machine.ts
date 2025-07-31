@@ -113,15 +113,15 @@ export class DrumMachine {
         }
         
         this.drumPart = new Tone.Part((time, value) => {
-             const playNote = (note: string) => {
+             const playNote = (note: string, offset: number) => {
                if (this.drumSamplers?.has(note)) {
-                    this.drumSamplers.player(note).start(time);
+                    this.drumSamplers.player(note).start(Tone.Time(time).add(offset));
                }
            }
            if (Array.isArray(value.note)) {
-               value.note.forEach(playNote);
+               value.note.forEach((note, index) => playNote(note, index * 0.001)); // Add a tiny offset
            } else if (value.note) {
-               playNote(value.note);
+               playNote(value.note, 0);
            }
         }, events).start(0);
 
