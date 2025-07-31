@@ -181,7 +181,7 @@ export default function Home() {
             handlePlayPause();
             setIsPlaying(true);
         }
-    }, [isReady, isPlaying]);
+    }, [isReady]);
 
     // --- UI Event Handlers ---
     const handleStartApp = useCallback(async () => {
