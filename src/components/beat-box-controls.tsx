@@ -60,6 +60,7 @@ interface BeatBoxControlsProps {
     activeAutopilotStyle: AutopilotStyle;
     onAutopilotStyleChange: (style: AutopilotStyle) => void;
     isMobile: boolean;
+    isLandscape?: boolean;
 }
 
 export function BeatBoxControls({
@@ -79,6 +80,7 @@ export function BeatBoxControls({
     activeAutopilotStyle,
     onAutopilotStyleChange,
     isMobile,
+    isLandscape = false,
 }: BeatBoxControlsProps) {
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isTempoOpen, setIsTempoOpen] = useState(false);
@@ -102,13 +104,171 @@ export function BeatBoxControls({
     const patternsToShow = selectedCategory === 'Classic' ? classicPatterns : meditativePatterns;
 
     const isBeatsOn = activePattern && activePattern.name !== 'Off';
+    
+    const buttonSize = isMobile ? 'sm' : 'default';
+
+    if (isLandscape) {
+        return (
+            <div className="flex flex-col gap-2">
+                <Dialog open={isBeatsOpen} onOpenChange={setIsBeatsOpen}>
+                    <DialogTrigger asChild>
+                         <Button variant={isBeatsOn ? 'default' : 'outline'} size="icon" className="w-10 h-10 rounded-full">
+                            <Drum className="w-5 h-5" />
+                        </Button>
+                    </DialogTrigger>
+                    {/* Beat Patterns Dialog Content */}
+                     <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Beat Patterns</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                            <div className="flex items-center justify-center space-x-2">
+                                <Label htmlFor="category-switch" className={cn(selectedCategory !== 'Classic' && "text-muted-foreground")}>Classic</Label>
+                                <Switch 
+                                    id="category-switch"
+                                    checked={selectedCategory === 'Meditative'}
+                                    onCheckedChange={(checked) => setSelectedCategory(checked ? 'Meditative' : 'Classic')}
+                                />
+                                <Label htmlFor="category-switch" className={cn(selectedCategory !== 'Meditative' && "text-muted-foreground")}>Meditative</Label>
+                            </div>
+                           
+                            <div className="grid grid-cols-2 gap-2">
+                                {patternsToShow.map((pattern) => (
+                                    <Button
+                                        key={pattern.name}
+                                        variant={activePattern.name === pattern.name ? 'default' : 'outline'}
+                                        onClick={() => {
+                                            onPatternChange(pattern);
+                                            setIsBeatsOpen(false);
+                                        }}
+                                    >
+                                        {pattern.name}
+                                    </Button>
+                                ))}
+                            </div>
+                            
+                            {offPattern && (
+                                <div>
+                                    <Separator className="my-3" />
+                                    <Button
+                                        key={offPattern.name}
+                                        variant={'outline'}
+                                        onClick={() => {
+                                            onPatternChange(offPattern);
+                                            setIsBeatsOpen(false);
+                                        }}
+                                        className={cn(
+                                            "w-full",
+                                            activePattern.name === offPattern.name && "border-primary text-primary"
+                                        )}
+                                    >
+                                        {offPattern.name}
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    </DialogContent>
+                </Dialog>
+
+                <Dialog open={isTempoOpen} onOpenChange={setIsTempoOpen}>
+                    <DialogTrigger asChild>
+                         <Button variant="outline" size="icon" className="w-10 h-10 rounded-full">
+                            <Zap className="w-5 h-5" />
+                        </Button>
+                    </DialogTrigger>
+                     {/* Tempo Dialog Content */}
+                     <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Adjust Tempo</DialogTitle>
+                        </DialogHeader>
+                        <div className="grid grid-cols-1 gap-2 py-4">
+                            {tempos.map((tempo) => (
+                                <Button
+                                    key={tempo.name}
+                                    variant={activeTempo.name === tempo.name ? 'default' : 'outline'}
+                                    onClick={() => {
+                                        onTempoChange(tempo);
+                                        setIsTempoOpen(false);
+                                    }}
+                                    className="flex justify-between w-full"
+                                >
+                                    <span>{tempo.name}</span>
+                                    <span className="text-sm text-muted-foreground">{tempo.bpm} BPM</span>
+                                </Button>
+                            ))}
+                        </div>
+                    </DialogContent>
+                </Dialog>
+                
+                <Dialog open={isStyleOpen} onOpenChange={setIsStyleOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant={isAutopilotOn ? 'default' : 'outline'} size="icon" className="w-10 h-10 rounded-full">
+                            <Bot className="w-5 h-5" />
+                        </Button>
+                    </DialogTrigger>
+                     {/* Autopilot Dialog Content */}
+                     <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Autopilot Style</DialogTitle>
+                        </DialogHeader>
+                        <div className='py-4 space-y-4'>
+                             <div className="flex items-center space-x-2">
+                                <Switch id="autopilot-switch" checked={isAutopilotOn} onCheckedChange={onAutopilotToggle} />
+                                <Label htmlFor="autopilot-switch">Autopilot On/Off</Label>
+                            </div>
+                            <div className={cn(
+                                "grid grid-cols-3 gap-2 transition-opacity",
+                                !isAutopilotOn && "opacity-50 pointer-events-none"
+                            )}>
+                                {autopilotStyles.map((style) => (
+                                    <Button
+                                        key={style}
+                                        variant={activeAutopilotStyle === style ? 'default' : 'outline'}
+                                        onClick={() => {
+                                            onAutopilotStyleChange(style);
+                                        }}
+                                        disabled={!isAutopilotOn}
+                                    >
+                                        {style}
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+
+
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <Button variant="outline" size="icon" className="w-10 h-10 rounded-full">
+                            <SlidersHorizontal className="w-5 h-5"/>
+                        </Button>
+                    </DialogTrigger>
+                    {/* Mixer Dialog Content */}
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Mixer</DialogTitle>
+                        </DialogHeader>
+                        <MixerControls 
+                            volumes={volumes} 
+                            onVolumeChange={onVolumeChange}
+                            effects={effects}
+                            onEffectChange={onEffectChange}
+                         />
+                    </DialogContent>
+                </Dialog>
+                
+                <HelpGuide buttonVariant="outline" size="icon" className="w-10 h-10 rounded-full" showText={false}/>
+            </div>
+        )
+    }
 
     return (
         <Card className="bg-card/50">
             <CardContent className="p-2 md:p-4 flex justify-around items-center gap-1 md:gap-2">
                 <Dialog open={isBeatsOpen} onOpenChange={setIsBeatsOpen}>
                     <DialogTrigger asChild>
-                        <Button variant={isBeatsOn ? 'default' : 'outline'} className="flex-1" size={isMobile ? 'sm' : 'default'}>
+                        <Button variant={isBeatsOn ? 'default' : 'outline'} className="flex-1" size={buttonSize}>
                             <Drum className="w-4 h-4 md:mr-2" />
                             <span className="hidden sm:inline">Beats</span>
                         </Button>
@@ -168,7 +328,7 @@ export function BeatBoxControls({
 
                 <Dialog open={isTempoOpen} onOpenChange={setIsTempoOpen}>
                     <DialogTrigger asChild>
-                         <Button variant="outline" className="flex-1" size={isMobile ? 'sm' : 'default'}>
+                         <Button variant="outline" className="flex-1" size={buttonSize}>
                             <Zap className="w-4 h-4 md:mr-2" />
                             <span className="hidden sm:inline">Tempo</span>
                         </Button>
@@ -198,7 +358,7 @@ export function BeatBoxControls({
                 
                 <Dialog open={isStyleOpen} onOpenChange={setIsStyleOpen}>
                     <DialogTrigger asChild>
-                        <Button variant={isAutopilotOn ? 'default' : 'outline'} className="flex-1" size={isMobile ? 'sm' : 'default'}>
+                        <Button variant={isAutopilotOn ? 'default' : 'outline'} className="flex-1" size={buttonSize}>
                             <Bot className="w-4 h-4 md:mr-2" />
                             <span className="hidden sm:inline">Autopilot</span>
                         </Button>
@@ -236,7 +396,7 @@ export function BeatBoxControls({
 
                 <Dialog>
                     <DialogTrigger asChild>
-                        <Button variant="outline" className="flex-1 px-2 md:px-4" size={isMobile ? 'sm' : 'default'}>
+                        <Button variant="outline" className="flex-1 px-2 md:px-4" size={buttonSize}>
                             <SlidersHorizontal className="w-4 h-4 md:mr-2"/>
                              <span className="hidden sm:inline">Mixer</span>
                         </Button>
@@ -254,9 +414,10 @@ export function BeatBoxControls({
                     </DialogContent>
                 </Dialog>
 
-                <HelpGuide buttonVariant="outline" buttonClassName="flex-1" size={isMobile ? 'sm' : 'default'}/>
+                <HelpGuide buttonVariant="outline" buttonClassName="flex-1" size={buttonSize}/>
 
             </CardContent>
         </Card>
     );
 }
+

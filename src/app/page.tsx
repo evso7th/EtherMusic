@@ -329,16 +329,23 @@ export default function Home() {
             <div className="fixed inset-0 z-0">
                  <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={activeTempo.bpm} />
             </div>
-            <div className={cn(
-                "relative z-10 flex flex-col h-full p-2 md:p-6 lg:p-8",
-                 // On mobile, use flex-col in portrait, and flex-row in landscape
-                isMobile && "portrait:flex-col landscape:flex-row landscape:p-1 landscape:gap-1"
+            
+             <div className={cn(
+                "relative z-10 flex h-full",
+                // Portrait mode: classic vertical layout
+                "portrait:flex-col portrait:p-2 md:p-6 lg:p-8",
+                 // Landscape mode: sidebars layout
+                "landscape:flex-row landscape:p-1 landscape:gap-1"
             )}>
+                {/* --- HEADER / LEFT SIDEBAR --- */}
                 <header className={cn(
-                    "flex-shrink-0 flex items-center justify-between mb-2",
-                    isMobile && "portrait:mb-2 landscape:hidden" // Hide header in landscape on mobile
+                    "flex-shrink-0",
+                    // Portrait mode header
+                    "portrait:flex portrait:items-center portrait:justify-between portrait:mb-2",
+                    // Landscape mode sidebar
+                    "landscape:flex landscape:flex-col landscape:items-center landscape:justify-center landscape:w-16 landscape:gap-4"
                 )}>
-                     <div>
+                     <div className="portrait:block landscape:hidden">
                         {isMobile ? (
                             <Dialog>
                                 <DialogTrigger asChild>
@@ -370,7 +377,10 @@ export default function Home() {
                              </>
                         )}
                     </div>
-                    <div className="flex items-center gap-1 md:gap-2">
+                    <div className={cn(
+                        "flex items-center gap-1 md:gap-2",
+                        "landscape:flex-col" // Stack playback controls vertically in landscape
+                    )}>
                          <PlaybackControls
                             isPlaying={isPlaying}
                             isRecording={isRecording}
@@ -381,14 +391,10 @@ export default function Home() {
                         />
                     </div>
                 </header>
-                 <main className={cn(
-                    "flex-grow flex flex-col gap-2 overflow-hidden",
-                    isMobile && "portrait:flex-col landscape:flex-row landscape:gap-1"
-                )}>
-                    <div className={cn(
-                        "flex-grow grid grid-cols-1 md:grid-cols-2 gap-2",
-                        isMobile && "portrait:grid-cols-1 landscape:grid-cols-2 portrait:gap-2 landscape:gap-1"
-                    )}>
+
+                 {/* --- MAIN CONTENT (PADS) --- */}
+                 <main className="flex-grow flex flex-col gap-2 overflow-hidden">
+                     <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-2 landscape:grid-cols-2 landscape:gap-1">
                         <MemoizedThereminPad
                             onInteraction={handleThereminInteraction}
                             type="bass"
@@ -415,10 +421,7 @@ export default function Home() {
                             isPolyphonic
                         />
                     </div>
-                    <div className={cn(
-                        "flex-shrink-0",
-                        isMobile && "landscape:hidden" // Hide beatbox in landscape on mobile
-                    )}>
+                    <div className="flex-shrink-0 portrait:block landscape:hidden">
                         <BeatBoxControls
                             patterns={beatPatterns}
                             activePattern={activePattern}
@@ -439,7 +442,31 @@ export default function Home() {
                         />
                     </div>
                 </main>
+
+                {/* --- RIGHT SIDEBAR --- */}
+                <div className="portrait:hidden landscape:flex landscape:flex-col landscape:items-center landscape:justify-center landscape:w-16 landscape:gap-2">
+                     <BeatBoxControls
+                        patterns={beatPatterns}
+                        activePattern={activePattern}
+                        onPatternChange={setActivePattern}
+                        tempos={tempos}
+                        activeTempo={activeTempo}
+                        onTempoChange={setActiveTempo}
+                        volumes={volumes}
+                        onVolumeChange={setVolumes}
+                        effects={effects}
+                        onEffectChange={setEffects}
+                        isAutopilotOn={isAutopilotOn}
+                        onAutopilotToggle={setIsAutopilotOn}
+                        autopilotStyles={autopilotStyles}
+                        activeAutopilotStyle={autopilotStyle}
+                        onAutopilotStyleChange={setAutopilotStyle}
+                        isMobile={isMobile}
+                        isLandscape={true} // Pass landscape prop
+                    />
+                </div>
             </div>
         </div>
     );
 }
+

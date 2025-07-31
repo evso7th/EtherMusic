@@ -41,7 +41,7 @@ export function PlaybackControls({
     };
 
     return (
-        <div className="flex items-center gap-1 md:gap-2">
+        <>
              <Button onClick={onStop} size="icon" variant="outline" className="w-10 h-10 rounded-full" aria-label="Stop" disabled={!isReady}>
                 <StopCircle className="w-5 h-5 md:w-6 md:h-6" />
             </Button>
@@ -85,6 +85,7 @@ export function PlaybackControls({
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </div>
+        </>
     );
 }
+
