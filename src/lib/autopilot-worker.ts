@@ -85,52 +85,56 @@ function generatePattern() {
         postMessage({ type: 'patternGenerated', melodyEvents, bassEvents });
         return;
     }
-
-    const groove = patternData.groove[Math.floor(Math.random() * patternData.groove.length)];
-    const fill = patternData.fills.length > 0 ? patternData.fills[Math.floor(Math.random() * patternData.fills.length)] : [];
     
-    const measures = 4;
-    const totalSixteenths = measures * 16;
-    const combinedPattern = new Map<number, PatternNote[]>();
+    // Generate a 4-measure phrase
+    const totalMeasures = 4;
+    const measuresPerGroove = patternData.groove.length;
+    const fillsPerStyle = patternData.fills.length;
+    
+    let combinedPattern: PatternNote[] = [];
 
-    for(let i = 0; i < measures; i++) {
-        const pattern = (i === measures - 1) ? fill : groove; // Use fill for the last measure
-        pattern.forEach(note => {
+    for (let measure = 0; measure < totalMeasures; measure++) {
+        let patternToAdd: PatternNote[];
+        // Use a fill for the last measure if available
+        if (measure === totalMeasures - 1 && fillsPerStyle > 0) {
+             patternToAdd = patternData.fills[Math.floor(Math.random() * fillsPerStyle)];
+        } else {
+             patternToAdd = patternData.groove[Math.floor(Math.random() * measuresPerGroove)];
+        }
+        
+        // Add notes with the correct time offset for the current measure
+        patternToAdd.forEach(note => {
             const [timeQuant, ...rest] = note;
-            const absoluteTime = (i * 16) + timeQuant;
-            if (!combinedPattern.has(absoluteTime)) {
-                combinedPattern.set(absoluteTime, []);
-            }
-            combinedPattern.get(absoluteTime)?.push(note);
+            combinedPattern.push([(measure * 16) + timeQuant, ...rest]);
         });
     }
 
+
     const sixteenthNoteDuration = Tone.Time('16n').toSeconds();
 
-    combinedPattern.forEach((notesAtTime, timeQuant) => {
-        notesAtTime.forEach(noteData => {
-            const [relTimeQuant, noteIndex, durationStr = '8n', velocity = 0.5] = noteData;
-            const startTime = timeQuant * sixteenthNoteDuration;
-            const durationSeconds = Tone.Time(durationStr).toSeconds();
-            
-            const isBassNote = noteIndex < 0;
-            const freqsList = isBassNote ? freqs.bass : freqs.melody;
-            const finalIndex = isBassNote ? Math.abs(noteIndex) - 1 : noteIndex;
+    combinedPattern.forEach(noteData => {
+        const [timeQuant, noteIndex, durationStr = '8n', velocity = 0.5] = noteData;
+        const startTime = timeQuant * sixteenthNoteDuration;
+        const durationSeconds = Tone.Time(durationStr).toSeconds();
+        
+        const isBassNote = noteIndex < 0;
+        const freqsList = isBassNote ? freqs.bass : freqs.melody;
+        // For bass, index -1 becomes 0, -2 becomes 1 etc.
+        const finalIndex = isBassNote ? Math.abs(noteIndex) - 1 : noteIndex;
 
-            if (finalIndex < freqsList.length) {
-                const event: NoteEvent = {
-                    time: startTime,
-                    freq: freqsList[finalIndex],
-                    dur: durationSeconds,
-                    vel: velocity,
-                };
-                if (isBassNote) {
-                    bassEvents.push(event);
-                } else {
-                    melodyEvents.push(event);
-                }
+        if (finalIndex < freqsList.length) {
+            const event: NoteEvent = {
+                time: startTime,
+                freq: freqsList[finalIndex],
+                dur: durationSeconds,
+                vel: velocity,
+            };
+            if (isBassNote) {
+                bassEvents.push(event);
+            } else {
+                melodyEvents.push(event);
             }
-        });
+        }
     });
     
     postMessage({ type: 'patternGenerated', melodyEvents, bassEvents });

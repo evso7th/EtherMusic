@@ -54,18 +54,16 @@ export class AutopilotEngine {
     
     private initializeParts() {
         this.melodyPart = new Tone.Part<NoteEvent>((time, note) => {
-            const availableSynth = this.melodySynths.shift();
+            const availableSynth = this.melodySynths.find(s => s.state === 'stopped');
             if (availableSynth) {
                 availableSynth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
-                this.melodySynths.push(availableSynth);
             }
         }, []).start(0);
 
         this.bassPart = new Tone.Part<NoteEvent>((time, note) => {
-            const availableSynth = this.bassSynths.shift();
+            const availableSynth = this.bassSynths.find(s => s.state === 'stopped');
             if (availableSynth) {
                 availableSynth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
-                this.bassSynths.push(availableSynth);
             }
         }, []).start(0);
     }
@@ -74,9 +72,18 @@ export class AutopilotEngine {
         if (event.data.type === 'patternGenerated') {
             const { melodyEvents, bassEvents } = event.data;
             
+            // Schedule the addition of new events to the transport timeline
             Tone.Transport.scheduleOnce(() => {
                 melodyEvents.forEach(e => this.melodyPart?.add(this.nextPatternTime + e.time, e));
                 bassEvents.forEach(e => this.bassPart?.add(this.nextPatternTime + e.time, e));
+
+                // If this is the very first pattern, and transport just started,
+                // we might need to nudge the start time.
+                if (this.nextPatternTime < Tone.Transport.seconds) {
+                    this.nextPatternTime = Tone.Time('@4m').toSeconds();
+                }
+
+                // Schedule the next pattern request
                 this.nextPatternTime += Tone.Time('4m').toSeconds();
                 this.requestNextPattern();
             }, this.nextPatternTime);
@@ -117,7 +124,8 @@ export class AutopilotEngine {
 
         if (isOn && !wasOn) {
             if (Tone.Transport.state === 'started') {
-                 // Schedule for the start of the next 4-measure block
+                this.melodyPart?.clear();
+                this.bassPart?.clear();
                 this.nextPatternTime = Tone.Time('@4m').toSeconds();
                 this.requestNextPattern();
             }
