@@ -1,4 +1,3 @@
-
 # EtherMusic Quick Guide
 
 Welcome to EtherMusic! This is a simple guide to get you started on making cool sounds.
