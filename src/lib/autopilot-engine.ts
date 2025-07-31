@@ -221,28 +221,28 @@ export class AutopilotEngine {
 
     private playNote(type: 'melody' | 'bass', note: NoteEvent, time: Tone.Unit.Time) {
         const synthPool = type === 'melody' ? this.melodySynths : this.bassSynths;
-        const numericTime = Tone.Transport.toSeconds(time);
+        let numericTime = Tone.Transport.toSeconds(time);
+
+        // Find the synth that will be available earliest
+        let bestSynth = synthPool.reduce((a, b) => {
+            return (this.synthReleaseTime.get(a) ?? -1) < (this.synthReleaseTime.get(b) ?? -1) ? a : b;
+        });
         
-        // Find a synth that is available at the requested time
-        let availableSynth = synthPool.find(s => (this.synthReleaseTime.get(s) ?? -1) <= numericTime);
-        
-        // If no synth is available, find the one that will be free the soonest and use it.
-        // This is a fallback and might cause a click, but prevents a crash.
-        if (!availableSynth) {
-            availableSynth = synthPool.reduce((a, b) => {
-                const aTime = this.synthReleaseTime.get(a) ?? Infinity;
-                const bTime = this.synthReleaseTime.get(b) ?? Infinity;
-                return aTime < bTime ? a : b;
-            });
+        const lastReleaseTime = this.synthReleaseTime.get(bestSynth) ?? -1;
+
+        // If the synth is not yet free, we must schedule the note slightly later
+        if (lastReleaseTime > numericTime) {
+            numericTime = lastReleaseTime;
         }
+
+        const durationSeconds = Tone.Time(note.dur).toSeconds();
         
-        if (availableSynth) {
-            availableSynth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
-            // Schedule the release time of this synth
-            const durationSeconds = Tone.Time(note.dur).toSeconds();
-            this.synthReleaseTime.set(availableSynth, numericTime + durationSeconds);
-        }
+        bestSynth.triggerAttackRelease(note.freq, durationSeconds, numericTime, note.vel);
+        
+        // Schedule the new release time for this synth
+        this.synthReleaseTime.set(bestSynth, numericTime + durationSeconds);
     }
+
 
     private setupParts() {
         this.parts = {
@@ -262,9 +262,12 @@ export class AutopilotEngine {
     private regeneratePatterns() {
         if (!this.isInitialized || !this.isAutopilotOn || this.freqs.bass.length === 0 || this.freqs.melody.length === 0) return;
         
+        // Don't clear parts immediately, let notes fade out.
+        // Clearing is implicitly handled by not adding new notes to old parts.
+        this.resetSynthUsage();
+        
         this.parts.bass.clear();
         this.parts.melody.clear();
-        this.resetSynthUsage();
         
         const patternData = autopilotPatternsData[this.autopilotStyle];
         if (!patternData) return;
@@ -310,13 +313,13 @@ export class AutopilotEngine {
             // Schedule a melody arpeggio
             const arpNotes = this.getArpeggioNotes(noteIndex, arpeggioOptions.octaves);
             const arpPattern = this.getArpeggioPattern(arpNotes, arpeggioOptions.pattern);
-            const arpSpeed = Tone.Time(arpeggioOptions.speed).toSeconds();
-            const arpNoteDuration = arpSpeed * 1.2; // slight overlap
+            const arpSpeedInSeconds = Tone.Time(arpeggioOptions.speed).toSeconds();
+            const arpNoteDuration = arpSpeedInSeconds * 1.2; // slight overlap
 
             arpPattern.forEach((arpNoteIndex, i) => {
                 if (arpNoteIndex < this.freqs.melody.length) {
                     const event: NoteEvent = {
-                        time: (startTime.toSeconds() + (arpSpeed * i)) as Tone.Unit.Seconds,
+                        time: (startTime.toSeconds() + (arpSpeedInSeconds * i)) as Tone.Unit.Seconds,
                         freq: this.freqs.melody[arpNoteIndex],
                         dur: Tone.Time(arpNoteDuration).toNotation(),
                         vel: velocity * (0.85 + Math.random() * 0.3), // add slight velocity variation
@@ -469,5 +472,3 @@ const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } =
         arpeggio: { pattern: 'up', speed: '8n', octaves: 2 }
     },
 };
-
-    
