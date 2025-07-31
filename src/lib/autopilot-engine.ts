@@ -3,7 +3,7 @@ import * as Tone from 'tone';
 import type { MusicKey, MusicScale, AutopilotStyle, MelodyInstrument } from '@/app/page';
 
 type NoteEvent = {
-    time: string;
+    time: string | number;
     freq: number;
     dur: string;
     vel: number;
@@ -52,7 +52,7 @@ export class AutopilotEngine {
     private currentScale: MusicScale = 'Major Pentatonic';
     
     // --- Synth Availability Tracking ---
-    private synthLastUsage: Map<Tone.Synth, number> = new Map();
+    private synthReleaseTime: Map<Tone.Synth, number> = new Map();
 
 
     private freqs = {
@@ -136,6 +136,7 @@ export class AutopilotEngine {
             this.parts.melody.stop().clear();
             this.melodySynths.forEach(s => s.triggerRelease());
             this.bassSynths.forEach(s => s.triggerRelease());
+            this.resetSynthUsage();
         }
     }
 
@@ -199,7 +200,6 @@ export class AutopilotEngine {
         for (let i = 0; i < 2; i++) {
             const synth = new Tone.Synth(bassSynthOptions).connect(this.channel);
             this.bassSynths.push(synth);
-            this.synthLastUsage.set(synth, -1);
         }
 
         const melodySynthOptions = {
@@ -209,27 +209,38 @@ export class AutopilotEngine {
         for (let i = 0; i < 4; i++) {
             const synth = new Tone.Synth(melodySynthOptions).connect(this.channel);
             this.melodySynths.push(synth);
-            this.synthLastUsage.set(synth, -1);
         }
+        
+        this.resetSynthUsage();
+    }
+    
+    private resetSynthUsage() {
+        this.bassSynths.forEach(s => this.synthReleaseTime.set(s, -1));
+        this.melodySynths.forEach(s => this.synthReleaseTime.set(s, -1));
     }
 
     private playNote(type: 'melody' | 'bass', note: NoteEvent, time: Tone.Unit.Time) {
         const synthPool = type === 'melody' ? this.melodySynths : this.bassSynths;
         const numericTime = Tone.Transport.toSeconds(time);
         
-        // Find a synth that is not currently playing at this exact time
-        let synth = synthPool.find(s => (this.synthLastUsage.get(s) ?? -1) < numericTime);
-
-        // If all synths are used at this exact time, pick the one used longest ago (fallback)
-        if (!synth) {
-            synth = synthPool.reduce((a, b) => 
-                ((this.synthLastUsage.get(a) ?? -1) < (this.synthLastUsage.get(b) ?? -1) ? a : b)
-            );
+        // Find a synth that is available at the requested time
+        let availableSynth = synthPool.find(s => (this.synthReleaseTime.get(s) ?? -1) <= numericTime);
+        
+        // If no synth is available, find the one that will be free the soonest and use it.
+        // This is a fallback and might cause a click, but prevents a crash.
+        if (!availableSynth) {
+            availableSynth = synthPool.reduce((a, b) => {
+                const aTime = this.synthReleaseTime.get(a) ?? Infinity;
+                const bTime = this.synthReleaseTime.get(b) ?? Infinity;
+                return aTime < bTime ? a : b;
+            });
         }
-
-        if (synth) {
-            synth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
-            this.synthLastUsage.set(synth, numericTime);
+        
+        if (availableSynth) {
+            availableSynth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
+            // Schedule the release time of this synth
+            const durationSeconds = Tone.Time(note.dur).toSeconds();
+            this.synthReleaseTime.set(availableSynth, numericTime + durationSeconds);
         }
     }
 
@@ -253,6 +264,7 @@ export class AutopilotEngine {
         
         this.parts.bass.clear();
         this.parts.melody.clear();
+        this.resetSynthUsage();
         
         const patternData = autopilotPatternsData[this.autopilotStyle];
         if (!patternData) return;
