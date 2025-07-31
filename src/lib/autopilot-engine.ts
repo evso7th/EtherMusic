@@ -50,6 +50,10 @@ export class AutopilotEngine {
     private userScale: MusicScale = 'Major Pentatonic';
     private currentKey: MusicKey = 'C';
     private currentScale: MusicScale = 'Major Pentatonic';
+    
+    // --- Synth Availability Tracking ---
+    private synthLastUsage: Map<Tone.Synth, number> = new Map();
+
 
     private freqs = {
         bass: [] as number[],
@@ -193,7 +197,9 @@ export class AutopilotEngine {
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
         };
         for (let i = 0; i < 2; i++) {
-            this.bassSynths.push(new Tone.Synth(bassSynthOptions).connect(this.channel));
+            const synth = new Tone.Synth(bassSynthOptions).connect(this.channel);
+            this.bassSynths.push(synth);
+            this.synthLastUsage.set(synth, -1);
         }
 
         const melodySynthOptions = {
@@ -201,15 +207,30 @@ export class AutopilotEngine {
             envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 },
         };
         for (let i = 0; i < 4; i++) {
-            this.melodySynths.push(new Tone.Synth(melodySynthOptions).connect(this.channel));
+            const synth = new Tone.Synth(melodySynthOptions).connect(this.channel);
+            this.melodySynths.push(synth);
+            this.synthLastUsage.set(synth, -1);
         }
     }
 
     private playNote(type: 'melody' | 'bass', note: NoteEvent, time: Tone.Unit.Time) {
         const synthPool = type === 'melody' ? this.melodySynths : this.bassSynths;
-        // Simple round-robin is enough here
-        const synth = synthPool[Math.floor(Math.random() * synthPool.length)];
-        synth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
+        const numericTime = Tone.Transport.toSeconds(time);
+        
+        // Find a synth that is not currently playing at this exact time
+        let synth = synthPool.find(s => (this.synthLastUsage.get(s) ?? -1) < numericTime);
+
+        // If all synths are used at this exact time, pick the one used longest ago (fallback)
+        if (!synth) {
+            synth = synthPool.reduce((a, b) => 
+                ((this.synthLastUsage.get(a) ?? -1) < (this.synthLastUsage.get(b) ?? -1) ? a : b)
+            );
+        }
+
+        if (synth) {
+            synth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
+            this.synthLastUsage.set(synth, numericTime);
+        }
     }
 
     private setupParts() {
@@ -436,3 +457,5 @@ const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } =
         arpeggio: { pattern: 'up', speed: '8n', octaves: 2 }
     },
 };
+
+    
