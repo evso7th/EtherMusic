@@ -298,13 +298,13 @@ export class AutopilotEngine {
             // Schedule a melody arpeggio
             const arpNotes = this.getArpeggioNotes(noteIndex, arpeggioOptions.octaves);
             const arpPattern = this.getArpeggioPattern(arpNotes, arpeggioOptions.pattern);
-            const arpSpeed = Tone.Time(arpeggioOptions.speed);
-            const arpNoteDuration = arpSpeed.toSeconds() * 1.2; // slight overlap
+            const arpSpeed = Tone.Time(arpeggioOptions.speed).toSeconds();
+            const arpNoteDuration = arpSpeed * 1.2; // slight overlap
 
             arpPattern.forEach((arpNoteIndex, i) => {
                 if (arpNoteIndex < this.freqs.melody.length) {
                     const event: NoteEvent = {
-                        time: startTime.add(arpSpeed.mult(i)).toNotation(),
+                        time: (startTime.toSeconds() + (arpSpeed * i)) as Tone.Unit.Seconds,
                         freq: this.freqs.melody[arpNoteIndex],
                         dur: Tone.Time(arpNoteDuration).toNotation(),
                         vel: velocity * (0.85 + Math.random() * 0.3), // add slight velocity variation
