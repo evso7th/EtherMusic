@@ -25,6 +25,7 @@ import { HelpGuide } from "./help-guide";
 import type { AutopilotStyle } from '@/app/page';
 import { Separator } from "./ui/separator";
 import { Switch } from "./ui/switch";
+import { ScrollArea } from "./ui/scroll-area";
 
 
 type BeatPattern = {
@@ -121,52 +122,54 @@ export function BeatBoxControls({
                         <DialogHeader>
                             <DialogTitle>Beat Patterns</DialogTitle>
                         </DialogHeader>
-                        <div className="space-y-4 py-4">
-                            <div className="flex items-center justify-center space-x-2">
-                                <Label htmlFor="category-switch" className={cn(selectedCategory !== 'Classic' && "text-muted-foreground")}>Classic</Label>
-                                <Switch 
-                                    id="category-switch"
-                                    checked={selectedCategory === 'Meditative'}
-                                    onCheckedChange={(checked) => setSelectedCategory(checked ? 'Meditative' : 'Classic')}
-                                />
-                                <Label htmlFor="category-switch" className={cn(selectedCategory !== 'Meditative' && "text-muted-foreground")}>Meditative</Label>
-                            </div>
-                           
-                            <div className="grid grid-cols-2 gap-2">
-                                {patternsToShow.map((pattern) => (
-                                    <Button
-                                        key={pattern.name}
-                                        variant={activePattern.name === pattern.name ? 'default' : 'outline'}
-                                        onClick={() => {
-                                            onPatternChange(pattern);
-                                            setIsBeatsOpen(false);
-                                        }}
-                                    >
-                                        {pattern.name}
-                                    </Button>
-                                ))}
-                            </div>
-                            
-                            {offPattern && (
-                                <div>
-                                    <Separator className="my-3" />
-                                    <Button
-                                        key={offPattern.name}
-                                        variant={'outline'}
-                                        onClick={() => {
-                                            onPatternChange(offPattern);
-                                            setIsBeatsOpen(false);
-                                        }}
-                                        className={cn(
-                                            "w-full",
-                                            activePattern.name === offPattern.name && "border-primary text-primary"
-                                        )}
-                                    >
-                                        {offPattern.name}
-                                    </Button>
+                        <ScrollArea className="h-auto max-h-[70vh]">
+                            <div className="space-y-4 py-4 pr-4">
+                                <div className="flex items-center justify-center space-x-2">
+                                    <Label htmlFor="category-switch" className={cn(selectedCategory !== 'Classic' && "text-muted-foreground")}>Classic</Label>
+                                    <Switch 
+                                        id="category-switch"
+                                        checked={selectedCategory === 'Meditative'}
+                                        onCheckedChange={(checked) => setSelectedCategory(checked ? 'Meditative' : 'Classic')}
+                                    />
+                                    <Label htmlFor="category-switch" className={cn(selectedCategory !== 'Meditative' && "text-muted-foreground")}>Meditative</Label>
                                 </div>
-                            )}
-                        </div>
+                            
+                                <div className="grid grid-cols-2 gap-2">
+                                    {patternsToShow.map((pattern) => (
+                                        <Button
+                                            key={pattern.name}
+                                            variant={activePattern.name === pattern.name ? 'default' : 'outline'}
+                                            onClick={() => {
+                                                onPatternChange(pattern);
+                                                setIsBeatsOpen(false);
+                                            }}
+                                        >
+                                            {pattern.name}
+                                        </Button>
+                                    ))}
+                                </div>
+                                
+                                {offPattern && (
+                                    <div>
+                                        <Separator className="my-3" />
+                                        <Button
+                                            key={offPattern.name}
+                                            variant={'outline'}
+                                            onClick={() => {
+                                                onPatternChange(offPattern);
+                                                setIsBeatsOpen(false);
+                                            }}
+                                            className={cn(
+                                                "w-full",
+                                                activePattern.name === offPattern.name && "border-primary text-primary"
+                                            )}
+                                        >
+                                            {offPattern.name}
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        </ScrollArea>
                     </DialogContent>
                 </Dialog>
 
@@ -181,22 +184,24 @@ export function BeatBoxControls({
                         <DialogHeader>
                             <DialogTitle>Adjust Tempo</DialogTitle>
                         </DialogHeader>
-                        <div className="grid grid-cols-1 gap-2 py-4">
-                            {tempos.map((tempo) => (
-                                <Button
-                                    key={tempo.name}
-                                    variant={activeTempo.name === tempo.name ? 'default' : 'outline'}
-                                    onClick={() => {
-                                        onTempoChange(tempo);
-                                        setIsTempoOpen(false);
-                                    }}
-                                    className="flex justify-between w-full"
-                                >
-                                    <span>{tempo.name}</span>
-                                    <span className="text-sm text-muted-foreground">{tempo.bpm} BPM</span>
-                                </Button>
-                            ))}
-                        </div>
+                         <ScrollArea className="h-auto max-h-[70vh]">
+                            <div className="grid grid-cols-1 gap-2 py-4 pr-4">
+                                {tempos.map((tempo) => (
+                                    <Button
+                                        key={tempo.name}
+                                        variant={activeTempo.name === tempo.name ? 'default' : 'outline'}
+                                        onClick={() => {
+                                            onTempoChange(tempo);
+                                            setIsTempoOpen(false);
+                                        }}
+                                        className="flex justify-between w-full"
+                                    >
+                                        <span>{tempo.name}</span>
+                                        <span className="text-sm text-muted-foreground">{tempo.bpm} BPM</span>
+                                    </Button>
+                                ))}
+                            </div>
+                        </ScrollArea>
                     </DialogContent>
                 </Dialog>
                 
@@ -211,29 +216,31 @@ export function BeatBoxControls({
                         <DialogHeader>
                             <DialogTitle>Autopilot Style</DialogTitle>
                         </DialogHeader>
-                        <div className='py-4 space-y-4'>
-                             <div className="flex items-center space-x-2">
-                                <Switch id="autopilot-switch" checked={isAutopilotOn} onCheckedChange={onAutopilotToggle} />
-                                <Label htmlFor="autopilot-switch">Autopilot On/Off</Label>
+                        <ScrollArea className="h-auto max-h-[70vh]">
+                            <div className='py-4 space-y-4 pr-4'>
+                                <div className="flex items-center space-x-2">
+                                    <Switch id="autopilot-switch" checked={isAutopilotOn} onCheckedChange={onAutopilotToggle} />
+                                    <Label htmlFor="autopilot-switch">Autopilot On/Off</Label>
+                                </div>
+                                <div className={cn(
+                                    "grid grid-cols-3 gap-2 transition-opacity",
+                                    !isAutopilotOn && "opacity-50 pointer-events-none"
+                                )}>
+                                    {autopilotStyles.map((style) => (
+                                        <Button
+                                            key={style}
+                                            variant={activeAutopilotStyle === style ? 'default' : 'outline'}
+                                            onClick={() => {
+                                                onAutopilotStyleChange(style);
+                                            }}
+                                            disabled={!isAutopilotOn}
+                                        >
+                                            {style}
+                                        </Button>
+                                    ))}
+                                </div>
                             </div>
-                            <div className={cn(
-                                "grid grid-cols-3 gap-2 transition-opacity",
-                                !isAutopilotOn && "opacity-50 pointer-events-none"
-                            )}>
-                                {autopilotStyles.map((style) => (
-                                    <Button
-                                        key={style}
-                                        variant={activeAutopilotStyle === style ? 'default' : 'outline'}
-                                        onClick={() => {
-                                            onAutopilotStyleChange(style);
-                                        }}
-                                        disabled={!isAutopilotOn}
-                                    >
-                                        {style}
-                                    </Button>
-                                ))}
-                            </div>
-                        </div>
+                        </ScrollArea>
                     </DialogContent>
                 </Dialog>
 
@@ -249,12 +256,16 @@ export function BeatBoxControls({
                         <DialogHeader>
                             <DialogTitle>Mixer</DialogTitle>
                         </DialogHeader>
-                        <MixerControls 
-                            volumes={volumes} 
-                            onVolumeChange={onVolumeChange}
-                            effects={effects}
-                            onEffectChange={onEffectChange}
-                         />
+                        <ScrollArea className="h-auto max-h-[70vh]">
+                            <div className="pr-4">
+                                <MixerControls 
+                                    volumes={volumes} 
+                                    onVolumeChange={onVolumeChange}
+                                    effects={effects}
+                                    onEffectChange={onEffectChange}
+                                />
+                            </div>
+                        </ScrollArea>
                     </DialogContent>
                 </Dialog>
                 
@@ -273,56 +284,58 @@ export function BeatBoxControls({
                             <span className="hidden sm:inline">Beats</span>
                         </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>Beat Patterns</DialogTitle>
                         </DialogHeader>
-                        <div className="space-y-4 py-4">
-                            <div className="flex items-center justify-center space-x-2">
-                                <Label htmlFor="category-switch" className={cn(selectedCategory !== 'Classic' && "text-muted-foreground")}>Classic</Label>
-                                <Switch 
-                                    id="category-switch"
-                                    checked={selectedCategory === 'Meditative'}
-                                    onCheckedChange={(checked) => setSelectedCategory(checked ? 'Meditative' : 'Classic')}
-                                />
-                                <Label htmlFor="category-switch" className={cn(selectedCategory !== 'Meditative' && "text-muted-foreground")}>Meditative</Label>
-                            </div>
-                           
-                            <div className="grid grid-cols-2 gap-2">
-                                {patternsToShow.map((pattern) => (
-                                    <Button
-                                        key={pattern.name}
-                                        variant={activePattern.name === pattern.name ? 'default' : 'outline'}
-                                        onClick={() => {
-                                            onPatternChange(pattern);
-                                            setIsBeatsOpen(false);
-                                        }}
-                                    >
-                                        {pattern.name}
-                                    </Button>
-                                ))}
-                            </div>
-                            
-                            {offPattern && (
-                                <div>
-                                    <Separator className="my-3" />
-                                    <Button
-                                        key={offPattern.name}
-                                        variant={'outline'}
-                                        onClick={() => {
-                                            onPatternChange(offPattern);
-                                            setIsBeatsOpen(false);
-                                        }}
-                                        className={cn(
-                                            "w-full",
-                                            activePattern.name === offPattern.name && "border-primary text-primary"
-                                        )}
-                                    >
-                                        {offPattern.name}
-                                    </Button>
+                        <ScrollArea className="h-auto max-h-[70vh]">
+                            <div className="space-y-4 py-4 pr-4">
+                                <div className="flex items-center justify-center space-x-2">
+                                    <Label htmlFor="category-switch-portrait" className={cn(selectedCategory !== 'Classic' && "text-muted-foreground")}>Classic</Label>
+                                    <Switch 
+                                        id="category-switch-portrait"
+                                        checked={selectedCategory === 'Meditative'}
+                                        onCheckedChange={(checked) => setSelectedCategory(checked ? 'Meditative' : 'Classic')}
+                                    />
+                                    <Label htmlFor="category-switch-portrait" className={cn(selectedCategory !== 'Meditative' && "text-muted-foreground")}>Meditative</Label>
                                 </div>
-                            )}
-                        </div>
+                            
+                                <div className="grid grid-cols-2 gap-2">
+                                    {patternsToShow.map((pattern) => (
+                                        <Button
+                                            key={pattern.name}
+                                            variant={activePattern.name === pattern.name ? 'default' : 'outline'}
+                                            onClick={() => {
+                                                onPatternChange(pattern);
+                                                setIsBeatsOpen(false);
+                                            }}
+                                        >
+                                            {pattern.name}
+                                        </Button>
+                                    ))}
+                                </div>
+                                
+                                {offPattern && (
+                                    <div>
+                                        <Separator className="my-3" />
+                                        <Button
+                                            key={offPattern.name}
+                                            variant={'outline'}
+                                            onClick={() => {
+                                                onPatternChange(offPattern);
+                                                setIsBeatsOpen(false);
+                                            }}
+                                            className={cn(
+                                                "w-full",
+                                                activePattern.name === offPattern.name && "border-primary text-primary"
+                                            )}
+                                        >
+                                            {offPattern.name}
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        </ScrollArea>
                     </DialogContent>
                 </Dialog>
 
@@ -337,22 +350,24 @@ export function BeatBoxControls({
                         <DialogHeader>
                             <DialogTitle>Adjust Tempo</DialogTitle>
                         </DialogHeader>
-                        <div className="grid grid-cols-1 gap-2 py-4">
-                            {tempos.map((tempo) => (
-                                <Button
-                                    key={tempo.name}
-                                    variant={activeTempo.name === tempo.name ? 'default' : 'outline'}
-                                    onClick={() => {
-                                        onTempoChange(tempo);
-                                        setIsTempoOpen(false);
-                                    }}
-                                    className="flex justify-between w-full"
-                                >
-                                    <span>{tempo.name}</span>
-                                    <span className="text-sm text-muted-foreground">{tempo.bpm} BPM</span>
-                                </Button>
-                            ))}
-                        </div>
+                         <ScrollArea className="h-auto max-h-[70vh]">
+                            <div className="grid grid-cols-1 gap-2 py-4 pr-4">
+                                {tempos.map((tempo) => (
+                                    <Button
+                                        key={tempo.name}
+                                        variant={activeTempo.name === tempo.name ? 'default' : 'outline'}
+                                        onClick={() => {
+                                            onTempoChange(tempo);
+                                            setIsTempoOpen(false);
+                                        }}
+                                        className="flex justify-between w-full"
+                                    >
+                                        <span>{tempo.name}</span>
+                                        <span className="text-sm text-muted-foreground">{tempo.bpm} BPM</span>
+                                    </Button>
+                                ))}
+                            </div>
+                        </ScrollArea>
                     </DialogContent>
                 </Dialog>
                 
@@ -367,29 +382,31 @@ export function BeatBoxControls({
                         <DialogHeader>
                             <DialogTitle>Autopilot Style</DialogTitle>
                         </DialogHeader>
-                        <div className='py-4 space-y-4'>
-                             <div className="flex items-center space-x-2">
-                                <Switch id="autopilot-switch" checked={isAutopilotOn} onCheckedChange={onAutopilotToggle} />
-                                <Label htmlFor="autopilot-switch">Autopilot On/Off</Label>
+                        <ScrollArea className="h-auto max-h-[70vh]">
+                            <div className='py-4 space-y-4 pr-4'>
+                                <div className="flex items-center space-x-2">
+                                    <Switch id="autopilot-switch-portrait" checked={isAutopilotOn} onCheckedChange={onAutopilotToggle} />
+                                    <Label htmlFor="autopilot-switch-portrait">Autopilot On/Off</Label>
+                                </div>
+                                <div className={cn(
+                                    "grid grid-cols-3 gap-2 transition-opacity",
+                                    !isAutopilotOn && "opacity-50 pointer-events-none"
+                                )}>
+                                    {autopilotStyles.map((style) => (
+                                        <Button
+                                            key={style}
+                                            variant={activeAutopilotStyle === style ? 'default' : 'outline'}
+                                            onClick={() => {
+                                                onAutopilotStyleChange(style);
+                                            }}
+                                            disabled={!isAutopilotOn}
+                                        >
+                                            {style}
+                                        </Button>
+                                    ))}
+                                </div>
                             </div>
-                            <div className={cn(
-                                "grid grid-cols-3 gap-2 transition-opacity",
-                                !isAutopilotOn && "opacity-50 pointer-events-none"
-                            )}>
-                                {autopilotStyles.map((style) => (
-                                    <Button
-                                        key={style}
-                                        variant={activeAutopilotStyle === style ? 'default' : 'outline'}
-                                        onClick={() => {
-                                            onAutopilotStyleChange(style);
-                                        }}
-                                        disabled={!isAutopilotOn}
-                                    >
-                                        {style}
-                                    </Button>
-                                ))}
-                            </div>
-                        </div>
+                        </ScrollArea>
                     </DialogContent>
                 </Dialog>
 
@@ -405,12 +422,16 @@ export function BeatBoxControls({
                         <DialogHeader>
                             <DialogTitle>Mixer</DialogTitle>
                         </DialogHeader>
-                        <MixerControls 
-                            volumes={volumes} 
-                            onVolumeChange={onVolumeChange}
-                            effects={effects}
-                            onEffectChange={onEffectChange}
-                         />
+                        <ScrollArea className="h-auto max-h-[70vh]">
+                             <div className="pr-4">
+                                <MixerControls 
+                                    volumes={volumes} 
+                                    onVolumeChange={onVolumeChange}
+                                    effects={effects}
+                                    onEffectChange={onEffectChange}
+                                />
+                            </div>
+                        </ScrollArea>
                     </DialogContent>
                 </Dialog>
 
@@ -421,3 +442,6 @@ export function BeatBoxControls({
     );
 }
 
+
+
+    

@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { MelodyInstrument, MusicKey, MusicScale } from '@/app/page';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { ScrollArea } from './ui/scroll-area';
 
 interface ThereminPadProps {
     type: 'melody' | 'bass';
@@ -124,56 +125,58 @@ export function ThereminPad({
                 <SheetHeader>
                     <SheetTitle>Melody Settings</SheetTitle>
                 </SheetHeader>
-                <div className="py-4 space-y-6">
-                    {musicKeys && activeKey && onKeyChange && (
-                        <div className="space-y-2">
-                             <Label>Music Key</Label>
-                             <Select value={activeKey} onValueChange={onKeyChange}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Key" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {musicKeys.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    )}
-                    {musicScales && activeScale && onScaleChange && (
-                        <div className="space-y-2">
-                             <Label>Music Scale</Label>
-                             <Select value={activeScale} onValueChange={onScaleChange}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Scale" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {musicScales.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    )}
-                    {instruments && activeInstrument && onInstrumentChange && (
-                        <div className="space-y-2">
-                            <Label>Instrument</Label>
-                            <Select value={activeInstrument} onValueChange={onInstrumentChange}>
-                                <SelectTrigger className="capitalize">
-                                    <SelectValue placeholder="Instrument" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {instruments.map(inst => (
-                                        <SelectItem key={inst} value={inst} className="capitalize">{inst}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    )}
-                     <Button 
-                        onClick={() => setIsSettingsOpen(false)} 
-                        className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                        variant="outline"
-                    >
-                        Done
-                    </Button>
-                </div>
+                 <ScrollArea className="h-[85vh]">
+                    <div className="py-4 pr-4 space-y-6">
+                        {musicKeys && activeKey && onKeyChange && (
+                            <div className="space-y-2">
+                                <Label>Music Key</Label>
+                                <Select value={activeKey} onValueChange={onKeyChange}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Key" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {musicKeys.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+                        {musicScales && activeScale && onScaleChange && (
+                            <div className="space-y-2">
+                                <Label>Music Scale</Label>
+                                <Select value={activeScale} onValueChange={onScaleChange}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Scale" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {musicScales.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+                        {instruments && activeInstrument && onInstrumentChange && (
+                            <div className="space-y-2">
+                                <Label>Instrument</Label>
+                                <Select value={activeInstrument} onValueChange={onInstrumentChange}>
+                                    <SelectTrigger className="capitalize">
+                                        <SelectValue placeholder="Instrument" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {instruments.map(inst => (
+                                            <SelectItem key={inst} value={inst} className="capitalize">{inst}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+                        <Button 
+                            onClick={() => setIsSettingsOpen(false)} 
+                            className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                            variant="outline"
+                        >
+                            Done
+                        </Button>
+                    </div>
+                </ScrollArea>
             </SheetContent>
         </Sheet>
     );
@@ -231,3 +234,5 @@ export function ThereminPad({
         </Card>
     );
 }
+
+    
