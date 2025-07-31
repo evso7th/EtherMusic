@@ -115,7 +115,7 @@ export class DrumMachine {
         this.drumPart = new Tone.Part((time, value) => {
              const playNote = (note: string, offset: number) => {
                if (this.drumSamplers?.has(note)) {
-                    this.drumSamplers.player(note).start(Tone.Time(time).add(offset));
+                    this.drumSamplers.player(note).start(time as number + offset);
                }
            }
            if (Array.isArray(value.note)) {
