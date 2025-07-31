@@ -12,7 +12,7 @@ type NoteEvent = {
 // Simplified note type for pattern definitions
 type PatternNote = [
     timeQuant: number, // In 16th notes (0-63 for 4 measures)
-    noteIndex: number,   // Index in the frequency array
+    noteIndex: number,   // Index in the frequency array. Negative for bass.
     duration?: string,    // Optional duration, defaults to '8n'
     velocity?: number     // Optional velocity, defaults to 0.5
 ];
@@ -224,23 +224,25 @@ export class AutopilotEngine {
         let numericTime = Tone.Transport.toSeconds(time);
 
         // Find the synth that will be available earliest
-        let bestSynth = synthPool.reduce((a, b) => {
-            return (this.synthReleaseTime.get(a) ?? -1) < (this.synthReleaseTime.get(b) ?? -1) ? a : b;
+        let availableSynth = synthPool.reduce((a, b) => {
+            const aTime = this.synthReleaseTime.get(a) ?? -1;
+            const bTime = this.synthReleaseTime.get(b) ?? -1;
+            return aTime < bTime ? a : b;
         });
         
-        const lastReleaseTime = this.synthReleaseTime.get(bestSynth) ?? -1;
+        const lastReleaseTime = this.synthReleaseTime.get(availableSynth) ?? -1;
 
-        // If the synth is not yet free, we must schedule the note slightly later
+        // If the synth is not yet free at the scheduled time, we must schedule the note slightly later
         if (lastReleaseTime > numericTime) {
             numericTime = lastReleaseTime;
         }
-
-        const durationSeconds = Tone.Time(note.dur).toSeconds();
         
-        bestSynth.triggerAttackRelease(note.freq, durationSeconds, numericTime, note.vel);
-        
-        // Schedule the new release time for this synth
-        this.synthReleaseTime.set(bestSynth, numericTime + durationSeconds);
+        if (availableSynth) {
+            availableSynth.triggerAttackRelease(note.freq, note.dur, numericTime, note.vel);
+            // Schedule the new release time for this synth
+            const durationSeconds = Tone.Time(note.dur).toSeconds();
+            this.synthReleaseTime.set(availableSynth, numericTime + durationSeconds);
+        }
     }
 
 
@@ -394,46 +396,47 @@ export class AutopilotEngine {
 const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } = {
     Ambient: {
         groove: [
-            [[-1, 1, '2m'], [0, 8, '2m'], [16, 5, '2m']],
+            [[-1, 1, '2m'], [1, 8, '2m'], [17, 5, '2m', 0.8]], // Syncopated start
         ],
         fills: [
-            [[48, 10, '1m'], [56, 3, '1m']],
+            [[48, 10, '1m'], [58, 3, '1m']], // Syncopated start
         ]
     },
     House: {
         groove: [
-            [[-2, 1, '1m'], [-18, 2, '1m'], [0, 0, '8n'], [8, 4, '8n'], [12, 2, '8n']],
+            // Syncopated bass and melody
+            [[-2, 1, '1m'], [3, 0, '8n'], [7, 4, '8n', 0.7], [10, 2, '8n'], [-18, 2, '1m']],
         ],
         fills: [
-            [[48, 7, '8n'], [52, 9, '8n'], [56, 11, '4n']],
+            [[48, 7, '8n'], [51, 9, '8n'], [54, 11, '4n']], // Syncopated fill
         ],
         arpeggio: { pattern: 'up', speed: '16n', octaves: 1 }
     },
     Wind: {
         groove: [
-            [[0, 10, '2n'], [4, 14, '2n'], [8, 12, '2n']],
+            [[1, 10, '2n'], [5, 14, '2n'], [9, 12, '2n']], // Syncopated
         ],
         fills: [
-            [[48, 15, '8n'], [52, 14, '8n'], [56, 12, '4n'], [60, 10, '4n']],
+            [[49, 15, '8n'], [53, 14, '8n'], [57, 12, '4n'], [61, 10, '4n']], // Syncopated
         ],
         arpeggio: { pattern: 'upDown', speed: '8t', octaves: 2 }
     },
     Sequence: {
         groove: [
-            [[-1, 1, '1m'], [-17, 4, '1m'], [0, 0], [8, 4], [16, 7], [24, 4]],
-            [[-1, 1, '1m'], [-17, 5, '1m'], [0, 2], [8, 5], [16, 9], [24, 5]],
+            [[-1, 1, '1m'], [-17, 4, '1m'], [1, 0], [7, 4], [17, 7], [23, 4]], // Syncopated
+            [[-1, 1, '1m'], [-17, 5, '1m'], [2, 2], [6, 5], [18, 9], [22, 5]], // Syncopated
         ],
         fills: [
-            [[48, 12], [52, 9], [56, 7], [60, 4]],
+            [[49, 12], [53, 9], [57, 7], [61, 4]], // Syncopated
         ],
         arpeggio: { pattern: 'up', speed: '16n', octaves: 2 }
     },
     Chimes: {
         groove: [
-            [[0, 12, '2n', 0.8], [8, 16, '2n', 0.7], [16, 14, '2n', 0.8]],
+            [[2, 12, '2n', 0.8], [9, 16, '2n', 0.7], [18, 14, '2n', 0.8]], // Syncopated
         ],
         fills: [
-            [[48, 19, '1n', 0.8], [56, 17, '1n', 0.7]],
+            [[49, 19, '1n', 0.8], [59, 17, '1n', 0.7]], // Syncopated
         ]
     },
     Drone: {
@@ -447,10 +450,11 @@ const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } =
     },
     Toccata: {
         groove: [
-            [[-1, 1, '1m'], [-17, 5, '1m'], [0,0], [8,7], [16,12], [24,4]],
+            // Bass on downbeats, melody syncopated
+            [[-1, 1, '1m'], [-17, 5, '1m'], [3,0], [7,7], [19,12], [23,4]],
         ],
         fills: [
-             [[48,12], [52,9], [56,7], [60,5]],
+             [[49,12], [53,9], [58,7], [61,5]], // Syncopated
         ],
         arpeggio: { pattern: 'upDown', speed: '16n', octaves: 2 }
     },
@@ -459,15 +463,15 @@ const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } =
             [[-1, 1, '4n'], [-9, 4, '4n'], [-17, 1, '4n'], [-25, 4, '4n'], [0, 0, '4n'], [4, 2, '4n'], [8, 4, '4n'], [12, 0, '4n']],
         ],
         fills: [
-            [[48, 7, '4n'], [52, 5, '4n'], [56, 4, '2n']],
+            [[48, 7, '4n'], [52, 5, '4n'], [58, 4, '2n']], // Syncopated
         ]
     },
      Space: {
         groove: [
-             [[-1, 1, '1m', 0.6], [0, 0], [16, 4], [32, 7]],
+             [[-1, 1, '1m', 0.6], [2, 0], [18, 4], [34, 7]], // Syncopated
         ],
         fills: [
-            [[48, 11, '2n', 0.8], [56, 16, '2n', 0.3]], // "Meteor" sound effect
+            [[49, 11, '2n', 0.8], [58, 16, '2n', 0.3]], // "Meteor" sound effect with syncopation
         ],
         arpeggio: { pattern: 'up', speed: '8n', octaves: 2 }
     },
