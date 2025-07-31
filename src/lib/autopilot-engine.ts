@@ -17,9 +17,16 @@ type PatternNote = [
     velocity?: number     // Optional velocity, defaults to 0.5
 ];
 
+type ArpeggioPattern = 'up' | 'down' | 'upDown' | 'random';
+
 type AutopilotPatternData = {
     groove: PatternNote[][];
     fills: PatternNote[][];
+    arpeggio?: {
+        pattern: ArpeggioPattern;
+        speed: string; // e.g., '16n', '8t' (triplet)
+        octaves: number;
+    };
 };
 
 const ALL_KEYS: MusicKey[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -229,26 +236,33 @@ export class AutopilotEngine {
         const patternData = autopilotPatternsData[this.autopilotStyle];
         if (!patternData) return;
         
-        // Choose a random groove and a random fill
         const groove = patternData.groove[Math.floor(Math.random() * patternData.groove.length)];
         const fill = patternData.fills[Math.floor(Math.random() * patternData.fills.length)];
         const combinedPattern = [...groove, ...fill];
 
         combinedPattern.forEach(noteData => {
-            const [timeQuant, noteIndex, duration = '8n', velocity = 0.5] = noteData;
-            
-            const m = Math.floor(timeQuant / 16);
-            const q = Math.floor((timeQuant % 16) / 4);
-            const s = timeQuant % 4;
-            const time = `${m}:${q}:${s}`;
+            this.scheduleNoteOrArpeggio(noteData, patternData.arpeggio);
+        });
+    }
 
-            const isBassNote = noteIndex < 0;
+    private scheduleNoteOrArpeggio(noteData: PatternNote, arpeggioOptions?: AutopilotPatternData['arpeggio']) {
+        const [timeQuant, noteIndex, duration = '8n', velocity = 0.5] = noteData;
+            
+        const m = Math.floor(timeQuant / 16);
+        const q = Math.floor((timeQuant % 16) / 4);
+        const s = timeQuant % 4;
+        const startTime = Tone.Time(`${m}:${q}:${s}`);
+
+        const isBassNote = noteIndex < 0;
+
+        if (isBassNote || !arpeggioOptions) {
+            // Schedule a single bass note or a melody note without arpeggio
             const freqs = isBassNote ? this.freqs.bass : this.freqs.melody;
             const finalIndex = isBassNote ? Math.abs(noteIndex) - 1 : noteIndex;
-            
+
             if (finalIndex < freqs.length) {
                 const event: NoteEvent = {
-                    time,
+                    time: startTime.toNotation(),
                     freq: freqs[finalIndex],
                     dur: duration,
                     vel: velocity,
@@ -259,13 +273,67 @@ export class AutopilotEngine {
                     this.parts.melody.add(event);
                 }
             }
-        });
+        } else {
+            // Schedule a melody arpeggio
+            const arpNotes = this.getArpeggioNotes(noteIndex, arpeggioOptions.octaves);
+            const arpPattern = this.getArpeggioPattern(arpNotes, arpeggioOptions.pattern);
+            const arpSpeed = Tone.Time(arpeggioOptions.speed);
+            const arpNoteDuration = arpSpeed.toSeconds() * 1.2; // slight overlap
+
+            arpPattern.forEach((arpNoteIndex, i) => {
+                if (arpNoteIndex < this.freqs.melody.length) {
+                    const event: NoteEvent = {
+                        time: startTime.add(arpSpeed.mult(i)).toNotation(),
+                        freq: this.freqs.melody[arpNoteIndex],
+                        dur: Tone.Time(arpNoteDuration).toNotation(),
+                        vel: velocity * (0.85 + Math.random() * 0.3), // add slight velocity variation
+                    };
+                    this.parts.melody.add(event);
+                }
+            });
+        }
+    }
+    
+    private getArpeggioNotes(baseNoteIndex: number, octaves: number): number[] {
+        // Gets a slice of the scale around the base note for arpeggiation
+        const scale = this.freqs.melody;
+        if (!scale.length) return [];
+        
+        // Find notes for the arpeggio, e.g., root, third, fifth from the base note's position in the scale
+        const noteIndices = [
+            baseNoteIndex,
+            baseNoteIndex + 2,
+            baseNoteIndex + 4,
+        ];
+
+        if (octaves > 1) {
+            const notesPerOctave = this.userScale.includes('Pentatonic') ? 5 : 7;
+            noteIndices.push(baseNoteIndex + notesPerOctave);
+        }
+
+        return noteIndices.filter(i => i < scale.length);
+    }
+    
+    private getArpeggioPattern(noteIndices: number[], pattern: ArpeggioPattern): number[] {
+        if (noteIndices.length === 0) return [];
+        switch(pattern) {
+            case 'up':
+                return noteIndices;
+            case 'down':
+                return [...noteIndices].reverse();
+            case 'upDown':
+                return [...noteIndices, ...[...noteIndices].reverse().slice(1)];
+            case 'random':
+                return noteIndices.sort(() => 0.5 - Math.random());
+            default:
+                return noteIndices;
+        }
     }
     
     private updateFrequencies() {
         this.freqs = {
             bass: this.getScaleFrequencies(this.currentKey, this.currentScale, [2, 3]),
-            melody: this.getScaleFrequencies(this.currentKey, this.currentScale, [3, 4, 5]),
+            melody: this.getScaleFrequencies(this.currentKey, this.currentScale, [3, 4, 5, 6]), // Added 6th octave for arpeggios
         };
     }
 
@@ -298,28 +366,31 @@ const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } =
     },
     House: {
         groove: [
-            [[-2, 1], [-8, 1], [-16, 2], [-24, 2], [0, 0, '16n'], [4, 2, '16n'], [8, 4, '16n'], [12, 2, '16n']],
+            [[-2, 1, '1m'], [-18, 2, '1m'], [0, 0, '8n'], [8, 4, '8n'], [12, 2, '8n']],
         ],
         fills: [
             [[48, 7, '8n'], [52, 9, '8n'], [56, 11, '4n']],
-        ]
+        ],
+        arpeggio: { pattern: 'up', speed: '16n', octaves: 1 }
     },
     Wind: {
         groove: [
-            [[0, 10], [2, 12], [4, 14], [6, 12], [8, 10], [10, 12], [12, 14], [14, 12]],
+            [[0, 10, '2n'], [4, 14, '2n'], [8, 12, '2n']],
         ],
         fills: [
             [[48, 15, '8n'], [52, 14, '8n'], [56, 12, '4n'], [60, 10, '4n']],
-        ]
+        ],
+        arpeggio: { pattern: 'upDown', speed: '8t', octaves: 2 }
     },
     Sequence: {
         groove: [
-            [[-1, 1], [-9, 1], [-17, 4], [-25, 4], [0, 0], [4, 4], [8, 7], [12, 4]],
-            [[-1, 1], [-9, 5], [-17, 2], [-25, 2], [0, 2], [4, 5], [8, 9], [12, 5]],
+            [[-1, 1, '1m'], [-17, 4, '1m'], [0, 0], [8, 4], [16, 7], [24, 4]],
+            [[-1, 1, '1m'], [-17, 5, '1m'], [0, 2], [8, 5], [16, 9], [24, 5]],
         ],
         fills: [
             [[48, 12], [52, 9], [56, 7], [60, 4]],
-        ]
+        ],
+        arpeggio: { pattern: 'up', speed: '16n', octaves: 2 }
     },
     Chimes: {
         groove: [
@@ -340,11 +411,12 @@ const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } =
     },
     Toccata: {
         groove: [
-            [[-1, 1], [-5, 1], [-9, 1], [-13, 1], [0,0,'16n'],[2,4,'16n'],[4,7,'16n'],[6,11,'16n'], [8,12,'16n'],[10,7,'16n'],[12,4,'16n'],[14,0,'16n']],
+            [[-1, 1, '1m'], [-17, 5, '1m'], [0,0], [8,7], [16,12], [24,4]],
         ],
         fills: [
-             [[48,12,'16n'], [50,11,'16n'], [52,9,'16n'], [54,7,'16n'], [56,5,'16n'], [58,4,'16n'], [60,2,'16n'], [62,0,'16n']],
-        ]
+             [[48,12], [52,9], [56,7], [60,5]],
+        ],
+        arpeggio: { pattern: 'upDown', speed: '16n', octaves: 2 }
     },
     Promenade: {
         groove: [
@@ -356,10 +428,11 @@ const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } =
     },
      Space: {
         groove: [
-             [[-1, 1, '1m', 0.6], [0, 0, '1m', 0.4], [16, 4, '1m', 0.45], [32, 7, '1m', 0.5]],
+             [[-1, 1, '1m', 0.6], [0, 0], [16, 4], [32, 7]],
         ],
         fills: [
             [[48, 11, '2n', 0.8], [56, 16, '2n', 0.3]], // "Meteor" sound effect
-        ]
+        ],
+        arpeggio: { pattern: 'up', speed: '8n', octaves: 2 }
     },
 };
