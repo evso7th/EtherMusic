@@ -81,8 +81,8 @@ export class DrumMachine {
                     return;
                 }
                 this.drumSamplers.player('E1').volume.value = -3;
-                this.drumSamplers.player('E2').volume.value = -3;
-                this.drumSamplers.player('F1').volume.value = -12;
+                this.drumSamplers.player('E2').volume.value = -6;
+                this.drumSamplers.player('F1').volume.value = -9;
                 this.drumSamplers.connect(this.channel);
                 resolve();
             }).toDestination();
@@ -115,7 +115,7 @@ export class DrumMachine {
         this.drumPart = new Tone.Part((time, value) => {
              const playNote = (note: string, offset: number) => {
                if (this.drumSamplers?.has(note)) {
-                    this.drumSamplers.player(note).start(time as number + offset);
+                    this.drumSamplers.player(note).start((time as number) + offset);
                }
            }
            if (Array.isArray(value.note)) {
