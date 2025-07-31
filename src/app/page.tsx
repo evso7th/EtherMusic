@@ -24,6 +24,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { cn } from '@/lib/utils';
 
 
 export const tempos: Tempo[] = [
@@ -328,14 +329,21 @@ export default function Home() {
             <div className="fixed inset-0 z-0">
                  <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={activeTempo.bpm} />
             </div>
-            <div className="relative z-10 flex flex-col h-full p-4 md:p-6 lg:p-8">
-                <header className="flex-shrink-0 flex items-center justify-between mb-4">
+            <div className={cn(
+                "relative z-10 flex flex-col h-full p-2 md:p-6 lg:p-8",
+                 // On mobile, use flex-col in portrait, and flex-row in landscape
+                isMobile && "portrait:flex-col landscape:flex-row landscape:p-1 landscape:gap-1"
+            )}>
+                <header className={cn(
+                    "flex-shrink-0 flex items-center justify-between mb-2",
+                    isMobile && "portrait:mb-2 landscape:hidden" // Hide header in landscape on mobile
+                )}>
                      <div>
                         {isMobile ? (
                             <Dialog>
                                 <DialogTrigger asChild>
                                     <button>
-                                        <Image src="/assets/images/icon.png" alt="EtherMusic Icon" width={40} height={40} />
+                                        <Image src="/assets/images/icon.png" alt="EtherMusic Icon" width={30} height={30} />
                                     </button>
                                 </DialogTrigger>
                                 <DialogContent>
@@ -373,8 +381,14 @@ export default function Home() {
                         />
                     </div>
                 </header>
-                <main className="flex-grow flex flex-col gap-4 overflow-hidden">
-                    <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <main className={cn(
+                    "flex-grow flex flex-col gap-2 overflow-hidden",
+                    isMobile && "portrait:flex-col landscape:flex-row landscape:gap-1"
+                )}>
+                    <div className={cn(
+                        "flex-grow grid grid-cols-1 md:grid-cols-2 gap-2",
+                        isMobile && "portrait:grid-cols-1 landscape:grid-cols-2 portrait:gap-2 landscape:gap-1"
+                    )}>
                         <MemoizedThereminPad
                             onInteraction={handleThereminInteraction}
                             type="bass"
@@ -401,7 +415,10 @@ export default function Home() {
                             isPolyphonic
                         />
                     </div>
-                    <div className="flex-shrink-0">
+                    <div className={cn(
+                        "flex-shrink-0",
+                        isMobile && "landscape:hidden" // Hide beatbox in landscape on mobile
+                    )}>
                         <BeatBoxControls
                             patterns={beatPatterns}
                             activePattern={activePattern}
@@ -426,5 +443,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
