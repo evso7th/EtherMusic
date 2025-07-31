@@ -102,7 +102,7 @@ function interpretLSystem(
 
 // --- MAIN GENERATION LOGIC ---
 export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequencies): { bassPattern: NoteEvent[], melodyPattern: NoteEvent[] } {
-    const bassPattern: NoteEvent[] = [];
+    let bassPattern: NoteEvent[] = [];
     let melodyPattern: NoteEvent[] = [];
 
     const baseNote = freqs.bass[0];
@@ -140,8 +140,8 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
         case 'House':
         case 'Sequence':
             axiom = 'F+F-F';
-            rules = { 'F': 'F+F-F' };
-            iterations = 3;
+            rules = { 'F': 'F[+F-F]X' };
+            iterations = 4;
             timeStep = 2; // 8th note
             duration = '8n';
             velocity = 0.6;
@@ -149,8 +149,8 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
 
         case 'Wind':
             axiom = 'A';
-            rules = { 'A': 'F[+A][-A]F', 'F': 'G', 'G':'A' };
-            iterations = 4;
+            rules = { 'A': 'F[+A]F[-A]A', 'F': 'G[+F]G[-F]' };
+            iterations = 3;
             timeStep = 1; // 16th note
             duration = '16n';
             velocity = 0.4;
@@ -162,10 +162,9 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
             rules = { 'F': 'G[+F]G[-F]' };
             iterations = 4;
             timeStep = 4; // quarter note
-            duration = '4n';
+            duration = '2n'; // longer duration for chime effect
             velocity = 0.7;
-            const sequenceChimes = generateLSystemSequence(axiom, rules, iterations);
-            melodyPattern = interpretLSystem(sequenceChimes, highFreqs, Math.floor(highFreqs.length/2), timeStep, duration, velocity);
+            melodyPattern = interpretLSystem(generateLSystemSequence(axiom, rules, iterations), highFreqs, Math.floor(highFreqs.length/2), timeStep, duration, velocity);
             break;
 
         case 'Drone':
@@ -200,8 +199,8 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
             axiom = 'F';
             rules = { 'F': 'F[+F]XF[-F]XF' };
             iterations = 3;
-            timeStep = 4; // quarter note
-            duration = '2n';
+            timeStep = 8; // half note
+            duration = '1m';
             velocity = 0.4;
             break;
 
@@ -215,11 +214,11 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
             break;
 
         case 'Promenade':
-            axiom = 'F G F E'; // Notes of the scale
-            rules = { 'F': 'G', 'G': 'A', 'E': 'F' }; // Simple walk
+            axiom = 'A+B-';
+            rules = { 'A': 'F+G', 'B': 'F-G', 'F':'A', 'G':'B' }; // Walk up and down
             iterations = 4;
-            timeStep = 2; // 8th note
-            duration = '8n';
+            timeStep = 4; // quarter note
+            duration = '4n';
             velocity = 0.55;
             break;
         
@@ -238,3 +237,5 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
     
     return { bassPattern: finalBass, melodyPattern };
 }
+
+    
