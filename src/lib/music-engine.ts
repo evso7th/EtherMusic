@@ -130,10 +130,10 @@ export function generateAutopilotPattern(style: AutopilotStyle, freqs: Frequenci
     switch (style) {
         case 'Ambient':
             axiom = 'A';
-            rules = { 'A': '[+F-X]A[-F+X]A' };
+            rules = { 'A': 'F[+A][-A]F', 'F': 'G', 'G':'A' };
             iterations = 4;
-            timeStep = 8; // half note
-            duration = '1m';
+            timeStep = 16; // whole note
+            duration = '2m';
             velocity = 0.3;
             break;
 
