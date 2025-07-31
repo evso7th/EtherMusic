@@ -21,10 +21,16 @@ export class LatchEngine {
     private synthPool: Tone.Synth[];
     private orbManager: OrbManager;
     private latchedNotes = new Map<number, LatchedBassNote>();
+    private allowedFrequencies: number[] = [];
 
-    constructor(synthPool: Tone.Synth[], orbManager: OrbManager) {
+    constructor(synthPool: Tone.Synth[], orbManager: OrbManager, allowedFrequencies: number[]) {
         this.synthPool = synthPool;
         this.orbManager = orbManager;
+        this.allowedFrequencies = allowedFrequencies;
+    }
+    
+    public setAllowedFrequencies(frequencies: number[]) {
+        this.allowedFrequencies = frequencies;
     }
     
     public setLatch(isOn: boolean) {
@@ -41,6 +47,12 @@ export class LatchEngine {
     
     public handleInteraction(pos: { x: number; y: number }, vol: number, quantizedFreq: number) {
         if (!this.isLatchOn) return;
+
+        // Ensure the frequency is within the allowed bass range for safety
+        if (!this.allowedFrequencies.includes(quantizedFreq)) {
+            console.warn("Latch frequency out of allowed range, ignoring.");
+            return;
+        }
 
         let existingEntryId;
         for (const [id, note] of this.latchedNotes.entries()) {

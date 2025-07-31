@@ -81,7 +81,8 @@ export class AudioEngine {
         this.createSynthPools();
         
         // --- Latch Engine ---
-        this.latchEngine = new LatchEngine(this.latchSynths, this.orbManager);
+        // Initialize with empty frequencies, will be updated by setHarmony
+        this.latchEngine = new LatchEngine(this.latchSynths, this.orbManager, []);
         
         // --- Drum Machine ---
         this.drumMachine = new DrumMachine(this.channels.drums);
@@ -215,8 +216,9 @@ export class AudioEngine {
         this.musicScale = scale;
         this.allowedFrequencies = {
             bass: this.getScaleFrequencies(key, scale, [2, 3]),
-            melody: this.getScaleFrequencies(key, scale, [3, 4, 5]),
+            melody: this.getScaleFrequencies(key, scale, [4, 5]),
         };
+        this.latchEngine.setAllowedFrequencies(this.allowedFrequencies.bass);
     }
 
     public setBassLatch(isLatchOn: boolean) {

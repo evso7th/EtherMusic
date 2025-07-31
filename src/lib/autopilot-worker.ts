@@ -54,12 +54,9 @@ let freqs = {
 // --- CORE LOGIC ---
 
 function getScaleFrequencies(key: MusicKey, scale: MusicScale, octaves: number[]): number[] {
-    const root = noteToFrequency(key + '0'); // Get base frequency for the key
-    const scaleIntervals: { [key in MusicScale]: number[] } = {
-        'Major': [0, 2, 4, 5, 7, 9, 11],
-        'Minor': [0, 2, 3, 5, 7, 8, 10],
-        'Major Pentatonic': [0, 2, 4, 7, 9],
-        'Minor Pentatonic': [0, 3, 5, 7, 10],
+    const scaleIntervals: { [key in MusicScale]: string[] } = {
+        'Major': ['0', '2', '4', '5', '7', '9', '11'], 'Minor': ['0', '2', '3', '5', '7', '8', '10'],
+        'Major Pentatonic': ['0', '2', '4', '7', '9'], 'Minor Pentatonic': ['0', '3', '5', '7', '10'],
     };
     
     let allFrequencies: number[] = [];
@@ -67,7 +64,8 @@ function getScaleFrequencies(key: MusicKey, scale: MusicScale, octaves: number[]
     
     octaves.forEach(octave => {
         intervals.forEach(interval => {
-            const freq = root * Math.pow(2, octave + interval / 12);
+            const noteName = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][ (['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'].indexOf(key) + parseInt(interval)) % 12 ];
+            const freq = noteToFrequency(noteName + octave);
             allFrequencies.push(freq);
         });
     });
@@ -86,7 +84,7 @@ function noteToFrequency(note: string): number {
 function updateFrequencies() {
     freqs = {
         bass: getScaleFrequencies(currentKey, currentScale, [2, 3]),
-        melody: getScaleFrequencies(currentKey, currentScale, [3, 4, 5, 6]),
+        melody: getScaleFrequencies(currentKey, currentScale, [4, 5]),
     };
 }
 
@@ -109,7 +107,9 @@ function generatePattern() {
     combinedPattern.forEach(noteData => {
         const [timeQuant, noteIndex, durationStr = '8n', velocity = 0.5] = noteData;
         const startTime = timeQuant * sixteenthNoteDuration;
-        const duration = (durationStr.endsWith('n') ? sixteenthNoteDuration * 16 / parseInt(durationStr) : sixteenthNoteDuration * 8 / parseInt(durationStr)) * (durationStr.endsWith('t') ? 2/3 : 1);
+        const durationSeconds = (durationStr.endsWith('n') 
+            ? (sixteenthNoteDuration * 16 / parseInt(durationStr)) 
+            : (sixteenthNoteDuration * 8 / parseInt(durationStr))) * (durationStr.endsWith('t') ? 2/3 : 1);
         
         const isBassNote = noteIndex < 0;
         const freqsList = isBassNote ? freqs.bass : freqs.melody;
@@ -119,7 +119,7 @@ function generatePattern() {
             const event: NoteEvent = {
                 time: startTime,
                 freq: freqsList[finalIndex],
-                dur: duration,
+                dur: durationSeconds,
                 vel: velocity,
             };
             if (isBassNote) {
@@ -155,47 +155,45 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
 const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } = {
     Ambient: {
         groove: [
-            [[-1, 1, '2m'], [1, 8, '2m'], [17, 5, '2m', 0.8]], // Syncopated start
+            [[-1, 1, '2m'], [0, 8, '2m'], [16, 5, '2m', 0.8]],
         ],
         fills: [
-            [[48, 10, '1m'], [58, 3, '1m']], // Syncopated start
+            [[32, 10, '1m'], [48, 3, '1m']],
         ]
     },
     House: {
         groove: [
-            // Syncopated bass and melody
-            [[-2, 1, '1m'], [3, 0, '8n'], [7, 4, '8n', 0.7], [10, 2, '8n'], [-18, 2, '1m']],
+            [[-1, 1, '4n'], [-5, 1, '4n'], [-9, 1, '4n'], [-13, 1, '4n'],
+             [0, 0, '8n'], [2, 2, '8n'], [4, 4, '8n'], [6, 2, '8n'],
+             [8, 7, '8n'], [10, 9, '8n'], [12, 11, '8n'], [14, 9, '8n']],
         ],
         fills: [
-            [[48, 7, '8n'], [51, 9, '8n'], [54, 11, '4n']], // Syncopated fill
+            [[48, 7, '8n'], [50, 9, '8n'], [52, 11, '4n']],
         ],
-        arpeggio: { pattern: 'up', speed: '16n', octaves: 1 }
     },
     Wind: {
         groove: [
-            [[1, 10, '2n'], [5, 14, '2n'], [9, 12, '2n']], // Syncopated
+            [[0, 10, '2n'], [4, 14, '2n'], [8, 12, '2n']],
         ],
         fills: [
-            [[49, 15, '8n'], [53, 14, '8n'], [57, 12, '4n'], [61, 10, '4n']], // Syncopated
+            [[48, 15, '8n'], [52, 14, '8n'], [56, 12, '4n'], [60, 10, '4n']],
         ],
-        arpeggio: { pattern: 'upDown', speed: '8t', octaves: 2 }
     },
     Sequence: {
         groove: [
-            [[-1, 1, '1m'], [-17, 4, '1m'], [1, 0], [7, 4], [17, 7], [23, 4]], // Syncopated
-            [[-1, 1, '1m'], [-17, 5, '1m'], [2, 2], [6, 5], [18, 9], [22, 5]], // Syncopated
+            [[-1, 1, '1m'], [-17, 4, '1m'], [0, 0, '8n'], [2, 4, '8n'], [4, 7, '8n'], [6, 4, '8n'], [8, 0, '8n'], [10, 4, '8n'], [12, 7, '8n'], [14, 4, '8n']],
+            [[-1, 1, '1m'], [-17, 5, '1m'], [0, 2, '8n'], [2, 5, '8n'], [4, 9, '8n'], [6, 5, '8n'], [8, 2, '8n'], [10, 5, '8n'], [12, 9, '8n'], [14, 5, '8n']],
         ],
         fills: [
-            [[49, 12], [53, 9], [57, 7], [61, 4]], // Syncopated
+            [[48, 12, '8n'], [50, 9, '8n'], [52, 7, '8n'], [54, 4, '8n'], [56, 12, '8n'], [58, 9, '8n'], [60, 7, '8n'], [62, 4, '8n']],
         ],
-        arpeggio: { pattern: 'up', speed: '16n', octaves: 2 }
     },
     Chimes: {
         groove: [
-            [[2, 12, '2n', 0.8], [9, 16, '2n', 0.7], [18, 14, '2n', 0.8]], // Syncopated
+            [[0, 12, '1n', 0.8], [8, 16, '1n', 0.7], [16, 14, '1n', 0.8]],
         ],
         fills: [
-            [[49, 19, '1n', 0.8], [59, 17, '1n', 0.7]], // Syncopated
+            [[32, 19, '1m', 0.8], [48, 17, '1m', 0.7]],
         ]
     },
     Drone: {
@@ -204,34 +202,37 @@ const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } =
             [[-1, 4, '4m', 0.35]],
         ],
         fills: [
-            [[48, 8, '4n', 0.2]]
+            [[32, 8, '2n', 0.2]]
         ]
     },
     Toccata: {
         groove: [
-            // Bass on downbeats, melody syncopated
-            [[-1, 1, '1m'], [-17, 5, '1m'], [3,0], [7,7], [19,12], [23,4]],
+            [[-1, 1, '4n'], [-5, 1, '4n'], [-9, 5, '4n'], [-13, 5, '4n'],
+             [0,0,'16n'], [1,4,'16n'], [2,7,'16n'], [3,11,'16n'], [4,12,'16n'], [5,11,'16n'], [6,7,'16n'], [7,4,'16n'],
+             [8,0,'16n'], [9,4,'16n'], [10,7,'16n'], [11,11,'16n'], [12,12,'16n'], [13,11,'16n'], [14,7,'16n'], [15,4,'16n']
+            ],
         ],
         fills: [
-             [[49,12], [53,9], [58,7], [61,5]], // Syncopated
+             [[48,12,'16n'], [49,9,'16n'], [50,7,'16n'], [51,5,'16n'], [52,12,'16n'], [53,9,'16n'], [54,7,'16n'], [55,5,'16n'],
+              [56,12,'16n'], [57,9,'16n'], [58,7,'16n'], [59,5,'16n'], [60,12,'16n'], [61,9,'16n'], [62,7,'16n'], [63,5,'16n']],
         ],
-        arpeggio: { pattern: 'upDown', speed: '16n', octaves: 2 }
     },
     Promenade: {
         groove: [
-            [[-1, 1, '4n'], [-9, 4, '4n'], [-17, 1, '4n'], [-25, 4, '4n'], [0, 0, '4n'], [4, 2, '4n'], [8, 4, '4n'], [12, 0, '4n']],
+            [[-1, 1, '4n'], [-5, 4, '4n'], [-9, 1, '4n'], [-13, 4, '4n'],
+             [0, 0, '4n'], [4, 2, '4n'], [8, 4, '4n'], [12, 0, '4n']],
         ],
         fills: [
-            [[48, 7, '4n'], [52, 5, '4n'], [58, 4, '2n']], // Syncopated
+            [[48, 7, '4n'], [52, 5, '4n'], [56, 4, '2n']],
         ]
     },
      Space: {
         groove: [
-             [[-1, 1, '1m', 0.6], [2, 0], [18, 4], [34, 7]], // Syncopated
+             [[-1, 1, '1m', 0.6], [0, 0, '8n'], [2, 4, '8n'], [4, 7, '8n'], [6, 4, '8n'],
+              [16, 4, '1m', 0.6], [16, 2, '8n'], [18, 5, '8n'], [20, 9, '8n'], [22, 5, '8n']],
         ],
         fills: [
-            [[49, 11, '2n', 0.8], [58, 16, '2n', 0.3]], // "Meteor" sound effect with syncopation
+            [[48, 11, '2n', 0.8], [56, 16, '2n', 0.3]],
         ],
-        arpeggio: { pattern: 'up', speed: '8n', octaves: 2 }
     },
 };
