@@ -1,5 +1,6 @@
 
 import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
+import * as Tone from 'tone';
 
 // --- TYPE DEFINITIONS ---
 
@@ -14,20 +15,13 @@ type NoteEvent = {
 type PatternNote = [
     timeQuant: number, // In 16th notes (0-63 for 4 measures)
     noteIndex: number,   // Index in the frequency array. Negative for bass.
-    duration?: string,    // Optional duration, defaults to '8n'
+    durationStr?: string,    // Optional duration, defaults to '8n'
     velocity?: number     // Optional velocity, defaults to 0.5
 ];
-
-type ArpeggioPattern = 'up' | 'down' | 'upDown' | 'random';
 
 type AutopilotPatternData = {
     groove: PatternNote[][];
     fills: PatternNote[][];
-    arpeggio?: {
-        pattern: ArpeggioPattern;
-        speed: string; // e.g., '16n', '8t' (triplet)
-        octaves: number;
-    };
 };
 
 // --- WORKER COMMUNICATION INTERFACES ---
@@ -64,21 +58,11 @@ function getScaleFrequencies(key: MusicKey, scale: MusicScale, octaves: number[]
     
     octaves.forEach(octave => {
         intervals.forEach(interval => {
-            const noteName = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][ (['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'].indexOf(key) + parseInt(interval)) % 12 ];
-            const freq = noteToFrequency(noteName + octave);
-            allFrequencies.push(freq);
+            const note = Tone.Frequency(key + octave).transpose(interval);
+            allFrequencies.push(note.toFrequency());
         });
     });
     return allFrequencies.sort((a,b) => a - b);
-}
-
-function noteToFrequency(note: string): number {
-    const notes = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#'];
-    const octave = parseInt(note.slice(-1));
-    const key = note.slice(0, -1);
-    const index = notes.indexOf(key);
-    const i = index - notes.indexOf('A');
-    return 440 * Math.pow(2, (octave - 4) + i / 12);
 }
 
 function updateFrequencies() {
@@ -96,38 +80,57 @@ function generatePattern() {
     const melodyEvents: NoteEvent[] = [];
     const bassEvents: NoteEvent[] = [];
     const patternData = autopilotPatternsData[currentStyle];
-    if (!patternData) return { melodyEvents, bassEvents };
+    if (!patternData) {
+        console.error(`No pattern data for style: ${currentStyle}`);
+        postMessage({ type: 'patternGenerated', melodyEvents, bassEvents });
+        return;
+    }
 
     const groove = patternData.groove[Math.floor(Math.random() * patternData.groove.length)];
-    const fill = patternData.fills[Math.floor(Math.random() * patternData.fills.length)];
-    const combinedPattern = [...groove, ...fill];
+    const fill = patternData.fills.length > 0 ? patternData.fills[Math.floor(Math.random() * patternData.fills.length)] : [];
+    
+    const measures = 4;
+    const totalSixteenths = measures * 16;
+    const combinedPattern = new Map<number, PatternNote[]>();
 
-    const sixteenthNoteDuration = 60 / 120 / 4; // Assume 120bpm for calculation, Transport will handle actual tempo
-
-    combinedPattern.forEach(noteData => {
-        const [timeQuant, noteIndex, durationStr = '8n', velocity = 0.5] = noteData;
-        const startTime = timeQuant * sixteenthNoteDuration;
-        const durationSeconds = (durationStr.endsWith('n') 
-            ? (sixteenthNoteDuration * 16 / parseInt(durationStr)) 
-            : (sixteenthNoteDuration * 8 / parseInt(durationStr))) * (durationStr.endsWith('t') ? 2/3 : 1);
-        
-        const isBassNote = noteIndex < 0;
-        const freqsList = isBassNote ? freqs.bass : freqs.melody;
-        const finalIndex = isBassNote ? Math.abs(noteIndex) - 1 : noteIndex;
-
-        if (finalIndex < freqsList.length) {
-            const event: NoteEvent = {
-                time: startTime,
-                freq: freqsList[finalIndex],
-                dur: durationSeconds,
-                vel: velocity,
-            };
-            if (isBassNote) {
-                bassEvents.push(event);
-            } else {
-                melodyEvents.push(event);
+    for(let i = 0; i < measures; i++) {
+        const pattern = (i === measures - 1) ? fill : groove; // Use fill for the last measure
+        pattern.forEach(note => {
+            const [timeQuant, ...rest] = note;
+            const absoluteTime = (i * 16) + timeQuant;
+            if (!combinedPattern.has(absoluteTime)) {
+                combinedPattern.set(absoluteTime, []);
             }
-        }
+            combinedPattern.get(absoluteTime)?.push(note);
+        });
+    }
+
+    const sixteenthNoteDuration = Tone.Time('16n').toSeconds();
+
+    combinedPattern.forEach((notesAtTime, timeQuant) => {
+        notesAtTime.forEach(noteData => {
+            const [relTimeQuant, noteIndex, durationStr = '8n', velocity = 0.5] = noteData;
+            const startTime = timeQuant * sixteenthNoteDuration;
+            const durationSeconds = Tone.Time(durationStr).toSeconds();
+            
+            const isBassNote = noteIndex < 0;
+            const freqsList = isBassNote ? freqs.bass : freqs.melody;
+            const finalIndex = isBassNote ? Math.abs(noteIndex) - 1 : noteIndex;
+
+            if (finalIndex < freqsList.length) {
+                const event: NoteEvent = {
+                    time: startTime,
+                    freq: freqsList[finalIndex],
+                    dur: durationSeconds,
+                    vel: velocity,
+                };
+                if (isBassNote) {
+                    bassEvents.push(event);
+                } else {
+                    melodyEvents.push(event);
+                }
+            }
+        });
     });
     
     postMessage({ type: 'patternGenerated', melodyEvents, bassEvents });
@@ -155,10 +158,11 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
 const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } = {
     Ambient: {
         groove: [
-            [[-1, 1, '2m'], [0, 8, '2m'], [16, 5, '2m', 0.8]],
+            [[-1, 1, '2m', 0.4], [0, 8, '2m', 0.5], [16, 5, '2m', 0.6]],
+            [[-1, 4, '2m', 0.4], [0, 5, '2m', 0.5], [16, 1, '2m', 0.6]],
         ],
         fills: [
-            [[32, 10, '1m'], [48, 3, '1m']],
+            [[32, 10, '1m', 0.7], [48, 3, '1m', 0.5]],
         ]
     },
     House: {
@@ -173,7 +177,7 @@ const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } =
     },
     Wind: {
         groove: [
-            [[0, 10, '2n'], [4, 14, '2n'], [8, 12, '2n']],
+            [[0, 10, '2n', 0.6], [4, 14, '2n', 0.7], [8, 12, '2n', 0.5]],
         ],
         fills: [
             [[48, 15, '8n'], [52, 14, '8n'], [56, 12, '4n'], [60, 10, '4n']],

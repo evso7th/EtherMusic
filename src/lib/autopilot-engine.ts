@@ -15,8 +15,8 @@ export class AutopilotEngine {
 
     private melodySynths: Tone.Synth[] = [];
     private bassSynths: Tone.Synth[] = [];
-    private melodyPart?: Tone.Part;
-    private bassPart?: Tone.Part;
+    private melodyPart?: Tone.Part<NoteEvent>;
+    private bassPart?: Tone.Part<NoteEvent>;
     private channel!: Tone.Channel;
     
     private worker?: Worker;
@@ -43,12 +43,17 @@ export class AutopilotEngine {
                 this.requestNextPattern();
             }
         });
+        
+        Tone.Transport.on('stop', () => {
+            this.melodyPart?.clear();
+            this.bassPart?.clear();
+        });
 
         this.isInitialized = true;
     }
     
     private initializeParts() {
-        this.melodyPart = new Tone.Part((time, note) => {
+        this.melodyPart = new Tone.Part<NoteEvent>((time, note) => {
             const availableSynth = this.melodySynths.shift();
             if (availableSynth) {
                 availableSynth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
@@ -56,7 +61,7 @@ export class AutopilotEngine {
             }
         }, []).start(0);
 
-        this.bassPart = new Tone.Part((time, note) => {
+        this.bassPart = new Tone.Part<NoteEvent>((time, note) => {
             const availableSynth = this.bassSynths.shift();
             if (availableSynth) {
                 availableSynth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
@@ -69,24 +74,17 @@ export class AutopilotEngine {
         if (event.data.type === 'patternGenerated') {
             const { melodyEvents, bassEvents } = event.data;
             
-            // Schedule the received events at the correct time
-            Tone.Transport.scheduleOnce(time => {
-                this.melodyPart?.clear();
-                this.bassPart?.clear();
-                
+            Tone.Transport.scheduleOnce(() => {
                 melodyEvents.forEach(e => this.melodyPart?.add(this.nextPatternTime + e.time, e));
                 bassEvents.forEach(e => this.bassPart?.add(this.nextPatternTime + e.time, e));
-
-                // Prepare for the next pattern
                 this.nextPatternTime += Tone.Time('4m').toSeconds();
                 this.requestNextPattern();
-
             }, this.nextPatternTime);
         }
     }
     
     private requestNextPattern() {
-        if (this.isAutopilotOn && Tone.Transport.state === 'started') {
+        if (this.isAutopilotOn && Tone.Transport.state === 'started' && this.worker) {
             this.postMessage({ type: 'generate' });
         }
     }
@@ -117,12 +115,13 @@ export class AutopilotEngine {
         
         this.postMessage({ type: 'setStyle', style });
 
-        if (isOn) {
-            if (!wasOn && Tone.Transport.state === 'started') {
-                this.nextPatternTime = Tone.Time('@4m').toSeconds(); // Schedule for the start of the next 4-measure block
+        if (isOn && !wasOn) {
+            if (Tone.Transport.state === 'started') {
+                 // Schedule for the start of the next 4-measure block
+                this.nextPatternTime = Tone.Time('@4m').toSeconds();
                 this.requestNextPattern();
             }
-        } else {
+        } else if (!isOn) {
             this.melodyPart?.clear();
             this.bassPart?.clear();
             this.melodySynths.forEach(s => s.triggerRelease());
@@ -176,6 +175,7 @@ export class AutopilotEngine {
         const melodySynthOptions = {
             oscillator: { type: 'fatsine4', spread: 40, count: 4 },
             envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 },
+            portamento: 0.02,
         };
         for (let i = 0; i < 4; i++) {
             const synth = new Tone.Synth(melodySynthOptions).connect(this.channel);

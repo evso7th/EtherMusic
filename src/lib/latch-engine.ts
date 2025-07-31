@@ -45,14 +45,10 @@ export class LatchEngine {
         }
     }
     
-    public handleInteraction(pos: { x: number; y: number }, vol: number, quantizedFreq: number) {
+    public handleInteraction(pos: { x: number; y: number }, vol: number, freq: number) {
         if (!this.isLatchOn) return;
 
-        // Ensure the frequency is within the allowed bass range for safety
-        if (!this.allowedFrequencies.includes(quantizedFreq)) {
-            console.warn("Latch frequency out of allowed range, ignoring.");
-            return;
-        }
+        const quantizedFreq = this.getClosestFrequency(freq);
 
         let existingEntryId;
         for (const [id, note] of this.latchedNotes.entries()) {
@@ -84,6 +80,12 @@ export class LatchEngine {
             }
         }
     }
+
+    private getClosestFrequency(targetFreq: number): number {
+        if (this.allowedFrequencies.length === 0) return targetFreq;
+        return this.allowedFrequencies.reduce((prev, curr) => (Math.abs(curr - targetFreq) < Math.abs(prev - targetFreq) ? curr : prev));
+    }
+
 
     private playNote(note: LatchedBassNote) {
         note.synth.triggerAttack(note.initialFreq, undefined, note.volume);
