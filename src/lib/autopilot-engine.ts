@@ -15,7 +15,7 @@ export class AutopilotEngine {
     private isAutopilotOn = false;
     private nextPatternTime = 0;
     private patternDuration = Tone.Time('4m').toSeconds();
-    private scheduleId: number | null = null;
+    private scheduleTimeoutId: number | null = null;
     
     private currentKey: MusicKey = 'C';
     private currentScale: MusicScale = 'Major Pentatonic';
@@ -70,26 +70,27 @@ export class AutopilotEngine {
     private startLoop() {
         this.stopCurrentLoop();
     
-        const generateAndScheduleNext = (time: number) => {
-            // CRITICAL: Prevent scheduling in the past.
-            this.nextPatternTime = Math.max(time, Tone.now());
-            
+        const generateAndScheduleNext = () => {
+            // Set the start time for the *next* pattern to be now.
+            // This ensures all notes within this pattern are scheduled relative to the same starting point.
+            this.nextPatternTime = Tone.now();
             this.postMessage({ type: 'generate' });
             
-            this.scheduleId = Tone.Transport.scheduleOnce(generateAndScheduleNext, `+${this.patternDuration}`);
+            // Use setTimeout for reliable, transport-independent scheduling.
+            this.scheduleTimeoutId = window.setTimeout(generateAndScheduleNext, this.patternDuration * 1000);
         }
     
         // Schedule the very first generation to happen almost immediately.
-        generateAndScheduleNext(Tone.now());
+        generateAndScheduleNext();
     }
     
     
     private stopCurrentLoop() {
-        if (this.scheduleId !== null) {
-            Tone.Transport.clear(this.scheduleId);
-            this.scheduleId = null;
+        if (this.scheduleTimeoutId !== null) {
+            clearTimeout(this.scheduleTimeoutId);
+            this.scheduleTimeoutId = null;
         }
-        Tone.Transport.cancel();
+        // This is a more robust way to stop all autopilot sounds immediately.
         this.audioEngine.stopAutopilotSynths();
     }
 
@@ -100,6 +101,7 @@ export class AutopilotEngine {
 
     public setTempo(bpm: number) {
         this.currentTempo = bpm;
+        this.patternDuration = Tone.Time('4m').toSeconds(); // Recalculate duration when tempo changes
         this.postMessage({ type: 'setTempo', bpm: this.currentTempo });
     }
 
@@ -118,6 +120,8 @@ export class AutopilotEngine {
         this.postMessage({ type: 'setStyle', style: this.currentStyle });
 
         if (isOn && !wasOn) {
+            // If transport is already running, start the loop immediately.
+            // Otherwise, the 'start' event on the transport will handle it.
             if (Tone.Transport.state === 'started') {
                 this.startLoop();
             }
@@ -128,8 +132,6 @@ export class AutopilotEngine {
 
     public setMelodyInstrument(instrument: MelodyInstrument) {
         if (!this.isInitialized) return;
-        // NOTE: We are not passing instrument info to the worker. 
-        // The AudioEngine handles applying the correct instrument sound.
-        this.postMessage({ type: 'setMelodyInstrument', instrument });
+        this.audioEngine.setMelodyInstrument(instrument);
     }
 }
