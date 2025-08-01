@@ -162,14 +162,18 @@ export default function Home() {
     }, [activePattern]);
     
     useEffect(() => {
-        audioEngine.current?.setHarmony(musicKey, musicScale);
-        autopilotEngine.current?.setHarmony(musicKey, musicScale);
-    }, [musicKey, musicScale]);
+        if (isReady) {
+            audioEngine.current?.setHarmony(musicKey, musicScale);
+            autopilotEngine.current?.setHarmony(musicKey, musicScale);
+        }
+    }, [musicKey, musicScale, isReady]);
 
     useEffect(() => {
-        audioEngine.current?.setMelodyInstrument(melodyInstrument);
-        autopilotEngine.current?.setMelodyInstrument(melodyInstrument);
-    }, [melodyInstrument]);
+        if (isReady) {
+            audioEngine.current?.setMelodyInstrument(melodyInstrument);
+            autopilotEngine.current?.setMelodyInstrument(melodyInstrument);
+        }
+    }, [melodyInstrument, isReady]);
     
     useEffect(() => {
         audioEngine.current?.setBassLatch(isBassLatchOn);
@@ -469,4 +473,3 @@ export default function Home() {
         </div>
     );
 }
-

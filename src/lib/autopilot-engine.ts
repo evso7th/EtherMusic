@@ -23,6 +23,10 @@ export class AutopilotEngine {
     private isAutopilotOn = false;
     private nextPatternTime = 0;
     private patternDuration = Tone.Time('4m').toSeconds();
+    
+    private currentKey: MusicKey = 'C';
+    private currentScale: MusicScale = 'Major Pentatonic';
+    private currentStyle: AutopilotStyle = 'Ambient';
 
     public async initialize(fxReverb: Tone.Reverb, fxDelay: Tone.FeedbackDelay) {
         if (this.isInitialized) return;
@@ -33,7 +37,6 @@ export class AutopilotEngine {
         
         this.createSynthPools();
         
-        // Use standard Worker constructor for Next.js
         if (typeof window !== 'undefined') {
             this.worker = new Worker(new URL('./autopilot-worker.ts', import.meta.url));
             this.worker.onmessage = this.handleWorkerMessage.bind(this);
@@ -51,6 +54,7 @@ export class AutopilotEngine {
         Tone.Transport.on('stop', () => {
             this.melodyPart?.clear();
             this.bassPart?.clear();
+            Tone.Transport.cancel(0);
         });
 
         this.isInitialized = true;
@@ -76,21 +80,26 @@ export class AutopilotEngine {
         if (event.data.type === 'patternGenerated') {
             const { melodyEvents, bassEvents } = event.data;
             
+            // Schedule the pattern to be added at the correct time
             Tone.Transport.scheduleOnce(() => {
                 melodyEvents.forEach(e => this.melodyPart?.add(this.nextPatternTime + e.time, e));
                 bassEvents.forEach(e => this.bassPart?.add(this.nextPatternTime + e.time, e));
+                
+                // Once added, schedule the next request
+                this.nextPatternTime += this.patternDuration;
+                this.requestNextPattern();
             }, this.nextPatternTime);
-
-            this.nextPatternTime += this.patternDuration;
-            this.requestNextPattern();
         }
     }
     
     private requestNextPattern() {
         if (this.isAutopilotOn && Tone.Transport.state === 'started' && this.worker) {
+             // Request the next pattern slightly before the current one ends.
+             // A 2-second buffer should be safe.
+             const requestTime = this.nextPatternTime > 2 ? this.nextPatternTime - 2 : 0;
              Tone.Transport.scheduleOnce(() => {
                  this.postMessage({ type: 'generate' });
-            }, this.nextPatternTime - this.patternDuration); // Request slightly before it's needed
+            }, requestTime);
         }
     }
 
@@ -110,6 +119,8 @@ export class AutopilotEngine {
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
+        this.currentKey = key;
+        this.currentScale = scale;
         this.postMessage({ type: 'setHarmony', key, scale });
     }
     
@@ -117,14 +128,17 @@ export class AutopilotEngine {
         if (!this.isInitialized) return;
         const wasOn = this.isAutopilotOn;
         this.isAutopilotOn = isOn;
+        this.currentStyle = style;
         
-        this.postMessage({ type: 'setStyle', style });
+        this.postMessage({ type: 'setStyle', style: this.currentStyle });
 
         if (isOn && !wasOn) {
+            // Ensure harmony is set before starting
+            this.postMessage({ type: 'setHarmony', key: this.currentKey, scale: this.currentScale });
             if (Tone.Transport.state === 'started') {
                 this.melodyPart?.clear();
                 this.bassPart?.clear();
-                this.nextPatternTime = Tone.Time('@4m').toSeconds();
+                this.nextPatternTime = Tone.Time('@4m').toSeconds(); // Align to the next 4-measure boundary
                 this.requestNextPattern();
             }
         } else if (!isOn) {
@@ -132,7 +146,7 @@ export class AutopilotEngine {
             this.bassPart?.clear();
             this.melodySynths.forEach(s => s.triggerRelease());
             this.bassSynths.forEach(s => s.triggerRelease());
-            Tone.Transport.cancel(this.nextPatternTime);
+            Tone.Transport.cancel(0); // Cancel all future scheduled events for this engine
         }
     }
 
