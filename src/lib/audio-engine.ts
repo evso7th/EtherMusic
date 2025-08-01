@@ -284,7 +284,7 @@ export class AudioEngine {
     public playAutopilotNote(time: number, note: {type: 'melody' | 'bass', freq: number, dur: number, vel: number}) {
         const synthPool = note.type === 'melody' ? this.melodySynths : this.autopilotBassSynths;
         
-        const availableSynth = synthPool.find(s => s.state === 'stopped');
+        const availableSynth = synthPool.find(s => s.state !== 'started');
 
         if (availableSynth) {
              availableSynth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
