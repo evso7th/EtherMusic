@@ -79,9 +79,9 @@ export class AutopilotEngine {
             this.scheduleId = Tone.Transport.scheduleOnce(generateAndScheduleNext, `+${this.patternDuration}`);
         }
     
-        // Start the first generation immediately at the next measure
-        const startTime = Tone.Time('@1m').toSeconds();
-        generateAndScheduleNext(startTime);
+        // Start the first generation immediately, but scheduled on the transport
+        const now = Tone.now();
+        generateAndScheduleNext(now);
     }
     
     
@@ -129,6 +129,7 @@ export class AutopilotEngine {
     }
 
     public setMelodyInstrument(instrument: MelodyInstrument) {
+        if (!this.isInitialized) return;
         this.currentMelodyInstrument = instrument;
         this.audioEngine.setMelodyInstrument(instrument);
     }
