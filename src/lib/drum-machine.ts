@@ -29,6 +29,24 @@ export class DrumMachine {
     public async initialize() {
         if (this.isInitialized) return;
         await this.loadDrumSamples();
+        
+        // Initialize the part once and keep it running.
+        this.drumPart = new Tone.Part((time, value) => {
+             const playNote = (note: string, offset: number) => {
+               if (this.drumSamplers?.has(note)) {
+                    this.drumSamplers.player(note).start(time + offset);
+               }
+           }
+           if (Array.isArray(value.note)) {
+               value.note.forEach((note, index) => playNote(note, index * 0.001)); // Add a tiny offset
+           } else if (value.note) {
+               playNote(value.note, 0);
+           }
+        }, []).start(0);
+
+        this.drumPart.loop = true;
+        this.drumPart.loopEnd = '4m';
+
         this.isInitialized = true;
     }
 
@@ -44,25 +62,40 @@ export class DrumMachine {
     }
 
     public setBeatPattern(patternName: string) {
-        if (!this.isInitialized) return;
-        this.currentBeatPatternName = patternName;
+        if (!this.isInitialized || !this.drumPart) return;
         
-        if (this.drumPart) {
-            this.drumPart.stop(0).dispose();
-            this.drumPart = null;
-        }
+        this.currentBeatPatternName = patternName;
+        this.drumPart.clear();
 
         if (patternName === 'Off') {
             this.drumSamplers?.stopAll();
             return;
         }
         
-        this.createAndStartPart(patternName);
+        const patternData = beatPatternsData[patternName];
+        if (!patternData || !patternData.groove?.length) {
+            return;
+        }
+
+        // We'll schedule 4 measures
+        for (let measure = 0; measure < 4; measure++) {
+            const isFillMeasure = (measure % 4 === 3) && patternData.fills && patternData.fills.length > 0;
+            const patternToPlay = isFillMeasure
+                ? patternData.fills[Math.floor(Math.random() * patternData.fills.length)]
+                : patternData.groove[Math.floor(Math.random() * patternData.groove.length)];
+
+            patternToPlay.forEach((notes, i) => {
+                if (notes && notes.length > 0) {
+                    const time = `${measure}:${Math.floor(i / 4)}:${i % 4}`;
+                    this.drumPart?.add(time, { note: notes });
+                }
+            });
+        }
     }
     
     public stop() {
         if (!this.isInitialized) return;
-        this.drumPart?.stop(0).clear();
+        this.drumPart?.clear();
         this.drumSamplers?.stopAll();
     }
     
@@ -87,46 +120,6 @@ export class DrumMachine {
                 resolve();
             }).toDestination();
         });
-    }
-
-    private createAndStartPart(patternName: string) {
-        const patternData = beatPatternsData[patternName];
-        if (!patternData || !patternData.groove?.length) {
-            return;
-        }
-        
-        const events: {time: string, note: string | string[]}[] = [];
-        
-        // We'll schedule 4 measures
-        for (let measure = 0; measure < 4; measure++) {
-            const isFillMeasure = (measure % 4 === 3) && patternData.fills && patternData.fills.length > 0;
-            const patternToPlay = isFillMeasure
-                ? patternData.fills[Math.floor(Math.random() * patternData.fills.length)]
-                : patternData.groove[Math.floor(Math.random() * patternData.groove.length)];
-
-            patternToPlay.forEach((notes, i) => {
-                if (notes) {
-                    const time = `${measure}:${Math.floor(i / 4)}:${i % 4}`;
-                    events.push({ time, note: notes });
-                }
-            });
-        }
-        
-        this.drumPart = new Tone.Part((time, value) => {
-             const playNote = (note: string, offset: number) => {
-               if (this.drumSamplers?.has(note)) {
-                    this.drumSamplers.player(note).start((time as number) + offset);
-               }
-           }
-           if (Array.isArray(value.note)) {
-               value.note.forEach((note, index) => playNote(note, index * 0.001)); // Add a tiny offset
-           } else if (value.note) {
-               playNote(value.note, 0);
-           }
-        }, events).start(0);
-
-        this.drumPart.loop = true;
-        this.drumPart.loopEnd = '4m';
     }
 }
 
