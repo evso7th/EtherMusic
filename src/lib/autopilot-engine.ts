@@ -1,6 +1,8 @@
 
 import * as Tone from 'tone';
 import type { MusicKey, MusicScale, AutopilotStyle, MelodyInstrument } from '@/app/page';
+// @ts-ignore
+import AutopilotWorker from './autopilot-worker.ts';
 import type { WorkerEvent, WorkerResponse } from './autopilot-worker';
 
 type NoteEvent = {
@@ -22,6 +24,7 @@ export class AutopilotEngine {
     private worker?: Worker;
     private isAutopilotOn = false;
     private nextPatternTime = 0;
+    private patternDuration = Tone.Time('4m').toSeconds();
 
     public async initialize(fxReverb: Tone.Reverb, fxDelay: Tone.FeedbackDelay) {
         if (this.isInitialized) return;
@@ -32,7 +35,7 @@ export class AutopilotEngine {
         
         this.createSynthPools();
         
-        this.worker = new Worker(new URL('./autopilot-worker.ts', import.meta.url));
+        this.worker = new AutopilotWorker();
         this.worker.onmessage = this.handleWorkerMessage.bind(this);
         
         this.initializeParts();
@@ -76,10 +79,9 @@ export class AutopilotEngine {
             Tone.Transport.scheduleOnce(() => {
                 melodyEvents.forEach(e => this.melodyPart?.add(this.nextPatternTime + e.time, e));
                 bassEvents.forEach(e => this.bassPart?.add(this.nextPatternTime + e.time, e));
-
+                
                 // Schedule the next pattern request for the end of the current pattern
-                const patternDuration = Tone.Time('4m').toSeconds();
-                this.nextPatternTime += patternDuration;
+                this.nextPatternTime += this.patternDuration;
                 this.requestNextPattern();
 
             }, this.nextPatternTime);
@@ -88,7 +90,7 @@ export class AutopilotEngine {
     
     private requestNextPattern() {
         if (this.isAutopilotOn && Tone.Transport.state === 'started' && this.worker) {
-            Tone.Transport.scheduleOnce(() => {
+             Tone.Transport.scheduleOnce(() => {
                  this.postMessage({ type: 'generate' });
             }, this.nextPatternTime);
         }
@@ -133,11 +135,8 @@ export class AutopilotEngine {
             this.melodySynths.forEach(s => s.triggerRelease());
             this.bassSynths.forEach(s => s.triggerRelease());
              // Cancel all future scheduled events related to autopilot
-            let currentEvent = Tone.Transport.get(this.nextPatternTime);
-            while(currentEvent){
-                Tone.Transport.clear(currentEvent.id);
-                currentEvent = Tone.Transport.get(this.nextPatternTime);
-            }
+            let currentEventId = Tone.Transport.scheduleOnce(() => {}, this.nextPatternTime);
+            Tone.Transport.clear(currentEventId);
         }
     }
 
