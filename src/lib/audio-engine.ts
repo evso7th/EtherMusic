@@ -30,6 +30,7 @@ export class AudioEngine {
     private melodySynths: Tone.Synth[] = [];
     private bassSynths: Tone.Synth[] = [];
     private latchSynths: Tone.Synth[] = [];
+    private autopilotMelodySynths: Tone.Synth[] = [];
     private autopilotBassSynths: Tone.Synth[] = [];
     
     private recorder!: Tone.Recorder;
@@ -210,7 +211,9 @@ export class AudioEngine {
                 };
                 break;
         }
+        // Apply to both manual and autopilot melody synths
         this.melodySynths.forEach(synth => synth.set(newOptions));
+        this.autopilotMelodySynths.forEach(synth => synth.set(newOptions));
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
@@ -282,8 +285,9 @@ export class AudioEngine {
     }
     
     public playAutopilotNote(time: number, note: {type: 'melody' | 'bass', freq: number, dur: number, vel: number}) {
-        const synthPool = note.type === 'melody' ? this.melodySynths : this.autopilotBassSynths;
+        if (!this.isInitialized) return;
         
+        const synthPool = note.type === 'melody' ? this.autopilotMelodySynths : this.autopilotBassSynths;
         const availableSynth = synthPool.find(s => s.state !== 'started');
 
         if (availableSynth) {
@@ -298,17 +302,24 @@ export class AudioEngine {
         const melodySynthOptions = { 
             portamento: 0.02,
         };
+        // Manual melody synths
         for (let i = 0; i < 4; i++) {
             this.melodySynths.push(new Tone.Synth(melodySynthOptions).connect(this.channels.melody));
+        }
+        // Autopilot melody synths
+        for (let i = 0; i < 4; i++) {
+            this.autopilotMelodySynths.push(new Tone.Synth(melodySynthOptions).connect(this.channels.autopilot));
         }
         
         const bassSynthOptions = {
             oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
         } as const;
+        // Manual bass synths
         for (let i = 0; i < 2; i++) {
             this.bassSynths.push(new Tone.Synth(bassSynthOptions).connect(this.channels.bass));
         }
+        // Autopilot bass synths
         for (let i = 0; i < 2; i++) {
             this.autopilotBassSynths.push(new Tone.Synth(bassSynthOptions).connect(this.channels.autopilot));
         }
