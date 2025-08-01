@@ -108,16 +108,15 @@ function generatePattern() {
     const pattern: AutopilotPattern = { melody: [], accompaniment: [], bass: [] };
     const totalDuration = durationToSeconds('4m', currentBpm);
     const measureDuration = durationToSeconds('1m', currentBpm);
+    const sixteenthNoteDuration = durationToSeconds('16n', currentBpm);
 
-    // Bass: one note per measure
+    // Bass: one note per measure, with syncopation
     for (let i = 0; i < 4; i++) {
-        // C2-C3 range, sometimes C1
         const C1_freq_max = 65.41; // C2
         const C3_freq_max = 130.81; // C3
         const bassFreqs = freqs.bass.filter(f => f < C3_freq_max);
         
         let freqIndex;
-        // Occasionally dip into C1 range
         if (Math.random() < 0.2) {
              freqIndex = Math.floor(Math.random() * bassFreqs.filter(f => f < C1_freq_max).length);
         } else {
@@ -125,65 +124,76 @@ function generatePattern() {
              freqIndex = bassFreqs.indexOf(C2_range[Math.floor(Math.random() * C2_range.length)]);
         }
 
+        let time = i * measureDuration;
+        // Syncopation: 30% chance to shift the note
+        if (Math.random() < 0.3) {
+            time += (Math.random() < 0.5 ? 1 : -1) * sixteenthNoteDuration;
+        }
+
         pattern.bass.push({
-            time: i * measureDuration,
+            time: time,
             freq: bassFreqs[freqIndex] || bassFreqs[0],
-            dur: measureDuration,
+            dur: measureDuration * (Math.random() * 0.5 + 0.5), // duration between 50% and 100% of measure
             vel: 0.4
         });
     }
 
-    // Accompaniment: simple chords
-    for (let i = 0; i < 4; i++) {
-        // Prefer C3 range, with deviations to C2 and C4
-        const C2_freq = 65.41;
+    // Accompaniment: Arpeggiated chords
+    for (let i = 0; i < 4; i++) { // For each measure
         const C3_freq = 130.81;
         const C4_freq = 261.63;
-        const C5_freq = 523.25;
-
         const preferredRange = freqs.accompaniment.filter(f => f >= C3_freq && f < C4_freq);
-        let rootFreq;
-
-        if (Math.random() < 0.7) { // 70% chance to stay in preferred C3 range
-             rootFreq = preferredRange[Math.floor(Math.random() * preferredRange.length)];
-        } else { // 30% chance to go to C2 or C4
-            const otherRange = freqs.accompaniment.filter(f => (f >= C2_freq && f < C3_freq) || (f >= C4_freq && f < C5_freq));
-            rootFreq = otherRange[Math.floor(Math.random() * otherRange.length)];
-        }
+        let rootFreq = preferredRange[Math.floor(Math.random() * preferredRange.length)];
         
-        if (!rootFreq) continue; // Skip if no suitable frequency found
-
+        if (!rootFreq) continue; 
         const rootNoteIndexInScale = freqs.accompaniment.indexOf(rootFreq);
         if (rootNoteIndexInScale === -1) continue;
 
         const chordFreqs = [rootFreq];
-        // Add 3rd and 5th
         if ((rootNoteIndexInScale + 2) < freqs.accompaniment.length) {
              chordFreqs.push(freqs.accompaniment[rootNoteIndexInScale + 2]);
         }
-       if ((rootNoteIndexInScale + 4) < freqs.accompaniment.length) {
+        if ((rootNoteIndexInScale + 4) < freqs.accompaniment.length) {
              chordFreqs.push(freqs.accompaniment[rootNoteIndexInScale + 4]);
         }
-       
-        if (chordFreqs.length > 1) {
-            pattern.accompaniment.push({
-                time: i * measureDuration + (measureDuration / 2),
-                freq: chordFreqs,
-                dur: measureDuration,
-                vel: 0.3
-            });
+        
+        // Create arpeggio from the chord
+        const arpPatterns = [
+            [0, 1, 2, 1], // Up and down
+            [0, 2, 1, 0], // Triangle
+            [0, 1, 0, 2], // Mixed
+        ];
+        const arpPattern = arpPatterns[Math.floor(Math.random() * arpPatterns.length)];
+        
+        for (let j=0; j<4; j++) { // Create 4 notes per measure (quarter notes)
+            const noteIndexInChord = arpPattern[j % arpPattern.length];
+            if (noteIndexInChord < chordFreqs.length) {
+                 pattern.accompaniment.push({
+                    time: i * measureDuration + j * durationToSeconds('4n', currentBpm),
+                    freq: chordFreqs[noteIndexInChord],
+                    dur: durationToSeconds('4n', currentBpm),
+                    vel: 0.3
+                });
+            }
         }
     }
 
-    // Melody: a few random notes
-    for (let i = 0; i < 8; i++) {
-        if (Math.random() > 0.5) {
+    // Melody: a few random notes, with syncopation
+    for (let i = 0; i < 16; i++) { // 16th note resolution
+        if (Math.random() > 0.8) { // Sparser melody
             const melodyFreqs = freqs.melody.filter(f => f < 524); // Up to C5
             const freq = melodyFreqs[Math.floor(Math.random() * melodyFreqs.length)];
+            
+            let time = i * sixteenthNoteDuration;
+             // Syncopation: 50% chance of small shift
+            if (Math.random() < 0.5) {
+                time += (Math.random() - 0.5) * sixteenthNoteDuration * 0.5;
+            }
+
             pattern.melody.push({
-                time: i * durationToSeconds('8n', currentBpm) * 2,
+                time: time,
                 freq: freq,
-                dur: durationToSeconds('8n', currentBpm),
+                dur: durationToSeconds('8n', currentBpm) * (Math.random() * 1.5 + 0.5), // variable duration
                 vel: 0.4
             });
         }
