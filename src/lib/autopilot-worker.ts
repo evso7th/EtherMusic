@@ -6,7 +6,7 @@ import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
 
 type NoteEvent = {
     time: number; // in seconds, relative to the start of the pattern
-    freq: number | number[];
+    freq: number; // Note: No longer an array
     dur: number; // in seconds
     vel: number;
 };
