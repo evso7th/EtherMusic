@@ -284,7 +284,6 @@ export class AudioEngine {
     public playAutopilotNote(time: number, note: {type: 'melody' | 'bass', freq: number, dur: number, vel: number}) {
         const synthPool = note.type === 'melody' ? this.melodySynths : this.autopilotBassSynths;
         
-        // This is a simplified voice allocation. It finds a synth that is not currently playing.
         const availableSynth = synthPool.find(s => s.state === 'stopped');
 
         if (availableSynth) {
