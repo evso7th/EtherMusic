@@ -1,28 +1,22 @@
 
 
 import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
+import type { AutopilotInstrument } from './audio-engine';
 
 // --- TYPE DEFINITIONS ---
 
-export type NoteEventFromWorker = {
+type NoteEvent = {
     time: number; // in seconds, relative to the start of the pattern
-    freq: number;
+    freq: number | number[];
     dur: number; // in seconds
     vel: number;
-    isBass: boolean;
 };
 
-// Simplified note type for pattern definitions
-type PatternNote = [
-    timeQuant: number, // In 16th notes (0-63 for 4 measures)
-    noteIndex: number,   // Index in the frequency array. Negative for bass.
-    durationStr?: string,    // Optional duration, defaults to '8n'
-    velocity?: number     // Optional velocity, defaults to 0.5
-];
-
-type AutopilotPatternData = {
-    groove: PatternNote[][];
-    fills: PatternNote[][];
+type AutopilotPattern = {
+    melody: NoteEvent[];
+    accompaniment: NoteEvent[];
+    bass: NoteEvent[];
+    effects: NoteEvent[];
 };
 
 // --- WORKER COMMUNICATION INTERFACES ---
@@ -34,7 +28,7 @@ export type WorkerEvent =
     | { type: 'setTempo', bpm: number };
 
 export type WorkerResponse =
-    | { type: 'patternGenerated', melodyEvents: NoteEventFromWorker[], bassEvents: NoteEventFromWorker[] };
+    | { type: 'patternGenerated', pattern: AutopilotPattern };
 
 
 // --- WORKER STATE ---
@@ -45,12 +39,12 @@ let currentStyle: AutopilotStyle = 'Ambient';
 let currentBpm = 120;
 let freqs = {
     bass: [] as number[],
+    accompaniment: [] as number[],
     melody: [] as number[],
 };
 
 // --- CORE LOGIC ---
 
-// Simple frequency calculation to avoid Tone.js dependency in worker
 function getNoteFrequency(key: MusicKey, octave: number, interval: number): number {
     const A4 = 440;
     const keyMap: {[key in MusicKey]: number} = { 'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5, 'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11 };
@@ -78,8 +72,12 @@ function getScaleFrequencies(key: MusicKey, scale: MusicScale, octaves: number[]
 
 function updateFrequencies() {
     freqs = {
-        bass: getScaleFrequencies(currentKey, currentScale, [2, 3]),
-        melody: getScaleFrequencies(currentKey, currentScale, [4, 5]),
+        // C1-C3
+        bass: getScaleFrequencies(currentKey, currentScale, [1, 2]),
+        // C2-C4
+        accompaniment: getScaleFrequencies(currentKey, currentScale, [2, 3]),
+        // C3-C5
+        melody: getScaleFrequencies(currentKey, currentScale, [3, 4]),
     };
 }
 
@@ -92,16 +90,13 @@ function durationToSeconds(duration: string, bpm: number): number {
     const unit = match[2];
 
     switch(unit) {
-        case 'n': // a subdivision
+        case 'n':
             if (value === 1) return quarterNoteDuration * 4;
             if (value === 2) return quarterNoteDuration * 2;
-            if (value === 4) return quarterNoteDuration;
-            if (value === 8) return quarterNoteDuration / 2;
-            if (value === 16) return quarterNoteDuration / 4;
             return quarterNoteDuration * (4 / value);
-        case 't': // a triplet
+        case 't':
             return (quarterNoteDuration * 4) / (value * 1.5);
-        case 'm': // a measure
+        case 'm':
             return value * 4 * quarterNoteDuration;
         default:
             return quarterNoteDuration / 2;
@@ -114,63 +109,56 @@ function generatePattern() {
         updateFrequencies();
     }
     
-    const melodyEvents: NoteEventFromWorker[] = [];
-    const bassEvents: NoteEventFromWorker[] = [];
-    const patternData = autopilotPatternsData[currentStyle];
-    if (!patternData) {
-        console.error(`No pattern data for style: ${currentStyle}`);
-        postMessage({ type: 'patternGenerated', melodyEvents, bassEvents });
-        return;
-    }
-    
-    const totalMeasures = 4;
-    const measuresPerGroove = patternData.groove.length;
-    const fillsPerStyle = patternData.fills.length;
-    
-    let combinedPattern: PatternNote[] = [];
+    const pattern: AutopilotPattern = { melody: [], accompaniment: [], bass: [], effects: [] };
+    const sixteenthNoteDuration = durationToSeconds('16n', currentBpm);
 
-    for (let measure = 0; measure < totalMeasures; measure++) {
-        let patternToAdd: PatternNote[];
-        if (measure === totalMeasures - 1 && fillsPerStyle > 0) {
-             patternToAdd = patternData.fills[Math.floor(Math.random() * fillsPerStyle)];
-        } else {
-             patternToAdd = patternData.groove[Math.floor(Math.random() * measuresPerGroove)];
-        }
-        
-        patternToAdd.forEach(note => {
-            const [timeQuant, ...rest] = note;
-            combinedPattern.push([(measure * 16) + timeQuant, ...rest]);
+    // Simple generation logic for now
+    // Bass: one note per measure
+    for (let i = 0; i < 4; i++) {
+        pattern.bass.push({
+            time: i * durationToSeconds('1m', currentBpm),
+            freq: freqs.bass[Math.floor(Math.random() * 3)], // low notes
+            dur: durationToSeconds('1m', currentBpm),
+            vel: 0.4
         });
     }
 
-    const sixteenthNoteDuration = durationToSeconds('16n', currentBpm);
+    // Accompaniment: simple chords
+    for (let i = 0; i < 2; i++) {
+        const rootIdx = Math.floor(Math.random() * 4);
+        const chord = [freqs.accompaniment[rootIdx], freqs.accompaniment[rootIdx + 2], freqs.accompaniment[rootIdx + 4]];
+        pattern.accompaniment.push({
+            time: i * durationToSeconds('2m', currentBpm),
+            freq: chord,
+            dur: durationToSeconds('2m', currentBpm),
+            vel: 0.3
+        });
+    }
 
-    combinedPattern.forEach(noteData => {
-        const [timeQuant, noteIndex, durationStr = '8n', velocity = 0.5] = noteData;
-        const startTime = timeQuant * sixteenthNoteDuration;
-        const durationSeconds = durationToSeconds(durationStr, currentBpm);
-        
-        const isBassNote = noteIndex < 0;
-        const freqsList = isBassNote ? freqs.bass : freqs.melody;
-        const finalIndex = isBassNote ? Math.abs(noteIndex) - 101 : noteIndex;
-        
-        if (finalIndex >= 0 && finalIndex < freqsList.length) {
-            const event: NoteEventFromWorker = {
-                time: startTime,
-                freq: freqsList[finalIndex],
-                dur: durationSeconds,
-                vel: velocity,
-                isBass: isBassNote,
-            };
-            if (isBassNote) {
-                bassEvents.push(event);
-            } else {
-                melodyEvents.push(event);
-            }
+    // Melody: a few random notes
+    for (let i = 0; i < 8; i++) {
+        if (Math.random() > 0.5) {
+            pattern.melody.push({
+                time: i * durationToSeconds('8n', currentBpm) * 2,
+                freq: freqs.melody[Math.floor(Math.random() * freqs.melody.length)],
+                dur: durationToSeconds('8n', currentBpm),
+                vel: 0.6
+            });
         }
-    });
+    }
     
-    postMessage({ type: 'patternGenerated', melodyEvents, bassEvents });
+    // Effects: random noise burst
+    if (Math.random() > 0.7) {
+        pattern.effects.push({
+            time: Math.random() * durationToSeconds('4m', currentBpm),
+            freq: 0, // freq doesn't matter for noise synth
+            dur: durationToSeconds('16n', currentBpm),
+            vel: 1.0
+        });
+    }
+
+
+    postMessage({ type: 'patternGenerated', pattern });
 }
 
 self.onmessage = function (event: MessageEvent<WorkerEvent>) {
@@ -185,124 +173,11 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             updateFrequencies();
             break;
         case 'setStyle':
+            // TODO: Implement style variations in generatePattern
             currentStyle = event.data.style;
             break;
         case 'setTempo':
             currentBpm = event.data.bpm;
             break;
     }
-};
-
-const BASS_NOTE = (index: number) => -101 - index;
-
-const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } = {
-    Ambient: {
-        groove: [
-            [[0, 8, '2m', 0.5], [16, 5, '2m', 0.6], [32, BASS_NOTE(1), '2m', 0.4]],
-            [[0, 5, '2m', 0.5], [16, 1, '2m', 0.6], [32, BASS_NOTE(4), '2m', 0.4]],
-        ],
-        fills: [
-            [[48, 10, '1m', 0.7], [56, 3, '1m', 0.5]],
-        ]
-    },
-    House: {
-        groove: [ 
-            [
-             [0, 0, '8n'], [2, 4, '8n'], [4, 7, '8n'], [6, 4, '8n'],
-             [8, 9, '8n'], [10, 11, '8n'], [12, 9, '8n'], [14, 7, '8n'],
-             [0, BASS_NOTE(0), '4n'], [4, BASS_NOTE(4), '4n'], [8, BASS_NOTE(7), '4n'], [12, BASS_NOTE(0), '4n'],
-            ],
-        ],
-        fills: [
-            [[48, 7, '8n'], [50, 9, '8n'], [52, 11, '4n'], [56, 9, '8n']],
-        ],
-    },
-    Wind: {
-        groove: [
-            [[0, 10, '2n', 0.6], [4, 14, '2n', 0.7], [8, 12, '2n', 0.5]],
-        ],
-        fills: [
-            [[48, 15, '8n'], [52, 14, '8n'], [56, 12, '4n'], [60, 10, '4n']],
-        ],
-    },
-    Sequence: { 
-        groove: [
-            [
-             [0, BASS_NOTE(0), '1m'],
-             [0, 0, '16n'], [1, 4, '16n'], [2, 7, '16n'], [3, 12, '16n'], [4, 7, '16n'], [5, 4, '16n'], [6, 0, '16n'], [7, 4, '16n'],
-             [8, 0, '16n'], [9, 4, '16n'], [10, 7, '16n'], [11, 12, '16n'], [12, 7, '16n'], [13, 4, '16n'], [14, 0, '16n'], [15, 4, '16n'],
-            ],
-            [
-             [0, BASS_NOTE(2), '1m'],
-             [0, 2, '16n'], [1, 5, '16n'], [2, 9, '16n'], [3, 14, '16n'], [4, 9, '16n'], [5, 5, '16n'], [6, 2, '16n'], [7, 5, '16n'],
-             [8, 2, '16n'], [9, 5, '16n'], [10, 9, '16n'], [11, 14, '16n'], [12, 9, '16n'], [13, 5, '16n'], [14, 2, '16n'], [15, 5, '16n'],
-            ],
-        ],
-        fills: [
-            [
-                [48, 12, '16n'], [49, 9, '16n'], [50, 7, '16n'], [51, 4, '16n'], [52, 12, '16n'], [53, 9, '16n'], [54, 7, '16n'], [55, 4, '16n'],
-                [56, 14, '16n'], [57, 11, '16n'], [58, 9, '16n'], [59, 5, '16n'], [60, 14, '16n'], [61, 11, '16n'], [62, 9, '16n'], [63, 5, '16n']
-            ],
-        ],
-    },
-    Chimes: {
-        groove: [
-            [[0, 12, '1n', 0.8], [8, 16, '1n', 0.7], [16, 14, '1n', 0.8]],
-        ],
-        fills: [
-            [[32, 19, '1m', 0.8], [48, 17, '1m', 0.7]],
-        ]
-    },
-    Drone: {
-        groove: [
-            [[0, BASS_NOTE(0), '4m', 0.4]],
-            [[0, BASS_NOTE(4), '4m', 0.35]],
-        ],
-        fills: [
-            [[32, 8, '2n', 0.2]]
-        ]
-    },
-    Toccata: { 
-        groove: [
-            [
-             [0, BASS_NOTE(0), '2n'], [8, BASS_NOTE(5), '2n'],
-             [0,0,'16n'], [1,4,'16n'], [2,7,'16n'], [3,11,'16n'], [4,12,'16n'], [5,11,'16n'], [6,7,'16n'], [7,4,'16n'],
-             [8,0,'16n'], [9,4,'16n'], [10,7,'16n'], [11,11,'16n'], [12,12,'16n'], [13,11,'16n'], [14,7,'16n'], [15,4,'16n']
-            ],
-        ],
-        fills: [
-             [
-              [48,12,'16n'], [49,9,'16n'], [50,7,'16n'], [51,5,'16n'], [52,12,'16n'], [53,9,'16n'], [54,7,'16n'], [55,5,'16n'],
-              [56,12,'16n'], [57,9,'16n'], [58,7,'16n'], [59,5,'16n'], [60,12,'16n'], [61,9,'16n'], [62,7,'16n'], [63,5,'16n']
-             ],
-        ],
-    },
-    Promenade: { 
-        groove: [
-            [
-                [0, 0, '4n'], [4, 2, '4n'], [8, 4, '4n'], [12, 0, '4n'],
-                [0, BASS_NOTE(0), '4n'], [4, BASS_NOTE(4), '4n'], [8, BASS_NOTE(7), '8n'], [10, BASS_NOTE(2), '4n'],
-            ],
-        ],
-        fills: [
-            [[48, 7, '4n'], [52, 5, '8n'], [56, 4, '2n']],
-        ]
-    },
-     Space: {
-        groove: [
-             [
-              [0, BASS_NOTE(0), '1m', 0.6], 
-              [0, 0, '8n'], [2, 4, '8n'], [4, 7, '8n'], [6, 4, '8n'],
-              [8, 0, '8n'], [10, 4, '8n'], [12, 7, '8n'], [14, 4, '8n'],
-             ],
-             [
-              [0, BASS_NOTE(4), '1m', 0.6], 
-              [0, 2, '8n'], [2, 5, '8n'], [4, 9, '8n'], [6, 5, '8n'],
-              [8, 2, '8n'], [10, 5, '8n'], [12, 9, '8n'], [14, 5, '8n'],
-            ],
-        ],
-        fills: [
-            [[48, 11, '2n', 0.8], [56, 16, '2n', 0.3]],
-        ],
-    },
 };

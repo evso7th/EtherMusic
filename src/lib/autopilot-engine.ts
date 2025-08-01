@@ -51,16 +51,19 @@ export class AutopilotEngine {
 
      private handleWorkerMessage(event: MessageEvent<WorkerResponse>) {
         if (event.data.type === 'patternGenerated') {
-            const { melodyEvents, bassEvents } = event.data;
-            const allEvents = [...melodyEvents, ...bassEvents];
+            const { melody, accompaniment, bass, effects } = event.data.pattern;
 
-            allEvents.forEach((note) => {
-                 this.audioEngine.playAutopilotNote(this.nextPatternTime + note.time, {
-                    type: note.isBass ? 'bass' : 'melody',
-                    freq: note.freq,
-                    dur: note.dur,
-                    vel: note.vel,
-                });
+            melody.forEach(note => {
+                this.audioEngine.playAutopilotEvent(this.nextPatternTime + note.time, { type: 'melody', ...note });
+            });
+            accompaniment.forEach(note => {
+                 this.audioEngine.playAutopilotEvent(this.nextPatternTime + note.time, { type: 'accompaniment', ...note });
+            });
+            bass.forEach(note => {
+                 this.audioEngine.playAutopilotEvent(this.nextPatternTime + note.time, { type: 'bass', ...note });
+            });
+            effects.forEach(note => {
+                 this.audioEngine.playAutopilotEvent(this.nextPatternTime + note.time, { type: 'effects', ...note });
             });
         }
     }
@@ -122,5 +125,7 @@ export class AutopilotEngine {
     public setMelodyInstrument(instrument: MelodyInstrument) {
         if (!this.isInitialized) return;
         this.currentMelodyInstrument = instrument;
+        // NOTE: We are not passing instrument info to the worker. 
+        // The AudioEngine handles applying the correct instrument sound.
     }
 }

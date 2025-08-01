@@ -14,6 +14,8 @@ type ActiveNote = {
     y: number;
 };
 
+export type AutopilotInstrument = 'melody' | 'bass' | 'accompaniment' | 'effects';
+
 
 export class AudioEngine {
     public isInitialized = false;
@@ -25,13 +27,28 @@ export class AudioEngine {
     public drumMachine!: DrumMachine;
 
     // --- Tone.js Objects ---
-    public channels!: { melody: Tone.Channel, bass: Tone.Channel, latch: Tone.Channel, drums: Tone.Channel, autopilot: Tone.Channel };
+    public channels!: { 
+        melody: Tone.Channel, 
+        bass: Tone.Channel, 
+        latch: Tone.Channel, 
+        drums: Tone.Channel, 
+        accompaniment: Tone.Channel,
+        effects: Tone.Channel,
+    };
     public fx!: { reverb: Tone.Reverb, delay: Tone.FeedbackDelay };
+
+    // Synth pools for manual playing
     private melodySynths: Tone.Synth[] = [];
     private bassSynths: Tone.Synth[] = [];
     private latchSynths: Tone.Synth[] = [];
-    private autopilotMelodySynths: Tone.Synth[] = [];
-    private autopilotBassSynths: Tone.Synth[] = [];
+    
+    // Dedicated synths for autopilot
+    private autopilotSynths!: {
+        melody: Tone.Synth,
+        bass: Tone.Synth,
+        accompaniment: Tone.PolySynth,
+        effects: Tone.NoiseSynth,
+    };
     
     private recorder!: Tone.Recorder;
     
@@ -72,7 +89,8 @@ export class AudioEngine {
             bass: new Tone.Channel(-9),
             latch: new Tone.Channel(-9),
             drums: new Tone.Channel(-9),
-            autopilot: new Tone.Channel(-9),
+            accompaniment: new Tone.Channel(-12),
+            effects: new Tone.Channel(-9),
         };
         
         // Connect channels to FX and destination
@@ -82,8 +100,9 @@ export class AudioEngine {
             channel.toDestination();
         }
         
-        // Synth Pools
+        // Synth Pools & Dedicated Synths
         this.createSynthPools();
+        this.createAutopilotSynths();
         
         // --- Latch Engine ---
         this.latchEngine = new LatchEngine(this.latchSynths, this.orbManager, []);
@@ -127,6 +146,7 @@ export class AudioEngine {
         
         this.latchEngine.stopAll();
         this.drumMachine.stop();
+        this.autopilotSynths.accompaniment.releaseAll();
     }
     
     public toggleRecording(): boolean {
@@ -159,8 +179,9 @@ export class AudioEngine {
         this.channels.melody.volume.value = volumes.melody;
         this.channels.bass.volume.value = volumes.bass;
         this.channels.latch.volume.value = volumes.latch;
-        this.channels.autopilot.volume.value = volumes.autopilot;
         this.drumMachine.setVolume(volumes.drums);
+        this.channels.accompaniment.volume.value = volumes.accompaniment;
+        this.channels.effects.volume.value = volumes.effects;
     }
 
     public setEffects(effects: Record<string, { reverb: number, delay: number }>) {
@@ -171,9 +192,11 @@ export class AudioEngine {
         this.channels.bass.send('delay', effects.bass.delay);
         this.channels.latch.send('reverb', effects.latch.reverb);
         this.channels.latch.send('delay', effects.latch.delay);
-        this.channels.autopilot.send('reverb', effects.autopilot.reverb);
-        this.channels.autopilot.send('delay', effects.autopilot.delay);
         this.drumMachine.setEffects(effects.drums);
+        this.channels.accompaniment.send('reverb', effects.accompaniment.reverb);
+        this.channels.accompaniment.send('delay', effects.accompaniment.delay);
+        this.channels.effects.send('reverb', effects.effects.reverb);
+        this.channels.effects.send('delay', effects.effects.delay);
     }
     
     public setBeatPattern(patternName: string) {
@@ -213,7 +236,7 @@ export class AudioEngine {
         }
         // Apply to both manual and autopilot melody synths
         this.melodySynths.forEach(synth => synth.set(newOptions));
-        this.autopilotMelodySynths.forEach(synth => synth.set(newOptions));
+        this.autopilotSynths.melody.set(newOptions);
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
@@ -284,44 +307,33 @@ export class AudioEngine {
         }
     }
     
-    public playAutopilotNote(time: number, note: {type: 'melody' | 'bass', freq: number, dur: number, vel: number}) {
+    public playAutopilotEvent(time: number, note: {type: AutopilotInstrument, freq: number | number[], dur: number, vel: number}) {
         if (!this.isInitialized) return;
         
-        const synthPool = note.type === 'melody' ? this.autopilotMelodySynths : this.autopilotBassSynths;
-        const availableSynth = synthPool.find(s => s.state !== 'started');
+        const synth = this.autopilotSynths[note.type];
+        if (!synth) return;
 
-        if (availableSynth) {
-             availableSynth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
+        if (note.type === 'effects' && synth instanceof Tone.NoiseSynth) {
+            synth.triggerAttackRelease(note.dur, time);
+        } else if (synth instanceof Tone.Synth || synth instanceof Tone.PolySynth) {
+            synth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
         }
     }
-
 
     // --- PRIVATE METHODS ---
     
     private createSynthPools() {
-        const melodySynthOptions = { 
-            portamento: 0.02,
-        };
-        // Manual melody synths
+        const melodySynthOptions = { portamento: 0.02, };
         for (let i = 0; i < 4; i++) {
             this.melodySynths.push(new Tone.Synth(melodySynthOptions).connect(this.channels.melody));
-        }
-        // Autopilot melody synths
-        for (let i = 0; i < 4; i++) {
-            this.autopilotMelodySynths.push(new Tone.Synth(melodySynthOptions).connect(this.channels.autopilot));
         }
         
         const bassSynthOptions = {
             oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
         } as const;
-        // Manual bass synths
         for (let i = 0; i < 2; i++) {
             this.bassSynths.push(new Tone.Synth(bassSynthOptions).connect(this.channels.bass));
-        }
-        // Autopilot bass synths
-        for (let i = 0; i < 2; i++) {
-            this.autopilotBassSynths.push(new Tone.Synth(bassSynthOptions).connect(this.channels.autopilot));
         }
 
         const latchSynthOptions = {
@@ -331,6 +343,35 @@ export class AudioEngine {
         for (let i = 0; i < 2; i++) {
             this.latchSynths.push(new Tone.Synth(latchSynthOptions).connect(this.channels.latch));
         }
+    }
+
+    private createAutopilotSynths() {
+        this.autopilotSynths = {
+            melody: new Tone.Synth({
+                oscillator: { type: 'fatsine4', spread: 40, count: 4 },
+                envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 },
+            }).connect(this.channels.accompaniment),
+            
+            accompaniment: new Tone.PolySynth(Tone.Synth, {
+                 oscillator: { type: 'amtriangle', harmonicity: 1.5 },
+                 envelope: { attack: 0.1, decay: 0.8, sustain: 0.2, release: 0.8 },
+            }).connect(this.channels.accompaniment),
+            
+            bass: new Tone.Synth({
+                oscillator: { type: 'fmsine', modulationType: 'triangle', harmonicity: 0.5 },
+                envelope: { attack: 0.05, decay: 0.3, sustain: 0.4, release: 1 },
+                filter: { Q: 2, type: 'lowpass', rolloff: -24 },
+                filterEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.5, baseFrequency: 'C1', octaves: 2 },
+            }).connect(this.channels.accompaniment),
+
+            effects: new Tone.NoiseSynth({
+                noise: { type: 'pink' },
+                envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.2 },
+            }).connect(this.channels.effects),
+        };
+        // The autopilot melody, accompaniment and bass all go to the same channel for now
+        // to simplify mixer controls.
+        this.autopilotSynths.accompaniment.volume.value = -6; // PolySynths can be loud
     }
 
     private getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]): number[] => {

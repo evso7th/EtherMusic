@@ -1,9 +1,10 @@
 
+
 "use client";
 
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
-import { Music, Waves, Drum, Bot, Anchor } from 'lucide-react';
+import { Music, Waves, Drum, Bot, Anchor, Sparkles, Combine } from 'lucide-react';
 import { Separator } from './ui/separator';
 
 interface MixerControlsProps {
@@ -11,16 +12,18 @@ interface MixerControlsProps {
         melody: number;
         bass: number;
         drums: number;
-        autopilot: number;
         latch: number;
+        accompaniment: number;
+        effects: number;
     };
     onVolumeChange: (volumes: MixerControlsProps['volumes']) => void;
     effects: {
         melody: { reverb: number, delay: number };
         bass: { reverb: number, delay: number };
         drums: { reverb: number, delay: number };
-        autopilot: { reverb: number, delay: number };
         latch: { reverb: number, delay: number };
+        accompaniment: { reverb: number, delay: number };
+        effects: { reverb: number, delay: number };
     };
     onEffectChange: (effects: MixerControlsProps['effects']) => void;
 }
@@ -103,7 +106,7 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
         });
     };
 
-    const handleEffectChange = (instrument: 'melody' | 'bass' | 'drums' | 'autopilot' | 'latch', effect: 'reverb' | 'delay', value: number) => {
+    const handleEffectChange = (instrument: 'melody' | 'bass' | 'drums' | 'latch' | 'accompaniment' | 'effects', effect: 'reverb' | 'delay', value: number) => {
         onEffectChange({
             ...effects,
             [instrument]: {
@@ -159,16 +162,28 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
                 onReverbChange={(v) => handleEffectChange('drums', 'reverb', v)}
                 onDelayChange={(v) => handleEffectChange('drums', 'delay', v)}
             />
+            <Separator />
+            <div className="text-xs text-center text-muted-foreground pt-2">Autopilot</div>
+            <InstrumentControls 
+                label="Accomp"
+                icon={Combine}
+                volume={volumes.accompaniment}
+                reverb={effects.accompaniment.reverb}
+                delay={effects.accompaniment.delay}
+                onVolumeChange={(v) => handleVolumeChange('accompaniment', v)}
+                onReverbChange={(v) => handleEffectChange('accompaniment', 'reverb', v)}
+                onDelayChange={(v) => handleEffectChange('accompaniment', 'delay', v)}
+            />
              <Separator />
             <InstrumentControls 
-                label="Autopilot"
-                icon={Bot}
-                volume={volumes.autopilot}
-                reverb={effects.autopilot.reverb}
-                delay={effects.autopilot.delay}
-                onVolumeChange={(v) => handleVolumeChange('autopilot', v)}
-                onReverbChange={(v) => handleEffectChange('autopilot', 'reverb', v)}
-                onDelayChange={(v) => handleEffectChange('autopilot', 'delay', v)}
+                label="Effects"
+                icon={Sparkles}
+                volume={volumes.effects}
+                reverb={effects.effects.reverb}
+                delay={effects.effects.delay}
+                onVolumeChange={(v) => handleVolumeChange('effects', v)}
+                onReverbChange={(v) => handleEffectChange('effects', 'reverb', v)}
+                onDelayChange={(v) => handleEffectChange('effects', 'delay', v)}
             />
         </div>
     );
