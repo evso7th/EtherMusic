@@ -11,6 +11,10 @@ type NoteEvent = {
     vel: number;
 };
 
+export type NoteEventWithType = NoteEvent & {
+    type: 'melody' | 'accompaniment' | 'bass';
+}
+
 type AutopilotPattern = {
     melody: NoteEvent[];
     accompaniment: NoteEvent[];
@@ -172,7 +176,7 @@ function generatePattern() {
         // --- MELODY ---
         for (let i = 0; i < 16; i++) { // 16th note resolution for the whole pattern
             const currentGlobalTime = (measure * 16 + i) * sixteenthNoteDuration;
-            if (Math.random() > 0.85) { // Sparser melody
+            if (Math.random() > 0.9) { // Sparser melody
                 const melodyFreq = scaleFrequencies.melody[Math.floor(Math.random() * scaleFrequencies.melody.length)];
                 let time = currentGlobalTime;
                 if (Math.random() < 0.5) { // Syncopation
