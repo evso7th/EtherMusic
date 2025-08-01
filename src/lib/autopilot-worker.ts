@@ -142,6 +142,17 @@ function getFrequencyForPart(part: keyof typeof scaleFrequencies): number | null
     return availableFrequencies[Math.floor(Math.random() * availableFrequencies.length)];
 }
 
+function getChordTones(rootDegree: number, part: keyof typeof scaleFrequencies): number[] {
+    const octaveSet = (Math.random() < 0.15 && scaleFrequencies[part].rare.length > 0)
+        ? scaleFrequencies[part].rare
+        : scaleFrequencies[part].primary;
+    
+    const chordToneDegrees = [rootDegree, rootDegree + 2, rootDegree + 4];
+    return chordToneDegrees
+        .map(degree => octaveSet[degree % scaleIntervals.length])
+        .filter(Boolean); // Filter out undefined if degree is out of bounds
+}
+
 
 // --- PATTERN GENERATION ---
 
@@ -158,48 +169,57 @@ function generatePattern() {
     const pattern: AutopilotPattern = { melody: [], accompaniment: [], bass: [] };
     const measureDuration = durationToSeconds('1m', currentBpm);
     const sixteenthNoteDuration = durationToSeconds('16n', currentBpm);
+    const eighthNoteDuration = durationToSeconds('8n', currentBpm);
     
     const progression = generateChordProgression();
 
     for (let measure = 0; measure < 4; measure++) {
+        const measureStartTime = measure * measureDuration;
         const chordRootDegree = progression[measure];
         
-        // --- BASS ---
-        const bassFreq = getFrequencyForPart('bass');
-        if (bassFreq) {
-            let time = measure * measureDuration;
-            if (Math.random() < 0.3) { // Syncopation
-                time += (Math.random() < 0.5 ? 1 : -1) * sixteenthNoteDuration;
-            }
-            pattern.bass.push({
-                time,
-                freq: bassFreq,
-                dur: measureDuration * (Math.random() * 0.5 + 0.5),
-                vel: 0.5
+        // --- BASS (Arpeggios & Pulsations) ---
+        const bassChordTones = getChordTones(chordRootDegree, 'bass');
+        if (bassChordTones.length > 0) {
+             const bassRhythms = [
+                [0, 2, 4, 6], // steady eighths
+                [0, 3, 4, 7], // dotted
+                [0, 4],       // half notes
+                [0, 2, 4, 5, 6, 7] // syncopated
+            ];
+            const bassRhythm = bassRhythms[Math.floor(Math.random() * bassRhythms.length)];
+            const bassArp = [0, 1, 2, 1]; // Root, Third, Fifth, Third
+
+            bassRhythm.forEach(beat => {
+                const arpIndex = bassArp[Math.floor(Math.random() * bassArp.length)];
+                const freq = bassChordTones[arpIndex % bassChordTones.length];
+                if (freq) {
+                    let time = measureStartTime + beat * eighthNoteDuration;
+                     if (Math.random() < 0.3) { // Syncopation
+                        time += (Math.random() < 0.5 ? 1 : -1) * sixteenthNoteDuration * 0.5;
+                    }
+                    pattern.bass.push({
+                        time: time,
+                        freq: freq,
+                        dur: eighthNoteDuration,
+                        vel: 0.6
+                    });
+                }
             });
         }
         
         // --- ACCOMPANIMENT (ARPEGGIO) ---
-        const useRareAccompaniment = Math.random() < 0.1;
-        const accompanimentOctaveSet = useRareAccompaniment 
-            ? scaleFrequencies.accompaniment.rare 
-            : scaleFrequencies.accompaniment.primary;
+        const accompanimentChordTones = getChordTones(chordRootDegree, 'accompaniment');
 
-        const chordToneDegrees = [chordRootDegree, chordRootDegree + 2, chordRootDegree + 4];
-        const chordFreqs = chordToneDegrees
-            .map(degree => accompanimentOctaveSet[degree % scaleIntervals.length])
-            .filter(Boolean); // Filter out undefined if degree is out of bounds
-
-        if (chordFreqs.length > 0) {
+        if (accompanimentChordTones.length > 0) {
             const arpPatterns = [ [0, 1, 2, 1], [0, 2, 1, 0], [0, 1, 0, 2] ];
             const arpPattern = arpPatterns[Math.floor(Math.random() * arpPatterns.length)];
             
             for (let i = 0; i < 4; i++) { // Quarter notes
                 const noteIndexInChord = arpPattern[i % arpPattern.length];
-                if (noteIndexInChord < chordFreqs.length) {
+                if (noteIndexInChord < accompanimentChordTones.length) {
                     pattern.accompaniment.push({
-                        time: measure * measureDuration + i * durationToSeconds('4n', currentBpm),
-                        freq: chordFreqs[noteIndexInChord],
+                        time: measureStartTime + i * durationToSeconds('4n', currentBpm),
+                        freq: accompanimentChordTones[noteIndexInChord],
                         dur: durationToSeconds('4n', currentBpm),
                         vel: 0.3
                     });
@@ -209,7 +229,7 @@ function generatePattern() {
         
         // --- MELODY ---
         for (let i = 0; i < 16; i++) { // 16th note resolution for the whole pattern
-            const currentGlobalTime = (measure * 16 + i) * sixteenthNoteDuration;
+            const currentGlobalTime = measureStartTime + i * sixteenthNoteDuration;
             if (Math.random() > 0.9) { // Sparser melody
                 const melodyFreq = getFrequencyForPart('melody');
                 if (melodyFreq) {
@@ -220,7 +240,7 @@ function generatePattern() {
                     pattern.melody.push({
                         time,
                         freq: melodyFreq,
-                        dur: durationToSeconds('8n', currentBpm) * (Math.random() * 1.5 + 0.5),
+                        dur: eighthNoteDuration * (Math.random() * 1.5 + 0.5),
                         vel: 0.6
                     });
                 }
@@ -252,5 +272,3 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             break;
     }
 };
-
-    

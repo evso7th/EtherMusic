@@ -84,8 +84,8 @@ export class AudioEngine {
         // Master Channels
         this.channels = {
             melody: new Tone.Channel(-6),
-            manualBass: new Tone.Channel(-9),
-            latch: new Tone.Channel(-9),
+            manualBass: new Tone.Channel(-6),
+            latch: new Tone.Channel(-6),
             drums: new Tone.Channel(-9),
             autopilotBass: new Tone.Channel(-12),
             accompaniment: new Tone.Channel(-12),
@@ -185,7 +185,6 @@ export class AudioEngine {
         this.channels.manualBass.volume.value = volumes.manualBass;
         this.channels.latch.volume.value = volumes.latch;
         this.drumMachine.setVolume(volumes.drums);
-        // Both autopilot channels are controlled by a single slider
         this.channels.autopilotBass.volume.value = volumes.autopilot;
         this.channels.accompaniment.volume.value = volumes.autopilot;
     }
@@ -200,7 +199,6 @@ export class AudioEngine {
         this.channels.latch.send('delay', effects.latch.delay);
         this.drumMachine.setEffects(effects.drums);
         
-        // Apply single autopilot effect setting to both autopilot channels
         this.channels.autopilotBass.send('reverb', effects.autopilot.reverb);
         this.channels.autopilotBass.send('delay', effects.autopilot.delay);
         this.channels.accompaniment.send('reverb', effects.autopilot.reverb);
@@ -410,12 +408,12 @@ export class AudioEngine {
             this.autopilotAccompanimentSynths.push(new Tone.Synth(accompanimentOptions).connect(this.channels.accompaniment));
         }
 
-        // Bass Synths (2 voices)
+        // Bass Synths (2 voices) - Plucked sound
         const bassOptions = {
-            oscillator: { type: 'fmsine', modulationType: 'triangle', harmonicity: 0.5 },
-            envelope: { attack: 0.05, decay: 0.3, sustain: 0.4, release: 1 },
-            filter: { Q: 2, type: 'lowpass', rolloff: -24 },
-            filterEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.5, baseFrequency: 'C1', octaves: 2 },
+            oscillator: { type: 'fatsawtooth', count: 2, spread: 30 },
+            envelope: { attack: 0.01, decay: 0.3, sustain: 0.1, release: 0.6 },
+            filter: { Q: 4, type: 'lowpass', rolloff: -24 },
+            filterEnvelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1, baseFrequency: 'C1', octaves: 4 },
         };
         for (let i = 0; i < 2; i++) {
             this.autopilotBassSynths.push(new Tone.Synth(bassOptions).connect(this.channels.autopilotBass));
