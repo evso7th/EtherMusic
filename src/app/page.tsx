@@ -82,7 +82,7 @@ export default function Home() {
         autopilot: { reverb: -60, delay: -60 },
     });
     const [activePattern, setActivePattern] = useState<(typeof beatPatterns)[number]>(beatPatterns.find(p => p.name === 'Off')!);
-    const [melodyInstrument, setMelodyInstrument] = useState<MelodyInstrument>('synth');
+    const [melodyInstrument, setMelodyInstrument] = useState<MelodyInstrument>('theremin');
     const [musicKey, setMusicKey] = useState<MusicKey>('C');
     const [musicScale, setMusicScale] = useState<MusicScale>('Major Pentatonic');
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);

@@ -393,8 +393,8 @@ export class AudioEngine {
 
         // Melody Synths (4 voices)
         const melodyOptions = {
-            oscillator: { type: 'fatsine4', spread: 40, count: 4 },
-            envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 },
+            oscillator: { type: 'sine' },
+            envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 },
         };
         for (let i = 0; i < 4; i++) {
             this.autopilotMelodySynths.push(new Tone.Synth(melodyOptions).connect(this.channels.melody));

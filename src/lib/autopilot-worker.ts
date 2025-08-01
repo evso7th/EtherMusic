@@ -146,7 +146,7 @@ function generatePattern() {
                 time,
                 freq: bassFreq,
                 dur: measureDuration * (Math.random() * 0.5 + 0.5),
-                vel: 0.4
+                vel: 0.5
             });
         }
         
@@ -186,7 +186,7 @@ function generatePattern() {
                     time,
                     freq: melodyFreq,
                     dur: durationToSeconds('8n', currentBpm) * (Math.random() * 1.5 + 0.5),
-                    vel: 0.4
+                    vel: 0.6
                 });
             }
         }
