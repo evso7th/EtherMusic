@@ -156,10 +156,9 @@ function generatePattern() {
         
         const isBassNote = noteIndex < 0;
         const freqsList = isBassNote ? freqs.bass : freqs.melody;
-        // For bass, index -1 becomes 0, -2 becomes 1 etc.
-        const finalIndex = isBassNote ? Math.abs(noteIndex) - 1 : noteIndex;
-
-        if (finalIndex < freqsList.length) {
+        const finalIndex = isBassNote ? Math.abs(noteIndex) - 101 : noteIndex;
+        
+        if (finalIndex >= 0 && finalIndex < freqsList.length) {
             const event: NoteEventFromWorker = {
                 time: startTime,
                 freq: freqsList[finalIndex],
@@ -200,11 +199,13 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
     }
 };
 
+const BASS_NOTE = (index: number) => -101 - index;
+
 const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } = {
     Ambient: {
         groove: [
-            [[-1, 1, '2m', 0.4], [0, 8, '2m', 0.5], [16, 5, '2m', 0.6]],
-            [[-1, 4, '2m', 0.4], [0, 5, '2m', 0.5], [16, 1, '2m', 0.6]],
+            [[BASS_NOTE(1), 1, '2m', 0.4], [0, 8, '2m', 0.5], [16, 5, '2m', 0.6]],
+            [[BASS_NOTE(4), 4, '2m', 0.4], [0, 5, '2m', 0.5], [16, 1, '2m', 0.6]],
         ],
         fills: [
             [[32, 10, '1m', 0.7], [48, 3, '1m', 0.5]],
@@ -212,7 +213,7 @@ const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } =
     },
     House: {
         groove: [ // Syncopated bass and melody
-            [[-1, 1, '8n'], [-4, 2, '4n'], [-7, 1, '8n'], [-10, 2, '4n'], [-15, 1, '8n'],
+            [[BASS_NOTE(1), 1, '8n'], [BASS_NOTE(4), 2, '4n'], [BASS_NOTE(7), 1, '8n'], [BASS_NOTE(10), 2, '4n'], [BASS_NOTE(15), 1, '8n'],
              [0, 0, '8n'], [3, 4, '8n'], [6, 7, '8n'], [8, 4, '8n'],
              [10, 9, '8n'], [12, 11, '8n'], [14, 9, '8n'], [15, 7, '8n']],
         ],
@@ -230,10 +231,10 @@ const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } =
     },
     Sequence: { // Arpeggiator
         groove: [
-            [[-1, 1, '1m'], [-17, 4, '1m'],
+            [[BASS_NOTE(0), 1, '1m'], [BASS_NOTE(17), 4, '1m'],
              [0, 0, '16n'], [1, 4, '16n'], [2, 7, '16n'], [3, 12, '16n'], [4, 7, '16n'], [5, 4, '16n'],
              [6, 0, '16n'], [7, 4, '16n'], [8, 7, '16n'], [9, 12, '16n'], [10, 7, '16n'], [11, 4, '16n']],
-            [[-1, 1, '1m'], [-17, 5, '1m'],
+            [[BASS_NOTE(0), 1, '1m'], [BASS_NOTE(17), 5, '1m'],
              [0, 2, '16n'], [1, 5, '16n'], [2, 9, '16n'], [3, 14, '16n'], [4, 9, '16n'], [5, 5, '16n'],
              [6, 2, '16n'], [7, 5, '16n'], [8, 9, '16n'], [9, 14, '16n'], [10, 9, '16n'], [11, 5, '16n']],
         ],
@@ -252,8 +253,8 @@ const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } =
     },
     Drone: {
         groove: [
-            [[-1, 1, '4m', 0.4]],
-            [[-1, 4, '4m', 0.35]],
+            [[BASS_NOTE(0), 1, '4m', 0.4]],
+            [[BASS_NOTE(4), 4, '4m', 0.35]],
         ],
         fills: [
             [[32, 8, '2n', 0.2]]
@@ -261,7 +262,7 @@ const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } =
     },
     Toccata: { // Fast arpeggios
         groove: [
-            [[-1, 1, '2n'], [-9, 5, '2n'],
+            [[BASS_NOTE(1), 1, '2n'], [BASS_NOTE(9), 5, '2n'],
              [0,0,'16n'], [1,4,'16n'], [2,7,'16n'], [3,11,'16n'], [4,12,'16n'], [5,11,'16n'], [6,7,'16n'], [7,4,'16n'],
              [8,0,'16n'], [9,4,'16n'], [10,7,'16n'], [11,11,'16n'], [12,12,'16n'], [13,11,'16n'], [14,7,'16n'], [15,4,'16n']
             ],
@@ -273,7 +274,7 @@ const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } =
     },
     Promenade: { // Syncopated
         groove: [
-            [[-1, 1, '4n'], [-5, 4, '4n'], [-8, 1, '8n'], [-10, 4, '4n'],
+            [[BASS_NOTE(1), 1, '4n'], [BASS_NOTE(5), 4, '4n'], [BASS_NOTE(8), 1, '8n'], [BASS_NOTE(10), 4, '4n'],
              [0, 0, '4n'], [4, 2, '4n'], [8, 4, '4n'], [12, 0, '4n']],
         ],
         fills: [
@@ -282,8 +283,8 @@ const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } =
     },
      Space: {
         groove: [
-             [[-1, 1, '1m', 0.6], [0, 0, '8n'], [2, 4, '8n'], [4, 7, '8n'], [6, 4, '8n'],
-              [16, 4, '1m', 0.6], [16, 2, '8n'], [18, 5, '8n'], [20, 9, '8n'], [22, 5, '8n']],
+             [[BASS_NOTE(1), 1, '1m', 0.6], [0, 0, '8n'], [2, 4, '8n'], [4, 7, '8n'], [6, 4, '8n'],
+              [BASS_NOTE(17), 4, '1m', 0.6], [16, 2, '8n'], [18, 5, '8n'], [20, 9, '8n'], [22, 5, '8n']],
         ],
         fills: [
             [[48, 11, '2n', 0.8], [56, 16, '2n', 0.3]],
