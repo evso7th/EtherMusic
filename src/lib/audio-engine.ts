@@ -408,12 +408,17 @@ export class AudioEngine {
             this.autopilotAccompanimentSynths.push(new Tone.Synth(accompanimentOptions).connect(this.channels.accompaniment));
         }
 
-        // Bass Synths (2 voices) - Plucked sound
+        // Bass Synths (2 voices) - "Kick Drum" like sound
         const bassOptions = {
-            oscillator: { type: 'fatsawtooth', count: 2, spread: 30 },
-            envelope: { attack: 0.01, decay: 0.3, sustain: 0.1, release: 0.6 },
-            filter: { Q: 4, type: 'lowpass', rolloff: -24 },
-            filterEnvelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1, baseFrequency: 'C1', octaves: 4 },
+            oscillator: { type: 'sine' },
+            envelope: {
+                attack: 0.001,
+                decay: 0.1,
+                sustain: 0.0,
+                release: 0.1
+            },
+            // This creates the percussive "thump"
+            pitchDecay: 0.05,
         };
         for (let i = 0; i < 2; i++) {
             this.autopilotBassSynths.push(new Tone.Synth(bassOptions).connect(this.channels.autopilotBass));

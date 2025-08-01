@@ -170,6 +170,7 @@ function generatePattern() {
     const measureDuration = durationToSeconds('1m', currentBpm);
     const sixteenthNoteDuration = durationToSeconds('16n', currentBpm);
     const eighthNoteDuration = durationToSeconds('8n', currentBpm);
+    const quarterNoteDuration = durationToSeconds('4n', currentBpm);
     
     const progression = generateChordProgression();
 
@@ -177,33 +178,32 @@ function generatePattern() {
         const measureStartTime = measure * measureDuration;
         const chordRootDegree = progression[measure];
         
-        // --- BASS (Arpeggios & Pulsations) ---
-        const bassChordTones = getChordTones(chordRootDegree, 'bass');
-        if (bassChordTones.length > 0) {
+        // --- BASS (Slow, Rhythmic Pulses) ---
+        const bassNoteFreq = getFrequencyForPart('bass');
+        if (bassNoteFreq) {
              const bassRhythms = [
-                [0, 2, 4, 6], // steady eighths
-                [0, 3, 4, 7], // dotted
-                [0, 4],       // half notes
-                [0, 2, 4, 5, 6, 7] // syncopated
+                // "tuuudu-- tuuudu--"
+                [{time: 0, dur: '2n'}, {time: 2 * quarterNoteDuration, dur: '2n'}],
+                // "tu-dum--- tu-dum---"
+                [{time: 0, dur: '4n'}, {time: 2 * quarterNoteDuration, dur: '4n'}],
+                // "tuuuu-duuum---"
+                [{time: 0, dur: '2n.'}], // Dotted half note
+                // "tu-dum tu-dum tu-dum tu-dum"
+                [{time: 0, dur: '4n'}, {time: 1 * quarterNoteDuration, dur: '4n'}, {time: 2 * quarterNoteDuration, dur: '4n'}, {time: 3 * quarterNoteDuration, dur: '4n'}],
             ];
             const bassRhythm = bassRhythms[Math.floor(Math.random() * bassRhythms.length)];
-            const bassArp = [0, 1, 2, 1]; // Root, Third, Fifth, Third
 
-            bassRhythm.forEach(beat => {
-                const arpIndex = bassArp[Math.floor(Math.random() * bassArp.length)];
-                const freq = bassChordTones[arpIndex % bassChordTones.length];
-                if (freq) {
-                    let time = measureStartTime + beat * eighthNoteDuration;
-                     if (Math.random() < 0.3) { // Syncopation
-                        time += (Math.random() < 0.5 ? 1 : -1) * sixteenthNoteDuration * 0.5;
-                    }
-                    pattern.bass.push({
-                        time: time,
-                        freq: freq,
-                        dur: eighthNoteDuration,
-                        vel: 0.6
-                    });
+            bassRhythm.forEach(note => {
+                let time = measureStartTime + note.time;
+                 if (Math.random() < 0.2) { // Less frequent syncopation
+                    time += (Math.random() < 0.5 ? 1 : -1) * sixteenthNoteDuration * 0.5;
                 }
+                pattern.bass.push({
+                    time: time,
+                    freq: bassNoteFreq, // Use the same root note for the whole measure
+                    dur: durationToSeconds(note.dur, currentBpm),
+                    vel: 0.8
+                });
             });
         }
         
