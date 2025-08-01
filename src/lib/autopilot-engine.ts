@@ -68,18 +68,12 @@ export class AutopilotEngine {
     private startLoop() {
         this.stopCurrentLoop();
     
-        // Function to be scheduled
         const generateAndScheduleNext = (time: number) => {
-            // Set the time for the upcoming pattern
             this.nextPatternTime = time;
-            // Request the pattern from the worker
             this.postMessage({ type: 'generate' });
-    
-            // Schedule the next call
             this.scheduleId = Tone.Transport.scheduleOnce(generateAndScheduleNext, `+${this.patternDuration}`);
         }
     
-        // Start the first generation immediately, but scheduled on the transport
         const now = Tone.now();
         generateAndScheduleNext(now);
     }
@@ -117,10 +111,7 @@ export class AutopilotEngine {
         this.postMessage({ type: 'setStyle', style: this.currentStyle });
 
         if (isOn && !wasOn) {
-            // Ensure worker has all current settings before starting
-            this.postMessage({ type: 'setTempo', bpm: this.currentTempo });
-            this.postMessage({ type: 'setHarmony', key: this.currentKey, scale: this.currentScale });
-             if (Tone.Transport.state === 'started') {
+            if (Tone.Transport.state === 'started') {
                 this.startLoop();
             }
         } else if (!isOn && wasOn) {
@@ -131,7 +122,5 @@ export class AutopilotEngine {
     public setMelodyInstrument(instrument: MelodyInstrument) {
         if (!this.isInitialized) return;
         this.currentMelodyInstrument = instrument;
-        // We don't need to post this to the worker, as it only generates frequencies, not sounds.
-        // The AudioEngine handles the instrument sound.
     }
 }
