@@ -40,10 +40,16 @@ let currentScale: MusicScale = 'Major Pentatonic';
 let currentStyle: AutopilotStyle = 'Ambient';
 let currentBpm = 120;
 let scaleIntervals: number[] = [];
-let scaleFrequencies = {
-    bass: [] as number[],
-    accompaniment: [] as number[],
-    melody: [] as number[],
+
+type OctaveConfig = {
+    primary: number[];
+    rare: number[];
+};
+
+let scaleFrequencies: Record<'bass' | 'accompaniment' | 'melody', { primary: number[], rare: number[] }> = {
+    bass: { primary: [], rare: [] },
+    accompaniment: { primary: [], rare: [] },
+    melody: { primary: [], rare: [] },
 };
 
 // --- MUSIC THEORY HELPERS ---
@@ -71,7 +77,7 @@ function getNoteFrequency(key: MusicKey, octave: number, interval: number): numb
     return Math.pow(2, (midiNote - 69) / 12) * A4;
 }
 
-function getScaleFrequencies(key: MusicKey, scale: MusicScale, octaves: number[]): number[] {
+function getScaleFrequenciesForOctaves(key: MusicKey, scale: MusicScale, octaves: number[]): number[] {
     const intervals = scaleIntervalMap[scale];
     let allFrequencies: number[] = [];
     octaves.forEach(octave => {
@@ -84,11 +90,20 @@ function getScaleFrequencies(key: MusicKey, scale: MusicScale, octaves: number[]
 
 function updateMusicContext() {
     scaleIntervals = scaleIntervalMap[currentScale];
-    scaleFrequencies = {
-        bass: getScaleFrequencies(currentKey, currentScale, [1, 2]),
-        accompaniment: getScaleFrequencies(currentKey, currentScale, [2, 3, 4]),
-        melody: getScaleFrequencies(currentKey, currentScale, [3, 4, 5]),
+    
+    const octaveMap: Record<keyof typeof scaleFrequencies, OctaveConfig> = {
+        bass: { primary: [2, 3], rare: [1] },
+        accompaniment: { primary: [3], rare: [2, 4] },
+        melody: { primary: [3, 4], rare: [5] },
     };
+
+    for (const part in octaveMap) {
+        const key = part as keyof typeof scaleFrequencies;
+        scaleFrequencies[key] = {
+            primary: getScaleFrequenciesForOctaves(currentKey, currentScale, octaveMap[key].primary),
+            rare: getScaleFrequenciesForOctaves(currentKey, currentScale, octaveMap[key].rare),
+        };
+    }
 }
 
 function durationToSeconds(duration: string, bpm: number): number {
@@ -113,6 +128,21 @@ function durationToSeconds(duration: string, bpm: number): number {
     }
 }
 
+// Helper to get a frequency from the correct octave based on probability
+function getFrequencyForPart(part: keyof typeof scaleFrequencies): number | null {
+    const partFrequencies = scaleFrequencies[part];
+    const useRare = Math.random() < 0.15; // 15% chance to use a rare octave
+
+    const availableFrequencies = (useRare && partFrequencies.rare.length > 0) 
+        ? partFrequencies.rare 
+        : partFrequencies.primary;
+
+    if (availableFrequencies.length === 0) return null;
+    
+    return availableFrequencies[Math.floor(Math.random() * availableFrequencies.length)];
+}
+
+
 // --- PATTERN GENERATION ---
 
 function generateChordProgression(): number[] {
@@ -121,7 +151,7 @@ function generateChordProgression(): number[] {
 }
 
 function generatePattern() {
-    if (scaleFrequencies.bass.length === 0) {
+    if (scaleFrequencies.bass.primary.length === 0) {
         updateMusicContext();
     }
     
@@ -135,9 +165,8 @@ function generatePattern() {
         const chordRootDegree = progression[measure];
         
         // --- BASS ---
-        const bassNoteIndex = chordRootDegree;
-        if (bassNoteIndex < scaleFrequencies.bass.length) {
-            const bassFreq = scaleFrequencies.bass[bassNoteIndex];
+        const bassFreq = getFrequencyForPart('bass');
+        if (bassFreq) {
             let time = measure * measureDuration;
             if (Math.random() < 0.3) { // Syncopation
                 time += (Math.random() < 0.5 ? 1 : -1) * sixteenthNoteDuration;
@@ -151,9 +180,14 @@ function generatePattern() {
         }
         
         // --- ACCOMPANIMENT (ARPEGGIO) ---
+        const useRareAccompaniment = Math.random() < 0.1;
+        const accompanimentOctaveSet = useRareAccompaniment 
+            ? scaleFrequencies.accompaniment.rare 
+            : scaleFrequencies.accompaniment.primary;
+
         const chordToneDegrees = [chordRootDegree, chordRootDegree + 2, chordRootDegree + 4];
         const chordFreqs = chordToneDegrees
-            .map(degree => scaleFrequencies.accompaniment[degree % scaleIntervals.length])
+            .map(degree => accompanimentOctaveSet[degree % scaleIntervals.length])
             .filter(Boolean); // Filter out undefined if degree is out of bounds
 
         if (chordFreqs.length > 0) {
@@ -177,17 +211,19 @@ function generatePattern() {
         for (let i = 0; i < 16; i++) { // 16th note resolution for the whole pattern
             const currentGlobalTime = (measure * 16 + i) * sixteenthNoteDuration;
             if (Math.random() > 0.9) { // Sparser melody
-                const melodyFreq = scaleFrequencies.melody[Math.floor(Math.random() * scaleFrequencies.melody.length)];
-                let time = currentGlobalTime;
-                if (Math.random() < 0.5) { // Syncopation
-                    time += (Math.random() - 0.5) * sixteenthNoteDuration * 0.5;
+                const melodyFreq = getFrequencyForPart('melody');
+                if (melodyFreq) {
+                    let time = currentGlobalTime;
+                    if (Math.random() < 0.5) { // Syncopation
+                        time += (Math.random() - 0.5) * sixteenthNoteDuration * 0.5;
+                    }
+                    pattern.melody.push({
+                        time,
+                        freq: melodyFreq,
+                        dur: durationToSeconds('8n', currentBpm) * (Math.random() * 1.5 + 0.5),
+                        vel: 0.6
+                    });
                 }
-                pattern.melody.push({
-                    time,
-                    freq: melodyFreq,
-                    dur: durationToSeconds('8n', currentBpm) * (Math.random() * 1.5 + 0.5),
-                    vel: 0.6
-                });
             }
         }
     }
@@ -216,3 +252,5 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             break;
     }
 };
+
+    
