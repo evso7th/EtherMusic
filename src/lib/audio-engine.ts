@@ -308,7 +308,7 @@ export class AudioEngine {
     }
     
     public playAutopilotEvent(time: number, note: {type: AutopilotInstrument, freq: number | number[], dur: number, vel: number}) {
-        if (!this.isInitialized) return;
+        if (!this.isInitialized || !isFinite(time) || time < Tone.now()) return;
         
         const synth = this.autopilotSynths[note.type];
         if (!synth) return;

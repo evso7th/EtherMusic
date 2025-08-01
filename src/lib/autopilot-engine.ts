@@ -68,20 +68,19 @@ export class AutopilotEngine {
     }
     
     private startLoop() {
-        this.stopCurrentLoop(); // Ensure no previous loops are running
+        this.stopCurrentLoop();
     
         const generateAndScheduleNext = (time: number) => {
             // CRITICAL: Prevent scheduling in the past.
-            // If the scheduled time has already passed, use the current time instead.
             this.nextPatternTime = Math.max(time, Tone.now());
             
             this.postMessage({ type: 'generate' });
+            
             this.scheduleId = Tone.Transport.scheduleOnce(generateAndScheduleNext, `+${this.patternDuration}`);
         }
     
-        // Schedule the very first generation to happen at the start of the next measure.
-        const nextMeasureTime = Tone.Transport.nextSubdivision('1m');
-        this.scheduleId = Tone.Transport.scheduleOnce(generateAndScheduleNext, nextMeasureTime);
+        // Schedule the very first generation to happen almost immediately.
+        generateAndScheduleNext(Tone.now());
     }
     
     
