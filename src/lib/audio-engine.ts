@@ -140,7 +140,6 @@ export class AudioEngine {
         
         // This stops the clock and cancels all scheduled events immediately.
         Tone.Transport.stop();
-        Tone.Transport.cancel();
         
         // Immediately stop all manually played notes.
         this.activeNotes.forEach(note => note.synth.triggerRelease());
@@ -152,6 +151,9 @@ export class AudioEngine {
         this.latchEngine.stopAll();
         this.drumMachine.stop();
         this.stopAutopilotSynths();
+        
+        // CRITICAL: Cancel any events that might have been scheduled just before stopping
+        Tone.Transport.cancel();
     }
     
     public toggleRecording(): boolean {
@@ -313,8 +315,14 @@ export class AudioEngine {
     }
     
     public playAutopilotEvent(time: number, note: {type: AutopilotInstrument, freq: number | number[], dur: number, vel: number}) {
-        if (!this.isInitialized || !isFinite(time) || time < Tone.now()) return;
+        if (!this.isInitialized || !isFinite(time)) return;
         
+        // This is the fix: ensure we don't schedule events in the past.
+        const now = Tone.now();
+        if (time < now) {
+            time = now;
+        }
+
         const synth = this.autopilotSynths[note.type];
         if (!synth) return;
 
@@ -325,24 +333,20 @@ export class AudioEngine {
         }
     }
 
-    /**
-     * Immediately stops all sounds produced by the autopilot synthesizers.
-     * This is a "hard stop" that doesn't wait for envelope releases.
-     */
     public stopAutopilotSynths() {
         if (!this.isInitialized) return;
         
-        // A hard way to stop sound is to disconnect and reconnect the synth.
-        // This immediately cuts off any playing audio.
         for (const key in this.autopilotSynths) {
             const instrument = key as AutopilotInstrument;
             const synth = this.autopilotSynths[instrument];
-            const channel = this.channels[instrument] ?? this.channels.accompaniment;
+            const channel = this.channels[instrument] ?? this.channels.accompaniment; // Default to 'accompaniment' for melody
             
+            // For PolySynth, releaseAll is a good immediate way to stop notes
             if (synth instanceof Tone.PolySynth) {
                 synth.releaseAll();
             }
 
+            // Disconnecting is a "hard stop" that cuts off the sound immediately
             synth.disconnect();
             synth.connect(channel);
         }
@@ -378,7 +382,7 @@ export class AudioEngine {
             melody: new Tone.Synth({
                 oscillator: { type: 'fatsine4', spread: 40, count: 4 },
                 envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 },
-            }).connect(this.channels.accompaniment),
+            }).connect(this.channels.melody),
             
             accompaniment: new Tone.PolySynth(Tone.Synth, {
                  oscillator: { type: 'amtriangle', harmonicity: 1.5 },
