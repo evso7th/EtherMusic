@@ -4,7 +4,7 @@
 
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
-import { Music, Waves, Drum, Bot, Anchor, Sparkles, Combine } from 'lucide-react';
+import { Music, Waves, Drum, Bot, Anchor } from 'lucide-react';
 import { Separator } from './ui/separator';
 
 type Volumes = { 
@@ -170,20 +170,17 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
 
             <Separator />
             
-            <div>
-                 <div className="text-xs text-center text-muted-foreground mb-3">Autopilot</div>
-                 <div className="space-y-4">
-                     <InstrumentControls 
-                        label="Autopilot"
-                        icon={Bot}
-                        volume={volumes.autopilot}
-                        reverb={effects.autopilot.reverb}
-                        delay={effects.autopilot.delay}
-                        onVolumeChange={(v) => handleVolumeChange('autopilot', v)}
-                        onReverbChange={(v) => handleEffectChange('autopilot', 'reverb', v)}
-                        onDelayChange={(v) => handleEffectChange('autopilot', 'delay', v)}
-                    />
-                 </div>
+            <div className="space-y-4">
+                 <InstrumentControls 
+                    label="Autopilot"
+                    icon={Bot}
+                    volume={volumes.autopilot}
+                    reverb={effects.autopilot.reverb}
+                    delay={effects.autopilot.delay}
+                    onVolumeChange={(v) => handleVolumeChange('autopilot', v)}
+                    onReverbChange={(v) => handleEffectChange('autopilot', 'reverb', v)}
+                    onDelayChange={(v) => handleEffectChange('autopilot', 'delay', v)}
+                />
             </div>
         </div>
     );
