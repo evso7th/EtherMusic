@@ -125,6 +125,7 @@ export default function Home() {
             mainEngine.setHarmony(musicKey, musicScale);
             mainEngine.setBeatPattern(activePattern.name);
             
+            // CRITICAL: Sync autopilot engine state immediately after initialization
             apEngine.setTempo(activeTempo.bpm);
             apEngine.setHarmony(musicKey, musicScale);
             apEngine.setMelodyInstrument(melodyInstrument);

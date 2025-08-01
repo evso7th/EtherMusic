@@ -131,6 +131,7 @@ export class AutopilotEngine {
     public setMelodyInstrument(instrument: MelodyInstrument) {
         if (!this.isInitialized) return;
         this.currentMelodyInstrument = instrument;
-        this.audioEngine.setMelodyInstrument(instrument);
+        // We don't need to post this to the worker, as it only generates frequencies, not sounds.
+        // The AudioEngine handles the instrument sound.
     }
 }
