@@ -39,6 +39,22 @@ export type Tempo = {
     bpm: number;
 };
 
+type Volumes = { 
+    melody: number; 
+    manualBass: number;
+    latch: number; 
+    drums: number; 
+    autopilot: number;
+};
+
+type Effects = {
+    melody: { reverb: number, delay: number };
+    manualBass: { reverb: number, delay: number };
+    latch: { reverb: number, delay: number };
+    drums: { reverb: number, delay: number };
+    autopilot: { reverb: number, delay: number };
+};
+
 interface BeatBoxControlsProps {
     patterns: BeatPattern[];
     activePattern: BeatPattern;
@@ -46,17 +62,10 @@ interface BeatBoxControlsProps {
     tempos: Tempo[];
     activeTempo: Tempo;
     onTempoChange: (tempo: Tempo) => void;
-    volumes: { melody: number; bass: number; drums: number; latch: number; accompaniment: number; effects: number; };
-    onVolumeChange: (volumes: BeatBoxControlsProps['volumes']) => void;
-    effects: {
-        melody: { reverb: number, delay: number };
-        bass: { reverb: number, delay: number };
-        drums: { reverb: number, delay: number };
-        latch: { reverb: number, delay: number };
-        accompaniment: { reverb: number, delay: number };
-        effects: { reverb: number, delay: number };
-    };
-    onEffectChange: (effects: BeatBoxControlsProps['effects']) => void;
+    volumes: Volumes;
+    onVolumeChange: (volumes: Volumes) => void;
+    effects: Effects;
+    onEffectChange: (effects: Effects) => void;
     isAutopilotOn: boolean;
     onAutopilotToggle: (isOn: boolean) => void;
     autopilotStyles: AutopilotStyle[];

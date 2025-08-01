@@ -29,22 +29,23 @@ export class AudioEngine {
     // --- Tone.js Objects ---
     public channels!: { 
         melody: Tone.Channel, 
-        bass: Tone.Channel, 
+        manualBass: Tone.Channel,
         latch: Tone.Channel, 
         drums: Tone.Channel, 
+        autopilotBass: Tone.Channel,
         accompaniment: Tone.Channel,
     };
     public fx!: { reverb: Tone.Reverb, delay: Tone.FeedbackDelay };
 
     // Synth pools for manual playing
     private melodySynths: Tone.Synth[] = [];
-    private bassSynths: Tone.Synth[] = [];
+    private manualBassSynths: Tone.Synth[] = [];
     private latchSynths: Tone.Synth[] = [];
     
     // Dedicated synths for autopilot
-    private melodySynth!: Tone.PolySynth;
-    private accompanimentSynth!: Tone.PolySynth;
-    private bassSynth!: Tone.PolySynth;
+    private autopilotMelodySynth!: Tone.PolySynth;
+    private autopilotAccompanimentSynth!: Tone.PolySynth;
+    private autopilotBassSynth!: Tone.PolySynth;
     
     private recorder!: Tone.Recorder;
     
@@ -82,9 +83,10 @@ export class AudioEngine {
         // Master Channels
         this.channels = {
             melody: new Tone.Channel(-6),
-            bass: new Tone.Channel(-9),
+            manualBass: new Tone.Channel(-9),
             latch: new Tone.Channel(-9),
             drums: new Tone.Channel(-9),
+            autopilotBass: new Tone.Channel(-12),
             accompaniment: new Tone.Channel(-12),
         };
         
@@ -179,23 +181,28 @@ export class AudioEngine {
     public setVolumes(volumes: Record<string, number>) {
         if (!this.isInitialized || !this.channels) return;
         this.channels.melody.volume.value = volumes.melody;
-        this.channels.bass.volume.value = volumes.bass;
+        this.channels.manualBass.volume.value = volumes.manualBass;
         this.channels.latch.volume.value = volumes.latch;
         this.drumMachine.setVolume(volumes.drums);
-        this.channels.accompaniment.volume.value = volumes.accompaniment;
+        this.channels.autopilotBass.volume.value = volumes.autopilot;
+        this.channels.accompaniment.volume.value = volumes.autopilot;
     }
 
     public setEffects(effects: Record<string, { reverb: number, delay: number }>) {
         if (!this.isInitialized || !this.channels) return;
         this.channels.melody.send('reverb', effects.melody.reverb);
         this.channels.melody.send('delay', effects.melody.delay);
-        this.channels.bass.send('reverb', effects.bass.reverb);
-        this.channels.bass.send('delay', effects.bass.delay);
+        this.channels.manualBass.send('reverb', effects.manualBass.reverb);
+        this.channels.manualBass.send('delay', effects.manualBass.delay);
         this.channels.latch.send('reverb', effects.latch.reverb);
         this.channels.latch.send('delay', effects.latch.delay);
         this.drumMachine.setEffects(effects.drums);
-        this.channels.accompaniment.send('reverb', effects.accompaniment.reverb);
-        this.channels.accompaniment.send('delay', effects.accompaniment.delay);
+        
+        // Apply single autopilot effect setting to both autopilot channels
+        this.channels.autopilotBass.send('reverb', effects.autopilot.reverb);
+        this.channels.autopilotBass.send('delay', effects.autopilot.delay);
+        this.channels.accompaniment.send('reverb', effects.autopilot.reverb);
+        this.channels.accompaniment.send('delay', effects.autopilot.delay);
     }
     
     public setBeatPattern(patternName: string) {
@@ -235,7 +242,7 @@ export class AudioEngine {
         }
         // Apply to both manual and autopilot melody synths
         this.melodySynths.forEach(synth => synth.set(newOptions));
-        this.melodySynth.set(newOptions);
+        this.autopilotMelodySynth.set(newOptions);
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
@@ -265,7 +272,7 @@ export class AudioEngine {
             return;
         }
 
-        const synthPool = type === 'melody' ? this.melodySynths : this.bassSynths;
+        const synthPool = type === 'melody' ? this.melodySynths : this.manualBassSynths;
         const activeSynths = new Set(Array.from(this.activeNotes.values()).map(n => n.synth));
         const freeSynth = synthPool.find(s => !activeSynths.has(s));
 
@@ -317,13 +324,13 @@ export class AudioEngine {
         let synth: Tone.PolySynth | undefined;
         switch (note.type) {
             case 'melody':
-                synth = this.melodySynth;
+                synth = this.autopilotMelodySynth;
                 break;
             case 'accompaniment':
-                synth = this.accompanimentSynth;
+                synth = this.autopilotAccompanimentSynth;
                 break;
             case 'bass':
-                synth = this.bassSynth;
+                synth = this.autopilotBassSynth;
                 break;
         }
 
@@ -336,9 +343,9 @@ export class AudioEngine {
         if (!this.isInitialized) return;
         
         // Dispose of the old synths to kill sound immediately
-        this.melodySynth?.dispose();
-        this.accompanimentSynth?.dispose();
-        this.bassSynth?.dispose();
+        this.autopilotMelodySynth?.dispose();
+        this.autopilotAccompanimentSynth?.dispose();
+        this.autopilotBassSynth?.dispose();
         
         // Recreate them fresh for the next use
         this.createAutopilotSynths();
@@ -360,7 +367,7 @@ export class AudioEngine {
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
         } as const;
         for (let i = 0; i < 2; i++) {
-            this.bassSynths.push(new Tone.Synth(bassSynthOptions).connect(this.channels.bass));
+            this.manualBassSynths.push(new Tone.Synth(bassSynthOptions).connect(this.channels.manualBass));
         }
 
         const latchSynthOptions = {
@@ -373,23 +380,23 @@ export class AudioEngine {
     }
     
      private createAutopilotSynths() {
-        this.melodySynth = new Tone.PolySynth(Tone.Synth, {
+        this.autopilotMelodySynth = new Tone.PolySynth(Tone.Synth, {
             oscillator: { type: 'fatsine4', spread: 40, count: 4 },
             envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 },
         }).connect(this.channels.melody);
         
-        this.accompanimentSynth = new Tone.PolySynth(Tone.Synth, {
+        this.autopilotAccompanimentSynth = new Tone.PolySynth(Tone.Synth, {
             oscillator: { type: 'fatsine', count: 3, spread: 60 },
             envelope: { attack: 0.2, decay: 0.9, sustain: 0.4, release: 1.4 },
         }).connect(this.channels.accompaniment);
-        this.accompanimentSynth.volume.value = -6; // PolySynths can be loud
+        this.autopilotAccompanimentSynth.volume.value = -6; // PolySynths can be loud
 
-        this.bassSynth = new Tone.PolySynth(Tone.Synth, {
+        this.autopilotBassSynth = new Tone.PolySynth(Tone.Synth, {
             oscillator: { type: 'fmsine', modulationType: 'triangle', harmonicity: 0.5 },
             envelope: { attack: 0.05, decay: 0.3, sustain: 0.4, release: 1 },
             filter: { Q: 2, type: 'lowpass', rolloff: -24 },
             filterEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.5, baseFrequency: 'C1', octaves: 2 },
-        }).connect(this.channels.bass);
+        }).connect(this.channels.autopilotBass);
     }
 
     private getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]): number[] => {
