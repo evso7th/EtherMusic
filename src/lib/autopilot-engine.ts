@@ -30,9 +30,7 @@ export class AutopilotEngine {
     public async initialize(fxReverb: Tone.Reverb, fxDelay: Tone.FeedbackDelay) {
         if (this.isInitialized) return;
 
-        this.channel = new Tone.Channel(0).toDestination();
-        this.channel.connect(fxReverb);
-        this.channel.connect(fxDelay);
+        this.channel = this.audioEngine.channels.melody;
         
         if (typeof window !== 'undefined') {
             this.worker = new Worker(new URL('./autopilot-worker.ts', import.meta.url));
@@ -97,7 +95,8 @@ export class AutopilotEngine {
 
     public setVolume(volume: number) {
         if (!this.isInitialized) return;
-        this.channel.volume.value = volume;
+        this.audioEngine.channels.melody.volume.value = volume;
+        this.audioEngine.channels.bass.volume.value = volume;
     }
 
     public setEffects(effects: { reverb: number, delay: number }) {

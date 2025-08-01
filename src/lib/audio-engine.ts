@@ -25,7 +25,7 @@ export class AudioEngine {
     public drumMachine!: DrumMachine;
 
     // --- Tone.js Objects ---
-    private channels!: { melody: Tone.Channel, bass: Tone.Channel, latch: Tone.Channel, drums: Tone.Channel };
+    public channels!: { melody: Tone.Channel, bass: Tone.Channel, latch: Tone.Channel, drums: Tone.Channel };
     public fx!: { reverb: Tone.Reverb, delay: Tone.FeedbackDelay };
     private melodySynths: Tone.Synth[] = [];
     private bassSynths: Tone.Synth[] = [];
@@ -280,12 +280,13 @@ export class AudioEngine {
         }
     }
     
-     public playAutopilotNote(time: number, note: {type: 'melody' | 'bass', freq: number, dur: number, vel: number}) {
+    public playAutopilotNote(time: number, note: {type: 'melody' | 'bass', freq: number, dur: number, vel: number}) {
         const synthPool = note.type === 'melody' ? this.melodySynths : this.bassSynths;
         
-        // Find a synth that will be free at that time. This is a simplification.
-        // A more robust solution would involve a voice management system.
-        const availableSynth = synthPool.find(s => s.state === 'stopped'); // a bit of a race condition, but ok for now
+        // This is a simplified voice allocation. It finds a synth that is not currently playing.
+        // It doesn't account for notes that *will be* playing at `time`.
+        // For this application, this simplification is likely acceptable.
+        const availableSynth = synthPool.find(s => s.state === 'stopped');
 
         if (availableSynth) {
              availableSynth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
