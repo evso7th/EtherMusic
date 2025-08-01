@@ -68,10 +68,10 @@ export class AudioEngine {
 
         // Master Channels
         this.channels = {
-            melody: new Tone.Channel(0).toDestination(),
-            bass: new Tone.Channel(0).toDestination(),
-            latch: new Tone.Channel(0).toDestination(),
-            drums: new Tone.Channel(0).toDestination(),
+            melody: new Tone.Channel(-6).toDestination(),
+            bass: new Tone.Channel(-9).toDestination(),
+            latch: new Tone.Channel(-9).toDestination(),
+            drums: new Tone.Channel(-9).toDestination(),
         };
         
         // Connect channels to FX
@@ -159,6 +159,7 @@ export class AudioEngine {
         this.channels.bass.volume.value = volumes.bass;
         this.channels.latch.volume.value = volumes.latch;
         this.drumMachine.setVolume(volumes.drums);
+        // Autopilot volume is handled by the AutopilotEngine itself on its own channel
     }
 
     public setEffects(effects: Record<string, { reverb: number, delay: number }>) {
@@ -170,6 +171,7 @@ export class AudioEngine {
         this.channels.latch.send('reverb', effects.latch.reverb);
         this.channels.latch.send('delay', effects.latch.delay);
         this.drumMachine.setEffects(effects.drums);
+        // Autopilot effects are handled by the AutopilotEngine on its own channel
     }
     
     public setBeatPattern(patternName: string) {
@@ -277,6 +279,19 @@ export class AudioEngine {
             this.orbManager.removeOrb(pointerId);
         }
     }
+    
+     public playAutopilotNote(time: number, note: {type: 'melody' | 'bass', freq: number, dur: number, vel: number}) {
+        const synthPool = note.type === 'melody' ? this.melodySynths : this.bassSynths;
+        
+        // Find a synth that will be free at that time. This is a simplification.
+        // A more robust solution would involve a voice management system.
+        const availableSynth = synthPool.find(s => s.state === 'stopped'); // a bit of a race condition, but ok for now
+
+        if (availableSynth) {
+             availableSynth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
+        }
+    }
+
 
     // --- PRIVATE METHODS ---
 

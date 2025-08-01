@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
@@ -112,7 +113,7 @@ export default function Home() {
             await mainEngine.initialize();
             audioEngine.current = mainEngine;
             
-            const apEngine = new AutopilotEngine();
+            const apEngine = new AutopilotEngine(mainEngine);
             await apEngine.initialize(mainEngine.fx.reverb, mainEngine.fx.delay);
             autopilotEngine.current = apEngine;
             
@@ -170,7 +171,7 @@ export default function Home() {
 
     useEffect(() => {
         if (isReady) {
-            audioEngine.current?.setMelodyInstrument(melodyInstrument);
+            // No need to set melody instrument on audio engine, autopilot will do it
             autopilotEngine.current?.setMelodyInstrument(melodyInstrument);
         }
     }, [melodyInstrument, isReady]);
@@ -183,8 +184,8 @@ export default function Home() {
     useEffect(() => {
         if (isReady && !isPlaying) {
             handlePlayPause();
-            setIsPlaying(true);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isReady]);
 
     // --- UI Event Handlers ---

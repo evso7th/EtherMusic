@@ -1,14 +1,16 @@
 
+
 import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
 import * as Tone from 'tone';
 
 // --- TYPE DEFINITIONS ---
 
-type NoteEvent = {
+export type NoteEventFromWorker = {
     time: number; // in seconds, relative to the start of the pattern
     freq: number;
     dur: number; // in seconds
     vel: number;
+    isBass: boolean;
 };
 
 // Simplified note type for pattern definitions
@@ -32,7 +34,7 @@ export type WorkerEvent =
     | { type: 'setStyle', style: AutopilotStyle };
 
 export type WorkerResponse =
-    | { type: 'patternGenerated', melodyEvents: NoteEvent[], bassEvents: NoteEvent[] };
+    | { type: 'patternGenerated', melodyEvents: NoteEventFromWorker[], bassEvents: NoteEventFromWorker[] };
 
 
 // --- WORKER STATE ---
@@ -77,8 +79,8 @@ function generatePattern() {
         updateFrequencies();
     }
     
-    const melodyEvents: NoteEvent[] = [];
-    const bassEvents: NoteEvent[] = [];
+    const melodyEvents: NoteEventFromWorker[] = [];
+    const bassEvents: NoteEventFromWorker[] = [];
     const patternData = autopilotPatternsData[currentStyle];
     if (!patternData) {
         console.error(`No pattern data for style: ${currentStyle}`);
@@ -123,11 +125,12 @@ function generatePattern() {
         const finalIndex = isBassNote ? Math.abs(noteIndex) - 1 : noteIndex;
 
         if (finalIndex < freqsList.length) {
-            const event: NoteEvent = {
+            const event: NoteEventFromWorker = {
                 time: startTime,
                 freq: freqsList[finalIndex],
                 dur: durationSeconds,
                 vel: velocity,
+                isBass: isBassNote,
             };
             if (isBassNote) {
                 bassEvents.push(event);

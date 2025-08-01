@@ -1,32 +1,31 @@
 
+
 import * as Tone from 'tone';
 import type { MusicKey, MusicScale, AutopilotStyle, MelodyInstrument } from '@/app/page';
-import type { WorkerEvent, WorkerResponse } from './autopilot-worker';
+import type { WorkerEvent, WorkerResponse, NoteEventFromWorker } from './autopilot-worker';
+import type { AudioEngine } from './audio-engine';
 
-type NoteEvent = {
-    time: number;
-    freq: number;
-    dur: number;
-    vel: number;
-};
 
 export class AutopilotEngine {
     public isInitialized = false;
 
-    private melodySynths: Tone.Synth[] = [];
-    private bassSynths: Tone.Synth[] = [];
-    private melodyPart?: Tone.Part<NoteEvent>;
-    private bassPart?: Tone.Part<NoteEvent>;
+    private audioEngine: AudioEngine;
     private channel!: Tone.Channel;
     
     private worker?: Worker;
     private isAutopilotOn = false;
     private nextPatternTime = 0;
     private patternDuration = Tone.Time('4m').toSeconds();
+    private scheduleId: number | null = null;
     
     private currentKey: MusicKey = 'C';
     private currentScale: MusicScale = 'Major Pentatonic';
     private currentStyle: AutopilotStyle = 'Ambient';
+    private currentMelodyInstrument: MelodyInstrument = 'synth';
+
+    constructor(audioEngine: AudioEngine) {
+        this.audioEngine = audioEngine;
+    }
 
     public async initialize(fxReverb: Tone.Reverb, fxDelay: Tone.FeedbackDelay) {
         if (this.isInitialized) return;
@@ -35,73 +34,62 @@ export class AutopilotEngine {
         this.channel.connect(fxReverb);
         this.channel.connect(fxDelay);
         
-        this.createSynthPools();
-        
         if (typeof window !== 'undefined') {
             this.worker = new Worker(new URL('./autopilot-worker.ts', import.meta.url));
             this.worker.onmessage = this.handleWorkerMessage.bind(this);
         }
         
-        this.initializeParts();
-
         Tone.Transport.on('start', () => {
             if (this.isAutopilotOn) {
-                this.nextPatternTime = Tone.Transport.seconds;
-                this.requestNextPattern();
+                this.stopCurrentLoop();
+                this.startLoop();
             }
         });
         
         Tone.Transport.on('stop', () => {
-            this.melodyPart?.clear();
-            this.bassPart?.clear();
-            Tone.Transport.cancel(0);
+            this.stopCurrentLoop();
         });
 
         this.isInitialized = true;
     }
-    
-    private initializeParts() {
-        this.melodyPart = new Tone.Part<NoteEvent>((time, note) => {
-            const availableSynth = this.melodySynths.find(s => s.state === 'stopped');
-            if (availableSynth) {
-                availableSynth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
-            }
-        }, []).start(0);
 
-        this.bassPart = new Tone.Part<NoteEvent>((time, note) => {
-            const availableSynth = this.bassSynths.find(s => s.state === 'stopped');
-            if (availableSynth) {
-                availableSynth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
-            }
-        }, []).start(0);
-    }
-    
-    private handleWorkerMessage(event: MessageEvent<WorkerResponse>) {
+     private handleWorkerMessage(event: MessageEvent<WorkerResponse>) {
         if (event.data.type === 'patternGenerated') {
             const { melodyEvents, bassEvents } = event.data;
-            
-            // Schedule the pattern to be added at the correct time
-            Tone.Transport.scheduleOnce(() => {
-                melodyEvents.forEach(e => this.melodyPart?.add(this.nextPatternTime + e.time, e));
-                bassEvents.forEach(e => this.bassPart?.add(this.nextPatternTime + e.time, e));
-                
-                // Once added, schedule the next request
-                this.nextPatternTime += this.patternDuration;
-                this.requestNextPattern();
-            }, this.nextPatternTime);
+
+            const scheduleNote = (note: NoteEventFromWorker) => {
+                 this.audioEngine.playAutopilotNote(this.nextPatternTime + note.time, {
+                    type: note.isBass ? 'bass' : 'melody',
+                    freq: note.freq,
+                    dur: note.dur,
+                    vel: note.vel,
+                });
+            }
+
+            melodyEvents.forEach(scheduleNote);
+            bassEvents.forEach(scheduleNote);
         }
     }
     
-    private requestNextPattern() {
-        if (this.isAutopilotOn && Tone.Transport.state === 'started' && this.worker) {
-             // Request the next pattern slightly before the current one ends.
-             // A 2-second buffer should be safe.
-             const requestTime = this.nextPatternTime > 2 ? this.nextPatternTime - 2 : 0;
-             Tone.Transport.scheduleOnce(() => {
-                 this.postMessage({ type: 'generate' });
-            }, requestTime);
+    private startLoop() {
+        this.stopCurrentLoop();
+
+        this.nextPatternTime = Tone.Time('@4m').toSeconds();
+        this.postMessage({ type: 'generate' });
+        
+        this.scheduleId = Tone.Transport.scheduleRepeat(() => {
+            this.nextPatternTime += this.patternDuration;
+            this.postMessage({ type: 'generate' });
+        }, this.patternDuration, this.nextPatternTime);
+    }
+    
+    private stopCurrentLoop() {
+        if (this.scheduleId !== null) {
+            Tone.Transport.clear(this.scheduleId);
+            this.scheduleId = null;
         }
     }
+
 
     private postMessage(message: WorkerEvent) {
         this.worker?.postMessage(message);
@@ -114,8 +102,10 @@ export class AutopilotEngine {
 
     public setEffects(effects: { reverb: number, delay: number }) {
         if (!this.isInitialized || !this.channel) return;
-        this.channel.send('reverb', effects.reverb);
-        this.channel.send('delay', effects.delay);
+        this.audioEngine.channels.melody.send('reverb', effects.reverb);
+        this.audioEngine.channels.melody.send('delay', effects.delay);
+        this.audioEngine.channels.bass.send('reverb', effects.reverb);
+        this.audioEngine.channels.bass.send('delay', effects.delay);
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
@@ -133,74 +123,17 @@ export class AutopilotEngine {
         this.postMessage({ type: 'setStyle', style: this.currentStyle });
 
         if (isOn && !wasOn) {
-            // Ensure harmony is set before starting
             this.postMessage({ type: 'setHarmony', key: this.currentKey, scale: this.currentScale });
-            if (Tone.Transport.state === 'started') {
-                this.melodyPart?.clear();
-                this.bassPart?.clear();
-                this.nextPatternTime = Tone.Time('@4m').toSeconds(); // Align to the next 4-measure boundary
-                this.requestNextPattern();
+             if (Tone.Transport.state === 'started') {
+                this.startLoop();
             }
-        } else if (!isOn) {
-            this.melodyPart?.clear();
-            this.bassPart?.clear();
-            this.melodySynths.forEach(s => s.triggerRelease());
-            this.bassSynths.forEach(s => s.triggerRelease());
-            Tone.Transport.cancel(0); // Cancel all future scheduled events for this engine
+        } else if (!isOn && wasOn) {
+            this.stopCurrentLoop();
         }
     }
 
     public setMelodyInstrument(instrument: MelodyInstrument) {
-        if (!this.isInitialized) return;
-        let newOptions;
-        switch (instrument) {
-            case 'organ':
-                newOptions = {
-                     oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
-                     envelope: { attack: 0.05, decay: 0.3, sustain: 0.9, release: 0.8 },
-                };
-                break;
-            case 'theremin':
-                newOptions = {
-                    oscillator: { type: 'sine' },
-                    envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 },
-                };
-                break;
-            case 'glass':
-                newOptions = {
-                     oscillator: { type: 'fmsine', harmonicity: 1.5, modulationIndex: 5 },
-                     envelope: { attack: 0.01, decay: 1.2, sustain: 0, release: 1.2 },
-                };
-                break;
-            case 'synth':
-            default:
-                 newOptions = {
-                    oscillator: { type: 'fatsine4', spread: 40, count: 4 },
-                    envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 },
-                };
-                break;
-        }
-        this.melodySynths.forEach(synth => synth.set(newOptions));
-    }
-
-    private createSynthPools() {
-        const bassSynthOptions = {
-            oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
-            envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
-        };
-        for (let i = 0; i < 2; i++) {
-            const synth = new Tone.Synth(bassSynthOptions).connect(this.channel);
-            this.bassSynths.push(synth);
-        }
-
-        const melodySynthOptions = {
-            oscillator: { type: 'fatsine4', spread: 40, count: 4 },
-            envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 },
-            portamento: 0.02,
-        };
-        for (let i = 0; i < 4; i++) {
-            const synth = new Tone.Synth(melodySynthOptions).connect(this.channel);
-            this.melodySynths.push(synth);
-        }
+        this.currentMelodyInstrument = instrument;
+        this.audioEngine.setMelodyInstrument(instrument);
     }
 }
