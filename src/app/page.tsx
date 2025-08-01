@@ -114,7 +114,7 @@ export default function Home() {
             audioEngine.current = mainEngine;
             
             const apEngine = new AutopilotEngine(mainEngine);
-            await apEngine.initialize(mainEngine.fx.reverb, mainEngine.fx.delay);
+            await apEngine.initialize();
             autopilotEngine.current = apEngine;
             
             // Sync initial state with the engines
@@ -126,8 +126,6 @@ export default function Home() {
             mainEngine.setBeatPattern(activePattern.name);
             
             apEngine.setHarmony(musicKey, musicScale);
-            apEngine.setVolume(volumes.autopilot);
-            apEngine.setEffects(effects.autopilot);
             apEngine.setMelodyInstrument(melodyInstrument);
 
             setIsReady(true);
@@ -150,12 +148,10 @@ export default function Home() {
 
     useEffect(() => {
         audioEngine.current?.setVolumes(volumes);
-        autopilotEngine.current?.setVolume(volumes.autopilot);
     }, [volumes]);
 
     useEffect(() => {
         audioEngine.current?.setEffects(effects);
-        autopilotEngine.current?.setEffects(effects.autopilot);
     }, [effects]);
 
     useEffect(() => {
@@ -171,7 +167,7 @@ export default function Home() {
 
     useEffect(() => {
         if (isReady) {
-            // No need to set melody instrument on audio engine, autopilot will do it
+            audioEngine.current?.setMelodyInstrument(melodyInstrument);
             autopilotEngine.current?.setMelodyInstrument(melodyInstrument);
         }
     }, [melodyInstrument, isReady]);
