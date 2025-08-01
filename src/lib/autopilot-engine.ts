@@ -67,15 +67,23 @@ export class AutopilotEngine {
     
     private startLoop() {
         this.stopCurrentLoop();
-
-        this.nextPatternTime = Tone.Time('@4m').toSeconds();
-        this.postMessage({ type: 'generate' });
-        
-        this.scheduleId = Tone.Transport.scheduleRepeat(() => {
-            this.nextPatternTime += this.patternDuration;
+    
+        // Function to be scheduled
+        const generateAndScheduleNext = (time: number) => {
+            // Set the time for the upcoming pattern
+            this.nextPatternTime = time;
+            // Request the pattern from the worker
             this.postMessage({ type: 'generate' });
-        }, this.patternDuration, this.nextPatternTime);
+    
+            // Schedule the next call
+            this.scheduleId = Tone.Transport.scheduleOnce(generateAndScheduleNext, `+${this.patternDuration}`);
+        }
+    
+        // Start the first generation immediately at the next measure
+        const startTime = Tone.Time('@1m').toSeconds();
+        generateAndScheduleNext(startTime);
     }
+    
     
     private stopCurrentLoop() {
         if (this.scheduleId !== null) {
