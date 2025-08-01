@@ -2,7 +2,7 @@
 
 import * as Tone from 'tone';
 import type { MusicKey, MusicScale, AutopilotStyle, MelodyInstrument } from '@/app/page';
-import type { WorkerEvent, WorkerResponse, NoteEventFromWorker } from './autopilot-worker';
+import type { WorkerEvent, WorkerResponse } from './autopilot-worker';
 import type { AudioEngine } from './audio-engine';
 
 
@@ -21,6 +21,7 @@ export class AutopilotEngine {
     private currentScale: MusicScale = 'Major Pentatonic';
     private currentStyle: AutopilotStyle = 'Ambient';
     private currentMelodyInstrument: MelodyInstrument = 'synth';
+    private currentTempo: number = 120;
 
     constructor(audioEngine: AudioEngine) {
         this.audioEngine = audioEngine;
@@ -88,6 +89,11 @@ export class AutopilotEngine {
         this.worker?.postMessage(message);
     }
 
+    public setTempo(bpm: number) {
+        this.currentTempo = bpm;
+        this.postMessage({ type: 'setTempo', bpm: this.currentTempo });
+    }
+
     public setHarmony(key: MusicKey, scale: MusicScale) {
         this.currentKey = key;
         this.currentScale = scale;
@@ -103,6 +109,8 @@ export class AutopilotEngine {
         this.postMessage({ type: 'setStyle', style: this.currentStyle });
 
         if (isOn && !wasOn) {
+            // Ensure worker has all current settings before starting
+            this.postMessage({ type: 'setTempo', bpm: this.currentTempo });
             this.postMessage({ type: 'setHarmony', key: this.currentKey, scale: this.currentScale });
              if (Tone.Transport.state === 'started') {
                 this.startLoop();

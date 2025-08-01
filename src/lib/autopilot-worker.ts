@@ -1,7 +1,6 @@
 
 
 import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
-import * as Tone from 'tone';
 
 // --- TYPE DEFINITIONS ---
 
@@ -31,7 +30,8 @@ type AutopilotPatternData = {
 export type WorkerEvent =
     | { type: 'generate' }
     | { type: 'setHarmony', key: MusicKey, scale: MusicScale }
-    | { type: 'setStyle', style: AutopilotStyle };
+    | { type: 'setStyle', style: AutopilotStyle }
+    | { type: 'setTempo', bpm: number };
 
 export type WorkerResponse =
     | { type: 'patternGenerated', melodyEvents: NoteEventFromWorker[], bassEvents: NoteEventFromWorker[] };
@@ -42,6 +42,7 @@ export type WorkerResponse =
 let currentKey: MusicKey = 'C';
 let currentScale: MusicScale = 'Major Pentatonic';
 let currentStyle: AutopilotStyle = 'Ambient';
+let currentBpm = 120;
 let freqs = {
     bass: [] as number[],
     melody: [] as number[],
@@ -49,10 +50,19 @@ let freqs = {
 
 // --- CORE LOGIC ---
 
+// Simple frequency calculation to avoid Tone.js dependency in worker
+function getNoteFrequency(key: MusicKey, octave: number, interval: number): number {
+    const A4 = 440;
+    const keyMap: {[key in MusicKey]: number} = { 'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5, 'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11 };
+    const keyIndex = keyMap[key];
+    const midiNote = 12 * (octave + 1) + keyIndex + interval;
+    return Math.pow(2, (midiNote - 69) / 12) * A4;
+}
+
 function getScaleFrequencies(key: MusicKey, scale: MusicScale, octaves: number[]): number[] {
-    const scaleIntervals: { [key in MusicScale]: string[] } = {
-        'Major': ['0', '2', '4', '5', '7', '9', '11'], 'Minor': ['0', '2', '3', '5', '7', '8', '10'],
-        'Major Pentatonic': ['0', '2', '4', '7', '9'], 'Minor Pentatonic': ['0', '3', '5', '7', '10'],
+    const scaleIntervals: { [key in MusicScale]: number[] } = {
+        'Major': [0, 2, 4, 5, 7, 9, 11], 'Minor': [0, 2, 3, 5, 7, 8, 10],
+        'Major Pentatonic': [0, 2, 4, 7, 9], 'Minor Pentatonic': [0, 3, 5, 7, 10],
     };
     
     let allFrequencies: number[] = [];
@@ -60,8 +70,7 @@ function getScaleFrequencies(key: MusicKey, scale: MusicScale, octaves: number[]
     
     octaves.forEach(octave => {
         intervals.forEach(interval => {
-            const note = Tone.Frequency(key + octave).transpose(interval);
-            allFrequencies.push(note.toFrequency());
+            allFrequencies.push(getNoteFrequency(key, octave, interval));
         });
     });
     return allFrequencies.sort((a,b) => a - b);
@@ -73,6 +82,33 @@ function updateFrequencies() {
         melody: getScaleFrequencies(currentKey, currentScale, [4, 5]),
     };
 }
+
+// Re-implement Tone.Time(...).toSeconds() to remove Tone.js dependency
+function durationToSeconds(duration: string, bpm: number): number {
+    const quarterNoteDuration = 60 / bpm;
+    const match = duration.match(/^(\d+)([ntm])$/);
+    if (!match) return quarterNoteDuration / 2; // Default to 8n
+
+    const value = parseInt(match[1]);
+    const unit = match[2];
+
+    switch(unit) {
+        case 'n': // a subdivision
+            if (value === 1) return quarterNoteDuration * 4;
+            if (value === 2) return quarterNoteDuration * 2;
+            if (value === 4) return quarterNoteDuration;
+            if (value === 8) return quarterNoteDuration / 2;
+            if (value === 16) return quarterNoteDuration / 4;
+            return quarterNoteDuration * (4 / value);
+        case 't': // a triplet
+            return (quarterNoteDuration * 4) / (value * 1.5);
+        case 'm': // a measure
+            return value * 4 * quarterNoteDuration;
+        default:
+            return quarterNoteDuration / 2;
+    }
+}
+
 
 function generatePattern() {
     if (freqs.bass.length === 0 || freqs.melody.length === 0) {
@@ -111,13 +147,12 @@ function generatePattern() {
         });
     }
 
-
-    const sixteenthNoteDuration = Tone.Time('16n').toSeconds();
+    const sixteenthNoteDuration = durationToSeconds('16n', currentBpm);
 
     combinedPattern.forEach(noteData => {
         const [timeQuant, noteIndex, durationStr = '8n', velocity = 0.5] = noteData;
         const startTime = timeQuant * sixteenthNoteDuration;
-        const durationSeconds = Tone.Time(durationStr).toSeconds();
+        const durationSeconds = durationToSeconds(durationStr, currentBpm);
         
         const isBassNote = noteIndex < 0;
         const freqsList = isBassNote ? freqs.bass : freqs.melody;
@@ -159,6 +194,9 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
         case 'setStyle':
             currentStyle = event.data.style;
             break;
+        case 'setTempo':
+            currentBpm = event.data.bpm;
+            break;
     }
 };
 
@@ -179,7 +217,7 @@ const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } =
              [10, 9, '8n'], [12, 11, '8n'], [14, 9, '8n'], [15, 7, '8n']],
         ],
         fills: [
-            [[48, 7, '8n'], [50, 9, '8n'], [51, 11, '4n.'], [54, 9, '8n']],
+            [[48, 7, '8n'], [50, 9, '8n'], [51, 11, '4n'], [54, 9, '8n']],
         ],
     },
     Wind: {
@@ -235,11 +273,11 @@ const autopilotPatternsData: { [key in AutopilotStyle]: AutopilotPatternData } =
     },
     Promenade: { // Syncopated
         groove: [
-            [[-1, 1, '4n.'], [-5, 4, '4n'], [-8, 1, '8n'], [-10, 4, '4n.'],
+            [[-1, 1, '4n'], [-5, 4, '4n'], [-8, 1, '8n'], [-10, 4, '4n'],
              [0, 0, '4n'], [4, 2, '4n'], [8, 4, '4n'], [12, 0, '4n']],
         ],
         fills: [
-            [[48, 7, '4n.'], [51, 5, '8n'], [54, 4, '2n']],
+            [[48, 7, '4n'], [51, 5, '8n'], [54, 4, '2n']],
         ]
     },
      Space: {

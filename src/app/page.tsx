@@ -125,6 +125,7 @@ export default function Home() {
             mainEngine.setHarmony(musicKey, musicScale);
             mainEngine.setBeatPattern(activePattern.name);
             
+            apEngine.setTempo(activeTempo.bpm);
             apEngine.setHarmony(musicKey, musicScale);
             apEngine.setMelodyInstrument(melodyInstrument);
 
@@ -144,6 +145,7 @@ export default function Home() {
     // --- State Sync with Audio Engine ---
     useEffect(() => {
         audioEngine.current?.setTempo(activeTempo.bpm);
+        autopilotEngine.current?.setTempo(activeTempo.bpm);
     }, [activeTempo]);
 
     useEffect(() => {
