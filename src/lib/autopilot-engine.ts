@@ -10,7 +10,6 @@ export class AutopilotEngine {
     public isInitialized = false;
 
     private audioEngine: AudioEngine;
-    private channel!: Tone.Channel;
     
     private worker?: Worker;
     private isAutopilotOn = false;
@@ -27,10 +26,8 @@ export class AutopilotEngine {
         this.audioEngine = audioEngine;
     }
 
-    public async initialize(fxReverb: Tone.Reverb, fxDelay: Tone.FeedbackDelay) {
+    public async initialize() {
         if (this.isInitialized) return;
-
-        this.channel = this.audioEngine.channels.melody;
         
         if (typeof window !== 'undefined') {
             this.worker = new Worker(new URL('./autopilot-worker.ts', import.meta.url));
@@ -54,18 +51,16 @@ export class AutopilotEngine {
      private handleWorkerMessage(event: MessageEvent<WorkerResponse>) {
         if (event.data.type === 'patternGenerated') {
             const { melodyEvents, bassEvents } = event.data;
+            const allEvents = [...melodyEvents, ...bassEvents];
 
-            const scheduleNote = (note: NoteEventFromWorker) => {
+            allEvents.forEach((note) => {
                  this.audioEngine.playAutopilotNote(this.nextPatternTime + note.time, {
                     type: note.isBass ? 'bass' : 'melody',
                     freq: note.freq,
                     dur: note.dur,
                     vel: note.vel,
                 });
-            }
-
-            melodyEvents.forEach(scheduleNote);
-            bassEvents.forEach(scheduleNote);
+            });
         }
     }
     
@@ -91,20 +86,6 @@ export class AutopilotEngine {
 
     private postMessage(message: WorkerEvent) {
         this.worker?.postMessage(message);
-    }
-
-    public setVolume(volume: number) {
-        if (!this.isInitialized) return;
-        this.audioEngine.channels.melody.volume.value = volume;
-        this.audioEngine.channels.bass.volume.value = volume;
-    }
-
-    public setEffects(effects: { reverb: number, delay: number }) {
-        if (!this.isInitialized || !this.channel) return;
-        this.audioEngine.channels.melody.send('reverb', effects.reverb);
-        this.audioEngine.channels.melody.send('delay', effects.delay);
-        this.audioEngine.channels.bass.send('reverb', effects.reverb);
-        this.audioEngine.channels.bass.send('delay', effects.delay);
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {

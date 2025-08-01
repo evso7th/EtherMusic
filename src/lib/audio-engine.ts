@@ -25,15 +25,14 @@ export class AudioEngine {
     public drumMachine!: DrumMachine;
 
     // --- Tone.js Objects ---
-    public channels!: { melody: Tone.Channel, bass: Tone.Channel, latch: Tone.Channel, drums: Tone.Channel };
+    public channels!: { melody: Tone.Channel, bass: Tone.Channel, latch: Tone.Channel, drums: Tone.Channel, autopilot: Tone.Channel };
     public fx!: { reverb: Tone.Reverb, delay: Tone.FeedbackDelay };
     private melodySynths: Tone.Synth[] = [];
     private bassSynths: Tone.Synth[] = [];
     private latchSynths: Tone.Synth[] = [];
+    private autopilotBassSynths: Tone.Synth[] = [];
     
     private recorder!: Tone.Recorder;
-    
-    private bassGain!: Tone.Gain;
     
     // --- Internal State ---
     private activeNotes = new Map<number, ActiveNote>();
@@ -68,28 +67,29 @@ export class AudioEngine {
 
         // Master Channels
         this.channels = {
-            melody: new Tone.Channel(-6).toDestination(),
-            bass: new Tone.Channel(-9).toDestination(),
-            latch: new Tone.Channel(-9).toDestination(),
-            drums: new Tone.Channel(-9).toDestination(),
+            melody: new Tone.Channel(-6),
+            bass: new Tone.Channel(-9),
+            latch: new Tone.Channel(-9),
+            drums: new Tone.Channel(-9),
+            autopilot: new Tone.Channel(-9),
         };
         
-        // Connect channels to FX
-        this.connectChannelsToFX();
+        // Connect channels to FX and destination
+        for (const channel of Object.values(this.channels)) {
+            channel.connect(this.fx.reverb);
+            channel.connect(this.fx.delay);
+            channel.toDestination();
+        }
         
         // Synth Pools
         this.createSynthPools();
         
         // --- Latch Engine ---
-        // Initialize with empty frequencies, will be updated by setHarmony
         this.latchEngine = new LatchEngine(this.latchSynths, this.orbManager, []);
         
         // --- Drum Machine ---
         this.drumMachine = new DrumMachine(this.channels.drums);
         await this.drumMachine.initialize();
-
-        // --- Bass Chain ---
-        this.bassGain = new Tone.Gain(1).connect(this.channels.bass);
         
         // Recorder
         this.recorder = new Tone.Recorder();
@@ -158,8 +158,8 @@ export class AudioEngine {
         this.channels.melody.volume.value = volumes.melody;
         this.channels.bass.volume.value = volumes.bass;
         this.channels.latch.volume.value = volumes.latch;
+        this.channels.autopilot.volume.value = volumes.autopilot;
         this.drumMachine.setVolume(volumes.drums);
-        // Autopilot volume is handled by the AutopilotEngine itself on its own channel
     }
 
     public setEffects(effects: Record<string, { reverb: number, delay: number }>) {
@@ -170,8 +170,9 @@ export class AudioEngine {
         this.channels.bass.send('delay', effects.bass.delay);
         this.channels.latch.send('reverb', effects.latch.reverb);
         this.channels.latch.send('delay', effects.latch.delay);
+        this.channels.autopilot.send('reverb', effects.autopilot.reverb);
+        this.channels.autopilot.send('delay', effects.autopilot.delay);
         this.drumMachine.setEffects(effects.drums);
-        // Autopilot effects are handled by the AutopilotEngine on its own channel
     }
     
     public setBeatPattern(patternName: string) {
@@ -281,11 +282,9 @@ export class AudioEngine {
     }
     
     public playAutopilotNote(time: number, note: {type: 'melody' | 'bass', freq: number, dur: number, vel: number}) {
-        const synthPool = note.type === 'melody' ? this.melodySynths : this.bassSynths;
+        const synthPool = note.type === 'melody' ? this.melodySynths : this.autopilotBassSynths;
         
         // This is a simplified voice allocation. It finds a synth that is not currently playing.
-        // It doesn't account for notes that *will be* playing at `time`.
-        // For this application, this simplification is likely acceptable.
         const availableSynth = synthPool.find(s => s.state === 'stopped');
 
         if (availableSynth) {
@@ -295,30 +294,24 @@ export class AudioEngine {
 
 
     // --- PRIVATE METHODS ---
-
-    private connectChannelsToFX() {
-        for (const channel of Object.values(this.channels)) {
-            channel.connect(this.fx.reverb);
-            channel.connect(this.fx.delay);
-        }
-    }
     
     private createSynthPools() {
-        const bassSynthOptions = {
-            oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
-            envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
-        } as const;
-        
-        for (let i = 0; i < 2; i++) {
-            const synth = new Tone.Synth(bassSynthOptions).connect(this.channels.bass);
-            this.bassSynths.push(synth);
-        }
-
         const melodySynthOptions = { 
             portamento: 0.02,
         };
         for (let i = 0; i < 4; i++) {
             this.melodySynths.push(new Tone.Synth(melodySynthOptions).connect(this.channels.melody));
+        }
+        
+        const bassSynthOptions = {
+            oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
+            envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 },
+        } as const;
+        for (let i = 0; i < 2; i++) {
+            this.bassSynths.push(new Tone.Synth(bassSynthOptions).connect(this.channels.bass));
+        }
+        for (let i = 0; i < 2; i++) {
+            this.autopilotBassSynths.push(new Tone.Synth(bassSynthOptions).connect(this.channels.autopilot));
         }
 
         const latchSynthOptions = {
