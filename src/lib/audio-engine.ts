@@ -137,16 +137,21 @@ export class AudioEngine {
     public stop() {
         if (!this.isInitialized) return;
         this.isPlaying = false;
-        Tone.Transport.stop();
         
+        // This stops the clock and cancels all scheduled events immediately.
+        Tone.Transport.stop();
+        Tone.Transport.cancel();
+        
+        // Immediately stop all manually played notes.
         this.activeNotes.forEach(note => note.synth.triggerRelease());
         this.activeNotes.clear();
         this.orbManager.removeAllOrbs('melody');
         this.orbManager.removeAllOrbs('bass');
         
+        // Stop all other sound sources immediately.
         this.latchEngine.stopAll();
         this.drumMachine.stop();
-        this.autopilotSynths.accompaniment.releaseAll();
+        this.stopAutopilotSynths();
     }
     
     public toggleRecording(): boolean {
@@ -320,6 +325,29 @@ export class AudioEngine {
         }
     }
 
+    /**
+     * Immediately stops all sounds produced by the autopilot synthesizers.
+     * This is a "hard stop" that doesn't wait for envelope releases.
+     */
+    public stopAutopilotSynths() {
+        if (!this.isInitialized) return;
+        
+        // A hard way to stop sound is to disconnect and reconnect the synth.
+        // This immediately cuts off any playing audio.
+        for (const key in this.autopilotSynths) {
+            const instrument = key as AutopilotInstrument;
+            const synth = this.autopilotSynths[instrument];
+            const channel = this.channels[instrument] ?? this.channels.accompaniment;
+            
+            if (synth instanceof Tone.PolySynth) {
+                synth.releaseAll();
+            }
+
+            synth.disconnect();
+            synth.connect(channel);
+        }
+    }
+
     // --- PRIVATE METHODS ---
     
     private createSynthPools() {
@@ -362,14 +390,14 @@ export class AudioEngine {
                 envelope: { attack: 0.05, decay: 0.3, sustain: 0.4, release: 1 },
                 filter: { Q: 2, type: 'lowpass', rolloff: -24 },
                 filterEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.5, baseFrequency: 'C1', octaves: 2 },
-            }).connect(this.channels.accompaniment),
+            }).connect(this.channels.bass),
 
             effects: new Tone.NoiseSynth({
                 noise: { type: 'pink' },
                 envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.2 },
             }).connect(this.channels.effects),
         };
-        // The autopilot melody, accompaniment and bass all go to the same channel for now
+        // The autopilot melody and accompaniment go to the same channel for now
         // to simplify mixer controls.
         this.autopilotSynths.accompaniment.volume.value = -6; // PolySynths can be loud
     }

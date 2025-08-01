@@ -89,6 +89,8 @@ export class AutopilotEngine {
             Tone.Transport.clear(this.scheduleId);
             this.scheduleId = null;
         }
+        Tone.Transport.cancel();
+        this.audioEngine.stopAutopilotSynths();
     }
 
 
