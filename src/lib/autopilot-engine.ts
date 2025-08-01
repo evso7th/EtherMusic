@@ -70,10 +70,7 @@ export class AutopilotEngine {
         this.stopCurrentLoop();
     
         const generateAndScheduleNext = () => {
-             // Set the start time for the *next* pattern to be now.
-            if(this.nextPatternTime < Tone.now()) {
-                this.nextPatternTime = Tone.now();
-            }
+            this.nextPatternTime = Tone.now(); // Always schedule from now
             this.postMessage({ type: 'generate' });
             
             this.scheduleTimeoutId = window.setTimeout(generateAndScheduleNext, this.patternDuration * 1000);
@@ -114,16 +111,16 @@ export class AutopilotEngine {
         this.isAutopilotOn = isOn;
         this.currentStyle = style;
         
-        this.postMessage({ type: 'setStyle', style: this.currentStyle });
+        // Ensure old loop is stopped before making changes or starting a new one
+        this.stopCurrentLoop();
 
-        if (isOn && !wasOn) {
+        if (isOn) {
+            this.postMessage({ type: 'setStyle', style: this.currentStyle });
             // If transport is already running, start the loop immediately.
             // Otherwise, the 'start' event on the transport will handle it.
             if (Tone.Transport.state === 'started') {
                 this.startLoop();
             }
-        } else if (!isOn && wasOn) {
-            this.stopCurrentLoop();
         }
     }
 

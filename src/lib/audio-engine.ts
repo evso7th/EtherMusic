@@ -42,11 +42,9 @@ export class AudioEngine {
     private latchSynths: Tone.Synth[] = [];
     
     // Dedicated synths for autopilot
-    private autopilotSynths!: {
-        melody: Tone.PolySynth,
-        bass: Tone.PolySynth,
-        accompaniment: Tone.PolySynth,
-    };
+    private melodySynth!: Tone.PolySynth;
+    private accompanimentSynth!: Tone.PolySynth;
+    private bassSynth!: Tone.PolySynth;
     
     private recorder!: Tone.Recorder;
     
@@ -237,7 +235,7 @@ export class AudioEngine {
         }
         // Apply to both manual and autopilot melody synths
         this.melodySynths.forEach(synth => synth.set(newOptions));
-        this.autopilotSynths.melody.set(newOptions);
+        this.melodySynth.set(newOptions);
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
@@ -308,37 +306,44 @@ export class AudioEngine {
         }
     }
     
-    public playAutopilotEvent(time: number, note: {type: AutopilotInstrument, freq: number | number[], dur: number, vel: number}) {
+     public playAutopilotEvent(time: number, note: {type: AutopilotInstrument, freq: number | number[], dur: number, vel: number}) {
         if (!this.isInitialized || !isFinite(time)) return;
         
-        let safeTime = time;
-        if (safeTime < Tone.now()) {
-            safeTime = Tone.now();
+        // If we are late, schedule for right now.
+        if (time < Tone.now()) {
+            time = Tone.now();
         }
 
-        const synth = this.autopilotSynths[note.type];
-        if (!synth) return;
+        let synth: Tone.PolySynth | undefined;
+        switch (note.type) {
+            case 'melody':
+                synth = this.melodySynth;
+                break;
+            case 'accompaniment':
+                synth = this.accompanimentSynth;
+                break;
+            case 'bass':
+                synth = this.bassSynth;
+                break;
+        }
 
-        if (synth instanceof Tone.PolySynth) {
-            synth.triggerAttackRelease(note.freq, note.dur, safeTime, note.vel);
+        if (synth && (synth instanceof Tone.Synth || synth instanceof Tone.PolySynth)) {
+            synth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
         }
     }
 
     public stopAutopilotSynths() {
         if (!this.isInitialized) return;
         
-        for (const key in this.autopilotSynths) {
-            const instrument = key as AutopilotInstrument;
-            const synth = this.autopilotSynths[instrument];
-            
-            if (synth instanceof Tone.PolySynth) {
-                // Disconnecting is a hard and fast way to stop all sound immediately.
-                synth.disconnect();
-                // Then reconnect for future use.
-                synth.connect(this.channels[instrument] ?? this.channels.accompaniment);
-            }
-        }
-         // Also cancel any events that were scheduled to happen in the future.
+        // Dispose of the old synths to kill sound immediately
+        this.melodySynth?.dispose();
+        this.accompanimentSynth?.dispose();
+        this.bassSynth?.dispose();
+        
+        // Recreate them fresh for the next use
+        this.createAutopilotSynths();
+         
+        // Also cancel any events that were scheduled to happen in the future.
         Tone.Transport.cancel();
     }
 
@@ -366,27 +371,25 @@ export class AudioEngine {
             this.latchSynths.push(new Tone.Synth(latchSynthOptions).connect(this.channels.latch));
         }
     }
+    
+     private createAutopilotSynths() {
+        this.melodySynth = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: 'fatsine4', spread: 40, count: 4 },
+            envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 },
+        }).connect(this.channels.melody);
+        
+        this.accompanimentSynth = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: 'fatsine', count: 3, spread: 60 },
+            envelope: { attack: 0.2, decay: 0.9, sustain: 0.4, release: 1.4 },
+        }).connect(this.channels.accompaniment);
+        this.accompanimentSynth.volume.value = -6; // PolySynths can be loud
 
-    private createAutopilotSynths() {
-        this.autopilotSynths = {
-            melody: new Tone.PolySynth(Tone.Synth, {
-                oscillator: { type: 'fatsine4', spread: 40, count: 4 },
-                envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 },
-            }).connect(this.channels.melody),
-            
-            accompaniment: new Tone.PolySynth(Tone.Synth, {
-                 oscillator: { type: 'fatsine', count: 2, spread: 60 },
-                 envelope: { attack: 0.2, decay: 0.9, sustain: 0.4, release: 1.4 },
-            }).connect(this.channels.accompaniment),
-            
-            bass: new Tone.PolySynth(Tone.Synth, {
-                oscillator: { type: 'fmsine', modulationType: 'triangle', harmonicity: 0.5 },
-                envelope: { attack: 0.05, decay: 0.3, sustain: 0.4, release: 1 },
-                filter: { Q: 2, type: 'lowpass', rolloff: -24 },
-                filterEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.5, baseFrequency: 'C1', octaves: 2 },
-            }).connect(this.channels.bass),
-        };
-        this.autopilotSynths.accompaniment.volume.value = -6; // PolySynths can be loud
+        this.bassSynth = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: 'fmsine', modulationType: 'triangle', harmonicity: 0.5 },
+            envelope: { attack: 0.05, decay: 0.3, sustain: 0.4, release: 1 },
+            filter: { Q: 2, type: 'lowpass', rolloff: -24 },
+            filterEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.5, baseFrequency: 'C1', octaves: 2 },
+        }).connect(this.channels.bass);
     }
 
     private getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]): number[] => {
