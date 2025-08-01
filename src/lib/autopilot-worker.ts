@@ -184,7 +184,7 @@ function generatePattern() {
                 time: i * durationToSeconds('8n', currentBpm) * 2,
                 freq: freq,
                 dur: durationToSeconds('8n', currentBpm),
-                vel: 0.6
+                vel: 0.4
             });
         }
     }
@@ -211,3 +211,4 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             break;
     }
 };
+
