@@ -2,7 +2,7 @@
 
 import * as Tone from 'tone';
 import type { MusicKey, MusicScale, AutopilotStyle, MelodyInstrument } from '@/app/page';
-import type { WorkerEvent, WorkerResponse } from './autopilot-worker';
+import type { WorkerEvent, WorkerResponse, NoteEventWithType } from './autopilot-worker';
 import type { AudioEngine } from './audio-engine';
 
 
@@ -20,7 +20,6 @@ export class AutopilotEngine {
     private currentKey: MusicKey = 'C';
     private currentScale: MusicScale = 'Major Pentatonic';
     private currentStyle: AutopilotStyle = 'Ambient';
-    private currentMelodyInstrument: MelodyInstrument = 'synth';
     private currentTempo: number = 120;
 
     constructor(audioEngine: AudioEngine) {
@@ -53,32 +52,36 @@ export class AutopilotEngine {
         if (event.data.type === 'patternGenerated') {
             const { melody, accompaniment, bass, effects } = event.data.pattern;
 
-            melody.forEach(note => {
-                this.audioEngine.playAutopilotEvent(this.nextPatternTime + note.time, { type: 'melody', ...note });
-            });
-            accompaniment.forEach(note => {
-                 this.audioEngine.playAutopilotEvent(this.nextPatternTime + note.time, { type: 'accompaniment', ...note });
-            });
-            bass.forEach(note => {
-                 this.audioEngine.playAutopilotEvent(this.nextPatternTime + note.time, { type: 'bass', ...note });
-            });
-            effects.forEach(note => {
-                 this.audioEngine.playAutopilotEvent(this.nextPatternTime + note.time, { type: 'effects', ...note });
+            // Combine all events to schedule them
+            const allEvents: NoteEventWithType[] = [
+                ...melody.map(n => ({ ...n, type: 'melody' as const })),
+                ...accompaniment.map(n => ({ ...n, type: 'accompaniment' as const })),
+                ...bass.map(n => ({ ...n, type: 'bass' as const })),
+                ...effects.map(n => ({ ...n, type: 'effects' as const })),
+            ];
+
+            allEvents.forEach((note) => {
+                // Here is the call to the audio engine
+                this.audioEngine.playAutopilotEvent(this.nextPatternTime + note.time, note);
             });
         }
     }
     
     private startLoop() {
-        this.stopCurrentLoop();
+        this.stopCurrentLoop(); // Ensure no previous loops are running
     
         const generateAndScheduleNext = (time: number) => {
-            this.nextPatternTime = time;
+            // CRITICAL: Prevent scheduling in the past.
+            // If the scheduled time has already passed, use the current time instead.
+            this.nextPatternTime = Math.max(time, Tone.now());
+            
             this.postMessage({ type: 'generate' });
             this.scheduleId = Tone.Transport.scheduleOnce(generateAndScheduleNext, `+${this.patternDuration}`);
         }
     
-        const now = Tone.now();
-        generateAndScheduleNext(now);
+        // Schedule the very first generation to happen at the start of the next measure.
+        const nextMeasureTime = Tone.Transport.nextSubdivision('1m');
+        this.scheduleId = Tone.Transport.scheduleOnce(generateAndScheduleNext, nextMeasureTime);
     }
     
     
@@ -124,8 +127,8 @@ export class AutopilotEngine {
 
     public setMelodyInstrument(instrument: MelodyInstrument) {
         if (!this.isInitialized) return;
-        this.currentMelodyInstrument = instrument;
         // NOTE: We are not passing instrument info to the worker. 
         // The AudioEngine handles applying the correct instrument sound.
+        this.postMessage({ type: 'setMelodyInstrument', instrument });
     }
 }
