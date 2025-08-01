@@ -14,7 +14,6 @@ interface MixerControlsProps {
         drums: number;
         latch: number;
         accompaniment: number;
-        effects: number;
     };
     onVolumeChange: (volumes: MixerControlsProps['volumes']) => void;
     effects: {
@@ -23,7 +22,6 @@ interface MixerControlsProps {
         drums: { reverb: number, delay: number };
         latch: { reverb: number, delay: number };
         accompaniment: { reverb: number, delay: number };
-        effects: { reverb: number, delay: number };
     };
     onEffectChange: (effects: MixerControlsProps['effects']) => void;
 }
@@ -106,7 +104,7 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
         });
     };
 
-    const handleEffectChange = (instrument: 'melody' | 'bass' | 'drums' | 'latch' | 'accompaniment' | 'effects', effect: 'reverb' | 'delay', value: number) => {
+    const handleEffectChange = (instrument: 'melody' | 'bass' | 'drums' | 'latch' | 'accompaniment', effect: 'reverb' | 'delay', value: number) => {
         onEffectChange({
             ...effects,
             [instrument]: {
@@ -119,6 +117,7 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
 
     return (
         <div className="p-1 space-y-3">
+            <div className="text-xs text-center text-muted-foreground pt-2">Manual Control</div>
             <InstrumentControls 
                 label="Melody"
                 icon={Music}
@@ -130,17 +129,6 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
                 onDelayChange={(v) => handleEffectChange('melody', 'delay', v)}
             />
             <Separator />
-            <InstrumentControls 
-                label="Bass"
-                icon={Waves}
-                volume={volumes.bass}
-                reverb={effects.bass.reverb}
-                delay={effects.bass.delay}
-                onVolumeChange={(v) => handleVolumeChange('bass', v)}
-                onReverbChange={(v) => handleEffectChange('bass', 'reverb', v)}
-                onDelayChange={(v) => handleEffectChange('bass', 'delay', v)}
-            />
-             <Separator />
             <InstrumentControls 
                 label="Latch"
                 icon={Anchor}
@@ -164,6 +152,17 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
             />
             <Separator />
             <div className="text-xs text-center text-muted-foreground pt-2">Autopilot</div>
+             <InstrumentControls 
+                label="Bass"
+                icon={Waves}
+                volume={volumes.bass}
+                reverb={effects.bass.reverb}
+                delay={effects.bass.delay}
+                onVolumeChange={(v) => handleVolumeChange('bass', v)}
+                onReverbChange={(v) => handleEffectChange('bass', 'reverb', v)}
+                onDelayChange={(v) => handleEffectChange('bass', 'delay', v)}
+            />
+            <Separator />
             <InstrumentControls 
                 label="Accomp"
                 icon={Combine}
@@ -173,17 +172,6 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
                 onVolumeChange={(v) => handleVolumeChange('accompaniment', v)}
                 onReverbChange={(v) => handleEffectChange('accompaniment', 'reverb', v)}
                 onDelayChange={(v) => handleEffectChange('accompaniment', 'delay', v)}
-            />
-             <Separator />
-            <InstrumentControls 
-                label="Effects"
-                icon={Sparkles}
-                volume={volumes.effects}
-                reverb={effects.effects.reverb}
-                delay={effects.effects.delay}
-                onVolumeChange={(v) => handleVolumeChange('effects', v)}
-                onReverbChange={(v) => handleEffectChange('effects', 'reverb', v)}
-                onDelayChange={(v) => handleEffectChange('effects', 'delay', v)}
             />
         </div>
     );

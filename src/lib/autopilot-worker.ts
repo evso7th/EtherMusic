@@ -16,7 +16,6 @@ type AutopilotPattern = {
     melody: NoteEvent[];
     accompaniment: NoteEvent[];
     bass: NoteEvent[];
-    effects: NoteEvent[];
 };
 
 // --- WORKER COMMUNICATION INTERFACES ---
@@ -72,12 +71,9 @@ function getScaleFrequencies(key: MusicKey, scale: MusicScale, octaves: number[]
 
 function updateFrequencies() {
     freqs = {
-        // C1, C2, C3
-        bass: getScaleFrequencies(currentKey, currentScale, [1, 2, 3]),
-        // C2, C3, C4
-        accompaniment: getScaleFrequencies(currentKey, currentScale, [2, 3, 4]),
-        // C3, C4, C5
-        melody: getScaleFrequencies(currentKey, currentScale, [3, 4, 5]),
+        bass: getScaleFrequencies(currentKey, currentScale, [1, 2, 3]), // C1-C3
+        accompaniment: getScaleFrequencies(currentKey, currentScale, [2, 3, 4]), // C2-C4
+        melody: getScaleFrequencies(currentKey, currentScale, [3, 4, 5]), // C3-C5
     };
 }
 
@@ -109,18 +105,29 @@ function generatePattern() {
         updateFrequencies();
     }
     
-    const pattern: AutopilotPattern = { melody: [], accompaniment: [], bass: [], effects: [] };
+    const pattern: AutopilotPattern = { melody: [], accompaniment: [], bass: [] };
     const totalDuration = durationToSeconds('4m', currentBpm);
     const measureDuration = durationToSeconds('1m', currentBpm);
 
     // Bass: one note per measure
     for (let i = 0; i < 4; i++) {
-        // Prefer C2-C3 range, sometimes go to C1
-        const bassFreqs = freqs.bass.filter(f => f < 131); // Up to C3
-        const freqIndex = Math.random() < 0.2 ? 0 : Math.floor(bassFreqs.length * 0.3) + Math.floor(Math.random() * (bassFreqs.length * 0.7));
+        // C2-C3 range, sometimes C1
+        const C1_freq_max = 65.41; // C2
+        const C3_freq_max = 130.81; // C3
+        const bassFreqs = freqs.bass.filter(f => f < C3_freq_max);
+        
+        let freqIndex;
+        // Occasionally dip into C1 range
+        if (Math.random() < 0.2) {
+             freqIndex = Math.floor(Math.random() * bassFreqs.filter(f => f < C1_freq_max).length);
+        } else {
+             const C2_range = bassFreqs.filter(f => f >= C1_freq_max);
+             freqIndex = bassFreqs.indexOf(C2_range[Math.floor(Math.random() * C2_range.length)]);
+        }
+
         pattern.bass.push({
             time: i * measureDuration,
-            freq: bassFreqs[freqIndex],
+            freq: bassFreqs[freqIndex] || bassFreqs[0],
             dur: measureDuration,
             vel: 0.4
         });
@@ -129,24 +136,33 @@ function generatePattern() {
     // Accompaniment: simple chords
     for (let i = 0; i < 4; i++) {
         // Prefer C3 range, with deviations to C2 and C4
-        const accompFreqs = freqs.accompaniment;
+        const C2_freq = 65.41;
         const C3_freq = 130.81;
         const C4_freq = 261.63;
-        const preferredRange = accompFreqs.filter(f => f >= C3_freq && f < C4_freq);
-        
-        let rootIdx;
-        if (Math.random() < 0.8) {
-             rootIdx = Math.floor(Math.random() * preferredRange.length);
-        } else {
-             rootIdx = Math.floor(Math.random() * (accompFreqs.length - 4));
-        }
+        const C5_freq = 523.25;
 
-        const rootFreq = preferredRange[rootIdx] ?? accompFreqs[rootIdx];
+        const preferredRange = freqs.accompaniment.filter(f => f >= C3_freq && f < C4_freq);
+        let rootFreq;
+
+        if (Math.random() < 0.7) { // 70% chance to stay in preferred C3 range
+             rootFreq = preferredRange[Math.floor(Math.random() * preferredRange.length)];
+        } else { // 30% chance to go to C2 or C4
+            const otherRange = freqs.accompaniment.filter(f => (f >= C2_freq && f < C3_freq) || (f >= C4_freq && f < C5_freq));
+            rootFreq = otherRange[Math.floor(Math.random() * otherRange.length)];
+        }
+        
+        if (!rootFreq) continue; // Skip if no suitable frequency found
+
+        const rootNoteIndexInScale = freqs.accompaniment.indexOf(rootFreq);
+        if (rootNoteIndexInScale === -1) continue;
+
         const chordFreqs = [rootFreq];
-        const rootNoteIndexInScale = accompFreqs.indexOf(rootFreq);
-        if (rootNoteIndexInScale !== -1 && (rootNoteIndexInScale + 2) < accompFreqs.length && (rootNoteIndexInScale + 4) < accompFreqs.length) {
-             chordFreqs.push(accompFreqs[rootNoteIndexInScale + 2]);
-             chordFreqs.push(accompFreqs[rootNoteIndexInScale + 4]);
+        // Add 3rd and 5th
+        if ((rootNoteIndexInScale + 2) < freqs.accompaniment.length) {
+             chordFreqs.push(freqs.accompaniment[rootNoteIndexInScale + 2]);
+        }
+       if ((rootNoteIndexInScale + 4) < freqs.accompaniment.length) {
+             chordFreqs.push(freqs.accompaniment[rootNoteIndexInScale + 4]);
         }
        
         if (chordFreqs.length > 1) {
@@ -173,20 +189,6 @@ function generatePattern() {
         }
     }
     
-    // Effects: Increase frequency of random noise bursts
-    const numEffects = Math.floor(Math.random() * 4) + 1; // 1 to 4 effects per pattern
-    for (let i = 0; i < numEffects; i++) {
-        if (Math.random() > 0.3) { // 70% chance to generate an effect
-            pattern.effects.push({
-                time: Math.random() * totalDuration,
-                freq: 0, // freq doesn't matter for noise synth
-                dur: durationToSeconds('16n', currentBpm) * (Math.random() * 3 + 1), // variable duration
-                vel: 0.8 // a bit louder
-            });
-        }
-    }
-
-
     postMessage({ type: 'patternGenerated', pattern });
 }
 
@@ -202,7 +204,6 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             updateFrequencies();
             break;
         case 'setStyle':
-            // TODO: Implement style variations in generatePattern
             currentStyle = event.data.style;
             break;
         case 'setTempo':
