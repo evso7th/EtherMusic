@@ -184,7 +184,7 @@ export function ThereminPad({
     const renderBassControls = () => (
         <>
             {onLatchToggle && (
-                <div className="flex items-center space-x-1">
+                <div className="flex items-center space-x-1 h-8">
                     <Switch id="latch-mode" checked={isLatchOn} onCheckedChange={onLatchToggle} />
                     <Label htmlFor="latch-mode" className="flex items-center gap-1 text-xs"><Anchor className="w-3 h-3" /> Latch</Label>
                 </div>
