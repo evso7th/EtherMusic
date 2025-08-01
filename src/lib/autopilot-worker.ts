@@ -72,12 +72,12 @@ function getScaleFrequencies(key: MusicKey, scale: MusicScale, octaves: number[]
 
 function updateFrequencies() {
     freqs = {
-        // C1-C3
-        bass: getScaleFrequencies(currentKey, currentScale, [1, 2]),
-        // C2-C4
-        accompaniment: getScaleFrequencies(currentKey, currentScale, [2, 3]),
-        // C3-C5
-        melody: getScaleFrequencies(currentKey, currentScale, [3, 4]),
+        // C1, C2, C3
+        bass: getScaleFrequencies(currentKey, currentScale, [1, 2, 3]),
+        // C2, C3, C4
+        accompaniment: getScaleFrequencies(currentKey, currentScale, [2, 3, 4]),
+        // C3, C4, C5
+        melody: getScaleFrequencies(currentKey, currentScale, [3, 4, 5]),
     };
 }
 
@@ -110,51 +110,80 @@ function generatePattern() {
     }
     
     const pattern: AutopilotPattern = { melody: [], accompaniment: [], bass: [], effects: [] };
-    const sixteenthNoteDuration = durationToSeconds('16n', currentBpm);
+    const totalDuration = durationToSeconds('4m', currentBpm);
+    const measureDuration = durationToSeconds('1m', currentBpm);
 
-    // Simple generation logic for now
     // Bass: one note per measure
     for (let i = 0; i < 4; i++) {
+        // Prefer C2-C3 range, sometimes go to C1
+        const bassFreqs = freqs.bass.filter(f => f < 131); // Up to C3
+        const freqIndex = Math.random() < 0.2 ? 0 : Math.floor(bassFreqs.length * 0.3) + Math.floor(Math.random() * (bassFreqs.length * 0.7));
         pattern.bass.push({
-            time: i * durationToSeconds('1m', currentBpm),
-            freq: freqs.bass[Math.floor(Math.random() * 3)], // low notes
-            dur: durationToSeconds('1m', currentBpm),
+            time: i * measureDuration,
+            freq: bassFreqs[freqIndex],
+            dur: measureDuration,
             vel: 0.4
         });
     }
 
     // Accompaniment: simple chords
-    for (let i = 0; i < 2; i++) {
-        const rootIdx = Math.floor(Math.random() * 4);
-        const chord = [freqs.accompaniment[rootIdx], freqs.accompaniment[rootIdx + 2], freqs.accompaniment[rootIdx + 4]];
-        pattern.accompaniment.push({
-            time: i * durationToSeconds('2m', currentBpm),
-            freq: chord,
-            dur: durationToSeconds('2m', currentBpm),
-            vel: 0.3
-        });
+    for (let i = 0; i < 4; i++) {
+        // Prefer C3 range, with deviations to C2 and C4
+        const accompFreqs = freqs.accompaniment;
+        const C3_freq = 130.81;
+        const C4_freq = 261.63;
+        const preferredRange = accompFreqs.filter(f => f >= C3_freq && f < C4_freq);
+        
+        let rootIdx;
+        if (Math.random() < 0.8) {
+             rootIdx = Math.floor(Math.random() * preferredRange.length);
+        } else {
+             rootIdx = Math.floor(Math.random() * (accompFreqs.length - 4));
+        }
+
+        const rootFreq = preferredRange[rootIdx] ?? accompFreqs[rootIdx];
+        const chordFreqs = [rootFreq];
+        const rootNoteIndexInScale = accompFreqs.indexOf(rootFreq);
+        if (rootNoteIndexInScale !== -1 && (rootNoteIndexInScale + 2) < accompFreqs.length && (rootNoteIndexInScale + 4) < accompFreqs.length) {
+             chordFreqs.push(accompFreqs[rootNoteIndexInScale + 2]);
+             chordFreqs.push(accompFreqs[rootNoteIndexInScale + 4]);
+        }
+       
+        if (chordFreqs.length > 1) {
+            pattern.accompaniment.push({
+                time: i * measureDuration + (measureDuration / 2),
+                freq: chordFreqs,
+                dur: measureDuration,
+                vel: 0.3
+            });
+        }
     }
 
     // Melody: a few random notes
     for (let i = 0; i < 8; i++) {
         if (Math.random() > 0.5) {
+            const melodyFreqs = freqs.melody.filter(f => f < 524); // Up to C5
+            const freq = melodyFreqs[Math.floor(Math.random() * melodyFreqs.length)];
             pattern.melody.push({
                 time: i * durationToSeconds('8n', currentBpm) * 2,
-                freq: freqs.melody[Math.floor(Math.random() * freqs.melody.length)],
+                freq: freq,
                 dur: durationToSeconds('8n', currentBpm),
                 vel: 0.6
             });
         }
     }
     
-    // Effects: random noise burst
-    if (Math.random() > 0.7) {
-        pattern.effects.push({
-            time: Math.random() * durationToSeconds('4m', currentBpm),
-            freq: 0, // freq doesn't matter for noise synth
-            dur: durationToSeconds('16n', currentBpm),
-            vel: 1.0
-        });
+    // Effects: Increase frequency of random noise bursts
+    const numEffects = Math.floor(Math.random() * 4) + 1; // 1 to 4 effects per pattern
+    for (let i = 0; i < numEffects; i++) {
+        if (Math.random() > 0.3) { // 70% chance to generate an effect
+            pattern.effects.push({
+                time: Math.random() * totalDuration,
+                freq: 0, // freq doesn't matter for noise synth
+                dur: durationToSeconds('16n', currentBpm) * (Math.random() * 3 + 1), // variable duration
+                vel: 0.8 // a bit louder
+            });
+        }
     }
 
 
