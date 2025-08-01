@@ -50,14 +50,13 @@ export class AutopilotEngine {
 
      private handleWorkerMessage(event: MessageEvent<WorkerResponse>) {
         if (event.data.type === 'patternGenerated') {
-            const { melody, accompaniment, bass, effects } = event.data.pattern;
+            const { melody, accompaniment, bass } = event.data.pattern;
 
             // Combine all events to schedule them
             const allEvents: NoteEventWithType[] = [
                 ...melody.map(n => ({ ...n, type: 'melody' as const })),
                 ...accompaniment.map(n => ({ ...n, type: 'accompaniment' as const })),
                 ...bass.map(n => ({ ...n, type: 'bass' as const })),
-                ...effects.map(n => ({ ...n, type: 'effects' as const })),
             ];
 
             allEvents.forEach((note) => {
@@ -71,16 +70,15 @@ export class AutopilotEngine {
         this.stopCurrentLoop();
     
         const generateAndScheduleNext = () => {
-            // Set the start time for the *next* pattern to be now.
-            // This ensures all notes within this pattern are scheduled relative to the same starting point.
-            this.nextPatternTime = Tone.now();
+             // Set the start time for the *next* pattern to be now.
+            if(this.nextPatternTime < Tone.now()) {
+                this.nextPatternTime = Tone.now();
+            }
             this.postMessage({ type: 'generate' });
             
-            // Use setTimeout for reliable, transport-independent scheduling.
             this.scheduleTimeoutId = window.setTimeout(generateAndScheduleNext, this.patternDuration * 1000);
         }
     
-        // Schedule the very first generation to happen almost immediately.
         generateAndScheduleNext();
     }
     
@@ -90,7 +88,6 @@ export class AutopilotEngine {
             clearTimeout(this.scheduleTimeoutId);
             this.scheduleTimeoutId = null;
         }
-        // This is a more robust way to stop all autopilot sounds immediately.
         this.audioEngine.stopAutopilotSynths();
     }
 

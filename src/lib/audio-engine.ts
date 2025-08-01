@@ -311,16 +311,16 @@ export class AudioEngine {
     public playAutopilotEvent(time: number, note: {type: AutopilotInstrument, freq: number | number[], dur: number, vel: number}) {
         if (!this.isInitialized || !isFinite(time)) return;
         
-        const now = Tone.now();
-        if (time < now) {
-            time = now;
+        let safeTime = time;
+        if (safeTime < Tone.now()) {
+            safeTime = Tone.now();
         }
 
         const synth = this.autopilotSynths[note.type];
         if (!synth) return;
 
         if (synth instanceof Tone.PolySynth) {
-            synth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
+            synth.triggerAttackRelease(note.freq, note.dur, safeTime, note.vel);
         }
     }
 
@@ -330,15 +330,16 @@ export class AudioEngine {
         for (const key in this.autopilotSynths) {
             const instrument = key as AutopilotInstrument;
             const synth = this.autopilotSynths[instrument];
-            const channel = this.channels[instrument] ?? this.channels.accompaniment; 
             
             if (synth instanceof Tone.PolySynth) {
-                synth.releaseAll();
-                // A hard stop to ensure sound cuts immediately.
+                // Disconnecting is a hard and fast way to stop all sound immediately.
                 synth.disconnect();
-                synth.connect(channel);
+                // Then reconnect for future use.
+                synth.connect(this.channels[instrument] ?? this.channels.accompaniment);
             }
         }
+         // Also cancel any events that were scheduled to happen in the future.
+        Tone.Transport.cancel();
     }
 
     // --- PRIVATE METHODS ---
