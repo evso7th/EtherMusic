@@ -6,7 +6,23 @@ import { LatchEngine } from './latch-engine';
 import { DrumMachine } from './drum-machine';
 import { OrbManager } from './orb-manager';
 
-export type InstrumentType = 'melody' | 'bass' | 'latch' | 'autopilot_melody' | 'autopilot_accompaniment' | 'autopilot_bass' | 'autopilot_effect';
+export type InstrumentType = 
+    'melody' | 
+    'bass' | 
+    'latch' | 
+    'autopilot_melody' | 
+    'autopilot_accompaniment' | 
+    'autopilot_bass' |
+    'autopilot_effect_star' |
+    'autopilot_effect_meteor' |
+    'autopilot_effect_warp' |
+    'autopilot_effect_hole' |
+    'autopilot_effect_pulsar' |
+    'autopilot_effect_nebula' |
+    'autopilot_effect_comet' |
+    'autopilot_effect_wind' |
+    'autopilot_effect_echoes';
+
 
 // A "Voice" represents a single synthesizer and its current state.
 class Voice {
@@ -84,7 +100,7 @@ export class AudioEngine {
     // --- The Unified Voice Pool ---
     private voicePool: Voice[] = [];
     private readonly MAX_VOICES = 18; // Total voices for the entire app
-    private presets: { [key in InstrumentType]: any } = {};
+    private presets: { [key in InstrumentType]?: any } = {};
 
     private allowedFrequencies = { bass: [] as number[], melody: [] as number[] };
     private isBassLatchOn = false;
@@ -197,22 +213,21 @@ export class AudioEngine {
     }
     
     public playAutopilotEvent(note: {type: InstrumentType, freq: number, dur: Tone.Unit.Time, vel: number}) {
-        if (!this.isInitialized || note.type.startsWith('autopilot') === false) return;
-        
-        // --- DEFENSIVE CHECK ---
-        if (typeof note.freq !== 'number' || !isFinite(note.freq)) {
-            console.warn("AudioEngine: Attempted to play a note with invalid frequency.", note);
-            return;
-        }
+        if (!this.isInitialized || !note.freq) return;
 
         const voice = this.getVoice();
         if (!voice) {
-            // console.warn("AudioEngine: No available voices for autopilot event.");
             return; 
         }
 
-        const channel = note.type === 'autopilot_effect' ? this.channels.effects : this.channels.autopilot;
-        voice.configure(this.presets[note.type], channel);
+        const preset = this.presets[note.type];
+        if (!preset) {
+            console.warn(`AudioEngine: No preset for instrument type "${note.type}"`);
+            return;
+        }
+        
+        const channel = note.type.startsWith('autopilot_effect') ? this.channels.effects : this.channels.autopilot;
+        voice.configure(preset, channel);
         
         voice.attack(note.freq, note.vel, null, note.type);
         voice.release(note.dur);
@@ -303,10 +318,20 @@ export class AudioEngine {
             latch: { oscillator: { type: 'fatsawtooth', count: 3, spread: 20 }, envelope: { attack: 0.2, decay: 0.1, sustain: 1, release: 0.8 }},
             
             // Autopilot presets
-            autopilot_bass: { oscillator: { type: 'fatsawtooth', count: 3, spread: 20 }, filter: { Q: 5, type: 'lowpass', rolloff: -24 }, envelope: { attack: 0.01, decay: 1.4, sustain: 0.1, release: 2 }, filterEnvelope: { attack: 0.01, decay: 0.7, sustain: 0, release: 0, baseFrequency: 200, octaves: 1.5 } },
-            autopilot_accompaniment: { oscillator: { type: 'triangle' }, envelope: { attack: 0.2, decay: 0.9, sustain: 0.1, release: 1.0 }, volume: -8 },
+            autopilot_bass: { oscillator: { type: 'fmsine', harmonicity: 0.5, modulationIndex: 3 }, filter: { Q: 1, type: 'lowpass', rolloff: -24 }, envelope: { attack: 0.04, decay: 0.1, sustain: 0.9, release: 1 }, filterEnvelope: { attack: 0.05, decay: 0.6, sustain: 0.4, release: 1.5, baseFrequency: 100, octaves: 1.2 } },
+            autopilot_accompaniment: { oscillator: { type: 'triangle8' }, envelope: { attack: 0.2, decay: 0.9, sustain: 0.1, release: 1.0 }, volume: -8 },
             autopilot_melody: { oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } },
-            autopilot_effect: { oscillator: { type: 'fmsine', modulationType: 'sine', harmonicity: 0.8 }, envelope: { attack: 0.01, decay: 0.8, sustain: 0, release: 0 } },
+            
+            // Effect presets
+            autopilot_effect_star: { oscillator: { type: 'fmsine', modulationType: 'sine', harmonicity: 0.8 }, envelope: { attack: 0.01, decay: 0.8, sustain: 0, release: 0 } },
+            autopilot_effect_meteor: { noise: { type: 'white' }, filter: { type: 'bandpass', Q: 15 }, envelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.2 } },
+            autopilot_effect_warp: { noise: { type: 'pink', playbackRate: 0.2 }, filter: { type: 'lowpass', Q: 2 }, envelope: { attack: 0.5, decay: 0.8, sustain: 0.1, release: 1 } },
+            autopilot_effect_hole: { oscillator: { type: 'amsine', harmonicity: 0.2 }, envelope: { attack: 2, decay: 2, sustain: 0, release: 1 } },
+            autopilot_effect_pulsar: { oscillator: { type: 'pwm', modulationFrequency: 0.2 }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0 } },
+            autopilot_effect_nebula: { oscillator: { type: 'fatsawtooth', count: 5, spread: 80 }, envelope: { attack: 1.5, decay: 2, sustain: 0.5, release: 2 } },
+            autopilot_effect_comet: { oscillator: { type: 'pulse', width: 0.1 }, envelope: { attack: 0.01, decay: 0.5, sustain: 0, release: 0.8 } },
+            autopilot_effect_wind: { noise: { type: 'brown' }, filter: { type: 'bandpass', Q: 8 }, envelope: { attack: 2, decay: 5, sustain: 0.1, release: 3 } },
+            autopilot_effect_echoes: { oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0 } },
         };
     }
 
@@ -354,3 +379,4 @@ export class AudioEngine {
         }
     }
 }
+
