@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import * as Tone from 'tone';
+import type { AudioEngine } from './audio-engine';
 import type { OrbManager } from './orb-manager';
 
 const NOTE_PROXIMITY_THRESHOLD = 35;
@@ -10,23 +11,21 @@ type LatchedBassNote = {
     id: number;
     x: number;
     y: number;
-    synth: Tone.Synth;
+    voice: any; // Will hold the Voice object from AudioEngine
     initialFreq: number;
-    volume: number; // Volume from 0.0 to 1.0
+    volume: number;
 };
 
 export class LatchEngine {
     private isLatchOn = false;
-    
-    private synthPool: Tone.Synth[];
+    private audioEngine: AudioEngine;
     private orbManager: OrbManager;
     private latchedNotes = new Map<number, LatchedBassNote>();
     private allowedFrequencies: number[] = [];
 
-    constructor(synthPool: Tone.Synth[], orbManager: OrbManager, allowedFrequencies: number[]) {
-        this.synthPool = synthPool;
+    constructor(audioEngine: AudioEngine, orbManager: OrbManager) {
+        this.audioEngine = audioEngine;
         this.orbManager = orbManager;
-        this.allowedFrequencies = allowedFrequencies;
     }
     
     public setAllowedFrequencies(frequencies: number[]) {
@@ -37,10 +36,7 @@ export class LatchEngine {
         const wasOn = this.isLatchOn;
         this.isLatchOn = isOn;
         
-        if (!wasOn && isOn) {
-            // just turned on, nothing to do
-        } else if (wasOn && !isOn) {
-            // just turned off
+        if (wasOn && !isOn) {
             this.stopAll();
         }
     }
@@ -50,6 +46,7 @@ export class LatchEngine {
 
         const quantizedFreq = this.getClosestFrequency(freq);
 
+        // Check if there is an existing note nearby to remove
         let existingEntryId;
         for (const [id, note] of this.latchedNotes.entries()) {
             const distance = Math.sqrt(Math.pow(note.x - pos.x, 2) + Math.pow(note.y - pos.y, 2));
@@ -62,20 +59,17 @@ export class LatchEngine {
         if (existingEntryId !== undefined) {
             this.releaseAndRemoveNote(existingEntryId);
         } else {
-            const freeSynth = this.synthPool.find(synth => 
-                !Array.from(this.latchedNotes.values()).some(n => n.synth === synth)
-            );
-
-            if (freeSynth) {
+            // Get a voice from the main engine
+            const voice = this.audioEngine.getLatchVoice(quantizedFreq, vol);
+            if (voice) {
                 const newId = Date.now() + Math.random();
                 const newNote: LatchedBassNote = {
                     id: newId, x: pos.x, y: pos.y,
                     initialFreq: quantizedFreq, 
                     volume: vol,
-                    synth: freeSynth,
+                    voice: voice,
                 };
                 this.latchedNotes.set(newId, newNote);
-                this.playNote(newNote);
                 this.orbManager.addOrb(newId, 'latch', pos.x, pos.y);
             }
         }
@@ -86,18 +80,17 @@ export class LatchEngine {
         return this.allowedFrequencies.reduce((prev, curr) => (Math.abs(curr - targetFreq) < Math.abs(prev - targetFreq) ? curr : prev));
     }
 
-
-    private playNote(note: LatchedBassNote) {
-        note.synth.triggerAttack(note.initialFreq, undefined, note.volume);
-    }
-    
     public startAll() {
-        this.latchedNotes.forEach(this.playNote.bind(this));
+        this.latchedNotes.forEach(note => {
+            if (note.voice && note.voice.isAvailable()) {
+                note.voice.attack(note.initialFreq, note.volume, null, 'latch');
+            }
+        });
     }
     
     public pauseAll() {
         this.latchedNotes.forEach((note) => {
-            note.synth.triggerRelease();
+            this.audioEngine.releaseLatchVoice(note.voice);
         });
     }
 
@@ -109,10 +102,12 @@ export class LatchEngine {
 
     private releaseAndRemoveNote(noteId: number) {
         const noteToRelease = this.latchedNotes.get(noteId);
-        if(noteToRelease) {
-            noteToRelease.synth.triggerRelease();
+        if(noteToRelease && noteToRelease.voice) {
+            this.audioEngine.releaseLatchVoice(noteToRelease.voice);
             this.latchedNotes.delete(noteId);
             this.orbManager.removeOrb(noteId);
         }
     }
 }
+
+    

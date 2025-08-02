@@ -1,7 +1,7 @@
 
 
 import * as Tone from 'tone';
-import type { MusicKey, MusicScale, AutopilotStyle, MelodyInstrument } from '@/app/page';
+import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
 import type { WorkerEvent, WorkerResponse } from './autopilot-worker';
 import type { AudioEngine } from './audio-engine';
 
@@ -25,7 +25,6 @@ export class AutopilotEngine {
             this.worker.onmessage = this.handleWorkerMessage.bind(this);
         }
         
-        // Listen to transport start/stop to sync the worker's clock
         Tone.Transport.on('start', () => {
             if (this.isAutopilotOn) {
                 this.postMessage({ type: 'start' });
@@ -34,7 +33,6 @@ export class AutopilotEngine {
         
         Tone.Transport.on('stop', () => {
             this.postMessage({ type: 'stop' });
-            this.audioEngine.stopAutopilotSynths();
         });
 
         this.isInitialized = true;
@@ -65,19 +63,13 @@ export class AutopilotEngine {
         this.postMessage({ type: 'setStyle', style: style });
 
         if (isOn) {
-            // If transport is already running, start the worker's clock immediately.
-            // Otherwise, the 'start' event on the transport will handle it.
             if (Tone.Transport.state === 'started') {
                  this.postMessage({ type: 'start' });
             }
         } else {
             this.postMessage({ type: 'stop' });
-            this.audioEngine.stopAutopilotSynths();
         }
     }
-
-    public setMelodyInstrument(instrument: MelodyInstrument) {
-        if (!this.isInitialized) return;
-        this.audioEngine.setMelodyInstrument(instrument);
-    }
 }
+
+    

@@ -126,11 +126,9 @@ export default function Home() {
             mainEngine.setHarmony(musicKey, musicScale);
             mainEngine.setBeatPattern(activePattern.name);
             
-            // CRITICAL: Sync autopilot engine state immediately after initialization
             apEngine.setTempo(activeTempo.bpm);
             apEngine.setHarmony(musicKey, musicScale);
-            apEngine.setMelodyInstrument(melodyInstrument);
-
+            
             setIsReady(true);
             console.log('Audio engines initialized and ready.');
         } catch(e) {
@@ -172,7 +170,6 @@ export default function Home() {
     useEffect(() => {
         if (isReady) {
             audioEngine.current?.setMelodyInstrument(melodyInstrument);
-            autopilotEngine.current?.setMelodyInstrument(melodyInstrument);
         }
     }, [melodyInstrument, isReady]);
     
@@ -256,15 +253,8 @@ export default function Home() {
     }, [isReady, autopilotStyle]);
 
     const handleRecord = useCallback(() => {
-        if (!isReady) return;
-        const recording = audioEngine.current?.toggleRecording();
-        setIsRecording(recording || false);
-        if (recording) {
-            toast({ title: "Recording Started", description: "All output is now being recorded." });
-        } else {
-            toast({ title: "Recording Stopped", description: "Your recording has been downloaded." });
-        }
-    }, [isReady, toast]);
+        toast({ title: "Recording Unavailable", description: "This feature is temporarily disabled." });
+    }, [toast]);
 
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isReady || !audioEngine.current) return;
@@ -474,3 +464,5 @@ export default function Home() {
         </div>
     );
 }
+
+    

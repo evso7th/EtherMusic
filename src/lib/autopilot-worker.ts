@@ -1,19 +1,17 @@
 
 
 import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
-import type { AutopilotInstrument } from './audio-engine';
+import type { InstrumentType } from './audio-engine';
 import type { Unit } from 'tone/build/esm/core/type/Units';
 
 // --- TYPE DEFINITIONS ---
 
 type NoteEvent = {
-    type: AutopilotInstrument;
-    freq: number | number[]; // Note: Can be an array for chords
-    dur: Unit.Time; // Use Tone's Time unit for flexibility
+    type: InstrumentType;
+    freq: number | number[]; 
+    dur: Unit.Time;
     vel: number;
 };
-
-// --- WORKER COMMUNICATION INTERFACES ---
 
 export type WorkerEvent =
     | { type: 'start' }
@@ -27,26 +25,26 @@ export type WorkerResponse =
 
 
 // --- WORKER STATE ---
-let timerId: number | null = null;
+let timerId: any = null;
 let tickCount = 0;
-const subdivisions = 16; // 16th note resolution
+const subdivisions = 16; 
 
 let currentKey: MusicKey = 'C';
 let currentScale: MusicScale = 'Major Pentatonic';
 let currentStyle: AutopilotStyle = 'Ambient';
 let currentBpm = 120;
 let scaleIntervals: number[] = [];
-let chordProgression: number[] = [0, 4, 5, 3]; // Example progression (I-V-vi-IV in major)
+let chordProgression: number[] = [0, 4, 5, 3];
 
 type OctaveConfig = {
     primary: number[];
     rare: number[];
 };
 
-let scaleFrequencies: Record<'bass' | 'accompaniment' | 'melody', { primary: number[], rare: number[] }> = {
-    bass: { primary: [], rare: [] },
-    accompaniment: { primary: [], rare: [] },
-    melody: { primary: [], rare: [] },
+let scaleFrequencies: Record<'bass' | 'accompaniment' | 'melody', OctaveConfig> = {
+    bass: { primary: [2, 3], rare: [1] },
+    accompaniment: { primary: [3], rare: [2, 4] },
+    melody: { primary: [3, 4], rare: [5] },
 };
 
 
@@ -67,6 +65,7 @@ function getNoteFrequency(key: MusicKey, octave: number, interval: number): numb
     return Math.pow(2, (midiNote - 69) / 12) * A4;
 }
 
+
 function getScaleFrequenciesForOctaves(key: MusicKey, scale: MusicScale, octaves: number[]): number[] {
     const intervals = scaleIntervalMap[scale];
     let allFrequencies: number[] = [];
@@ -81,71 +80,50 @@ function getScaleFrequenciesForOctaves(key: MusicKey, scale: MusicScale, octaves
 function updateMusicContext() {
     scaleIntervals = scaleIntervalMap[currentScale];
     
-    const octaveMap: Record<keyof typeof scaleFrequencies, OctaveConfig> = {
-        bass: { primary: [2, 3], rare: [1] },
-        accompaniment: { primary: [3], rare: [2, 4] },
-        melody: { primary: [3, 4], rare: [5] },
-    };
-
-    for (const part in octaveMap) {
+    for (const part in scaleFrequencies) {
         const key = part as keyof typeof scaleFrequencies;
-        scaleFrequencies[key] = {
-            primary: getScaleFrequenciesForOctaves(currentKey, currentScale, octaveMap[key].primary),
-            rare: getScaleFrequenciesForOctaves(currentKey, currentScale, octaveMap[key].rare),
-        };
+        const config = scaleFrequencies[key];
+        config.primary = getScaleFrequenciesForOctaves(currentKey, currentScale, config.primary);
+        config.rare = getScaleFrequenciesForOctaves(currentKey, currentScale, config.rare);
     }
 
-    if (currentScale === 'Major' || currentScale === 'Major Pentatonic') {
+    if (currentScale.includes('Major')) {
         chordProgression = [0, 4, 5, 3]; // I-V-vi-IV
     } else {
         chordProgression = [0, 5, 3, 6]; // i-VI-IV-VII
     }
 }
 
-function getFrequencyForPart(part: keyof typeof scaleFrequencies, degree: number): number | null {
-    const partFrequencies = scaleFrequencies[part];
-    if (!partFrequencies || partFrequencies.primary.length === 0) return null;
 
-    const useRare = Math.random() < 0.15;
-    const availableFrequencies = (useRare && partFrequencies.rare.length > 0) 
-        ? partFrequencies.rare 
-        : partFrequencies.primary;
-
-    if (availableFrequencies.length === 0) return null;
-
-    const safeDegree = degree % scaleIntervals.length;
-    const targetInterval = scaleIntervals[safeDegree];
-    const rootFreqOfNote = getNoteFrequency(currentKey, 0, targetInterval);
+function getFrequencyFromDegree(degree: number, part: keyof typeof scaleFrequencies): number {
+    const octaves = scaleFrequencies[part];
+    const targetFrequencies = Math.random() < 0.15 ? octaves.rare : octaves.primary;
     
-    let closestFreq = availableFrequencies[0];
-    let minDiff = Infinity;
+    const scaleIndex = degree % scaleIntervals.length;
+    const octaveOffset = Math.floor(degree / scaleIntervals.length);
     
-    for (const freq of availableFrequencies) {
-         const diff = Math.abs( (12 * Math.log2(freq/rootFreqOfNote)) % 12 );
-         const roundedDiff = Math.min(diff, 12 - diff);
-         if (roundedDiff < minDiff) {
-            minDiff = roundedDiff;
-            closestFreq = freq;
-        }
-    }
-    return closestFreq;
+    const baseOctaveFreqs = getScaleFrequenciesForOctaves(currentKey, currentScale, [3]); // Use a central octave for reference
+    if(baseOctaveFreqs.length === 0) return 440;
+    
+    const baseFreq = baseOctaveFreqs[scaleIndex];
+    const targetFreq = baseFreq * Math.pow(2, octaveOffset);
+
+    // Find the closest frequency in the allowed octaves
+    return targetFrequencies.reduce((prev, curr) => (Math.abs(curr - targetFreq) < Math.abs(prev - targetFreq) ? curr : prev));
 }
+
 
 function getChordTones(rootDegree: number, part: keyof typeof scaleFrequencies, count: number): number[] {
     const chordTones: number[] = [];
     for (let i = 0; i < count; i++) {
         const degree = rootDegree + i * 2;
-        const freq = getFrequencyForPart(part, degree);
-        if (freq) {
-            chordTones.push(freq);
-        }
+        chordTones.push(getFrequencyFromDegree(degree, part));
     }
-    return Array.from(new Set(chordTones)); // Return unique frequencies
+    return Array.from(new Set(chordTones));
 }
 
 
 // --- THE "CONDUCTOR" ---
-
 function tick() {
     const measure = Math.floor(tickCount / subdivisions);
     const beat = tickCount % subdivisions;
@@ -153,49 +131,46 @@ function tick() {
     const rootDegree = chordProgression[measure % chordProgression.length];
 
     // --- Bass ---
-    if (beat === 0) { // Play on the downbeat of the measure
-        const freq = getFrequencyForPart('bass', rootDegree);
-        if (freq) {
-            postMessage({ type: 'playNote', note: { type: 'bass', freq, dur: '1m', vel: 0.6 } });
-        }
+    if (beat % 8 === 0) { // Play on the downbeat of every half measure
+        const freq = getFrequencyFromDegree(rootDegree, 'bass');
+        postMessage({ type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '2n', vel: 0.6 } });
     }
 
-    // --- Accompaniment (Arpeggio) ---
-    if (beat % 2 === 0) { // Eighth note rhythm
+    // --- Accompaniment (Arpeggio) with Syncopation ---
+    const isAccompanimentTick = (beat + 1) % 2 === 0;
+    if (isAccompanimentTick && Math.random() > 0.1) { // Add some rests
         const chordTones = getChordTones(rootDegree, 'accompaniment', 3);
         if (chordTones.length > 0) {
-            const arpNoteIndex = (beat / 2) % chordTones.length;
+            const arpNoteIndex = Math.floor(beat / 2) % chordTones.length;
             const freq = chordTones[arpNoteIndex];
             if (freq) {
-                 postMessage({ type: 'playNote', note: { type: 'accompaniment', freq, dur: '8n', vel: 0.3 } });
+                const isSyncopated = Math.random() < 0.2;
+                if (!isSyncopated) {
+                     postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '8n', vel: 0.3 } });
+                }
             }
         }
     }
     
     // --- Melody (Arpeggio) ---
-    if (beat % 4 === 0) { // Quarter note rhythm for melody
-        const chordTones = getChordTones(rootDegree, 'melody', 3);
+    if (beat % 4 === 0 && Math.random() < 0.75) {
+        const chordTones = getChordTones(rootDegree, 'melody', 5);
         if (chordTones.length > 0) {
-            const arpNoteIndex = (beat / 4 + 1) % chordTones.length; // Offset from accompaniment
+            const arpNoteIndex = (Math.floor(beat / 4) + Math.floor(Math.random() * 3)) % chordTones.length;
             const freq = chordTones[arpNoteIndex];
             if (freq) {
-                 postMessage({ type: 'playNote', note: { type: 'melody', freq, dur: '4n', vel: 0.5 } });
+                 postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '4n', vel: 0.5 } });
             }
         }
     }
 
     // --- Effects ---
-    if (Math.random() < 0.05) { // Low chance on any tick
-        const freq = getFrequencyForPart('melody', Math.floor(Math.random() * 7));
-        if (freq) {
-            postMessage({ type: 'playNote', note: { type: 'effect', freq, dur: '2n', vel: 0.4 } });
-        }
+    if (Math.random() < 0.02) { // Lowered probability
+        const freq = getFrequencyFromDegree(Math.floor(Math.random() * 7), 'melody');
+        postMessage({ type: 'playNote', note: { type: 'autopilot_effect', freq, dur: '2n', vel: 0.4 } });
     }
 
-    tickCount++;
-    if (tickCount >= subdivisions * 4) {
-        tickCount = 0; // Reset after 4 measures
-    }
+    tickCount = (tickCount + 1) % (subdivisions * 4); // Loop over 4 measures
 }
 
 
@@ -203,7 +178,7 @@ function start() {
     stop(); // Ensure no multiple loops are running
     updateMusicContext();
     tickCount = 0;
-    const interval = (60 / currentBpm) * (4 / subdivisions) * 1000;
+    const interval = (60 / currentBpm / 4) * 1000; // 16th note interval
     timerId = setInterval(tick, interval);
 }
 
@@ -216,7 +191,6 @@ function stop() {
 
 
 // --- WORKER EVENT HANDLER ---
-
 self.onmessage = function (event: MessageEvent<WorkerEvent>) {
     const { type } = event.data;
     switch (type) {
@@ -229,18 +203,18 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
         case 'setHarmony':
             currentKey = event.data.key;
             currentScale = event.data.scale;
-            updateMusicContext();
+            updateMusicContext(); // Recalculate frequencies when harmony changes
             break;
         case 'setStyle':
             currentStyle = event.data.style;
-            // Potentially change chord progressions or rhythms based on style
             break;
         case 'setTempo':
             currentBpm = event.data.bpm;
-            // If the clock is running, restart it to apply the new tempo
-            if (timerId !== null) {
+            if (timerId !== null) { // If it's already running, restart with new tempo
                 start();
             }
             break;
     }
 };
+
+    
