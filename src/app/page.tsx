@@ -74,7 +74,7 @@ export default function Home() {
     const [isPlaying, setIsPlaying] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
-    const [volumes, setVolumes] = useState({ melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -12, effects: -9 });
+    const [volumes, setVolumes] = useState({ melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, effects: -6 });
     const [effects, setEffects] = useState({
         melody: { reverb: -60, delay: -60 },
         manualBass: { reverb: -60, delay: -60 },

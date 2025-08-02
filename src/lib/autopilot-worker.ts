@@ -96,7 +96,7 @@ function updateMusicContext() {
     scaleFrequencies = {
         bass: getScaleFrequenciesForOctaves(currentKey, currentScale, [2, 3]),
         accompaniment: getScaleFrequenciesForOctaves(currentKey, currentScale, [3, 4]),
-        melody: getScaleFrequenciesForOctaves(currentKey, currentScale, [4, 5]),
+        melody: getScaleFrequenciesForOctaves(currentKey, currentScale, [3, 4]), // Lowered melody range
     };
 
     if (currentScale.includes('Major')) {
@@ -186,7 +186,7 @@ function tick(time: number) {
         if (degree !== null) {
             const freq = getFrequencyFromDegree(degree, 'accompaniment');
             if (freq) {
-                self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '4n', vel: 0.5 }, time });
+                self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '4n', vel: 0.6 }, time });
             }
         }
     }
@@ -210,7 +210,7 @@ function tick(time: number) {
         if (nextDegree !== null) {
             const freq = getFrequencyFromDegree(nextDegree, 'melody');
             if (freq) {
-                self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '4n', vel: 0.7 }, time });
+                self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '4n', vel: 0.65 }, time });
                 lastMelodyDegree = nextDegree;
             }
         }
@@ -218,20 +218,20 @@ function tick(time: number) {
 
     // --- Effects ---
     if (enabledParts.effects && time >= nextEffectTime) {
-        if (Math.random() < 0.1) {
+        if (Math.random() < 0.2) { // Increased probability
              const randomRootDegree = chordProgression[Math.floor(Math.random() * chordProgression.length)];
              const freq = getFrequencyFromDegree(randomRootDegree, 'melody');
              if (freq) {
                  const effectType = effectTypes[Math.floor(Math.random() * effectTypes.length)];
-                 const numNotes = Math.floor(Math.random() * 3) + 2;
+                 const numNotes = Math.floor(Math.random() * 3) + 3; // More notes
                  for(let i=0; i < numNotes; i++){
                     const effectFreq = freq * Math.pow(1.05946, i*2);
-                    self.postMessage({ type: 'playNote', note: { type: effectType, freq: effectFreq, dur: '8n', vel: Math.random() * 0.3 + 0.2 }, time: time + i * 0.1 });
+                    self.postMessage({ type: 'playNote', note: { type: effectType, freq: effectFreq, dur: '8n', vel: Math.random() * 0.3 + 0.3 }, time: time + i * 0.1 });
                  }
              }
         }
-        const randomDelay = Math.random() * 2000 + 1000;
-        nextEffectTime = time + randomDelay;
+        const randomDelay = Math.random() * 2000 + 1000; // 1 to 3 seconds
+        nextEffectTime = time + randomDelay / 1000; // Convert ms to seconds for comparison with time
     }
 
 
@@ -248,21 +248,22 @@ function start() {
     let expected = self.performance.now();
 
     const loop = () => {
-        const drift = self.performance.now() - expected;
+        const now = self.performance.now();
+        const drift = now - expected;
         if (drift > intervalSeconds * 1000) {
-            // We're too far behind, reset
             console.warn("Autopilot worker drift too high, resetting.");
-            expected = self.performance.now();
+            expected = now;
         }
         
         // Pass the "expected" time to the tick function for scheduling in Tone.js
+        // We use the time value from the global scope, not the potentially drifted `now`
         tick(expected / 1000); // Convert ms to seconds
 
         expected += intervalSeconds * 1000;
-        timerId = setTimeout(loop, intervalSeconds * 1000 - drift);
+        timerId = setTimeout(loop, Math.max(0, intervalSeconds * 1000 - drift));
     }
     
-    nextEffectTime = self.performance.now() + 1000; // Schedule first effect
+    nextEffectTime = self.performance.now() / 1000 + 2; // Schedule first effect 2s from now
     timerId = setTimeout(loop, intervalSeconds * 1000);
 }
 
