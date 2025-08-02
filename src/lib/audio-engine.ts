@@ -30,7 +30,6 @@ class Voice {
     public isBusy = false;
     public activePointerId: number | null = null;
     public instrumentType: InstrumentType | null = null;
-    public releaseTime = 0;
 
     constructor() {
         // A generic synth configuration. It will be reconfigured on the fly.
@@ -61,9 +60,9 @@ class Voice {
 
     release(duration: Tone.Unit.Time = 0) {
         if (this.isBusy) {
-            // Use Tone.Time to correctly calculate the release duration
             const releaseDuration = new Tone.Time(duration).toSeconds() > 0 ? new Tone.Time(duration).toSeconds() : 0.05;
             this.synth.triggerRelease();
+            
             setTimeout(() => {
                 this.isBusy = false;
                 this.activePointerId = null;
@@ -225,7 +224,8 @@ export class AudioEngine {
         const channel = note.type.startsWith('autopilot_effect') ? this.channels.effects : this.channels.autopilot;
         
         voice.configure(preset, channel);
-        voice.attack(note.freq, note.vel, Tone.now(), null, note.type);
+        const time = Tone.now();
+        voice.attack(note.freq, note.vel, time, null, note.type);
         voice.release(note.dur);
     }
 
@@ -322,6 +322,7 @@ export class AudioEngine {
                 filterEnvelope: { attack: 0.01, decay: 0.05, sustain: 0.8, release: 0.8, baseFrequency: 200, octaves: 1.5 }
             },
             autopilot_accompaniment: { 
+                portamento: 0.01,
                 oscillator: { type: 'triangle8' }, 
                 envelope: { attack: 0.2, decay: 0.9, sustain: 0.1, release: 1.0 }
             },
