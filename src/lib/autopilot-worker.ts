@@ -1,5 +1,4 @@
 
-
 import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
 import type { InstrumentType } from './audio-engine';
 import type { Unit } from 'tone/build/esm/core/type/Units';
@@ -23,7 +22,7 @@ export type WorkerEvent =
     | { type: 'setParts', parts: Record<AutopilotPart, boolean> };
 
 export type WorkerResponse =
-    | { type: 'playNote', note: NoteEvent };
+    | { type: 'playNote', note: NoteEvent, time: number };
 
 
 // --- WORKER STATE ---
@@ -96,7 +95,7 @@ function updateMusicContext() {
     scaleFrequencies = {
         bass: getScaleFrequenciesForOctaves(currentKey, currentScale, [1, 2]),
         accompaniment: getScaleFrequenciesForOctaves(currentKey, currentScale, [2, 3]),
-        melody: getScaleFrequenciesForOctaves(currentKey, currentScale, [4, 5]),
+        melody: getScaleFrequenciesForOctaves(currentKey, currentScale, [3, 4]),
     };
 
     if (currentScale.includes('Major')) {
@@ -156,15 +155,13 @@ function tick() {
     const rootDegree = chordProgression[chordIndex];
     
     // Define a syncopated bass rhythm pattern (16th notes)
-    const bassPattern = [1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0]; 
+    const bassPattern = [1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0];
 
     // --- Bass ---
-    if (enabledParts.bass) {
-        if (bassPattern[beat] === 1) {
-            const freq = getFrequencyFromDegree(rootDegree, 'bass');
-            if (freq) {
-                 self.postMessage({ type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '8n', vel: 0.8 }});
-            }
+    if (enabledParts.bass && bassPattern[beat] === 1) {
+        const freq = getFrequencyFromDegree(rootDegree, 'bass');
+        if (freq) {
+             self.postMessage({ type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '8n', vel: 0.8 }, time: now });
         }
     }
 
@@ -179,7 +176,7 @@ function tick() {
                 if (freq) {
                     const isSyncopated = Math.random() < 0.2;
                     if (!isSyncopated) {
-                         self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '8n', vel: 0.3 }});
+                         self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '8n', vel: 0.3 }, time: now });
                     }
                 }
             }
@@ -194,7 +191,7 @@ function tick() {
                 const arpNoteIndex = (Math.floor(beat / 4) + Math.floor(Math.random() * chordTones.length)) % chordTones.length;
                 const freq = chordTones[arpNoteIndex];
                 if (freq) {
-                     self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '2n', vel: 0.5 }});
+                     self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '2n', vel: 0.5 }, time: now });
                 }
             }
         }
@@ -206,7 +203,7 @@ function tick() {
         const freq = getFrequencyFromDegree(randomRootDegree, 'melody');
         if (freq) {
             const effectType = effectTypes[Math.floor(Math.random() * effectTypes.length)];
-            self.postMessage({ type: 'playNote', note: { type: effectType, freq, dur: '1n', vel: Math.random() * 0.3 + 0.2 } });
+            self.postMessage({ type: 'playNote', note: { type: effectType, freq, dur: '1n', vel: Math.random() * 0.3 + 0.2 }, time: now });
             
             // Schedule the next effect time randomly between 1 and 5 seconds from now
             const randomDelay = Math.random() * 4000 + 1000;
@@ -276,3 +273,5 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             break;
     }
 };
+
+    
