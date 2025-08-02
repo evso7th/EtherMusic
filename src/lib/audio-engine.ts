@@ -72,7 +72,8 @@ class Voice {
                 Tone.Transport.clear(this.releaseEventId);
             }
             
-            const releaseEndTime = releaseStartTime + new Tone.Time(this.synth.envelope.release).toSeconds() + 0.05; // Add 50ms buffer
+            const releaseTime = new Tone.Time(this.synth.envelope.release).toSeconds();
+            const releaseEndTime = releaseStartTime + releaseTime + 0.05; // Add 50ms buffer
 
             this.releaseEventId = Tone.Transport.scheduleOnce(() => {
                 this.isBusy = false;
@@ -81,6 +82,25 @@ class Voice {
                 this.releaseEventId = null;
             }, releaseEndTime);
         }
+    }
+
+    attackRelease(freq: number, dur: Tone.Unit.Time, time: number, vel: number, type: InstrumentType) {
+        if (this.releaseEventId) {
+            Tone.Transport.clear(this.releaseEventId);
+        }
+        this.isBusy = true;
+        this.activePointerId = null; 
+        this.instrumentType = type;
+
+        this.synth.triggerAttackRelease(freq, dur, time, vel);
+        
+        const totalDuration = new Tone.Time(dur).toSeconds() + new Tone.Time(this.synth.envelope.release).toSeconds();
+
+        this.releaseEventId = Tone.Transport.scheduleOnce(() => {
+            this.isBusy = false;
+            this.instrumentType = null;
+            this.releaseEventId = null;
+        }, time + totalDuration);
     }
     
     dispose() {
@@ -224,7 +244,7 @@ export class AudioEngine {
     }
     
     public playAutopilotEvent(note: {type: InstrumentType, freq: number, dur: Tone.Unit.Time, vel: number}, time?: number) {
-         if (!this.isInitialized || note.freq === null || note.freq === undefined) {
+         if (!this.isInitialized || note.freq === null || note.freq === undefined || !time) {
              return;
         }
 
@@ -242,8 +262,7 @@ export class AudioEngine {
         const channel = note.type.startsWith('autopilot_effect') ? this.channels.effects : this.channels.autopilot;
         
         voice.configure(preset, channel);
-        voice.attack(note.freq, note.vel, time, null, note.type);
-        voice.release(note.dur);
+        voice.attackRelease(note.freq, note.dur, time, note.vel, note.type);
     }
 
     public stopAllSounds() {
