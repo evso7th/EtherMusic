@@ -1,5 +1,4 @@
 
-
 import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
 import type { InstrumentType } from './audio-engine';
 import type { Unit } from 'tone/build/esm/core/type/Units';
@@ -80,12 +79,21 @@ function getScaleFrequenciesForOctaves(key: MusicKey, scale: MusicScale, octaves
 function updateMusicContext() {
     scaleIntervals = scaleIntervalMap[currentScale];
     
-    for (const part in scaleFrequencies) {
-        const key = part as keyof typeof scaleFrequencies;
-        const config = scaleFrequencies[key];
-        config.primary = getScaleFrequenciesForOctaves(currentKey, currentScale, config.primary);
-        config.rare = getScaleFrequenciesForOctaves(currentKey, currentScale, config.rare);
-    }
+    // We need to re-calculate the frequencies every time the harmony changes
+    scaleFrequencies = {
+        bass: { 
+            primary: getScaleFrequenciesForOctaves(currentKey, currentScale, [2, 3]),
+            rare: getScaleFrequenciesForOctaves(currentKey, currentScale, [1]) 
+        },
+        accompaniment: { 
+            primary: getScaleFrequenciesForOctaves(currentKey, currentScale, [3]),
+            rare: getScaleFrequenciesForOctaves(currentKey, currentScale, [2, 4]) 
+        },
+        melody: { 
+            primary: getScaleFrequenciesForOctaves(currentKey, currentScale, [3, 4]),
+            rare: getScaleFrequenciesForOctaves(currentKey, currentScale, [5]) 
+        },
+    };
 
     if (currentScale.includes('Major')) {
         chordProgression = [0, 4, 5, 3]; // I-V-vi-IV
@@ -95,15 +103,18 @@ function updateMusicContext() {
 }
 
 
-function getFrequencyFromDegree(degree: number, part: keyof typeof scaleFrequencies): number {
+function getFrequencyFromDegree(degree: number, part: keyof typeof scaleFrequencies): number | null {
     const octaves = scaleFrequencies[part];
+    if (!octaves || !octaves.primary || !octaves.primary.length) return null;
+
     const targetFrequencies = Math.random() < 0.15 ? octaves.rare : octaves.primary;
-    
+    if (!targetFrequencies || targetFrequencies.length === 0) return null;
+
     const scaleIndex = degree % scaleIntervals.length;
     const octaveOffset = Math.floor(degree / scaleIntervals.length);
     
-    const baseOctaveFreqs = getScaleFrequenciesForOctaves(currentKey, currentScale, [3]); // Use a central octave for reference
-    if(baseOctaveFreqs.length === 0) return 440;
+    const baseOctaveFreqs = getScaleFrequenciesForOctaves(currentKey, currentScale, [3]);
+    if(baseOctaveFreqs.length === 0 || !baseOctaveFreqs[scaleIndex]) return null;
     
     const baseFreq = baseOctaveFreqs[scaleIndex];
     const targetFreq = baseFreq * Math.pow(2, octaveOffset);
@@ -113,13 +124,13 @@ function getFrequencyFromDegree(degree: number, part: keyof typeof scaleFrequenc
 }
 
 
-function getChordTones(rootDegree: number, part: keyof typeof scaleFrequencies, count: number): number[] {
-    const chordTones: number[] = [];
+function getChordTones(rootDegree: number, part: keyof typeof scaleFrequencies, count: number): (number | null)[] {
+    const chordTones: (number | null)[] = [];
     for (let i = 0; i < count; i++) {
         const degree = rootDegree + i * 2;
         chordTones.push(getFrequencyFromDegree(degree, part));
     }
-    return Array.from(new Set(chordTones));
+    return chordTones;
 }
 
 
@@ -131,14 +142,16 @@ function tick() {
     const rootDegree = chordProgression[measure % chordProgression.length];
 
     // --- Bass ---
-    if (beat % 8 === 0) { // Play on the downbeat of every half measure
+    if (beat % 8 === 0) { 
         const freq = getFrequencyFromDegree(rootDegree, 'bass');
-        postMessage({ type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '2n', vel: 0.6 } });
+        if (freq) {
+             self.postMessage({ type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '2n', vel: 0.6 } });
+        }
     }
 
     // --- Accompaniment (Arpeggio) with Syncopation ---
     const isAccompanimentTick = (beat + 1) % 2 === 0;
-    if (isAccompanimentTick && Math.random() > 0.1) { // Add some rests
+    if (isAccompanimentTick && Math.random() > 0.1) {
         const chordTones = getChordTones(rootDegree, 'accompaniment', 3);
         if (chordTones.length > 0) {
             const arpNoteIndex = Math.floor(beat / 2) % chordTones.length;
@@ -146,7 +159,7 @@ function tick() {
             if (freq) {
                 const isSyncopated = Math.random() < 0.2;
                 if (!isSyncopated) {
-                     postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '8n', vel: 0.3 } });
+                     self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '8n', vel: 0.3 } });
                 }
             }
         }
@@ -159,15 +172,17 @@ function tick() {
             const arpNoteIndex = (Math.floor(beat / 4) + Math.floor(Math.random() * 3)) % chordTones.length;
             const freq = chordTones[arpNoteIndex];
             if (freq) {
-                 postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '4n', vel: 0.5 } });
+                 self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '4n', vel: 0.5 } });
             }
         }
     }
 
     // --- Effects ---
-    if (Math.random() < 0.02) { // Lowered probability
+    if (Math.random() < 0.02) {
         const freq = getFrequencyFromDegree(Math.floor(Math.random() * 7), 'melody');
-        postMessage({ type: 'playNote', note: { type: 'autopilot_effect', freq, dur: '2n', vel: 0.4 } });
+        if (freq) {
+            self.postMessage({ type: 'playNote', note: { type: 'autopilot_effect', freq, dur: '2n', vel: 0.4 } });
+        }
     }
 
     tickCount = (tickCount + 1) % (subdivisions * 4); // Loop over 4 measures
@@ -216,5 +231,3 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             break;
     }
 };
-
-    
