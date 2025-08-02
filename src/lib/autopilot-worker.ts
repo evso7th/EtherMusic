@@ -6,7 +6,7 @@ import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
 
 type NoteEvent = {
     time: number; // in seconds, relative to the start of the pattern
-    freq: number; // Note: No longer an array
+    freq: number | number[]; // Note: Can be an array for chords
     dur: number; // in seconds
     vel: number;
 };
@@ -60,14 +60,6 @@ const scaleIntervalMap: { [key in MusicScale]: number[] } = {
     'Minor': [0, 2, 3, 5, 7, 8, 10],
     'Major Pentatonic': [0, 2, 4, 7, 9],
     'Minor Pentatonic': [0, 3, 5, 7, 10],
-};
-
-// Chord progressions (degrees of the scale)
-const chordProgressions: { [key in MusicScale]?: number[][] } = {
-    'Major': [ [0, 4, 5, 3], [0, 3, 4, 0], [0, 4, 1, 5] ], // I-V-vi-IV, I-IV-V-I, I-V-ii-vi
-    'Minor': [ [0, 5, 2, 6], [0, 3, 6, 0] ], // i-VI-III-VII, i-iv-VII-i
-    'Major Pentatonic': [ [0, 3, 4, 1], [0, 1, 3, 4] ], // More fluid progressions
-    'Minor Pentatonic': [ [0, 2, 3, 0], [0, 3, 1, 0] ],
 };
 
 function getNoteFrequency(key: MusicKey, octave: number, interval: number): number {
@@ -129,7 +121,6 @@ function durationToSeconds(duration: string, bpm: number): number {
     }
 }
 
-// Helper to get a frequency from the correct octave based on probability
 function getFrequencyForPart(part: keyof typeof scaleFrequencies, degree?: number): number | null {
     const partFrequencies = scaleFrequencies[part];
     if (!partFrequencies || partFrequencies.primary.length === 0) return null;
@@ -145,18 +136,20 @@ function getFrequencyForPart(part: keyof typeof scaleFrequencies, degree?: numbe
     if (degree !== undefined) {
         // Ensure degree is within the bounds of scaleIntervals
         const safeDegree = degree % scaleIntervals.length;
+        const targetInterval = scaleIntervals[safeDegree];
         // Find the corresponding frequency in the chosen octave set
-        const rootFreq = getNoteFrequency(currentKey, 0, scaleIntervals[safeDegree]); // get base frequency
+        const rootFreq = getNoteFrequency(currentKey, 0, targetInterval); // get base frequency
         
         // Find the closest match in the available frequencies
         let closestFreq = availableFrequencies[0];
         let minDiff = Infinity;
 
         for (const freq of availableFrequencies) {
-            // Compare pitch classes (modulo 12)
-            const diff = Math.abs( (12 * Math.log2(freq/rootFreq)) % 12 );
-            if (diff < minDiff) {
-                minDiff = diff;
+            // Compare pitch classes (modulo 12) to find the same note in the target octave
+             const diff = Math.abs( (12 * Math.log2(freq/rootFreq)) % 12 );
+             const roundedDiff = Math.min(diff, 12 - diff); // handle wrapping around octave
+            if (roundedDiff < minDiff) {
+                minDiff = roundedDiff;
                 closestFreq = freq;
             }
         }
@@ -173,10 +166,12 @@ function getChordTones(rootDegree: number, part: keyof typeof scaleFrequencies):
     
     if (octaveSet.length === 0) return [];
     
+    // Using 1, 3, 5 of the scale for the chord
     const chordToneDegrees = [rootDegree, rootDegree + 2, rootDegree + 4];
     
     return chordToneDegrees.map(degree => {
-        const targetInterval = scaleIntervals[degree % scaleIntervals.length];
+        const safeDegree = degree % scaleIntervals.length;
+        const targetInterval = scaleIntervals[safeDegree];
         const rootFreqOfNote = getNoteFrequency(currentKey, 0, targetInterval);
         
         let closestFreq = octaveSet[0];
@@ -184,8 +179,9 @@ function getChordTones(rootDegree: number, part: keyof typeof scaleFrequencies):
         
         for (const freq of octaveSet) {
              const diff = Math.abs( (12 * Math.log2(freq/rootFreqOfNote)) % 12 );
-             if (diff < minDiff) {
-                minDiff = diff;
+             const roundedDiff = Math.min(diff, 12 - diff);
+             if (roundedDiff < minDiff) {
+                minDiff = roundedDiff;
                 closestFreq = freq;
             }
         }
@@ -208,18 +204,18 @@ function generatePattern() {
     const quarterNoteDuration = durationToSeconds('4n', currentBpm);
     const halfNoteDuration = durationToSeconds('2n', currentBpm);
     
-    const progression = generateChordProgression();
+    const rootDegrees = [0, 1, 3, 4]; // Example degrees from a pentatonic scale
 
     for (let measure = 0; measure < 4; measure++) {
         const measureStartTime = measure * measureDuration;
-        const chordRootDegree = progression[measure];
+        const chordRootDegree = rootDegrees[measure % rootDegrees.length];
         
         // --- BASS ---
         const bassRhythms = [
-            [{ time: 0, dur: halfNoteDuration + quarterNoteDuration, vel: 0.7 }],
-            [{ time: 0, dur: halfNoteDuration, vel: 0.8 }, { time: halfNoteDuration, dur: quarterNoteDuration, vel: 0.6 }],
-            [{ time: 0, dur: quarterNoteDuration, vel: 0.8 }, {time: quarterNoteDuration, dur: quarterNoteDuration, vel: 0.6}, {time: halfNoteDuration, dur: halfNoteDuration, vel: 0.7}],
-            [{ time: 0, dur: measureDuration, vel: 0.6 }],
+            [{ time: 0, dur: halfNoteDuration + quarterNoteDuration }],
+            [{ time: 0, dur: halfNoteDuration }, { time: halfNoteDuration, dur: quarterNoteDuration }],
+            [{ time: 0, dur: quarterNoteDuration }, {time: quarterNoteDuration, dur: quarterNoteDuration}, {time: halfNoteDuration, dur: halfNoteDuration}],
+            [{ time: 0, dur: measureDuration }],
         ];
         const bassRhythm = bassRhythms[Math.floor(Math.random() * bassRhythms.length)];
         
@@ -240,7 +236,7 @@ function generatePattern() {
                 time: time,
                 freq: freq,
                 dur: note.dur * 0.9,
-                vel: note.vel
+                vel: 0.5 + Math.random() * 0.2
             });
         });
         
@@ -273,21 +269,28 @@ function generatePattern() {
         // --- MELODY (ARPEGGIATOR with Syncopation) ---
         const melodyChordTones = getChordTones(chordRootDegree, 'melody');
         if (melodyChordTones.length > 0) {
-            const numNotes = Math.random() > 0.7 ? 4 : 2; // Generate 2 or 4 notes in the measure
+            const arpPatterns = [ [0, 1, 2, 3], [3, 2, 1, 0], [0, 2, 1, 3], [0, 1, 3, 2] ]; // Pentatonic has 5 notes, use 4 for arps
+            const arpPattern = arpPatterns[Math.floor(Math.random() * arpPatterns.length)];
+            const numNotes = Math.random() > 0.5 ? 8 : 4; // Generate 4 (quarters) or 8 (eighths) notes
+
             for (let i = 0; i < numNotes; i++) {
-                const freq = melodyChordTones[Math.floor(Math.random() * melodyChordTones.length)];
-                if (freq) {
-                    let time = measureStartTime + (i * (measureDuration / numNotes));
-                    if (Math.random() < 0.4) { // Syncopation
-                        time += (Math.random() - 0.5) * quarterNoteDuration;
+                 if (Math.random() > 0.2) { // Sparseness
+                    const noteIndexInChord = arpPattern[i % arpPattern.length];
+                    const freq = melodyChordTones[noteIndexInChord % melodyChordTones.length];
+                    
+                    if (freq) {
+                        let time = measureStartTime + i * (measureDuration / numNotes);
+                        if (Math.random() < 0.4) { // Syncopation
+                             time += (Math.random() - 0.5) * (measureDuration / numNotes);
+                        }
+                        pattern.melody.push({
+                            time,
+                            freq,
+                            dur: (measureDuration / numNotes) * (Math.random() * 1.2 + 0.8),
+                            vel: 0.5 * Math.random() + 0.4
+                        });
                     }
-                    pattern.melody.push({
-                        time,
-                        freq,
-                        dur: halfNoteDuration * (Math.random() * 1.5 + 0.5),
-                        vel: 0.5 * Math.random() + 0.4
-                    });
-                }
+                 }
             }
         }
             
@@ -307,6 +310,7 @@ function generatePattern() {
     
     postMessage({ type: 'patternGenerated', pattern });
 }
+
 
 // --- WORKER EVENT HANDLER ---
 
@@ -329,3 +333,5 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             break;
     }
 };
+
+    
