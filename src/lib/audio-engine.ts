@@ -30,7 +30,7 @@ class Voice {
     public isBusy = false;
     public activePointerId: number | null = null;
     public instrumentType: InstrumentType | null = null;
-    private releaseTimeoutId: any = null;
+    private releaseEventId: Tone.ToneEventId | null = null;
 
     constructor() {
         // A generic synth configuration. It will be reconfigured on the fly.
@@ -53,9 +53,9 @@ class Voice {
     }
     
     attack(freq: number, vel: number, time: number | undefined, pointerId: number | null, type: InstrumentType) {
-        if (this.releaseTimeoutId) {
-            clearTimeout(this.releaseTimeoutId);
-            this.releaseTimeoutId = null;
+        if (this.releaseEventId) {
+            Tone.Transport.clear(this.releaseEventId);
+            this.releaseEventId = null;
         }
         this.isBusy = true;
         this.activePointerId = pointerId;
@@ -65,29 +65,27 @@ class Voice {
 
     release(duration: Tone.Unit.Time = 0) {
         if (this.isBusy) {
-            const releaseTime = Tone.now() + new Tone.Time(duration).toSeconds();
-            this.synth.triggerRelease(releaseTime);
-            
-            // Schedule the voice to become available again after it has audibly stopped.
-            // Add a small buffer (50ms) to ensure the release envelope has completed.
-            const releaseDurationMs = new Tone.Time(duration).toMilliseconds() + new Tone.Time(this.synth.envelope.release).toMilliseconds() + 50;
-            
-            if (this.releaseTimeoutId) {
-                clearTimeout(this.releaseTimeoutId);
-            }
+            const releaseStartTime = Tone.now() + new Tone.Time(duration).toSeconds();
+            this.synth.triggerRelease(releaseStartTime);
 
-            this.releaseTimeoutId = setTimeout(() => {
+            if (this.releaseEventId) {
+                Tone.Transport.clear(this.releaseEventId);
+            }
+            
+            const releaseEndTime = releaseStartTime + new Tone.Time(this.synth.envelope.release).toSeconds() + 0.05; // Add 50ms buffer
+
+            this.releaseEventId = Tone.Transport.scheduleOnce(() => {
                 this.isBusy = false;
                 this.activePointerId = null;
                 this.instrumentType = null;
-                this.releaseTimeoutId = null;
-            }, releaseDurationMs);
+                this.releaseEventId = null;
+            }, releaseEndTime);
         }
     }
     
     dispose() {
-        if (this.releaseTimeoutId) {
-            clearTimeout(this.releaseTimeoutId);
+        if (this.releaseEventId) {
+            Tone.Transport.clear(this.releaseEventId);
         }
         this.synth.dispose();
     }
@@ -133,8 +131,8 @@ export class AudioEngine {
             manualBass: new Tone.Channel(-6),
             latch: new Tone.Channel(-15),
             drums: new Tone.Channel(-9),
-            autopilot: new Tone.Channel(-12),
-            effects: new Tone.Channel(-9),
+            autopilot: new Tone.Channel(-10),
+            effects: new Tone.Channel(-6),
         };
         
         for (const channel of Object.values(this.channels)) {
@@ -298,7 +296,7 @@ export class AudioEngine {
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
         this.allowedFrequencies = {
-            bass: this.getScaleFrequencies(key, scale, [2, 3]),
+            bass: this.getScaleFrequencies(key, scale, [1, 2]),
             melody: this.getScaleFrequencies(key, scale, [3, 4, 5]),
         };
         this.latchEngine.setAllowedFrequencies(this.allowedFrequencies.bass);
@@ -338,7 +336,7 @@ export class AudioEngine {
                 oscillator: { type: "fmsine", harmonicity: 0.5 },
                 filter: { Q: 1, type: 'lowpass', rolloff: -12 },
                 envelope: { attack: 0.1, decay: 0.3, sustain: 0.4, release: 1.2 },
-                filterEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.1, release: 1, baseFrequency: 80, octaves: 1.5 }
+                filterEnvelope: { attack: 0.05, decay: 0.2, sustain: 0.1, release: 1, baseFrequency: 200, octaves: 1.5 }
             },
             autopilot_accompaniment: { 
                 portamento: 0.01,
