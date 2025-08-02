@@ -4,7 +4,7 @@ import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
 import type { WorkerEvent, WorkerResponse, AutopilotPart } from './autopilot-worker';
 import type { AudioEngine } from './audio-engine';
 
-// A map to hold the worker instances
+// A map to hold the worker instances for caching
 const workerCache: Partial<Record<AutopilotStyle, Worker>> = {};
 
 export class AutopilotEngine {
@@ -35,14 +35,19 @@ export class AutopilotEngine {
     public async initialize() {
         if (this.isInitialized) return;
         
-        if (typeof window !== 'undefined') {
-            // Pre-warm the default worker
-            this.getWorker('Ambient');
-        }
-        
-        Tone.Transport.on('start', this.handleTransportStart.bind(this));
-        Tone.Transport.on('stop', this.handleTransportStop.bind(this));
+        // This handler ensures that if the transport is started (e.g. by user pressing play)
+        // and the autopilot is on, the worker will start generating music.
+        Tone.Transport.on('start', () => {
+            if (this.isAutopilotOn) {
+                this.postMessageToActiveWorker({ type: 'start' });
+            }
+        });
 
+        // This handler stops the worker when the transport stops.
+        Tone.Transport.on('stop', () => {
+             this.postMessageToActiveWorker({ type: 'stop' });
+        });
+        
         this.isInitialized = true;
     }
 
@@ -51,15 +56,12 @@ export class AutopilotEngine {
             return workerCache[style]!;
         }
 
-        console.log(`Creating worker for style: ${style}`);
-        
         let workerPath: string;
-
         switch(style) {
             case 'Toccata':
                 workerPath = './autopilot-styles/toccata.worker.ts';
                 break;
-            case 'Ambient':
+            case 'Ambient': // Default case
             default:
                  workerPath = './autopilot-styles/ambient.worker.ts';
                 break;
@@ -67,8 +69,9 @@ export class AutopilotEngine {
 
         try {
             // This special syntax is a hint for bundlers like Webpack/Vite/Next.js
-            // to correctly handle the worker file.
-            const worker = new Worker(new URL(workerPath, import.meta.url), { type: 'module' });
+            // to correctly handle the worker file and provide a web-accessible URL.
+            const workerUrl = new URL(workerPath, import.meta.url);
+            const worker = new Worker(workerUrl, { type: 'module' });
             
             worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
                 this.handleWorkerMessage(event, style);
@@ -77,17 +80,15 @@ export class AutopilotEngine {
             workerCache[style] = worker;
             return worker;
         } catch (e) {
-            console.error(`Failed to construct Worker for style ${style}`, e);
-            // Fallback to ambient if something goes wrong, and ensure it's loaded.
+            console.error(`Failed to construct Worker for style ${style}:`, e);
             if (style !== 'Ambient') {
                 return this.getWorker('Ambient');
             }
-            throw e; // re-throw if even ambient fails
+            throw e;
         }
     }
     
     private handleWorkerMessage(event: MessageEvent<WorkerResponse>, style: AutopilotStyle) {
-        // Only process messages from the currently active style's worker
         if (this.currentStyle !== style || !this.isAutopilotOn) {
             return;
         }
@@ -97,16 +98,6 @@ export class AutopilotEngine {
         }
     }
     
-    private handleTransportStart() {
-        if (this.isAutopilotOn && this.activeWorker) {
-            this.postMessageToActiveWorker({ type: 'start' });
-        }
-    }
-
-    private handleTransportStop() {
-        this.postMessageToActiveWorker({ type: 'stop' });
-    }
-
     private postMessageToActiveWorker(message: WorkerEvent) {
         this.activeWorker?.postMessage(message);
     }
@@ -133,32 +124,31 @@ export class AutopilotEngine {
         const didStyleChange = this.currentStyle !== style;
         this.isAutopilotOn = isOn;
 
-        // --- Logic for switching workers ---
+        // If the style changed, we need to switch workers
         if (didStyleChange) {
-            if (this.activeWorker) {
-                this.postMessageToActiveWorker({ type: 'stop' });
-            }
+            // Stop the old worker if it exists
+            this.postMessageToActiveWorker({ type: 'stop' });
+
+            // Get the new worker and sync its state
             this.currentStyle = style;
             this.activeWorker = this.getWorker(style);
             this.syncWorkerState();
         }
 
-        // --- Logic for starting or stopping the active worker ---
-        if (isOn) {
-            // If the transport is already running, we need to start the new worker.
-            // This handles the case of switching styles while music is playing.
-            if (Tone.Transport.state === 'started') {
-                 this.postMessageToActiveWorker({ type: 'start' });
-            }
+        if (this.isAutopilotOn) {
+            // If the autopilot should be on, ensure the worker is started.
+            // This is safe to call even if the transport is paused; the worker will
+            // start generating notes once the transport starts.
+            this.postMessageToActiveWorker({ type: 'start' });
         } else {
-            // If autopilot is turned off, stop the worker.
+            // If the autopilot is being turned off, stop the worker.
             this.postMessageToActiveWorker({ type: 'stop' });
         }
     }
 
+    // Syncs the new worker with the last known state of the UI/app
     private syncWorkerState() {
         if (!this.activeWorker) return;
-        console.log(`Syncing new worker for style ${this.currentStyle} with state:`, this.lastKnownState);
         this.postMessageToActiveWorker({ type: 'setTempo', bpm: this.lastKnownState.bpm });
         this.postMessageToActiveWorker({ type: 'setHarmony', key: this.lastKnownState.key, scale: this.lastKnownState.scale });
         this.postMessageToActiveWorker({ type: 'setParts', parts: this.lastKnownState.parts });
