@@ -59,28 +59,16 @@ class Voice {
         this.synth.triggerAttack(freq, time, vel);
     }
 
-    release(time?: number) {
+    release(duration: Tone.Unit.Time = 0) {
         if (this.isBusy) {
-            this.synth.triggerRelease(time);
-            // We can't know for sure when it will be free, so we use a timeout
-            // This is a simplification; a more robust solution might use Tone.Draw.schedule
-            const releaseDuration = this.synth.get().envelope.release as number;
+            // Use Tone.Time to correctly calculate the release duration
+            const releaseDuration = new Tone.Time(duration).toSeconds() > 0 ? new Tone.Time(duration).toSeconds() : 0.05;
+            this.synth.triggerRelease();
             setTimeout(() => {
                 this.isBusy = false;
                 this.activePointerId = null;
                 this.instrumentType = null;
             }, releaseDuration * 1000 + 50);
-        }
-    }
-
-    scheduleRelease(time: number) {
-        if(this.isBusy) {
-            this.synth.triggerRelease(time);
-            Tone.Transport.scheduleOnce(() => {
-                this.isBusy = false;
-                this.activePointerId = null;
-                this.instrumentType = null;
-            }, time);
         }
     }
     
@@ -103,7 +91,7 @@ export class AudioEngine {
     
     // --- The Unified Voice Pool ---
     private voicePool: Voice[] = [];
-    private readonly MAX_VOICES = 18; // Total voices for the entire app
+    private readonly MAX_VOICES = 16; // Total voices for the entire app
     private presets: { [key in InstrumentType]?: any } = {};
 
     private allowedFrequencies = { bass: [] as number[], melody: [] as number[] };
@@ -182,7 +170,6 @@ export class AudioEngine {
         if (!this.isInitialized) return;
         const quantizedFreq = this.getClosestFrequency(freq, type);
         const instrumentType = type === 'melody' ? 'melody' : 'manualBass';
-        const time = Tone.now();
 
         if (type === 'bass' && this.isBassLatchOn) {
             this.latchEngine.handleInteraction(pos, vol, quantizedFreq);
@@ -191,6 +178,7 @@ export class AudioEngine {
         
         const voice = this.getVoice();
         if (voice) {
+            const time = Tone.now();
             const channel = type === 'melody' ? this.channels.melody : this.channels.manualBass;
             voice.configure(this.presets[instrumentType], channel);
             voice.attack(quantizedFreq, vol*vol, time, pointerId, instrumentType);
@@ -215,13 +203,14 @@ export class AudioEngine {
 
         const voice = this.getVoice(pointerId);
         if (voice) {
-            voice.release(Tone.now());
+            voice.release();
             this.orbManager.removeOrb(pointerId);
         }
     }
     
-    public playAutopilotEvent(note: {type: InstrumentType, freq: number, dur: Tone.Unit.Time, vel: number}, time: number) {
-        if (!this.isInitialized || !note.freq) return;
+    public playAutopilotEvent(note: {type: InstrumentType, freq: number, dur: Tone.Unit.Time, vel: number}) {
+        if (!this.isInitialized) return;
+        if (note.freq === null || note.freq === undefined) return;
 
         const voice = this.getVoice();
         if (!voice) {
@@ -235,17 +224,14 @@ export class AudioEngine {
         }
         
         const channel = note.type.startsWith('autopilot_effect') ? this.channels.effects : this.channels.autopilot;
-        const now = Tone.now();
-        const startTime = now + time;
-        const releaseTime = startTime + new Tone.Time(note.dur).toSeconds();
         
         voice.configure(preset, channel);
-        voice.attack(note.freq, note.vel, startTime, null, note.type);
-        voice.scheduleRelease(releaseTime);
+        voice.attack(note.freq, note.vel, Tone.now(), null, note.type);
+        voice.release(note.dur);
     }
 
     public stopAllSounds() {
-        this.voicePool.forEach(voice => voice.release(Tone.now()));
+        this.voicePool.forEach(voice => voice.release());
         this.orbManager.removeAllOrbs('melody');
         this.orbManager.removeAllOrbs('bass');
         this.latchEngine.stopAll();
@@ -317,7 +303,7 @@ export class AudioEngine {
     }
     
     public releaseLatchVoice(voice: Voice) {
-        voice.release(Tone.now());
+        voice.release();
     }
 
 
@@ -330,13 +316,18 @@ export class AudioEngine {
             latch: { oscillator: { type: 'fatsawtooth', count: 3, spread: 20 }, envelope: { attack: 0.2, decay: 0.1, sustain: 1, release: 0.8 }},
             
             // Autopilot presets
-            autopilot_bass: { oscillator: { type: 'fmsine', harmonicity: 0.5, modulationIndex: 3 }, filter: { Q: 1, type: 'lowpass', rolloff: -24 }, envelope: { attack: 0.04, decay: 0.1, sustain: 0.9, release: 1 }, filterEnvelope: { attack: 0.05, decay: 0.6, sustain: 0.4, release: 1.5, baseFrequency: 100, octaves: 1.2 } },
+            autopilot_bass: {
+                oscillator: { type: "fmsine", harmonicity: 0.8, modulationIndex: 4 },
+                filter: { Q: 2, type: 'lowpass', rolloff: -24 },
+                envelope: { attack: 0.01, decay: 0.3, sustain: 0.2, release: 0.8 },
+                filterEnvelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.8, baseFrequency: 300, octaves: 2.5 }
+            },
             autopilot_accompaniment: { oscillator: { type: 'triangle8' }, envelope: { attack: 0.2, decay: 0.9, sustain: 0.1, release: 1.0 }, volume: -8 },
             autopilot_melody: { oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } },
             
             // Effect presets
             autopilot_effect_star: { oscillator: { type: 'fmsine', modulationType: 'sine', harmonicity: 0.8 }, envelope: { attack: 0.01, decay: 0.8, sustain: 0, release: 0.5 } },
-            autopilot_effect_meteor: { noise: { type: 'white', fadeOut: 0.5 }, filter: { type: 'bandpass', Q: 15 }, envelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.2, attackCurve: 'exponential' } },
+            autopilot_effect_meteor: { noise: { type: 'white' }, filter: { type: 'bandpass', Q: 15 }, envelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.2, attackCurve: 'exponential' } },
             autopilot_effect_warp: { noise: { type: 'pink', playbackRate: 0.2 }, filter: { type: 'lowpass', Q: 2 }, envelope: { attack: 0.5, decay: 0.8, sustain: 0.1, release: 1 } },
             autopilot_effect_hole: { oscillator: { type: 'amsine', harmonicity: 0.2 }, envelope: { attack: 2, decay: 2, sustain: 0, release: 1 } },
             autopilot_effect_pulsar: { oscillator: { type: 'pwm', modulationFrequency: 0.2 }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.2 } },
