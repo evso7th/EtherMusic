@@ -31,10 +31,10 @@ export class AutopilotEngine {
 
     constructor(audioEngine: AudioEngine) {
         this.audioEngine = audioEngine;
-        this.initialize();
+        // The initialize method will now be called from page.tsx to ensure it's client-side only
     }
 
-    private initialize() {
+    public initialize() {
         // This handler ensures that if the transport is started (e.g. by user pressing play)
         // and the autopilot is on, the worker will start generating music.
         Tone.Transport.on('start', this.handleTransportStart);
@@ -59,8 +59,7 @@ export class AutopilotEngine {
             return workerCache[style]!;
         }
 
-        // --- CORRECTED LOGIC ---
-        // Files are now in the /public directory and served directly.
+        // Files are in the /public directory and served directly.
         // We can reference them with a simple absolute path.
         let workerPath: string;
         switch(style) {
@@ -76,19 +75,20 @@ export class AutopilotEngine {
             case 'Promenade':
             case 'Space':
             default:
+                 // Fallback for styles that don't have a dedicated worker yet
                 workerPath = '/assets/workers/ambient.worker.js';
                 break;
         }
 
         try {
             // Create the worker using the public path.
-            // No need for `new URL` or `import.meta.url`.
             const worker = new Worker(workerPath, { type: 'module' });
             
+            // CRITICAL FIX: Set up the message handler when the worker is created.
             worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
                 this.handleWorkerMessage(event, style);
             };
-            
+
             workerCache[style] = worker;
             return worker;
         } catch (e) {
@@ -147,11 +147,13 @@ export class AutopilotEngine {
 
         // --- Start new worker if it should be on ---
         if (isOn) {
-            this.currentStyle = style;
-            this.activeWorker = this.getWorker(style);
-            this.syncWorkerState();
+            if (this.activeWorker === null || didStyleChange) {
+                this.currentStyle = style;
+                this.activeWorker = this.getWorker(style);
+                this.syncWorkerState();
+            }
             
-            // If the transport is already playing, start the new worker immediately.
+            // If the transport is already playing, start the worker immediately.
             // Otherwise, it will be started by the 'start' event handler.
             if (Tone.Transport.state === 'started') {
                 this.postMessageToActiveWorker({ type: 'start' });
@@ -171,5 +173,6 @@ export class AutopilotEngine {
         Tone.Transport.off('start', this.handleTransportStart);
         Tone.Transport.off('stop', this.handleTransportStop);
         Object.values(workerCache).forEach(worker => worker?.terminate());
+        this.activeWorker = null;
     }
 }
