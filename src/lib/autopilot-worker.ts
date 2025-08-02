@@ -176,7 +176,7 @@ function tick() {
                 if (freq) {
                     const isSyncopated = Math.random() < 0.2;
                     if (!isSyncopated) {
-                         self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '8n', vel: 0.3 }, time: now });
+                         self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '8n', vel: 0.5 }, time: now });
                     }
                 }
             }
@@ -184,18 +184,18 @@ function tick() {
     }
     
     // --- Melody (Solo Phrases) ---
-    if (enabledParts.melody) {
-        if (beat % 4 === 0 && Math.random() < 0.25) { // Play less often
-            const chordTones = getChordTones(rootDegree, 'melody');
-            if (chordTones && chordTones.length > 0) {
-                const arpNoteIndex = (Math.floor(beat / 4) + Math.floor(Math.random() * chordTones.length)) % chordTones.length;
-                const freq = chordTones[arpNoteIndex];
-                if (freq) {
-                     self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '2n', vel: 0.5 }, time: now });
-                }
+    if (enabledParts.melody && beat % 4 === 0 && Math.random() < 0.25) {
+        const phraseLength = Math.floor(Math.random() * 3) + 2; // 2-4 notes
+        const chordTones = getChordTones(rootDegree, 'melody');
+        if (chordTones && chordTones.length > 0) {
+            for (let i = 0; i < phraseLength; i++) {
+                const freq = chordTones[Math.floor(Math.random() * chordTones.length)];
+                const startTime = now + i * (60 / currentBpm / 4); // Stagger notes by 16th
+                self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '8n', vel: 0.5 }, time: startTime });
             }
         }
     }
+
 
     // --- Effects ---
     if (enabledParts.effects && now >= nextEffectTime) {
@@ -203,10 +203,12 @@ function tick() {
         const freq = getFrequencyFromDegree(randomRootDegree, 'melody');
         if (freq) {
             const effectType = effectTypes[Math.floor(Math.random() * effectTypes.length)];
-            self.postMessage({ type: 'playNote', note: { type: effectType, freq, dur: '1n', vel: Math.random() * 0.3 + 0.2 }, time: now });
+            const numberOfNotes = Math.floor(Math.random() * 4) + 2; // 2 to 5 notes per effect
+            for(let i = 0; i < numberOfNotes; i++) {
+                 self.postMessage({ type: 'playNote', note: { type: effectType, freq: freq * (1 + (Math.random() - 0.5) * 0.1), dur: '1n', vel: Math.random() * 0.3 + 0.2 }, time: now + i * 50 });
+            }
             
-            // Schedule the next effect time randomly between 1 and 5 seconds from now
-            const randomDelay = Math.random() * 4000 + 1000;
+            const randomDelay = Math.random() * 2000 + 1000; // 1 to 3 seconds
             nextEffectTime = now + randomDelay;
         }
     }

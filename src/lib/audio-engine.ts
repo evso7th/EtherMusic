@@ -209,8 +209,7 @@ export class AudioEngine {
     }
     
     public playAutopilotEvent(note: {type: InstrumentType, freq: number, dur: Tone.Unit.Time, vel: number}) {
-        if (!this.isInitialized) return;
-        if (note.freq === null || note.freq === undefined) return;
+        if (!this.isInitialized || note.freq === null || note.freq === undefined) return;
 
         const voice = this.getVoice();
         if (!voice) {
@@ -317,12 +316,12 @@ export class AudioEngine {
             
             // Autopilot presets
             autopilot_bass: {
-                oscillator: { type: "fmsine", harmonicity: 0.8, modulationIndex: 4 },
-                filter: { Q: 2, type: 'lowpass', rolloff: -24 },
+                oscillator: { type: "fmsine", harmonicity: 0.8, modulationIndex: 2 },
+                filter: { Q: 1, type: 'lowpass', rolloff: -12 },
                 envelope: { attack: 0.01, decay: 0.3, sustain: 0.2, release: 0.8 },
-                filterEnvelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.8, baseFrequency: 300, octaves: 2.5 }
+                filterEnvelope: { attack: 0.01, decay: 0.05, sustain: 0.8, release: 0.8, baseFrequency: 200, octaves: 1.5 }
             },
-            autopilot_accompaniment: { oscillator: { type: 'triangle8' }, envelope: { attack: 0.2, decay: 0.9, sustain: 0.1, release: 1.0 }, volume: -8 },
+            autopilot_accompaniment: { oscillator: { type: 'triangle8' }, envelope: { attack: 0.2, decay: 0.9, sustain: 0.1, release: 1.0 }, volume: -2 },
             autopilot_melody: { oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } },
             
             // Effect presets
