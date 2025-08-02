@@ -53,19 +53,16 @@ export class AutopilotEngine {
 
         console.log(`Creating worker for style: ${style}`);
         
-        let workerUrl: URL;
-        const styleFileName = `${style.toLowerCase().split(' ').join('-')}.worker.ts`;
+        let worker: Worker;
 
-        try {
-            // This structure assumes we will create a worker for each style.
-            // The dynamic import URL is key here.
-            workerUrl = new URL(`./autopilot-styles/${styleFileName}`, import.meta.url);
-        } catch (e) {
-            console.warn(`Worker for style "${style}" not found, falling back to ambient.worker.ts`);
-            workerUrl = new URL('./autopilot-styles/ambient.worker.ts', import.meta.url);
+        // This is a specific pattern to let Webpack/Next.js handle worker bundling.
+        // We create the new Worker with a special URL constructor syntax.
+        if (style === 'Toccata') {
+            worker = new Worker(new URL('./autopilot-styles/toccata.worker.ts', import.meta.url), { type: 'module' });
+        } else {
+            // Default to ambient for any other style for now
+            worker = new Worker(new URL('./autopilot-styles/ambient.worker.ts', import.meta.url), { type: 'module' });
         }
-
-        const worker = new Worker(workerUrl, { type: 'module' });
         
         worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
             this.handleWorkerMessage(event, style);
@@ -102,8 +99,6 @@ export class AutopilotEngine {
     
     public setTempo(bpm: number) {
         this.lastKnownState.bpm = bpm;
-        // We can send tempo updates to all workers, or just the active one.
-        // For now, let's just update the active one for efficiency.
         this.postMessageToActiveWorker({ type: 'setTempo', bpm: bpm });
     }
 
