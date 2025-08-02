@@ -2,7 +2,7 @@
 
 import * as Tone from 'tone';
 import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
-import type { WorkerEvent, WorkerResponse } from './autopilot-worker';
+import type { WorkerEvent, WorkerResponse, AutopilotPart } from './autopilot-worker';
 import type { AudioEngine } from './audio-engine';
 
 
@@ -40,7 +40,7 @@ export class AutopilotEngine {
 
     private handleWorkerMessage(event: MessageEvent<WorkerResponse>) {
         if (event.data.type === 'playNote') {
-            this.audioEngine.playAutopilotEvent(event.data.note);
+            this.audioEngine.playAutopilotEvent(event.data.note, event.data.time);
         }
     }
 
@@ -54,6 +54,10 @@ export class AutopilotEngine {
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
         this.postMessage({ type: 'setHarmony', key, scale });
+    }
+
+    public setAutopilotParts(parts: Record<AutopilotPart, boolean>) {
+        this.postMessage({ type: 'setParts', parts: parts });
     }
     
     public setAutopilot(isOn: boolean, style: AutopilotStyle) {
@@ -71,5 +75,3 @@ export class AutopilotEngine {
         }
     }
 }
-
-    

@@ -52,31 +52,35 @@ class Voice {
         this.synth.connect(channel);
     }
     
-    attack(freq: number, vel: number, pointerId: number | null, type: InstrumentType) {
+    attack(freq: number, vel: number, time: number, pointerId: number | null, type: InstrumentType) {
         this.isBusy = true;
         this.activePointerId = pointerId;
         this.instrumentType = type;
-        this.synth.triggerAttack(freq, undefined, vel);
+        this.synth.triggerAttack(freq, time, vel);
     }
 
-    release(duration?: Tone.Unit.Time) {
+    release(time?: number) {
         if (this.isBusy) {
-            if (duration) {
-                // Schedule release and mark as not busy after release
-                this.releaseTime = Tone.now() + new Tone.Time(duration).toSeconds();
-                this.synth.triggerRelease(this.releaseTime);
-                Tone.Transport.scheduleOnce(() => {
-                    this.isBusy = false;
-                    this.activePointerId = null;
-                    this.instrumentType = null;
-                }, this.releaseTime);
-            } else {
-                // Immediate release
-                this.synth.triggerRelease();
+            this.synth.triggerRelease(time);
+            // We can't know for sure when it will be free, so we use a timeout
+            // This is a simplification; a more robust solution might use Tone.Draw.schedule
+            const releaseDuration = this.synth.get().envelope.release as number;
+            setTimeout(() => {
                 this.isBusy = false;
                 this.activePointerId = null;
                 this.instrumentType = null;
-            }
+            }, releaseDuration * 1000 + 50);
+        }
+    }
+
+    scheduleRelease(time: number) {
+        if(this.isBusy) {
+            this.synth.triggerRelease(time);
+            Tone.Transport.scheduleOnce(() => {
+                this.isBusy = false;
+                this.activePointerId = null;
+                this.instrumentType = null;
+            }, time);
         }
     }
     
@@ -175,8 +179,10 @@ export class AudioEngine {
     // --- Theremin Interaction ---
 
     public startNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}) {
+        if (!this.isInitialized) return;
         const quantizedFreq = this.getClosestFrequency(freq, type);
         const instrumentType = type === 'melody' ? 'melody' : 'manualBass';
+        const time = Tone.now();
 
         if (type === 'bass' && this.isBassLatchOn) {
             this.latchEngine.handleInteraction(pos, vol, quantizedFreq);
@@ -187,12 +193,13 @@ export class AudioEngine {
         if (voice) {
             const channel = type === 'melody' ? this.channels.melody : this.channels.manualBass;
             voice.configure(this.presets[instrumentType], channel);
-            voice.attack(quantizedFreq, vol*vol, pointerId, instrumentType);
+            voice.attack(quantizedFreq, vol*vol, time, pointerId, instrumentType);
             this.orbManager.addOrb(pointerId, type, pos.x, pos.y);
         }
     }
 
     public updateNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}) {
+        if (!this.isInitialized) return;
         const voice = this.getVoice(pointerId);
         if (voice) {
             const quantizedFreq = this.getClosestFrequency(freq, type);
@@ -203,16 +210,17 @@ export class AudioEngine {
     }
 
     public stopNote(type: 'melody' | 'bass', pointerId: number) {
+        if (!this.isInitialized) return;
         if (this.isBassLatchOn && type === 'bass') return;
 
         const voice = this.getVoice(pointerId);
         if (voice) {
-            voice.release();
+            voice.release(Tone.now());
             this.orbManager.removeOrb(pointerId);
         }
     }
     
-    public playAutopilotEvent(note: {type: InstrumentType, freq: number, dur: Tone.Unit.Time, vel: number}) {
+    public playAutopilotEvent(note: {type: InstrumentType, freq: number, dur: Tone.Unit.Time, vel: number}, time: number) {
         if (!this.isInitialized || !note.freq) return;
 
         const voice = this.getVoice();
@@ -227,14 +235,17 @@ export class AudioEngine {
         }
         
         const channel = note.type.startsWith('autopilot_effect') ? this.channels.effects : this.channels.autopilot;
-        voice.configure(preset, channel);
+        const now = Tone.now();
+        const startTime = now + time;
+        const releaseTime = startTime + new Tone.Time(note.dur).toSeconds();
         
-        voice.attack(note.freq, note.vel, null, note.type);
-        voice.release(note.dur);
+        voice.configure(preset, channel);
+        voice.attack(note.freq, note.vel, startTime, null, note.type);
+        voice.scheduleRelease(releaseTime);
     }
 
     public stopAllSounds() {
-        this.voicePool.forEach(voice => voice.release());
+        this.voicePool.forEach(voice => voice.release(Tone.now()));
         this.orbManager.removeAllOrbs('melody');
         this.orbManager.removeAllOrbs('bass');
         this.latchEngine.stopAll();
@@ -298,14 +309,15 @@ export class AudioEngine {
     public getLatchVoice(freq: number, vol: number): Voice | null {
         const voice = this.getVoice();
         if (voice) {
+            const time = Tone.now();
             voice.configure(this.presets.latch, this.channels.latch);
-            voice.attack(freq, vol, null, 'latch');
+            voice.attack(freq, vol, time, null, 'latch');
         }
         return voice;
     }
     
     public releaseLatchVoice(voice: Voice) {
-        voice.release();
+        voice.release(Tone.now());
     }
 
 
@@ -323,15 +335,15 @@ export class AudioEngine {
             autopilot_melody: { oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } },
             
             // Effect presets
-            autopilot_effect_star: { oscillator: { type: 'fmsine', modulationType: 'sine', harmonicity: 0.8 }, envelope: { attack: 0.01, decay: 0.8, sustain: 0, release: 0 } },
-            autopilot_effect_meteor: { noise: { type: 'white' }, filter: { type: 'bandpass', Q: 15 }, envelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.2 } },
+            autopilot_effect_star: { oscillator: { type: 'fmsine', modulationType: 'sine', harmonicity: 0.8 }, envelope: { attack: 0.01, decay: 0.8, sustain: 0, release: 0.5 } },
+            autopilot_effect_meteor: { noise: { type: 'white', fadeOut: 0.5 }, filter: { type: 'bandpass', Q: 15 }, envelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.2, attackCurve: 'exponential' } },
             autopilot_effect_warp: { noise: { type: 'pink', playbackRate: 0.2 }, filter: { type: 'lowpass', Q: 2 }, envelope: { attack: 0.5, decay: 0.8, sustain: 0.1, release: 1 } },
             autopilot_effect_hole: { oscillator: { type: 'amsine', harmonicity: 0.2 }, envelope: { attack: 2, decay: 2, sustain: 0, release: 1 } },
-            autopilot_effect_pulsar: { oscillator: { type: 'pwm', modulationFrequency: 0.2 }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0 } },
+            autopilot_effect_pulsar: { oscillator: { type: 'pwm', modulationFrequency: 0.2 }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.2 } },
             autopilot_effect_nebula: { oscillator: { type: 'fatsawtooth', count: 5, spread: 80 }, envelope: { attack: 1.5, decay: 2, sustain: 0.5, release: 2 } },
             autopilot_effect_comet: { oscillator: { type: 'pulse', width: 0.1 }, envelope: { attack: 0.01, decay: 0.5, sustain: 0, release: 0.8 } },
             autopilot_effect_wind: { noise: { type: 'brown' }, filter: { type: 'bandpass', Q: 8 }, envelope: { attack: 2, decay: 5, sustain: 0.1, release: 3 } },
-            autopilot_effect_echoes: { oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0 } },
+            autopilot_effect_echoes: { oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.5 } },
         };
     }
 
@@ -379,4 +391,3 @@ export class AudioEngine {
         }
     }
 }
-

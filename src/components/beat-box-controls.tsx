@@ -19,7 +19,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { MixerControls } from '@/components/mixer-controls';
-import { SlidersHorizontal, Drum, Zap, Bot, Wand2, Power } from 'lucide-react';
+import { SlidersHorizontal, Drum, Zap, Bot, Wand2, Power, TestTube2 } from 'lucide-react';
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
@@ -27,6 +27,8 @@ import type { AutopilotStyle } from '@/app/page';
 import { Separator } from "./ui/separator";
 import { Switch } from "./ui/switch";
 import { ScrollArea } from "./ui/scroll-area";
+import type { AutopilotPart } from "@/lib/autopilot-worker";
+import { Checkbox } from "./ui/checkbox";
 
 
 type BeatPattern = {
@@ -45,6 +47,7 @@ type Volumes = {
     latch: number; 
     drums: number; 
     autopilot: number;
+    effects: number;
 };
 
 type Effects = {
@@ -53,6 +56,7 @@ type Effects = {
     latch: { reverb: number, delay: number };
     drums: { reverb: number, delay: number };
     autopilot: { reverb: number, delay: number };
+    effects: { reverb: number, delay: number };
 };
 
 interface BeatBoxControlsProps {
@@ -71,8 +75,63 @@ interface BeatBoxControlsProps {
     autopilotStyles: AutopilotStyle[];
     activeAutopilotStyle: AutopilotStyle;
     onAutopilotStyleChange: (style: AutopilotStyle) => void;
+    autopilotParts: Record<AutopilotPart, boolean>;
+    onAutopilotPartsChange: (parts: Record<AutopilotPart, boolean>) => void;
     isMobile: boolean;
     isLandscape?: boolean;
+}
+
+const AutopilotDebugDialog = ({
+    autopilotParts,
+    onAutopilotPartsChange
+}: {
+    autopilotParts: Record<AutopilotPart, boolean>;
+    onAutopilotPartsChange: (parts: Record<AutopilotPart, boolean>) => void;
+}) => {
+
+    const handleCheckedChange = (part: AutopilotPart, checked: boolean) => {
+        onAutopilotPartsChange({
+            ...autopilotParts,
+            [part]: checked
+        });
+    };
+    
+    return (
+        <Dialog>
+            <DialogTrigger asChild>
+                <Button variant="outline" size="icon" className="w-10 h-10 rounded-full">
+                    <TestTube2 className="w-5 h-5" />
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Autopilot Debug</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <p className="text-sm text-muted-foreground">
+                        Use these controls to isolate and listen to individual autopilot parts.
+                    </p>
+                    <div className="space-y-2">
+                        {(Object.keys(autopilotParts) as AutopilotPart[]).map(part => (
+                             <div key={part} className="flex items-center space-x-2">
+                                <Checkbox
+                                    id={`check-${part}`}
+                                    checked={autopilotParts[part]}
+                                    onCheckedChange={(checked) => handleCheckedChange(part, !!checked)}
+                                />
+                                <label
+                                    htmlFor={`check-${part}`}
+                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 capitalize"
+                                >
+                                    {part}
+                                </label>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    )
 }
 
 export function BeatBoxControls({
@@ -91,6 +150,8 @@ export function BeatBoxControls({
     autopilotStyles,
     activeAutopilotStyle,
     onAutopilotStyleChange,
+    autopilotParts,
+    onAutopilotPartsChange,
     isMobile,
     isLandscape = false,
 }: BeatBoxControlsProps) {
@@ -281,6 +342,10 @@ export function BeatBoxControls({
                 </Dialog>
                 
                 <HelpGuide buttonVariant="outline" size="icon" className="w-10 h-10 rounded-full" showText={false}/>
+                <AutopilotDebugDialog 
+                    autopilotParts={autopilotParts}
+                    onAutopilotPartsChange={onAutopilotPartsChange}
+                />
             </div>
         )
     }
@@ -448,11 +513,12 @@ export function BeatBoxControls({
 
                 <HelpGuide buttonVariant="outline" buttonClassName="flex-1" size={buttonSize}/>
 
+                <AutopilotDebugDialog 
+                    autopilotParts={autopilotParts}
+                    onAutopilotPartsChange={onAutopilotPartsChange}
+                />
+
             </CardContent>
         </Card>
     );
 }
-
-
-
-    

@@ -26,6 +26,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
+import type { AutopilotPart } from '@/lib/autopilot-worker';
 
 
 export const tempos: Tempo[] = [
@@ -89,6 +90,12 @@ export default function Home() {
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
     const [isAutopilotOn, setIsAutopilotOn] = useState(false);
     const [autopilotStyle, setAutopilotStyle] = useState<AutopilotStyle>('Ambient');
+    const [autopilotParts, setAutopilotParts] = useState<Record<AutopilotPart, boolean>>({
+        bass: true,
+        accompaniment: true,
+        melody: true,
+        effects: true
+    });
 
     // --- Engine Ref ---
     const audioEngine = useRef<AudioEngine>();
@@ -176,6 +183,10 @@ export default function Home() {
     useEffect(() => {
         audioEngine.current?.setBassLatch(isBassLatchOn);
     }, [isBassLatchOn]);
+
+    useEffect(() => {
+        autopilotEngine.current?.setAutopilotParts(autopilotParts);
+    }, [autopilotParts]);
     
     // --- Auto-start playback when ready ---
     useEffect(() => {
@@ -433,6 +444,8 @@ export default function Home() {
                             autopilotStyles={autopilotStyles}
                             activeAutopilotStyle={autopilotStyle}
                             onAutopilotStyleChange={setAutopilotStyle}
+                            autopilotParts={autopilotParts}
+                            onAutopilotPartsChange={setAutopilotParts}
                             isMobile={isMobile}
                         />
                     </div>
@@ -456,6 +469,8 @@ export default function Home() {
                         autopilotStyles={autopilotStyles}
                         activeAutopilotStyle={autopilotStyle}
                         onAutopilotStyleChange={setAutopilotStyle}
+                        autopilotParts={autopilotParts}
+                        onAutopilotPartsChange={setAutopilotParts}
                         isMobile={isMobile}
                         isLandscape={true} // Pass landscape prop
                     />
@@ -464,5 +479,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
