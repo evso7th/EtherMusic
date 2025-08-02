@@ -5,7 +5,7 @@ import type { WorkerEvent, WorkerResponse, AutopilotPart } from './autopilot-wor
 import type { AudioEngine } from './audio-engine';
 
 // A map to hold the worker instances
-const styleWorkerMap: Partial<Record<AutopilotStyle, Worker>> = {};
+const workerCache: Partial<Record<AutopilotStyle, Worker>> = {};
 
 export class AutopilotEngine {
     public isInitialized = false;
@@ -14,6 +14,19 @@ export class AutopilotEngine {
     private activeWorker: Worker | null = null;
     private currentStyle: AutopilotStyle | null = null;
     private isAutopilotOn = false;
+
+    // Store the last known state to sync new workers
+    private lastKnownState: {
+        bpm: number;
+        key: MusicKey;
+        scale: MusicScale;
+        parts: Record<AutopilotPart, boolean>;
+    } = {
+        bpm: 120,
+        key: 'C',
+        scale: 'Major Pentatonic',
+        parts: { bass: true, accompaniment: true, melody: true, effects: true }
+    };
 
     constructor(audioEngine: AudioEngine) {
         this.audioEngine = audioEngine;
@@ -34,26 +47,37 @@ export class AutopilotEngine {
     }
 
     private getWorker(style: AutopilotStyle): Worker {
-        if (styleWorkerMap[style]) {
-            return styleWorkerMap[style]!;
+        if (workerCache[style]) {
+            return workerCache[style]!;
         }
 
         console.log(`Creating worker for style: ${style}`);
-        // For now, all styles use the same worker file.
-        // This will be replaced with style-specific worker files.
-        const worker = new Worker(new URL('./autopilot-worker.ts', import.meta.url));
+        
+        let workerUrl: URL;
+        const styleFileName = `${style.toLowerCase().split(' ').join('-')}.worker.ts`;
+
+        try {
+            // This structure assumes we will create a worker for each style.
+            // The dynamic import URL is key here.
+            workerUrl = new URL(`./autopilot-styles/${styleFileName}`, import.meta.url);
+        } catch (e) {
+            console.warn(`Worker for style "${style}" not found, falling back to ambient.worker.ts`);
+            workerUrl = new URL('./autopilot-styles/ambient.worker.ts', import.meta.url);
+        }
+
+        const worker = new Worker(workerUrl, { type: 'module' });
         
         worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
             this.handleWorkerMessage(event, style);
         };
         
-        styleWorkerMap[style] = worker;
+        workerCache[style] = worker;
         return worker;
     }
-
+    
     private handleWorkerMessage(event: MessageEvent<WorkerResponse>, style: AutopilotStyle) {
         // Only process messages from the currently active style's worker
-        if (this.currentStyle !== style) {
+        if (this.currentStyle !== style || !this.isAutopilotOn) {
             return;
         }
 
@@ -69,69 +93,70 @@ export class AutopilotEngine {
     }
 
     private handleTransportStop() {
-        // Stop all workers to be safe
-        for (const worker of Object.values(styleWorkerMap)) {
-            worker?.postMessage({ type: 'stop' });
-        }
+        this.postMessageToActiveWorker({ type: 'stop' });
     }
 
     private postMessageToActiveWorker(message: WorkerEvent) {
         this.activeWorker?.postMessage(message);
     }
     
-    private postMessageToAllWorkers(message: WorkerEvent) {
-        for (const worker of Object.values(styleWorkerMap)) {
-            worker?.postMessage(message);
-        }
-    }
-
     public setTempo(bpm: number) {
-        this.postMessageToAllWorkers({ type: 'setTempo', bpm: bpm });
+        this.lastKnownState.bpm = bpm;
+        // We can send tempo updates to all workers, or just the active one.
+        // For now, let's just update the active one for efficiency.
+        this.postMessageToActiveWorker({ type: 'setTempo', bpm: bpm });
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
-        this.postMessageToAllWorkers({ type: 'setHarmony', key, scale });
+        this.lastKnownState.key = key;
+        this.lastKnownState.scale = scale;
+        this.postMessageToActiveWorker({ type: 'setHarmony', key, scale });
     }
 
     public setAutopilotParts(parts: Record<AutopilotPart, boolean>) {
+        this.lastKnownState.parts = parts;
         this.postMessageToActiveWorker({ type: 'setParts', parts: parts });
     }
     
     public setAutopilot(isOn: boolean, style: AutopilotStyle) {
         if (!this.isInitialized) return;
 
+        const previousState = this.isAutopilotOn;
         this.isAutopilotOn = isOn;
         
         if (this.currentStyle !== style) {
-            // Stop the old worker if it exists
+            // Style has changed, we need to switch workers
             if (this.activeWorker) {
                 this.activeWorker.postMessage({ type: 'stop' });
             }
             
-            // Switch to the new worker
             this.currentStyle = style;
             this.activeWorker = this.getWorker(style);
             
-            // Sync the new worker's state
+            // Sync the new worker with the latest state
             this.syncWorkerState();
         }
 
         if (isOn) {
-            if (Tone.Transport.state === 'started') {
-                 this.handleTransportStart();
+            // If it was off and is now on, or if the style changed while it was on
+            if (!previousState || this.currentStyle === style) {
+                 if (Tone.Transport.state === 'started') {
+                     this.handleTransportStart();
+                 }
             }
         } else {
-            if (this.activeWorker) {
-                this.activeWorker.postMessage({ type: 'stop' });
+            // If it was on and is now off
+            if (previousState) {
+                this.handleTransportStop();
             }
         }
     }
 
-    // Syncs the state of the currently active worker
     private syncWorkerState() {
         if (!this.activeWorker) return;
-        // This is a placeholder for sending all current state (tempo, key, etc.)
-        // to the newly activated worker.
-        // For now, postMessageToAllWorkers handles this implicitly.
+        console.log(`Syncing new worker for style ${this.currentStyle} with state:`, this.lastKnownState);
+        this.postMessageToActiveWorker({ type: 'setTempo', bpm: this.lastKnownState.bpm });
+        this.postMessageToActiveWorker({ type: 'setHarmony', key: this.lastKnownState.key, scale: this.lastKnownState.scale });
+        this.postMessageToActiveWorker({ type: 'setParts', parts: this.lastKnownState.parts });
     }
 }

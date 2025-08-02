@@ -1,10 +1,6 @@
 
-// This file is a template and can be used as a base for new styles.
-// However, it is not directly used by the AutopilotEngine anymore.
-// The engine now dynamically loads workers from the /autopilot-styles/ directory.
-
 import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
-import type { InstrumentType } from './audio-engine';
+import type { InstrumentType } from '../audio-engine';
 import type { Unit } from 'tone/build/esm/core/type/Units';
 
 // --- TYPE DEFINITIONS ---
@@ -21,7 +17,7 @@ export type WorkerEvent =
     | { type: 'start' }
     | { type: 'stop' }
     | { type: 'setHarmony', key: MusicKey, scale: MusicScale }
-    | { type: 'setStyle', style: AutopilotStyle } // This is kept for potential future use but is managed by engine
+    | { type: 'setStyle', style: AutopilotStyle }
     | { type: 'setTempo', bpm: number }
     | { type: 'setParts', parts: Record<AutopilotPart, boolean> };
 
@@ -35,12 +31,10 @@ let tickCount = 0;
 const subdivisions = 16; 
 
 let currentKey: MusicKey = 'C';
-let currentScale: MusicScale = 'Major Pentatonic';
+let currentScale: MusicScale = 'Minor'; // Toccata often sounds better in minor keys
 let currentBpm = 120;
 let scaleIntervals: number[] = [];
-let chordProgression: number[] = [0, 4, 5, 3]; 
-
-let lastMelodyDegree: number | null = null;
+let chordProgression: number[] = [0, 3, 4, 0]; // i-iv-V-i - classic dramatic progression
 
 let enabledParts: Record<AutopilotPart, boolean> = {
     bass: true,
@@ -54,14 +48,6 @@ let scaleFrequencies: Record<'bass' | 'accompaniment' | 'melody', number[]> = {
     accompaniment: [],
     melody: [],
 };
-
-const effectTypes: InstrumentType[] = [
-    'autopilot_effect_star', 'autopilot_effect_meteor', 'autopilot_effect_warp', 'autopilot_effect_hole',
-    'autopilot_effect_pulsar', 'autopilot_effect_nebula', 'autopilot_effect_comet', 'autopilot_effect_wind', 'autopilot_effect_echoes'
-];
-
-let nextEffectTime = 0;
-
 
 // --- MUSIC THEORY HELPERS ---
 
@@ -80,7 +66,6 @@ function getNoteFrequency(key: MusicKey, octave: number, interval: number): numb
     return Math.pow(2, (midiNote - 69) / 12) * A4;
 }
 
-
 function getScaleFrequenciesForOctaves(key: MusicKey, scale: MusicScale, octaves: number[]): number[] {
     const intervals = scaleIntervalMap[scale];
     if (!intervals) return [];
@@ -98,18 +83,16 @@ function updateMusicContext() {
     
     scaleFrequencies = {
         bass: getScaleFrequenciesForOctaves(currentKey, currentScale, [1, 2]),
-        accompaniment: getScaleFrequenciesForOctaves(currentKey, currentScale, [3, 4]),
-        melody: getScaleFrequenciesForOctaves(currentKey, currentScale, [4, 5]),
+        accompaniment: getScaleFrequenciesForOctaves(currentKey, currentScale, [2, 3]),
+        melody: getScaleFrequenciesForOctaves(currentKey, currentScale, [3, 4]),
     };
 
-    if (currentScale.includes('Major')) {
+     if (currentScale.includes('Major')) {
         chordProgression = [0, 4, 5, 3]; // I-V-vi-IV
     } else {
-        chordProgression = [0, 5, 3, 6]; // i-VI-IV-VII
+        chordProgression = [0, 3, 4, 0]; // i-iv-V-i
     }
-    lastMelodyDegree = null;
 }
-
 
 function getFrequencyFromDegree(degree: number, part: keyof typeof scaleFrequencies): number | null {
     const freqs = scaleFrequencies[part];
@@ -124,125 +107,88 @@ function getFrequencyFromDegree(degree: number, part: keyof typeof scaleFrequenc
     if (finalIndex >= 0 && finalIndex < freqs.length) {
         return freqs[finalIndex];
     }
-
     return null;
 }
-
 
 function getChordTones(rootDegree: number): number[] {
     const chordTones: number[] = [];
     if (!scaleIntervals.length) return [];
     
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) { // Use 4 notes for richer arpeggios
         const degreeIndex = (rootDegree + i * 2);
         chordTones.push(degreeIndex);
     }
     return chordTones;
 }
 
-
 // --- STYLE-SPECIFIC GENERATORS ---
 function tick(time: number) {
     const measure = Math.floor(tickCount / subdivisions);
-    const beat = tickCount % subdivisions;
+    const beatInMeasure = tickCount % subdivisions; // 0-15
     
     const chordIndex = Math.floor(measure / 2) % chordProgression.length;
     const rootDegree = chordProgression[chordIndex];
     const chordToneDegrees = getChordTones(rootDegree);
 
-    // Bass
-    if (enabledParts.bass && beat === 0) {
+    // Bass: Plays on the downbeat of each measure, holding the root note
+    if (enabledParts.bass && beatInMeasure === 0) {
         const freq = getFrequencyFromDegree(rootDegree, 'bass');
         if (freq) {
-            self.postMessage({ type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '1m', vel: 0.8 }, time });
+            self.postMessage({ type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '2n', vel: 0.9 }, time });
         }
     }
 
-    // Accompaniment
-    if (enabledParts.accompaniment && (beat % 4 === 0)) {
-         const syncopation = (tickCount % 8 === 0) ? 1 : 0;
-        const arpPattern = [0, 1, 2, 1];
-        const patternIndex = (Math.floor(beat/2) + syncopation) % arpPattern.length;
-        const degree = chordToneDegrees[arpPattern[patternIndex]];
-
+    // Accompaniment: Fast, relentless 16th note arpeggios
+    if (enabledParts.accompaniment) {
+        const arpPattern = [0, 1, 2, 3, 2, 1, 0, 1]; // Classic Toccata-style pattern
+        const degreeIndex = arpPattern[beatInMeasure % arpPattern.length];
+        const degree = chordToneDegrees[degreeIndex % chordToneDegrees.length];
+        
         if (degree !== null) {
             const freq = getFrequencyFromDegree(degree, 'accompaniment');
             if (freq) {
-                self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '2n', vel: 0.5 }, time });
+                self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '16n', vel: 0.5 }, time });
             }
         }
     }
 
-    // Melody
-    if (enabledParts.melody && beat % 8 === 1 && Math.random() > 0.4) {
-        let nextDegree: number | null = null;
+    // Melody: Plays a slower, more deliberate melody line on top
+    if (enabledParts.melody && beatInMeasure % 4 === 0) { // Play on each quarter note
+        const melodyPattern = [0, 2, 1, 3];
+        const degreeIndex = melodyPattern[Math.floor(beatInMeasure / 4) % melodyPattern.length];
+        const degree = chordToneDegrees[degreeIndex];
         
-        if (lastMelodyDegree !== null) {
-            if (Math.random() < 0.8) {
-                const direction = Math.random() < 0.5 ? 1 : -1;
-                nextDegree = lastMelodyDegree + direction;
-            } else {
-                nextDegree = chordToneDegrees[Math.floor(Math.random() * chordToneDegrees.length)];
-            }
-        } else {
-            nextDegree = chordToneDegrees[Math.floor(Math.random() * chordToneDegrees.length)];
-        }
-
-        if (nextDegree !== null) {
-            const freq = getFrequencyFromDegree(nextDegree, 'melody');
+        if (degree !== null) {
+            const freq = getFrequencyFromDegree(degree, 'melody');
             if (freq) {
-                self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '1n', vel: 0.6 }, time });
-                lastMelodyDegree = nextDegree;
+                self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '4n', vel: 0.75 }, time });
             }
         }
     }
-
-    // Effects
-    if (enabledParts.effects && time >= nextEffectTime) {
-        if (Math.random() < 0.15) {
-             const randomRootDegree = chordProgression[Math.floor(Math.random() * chordProgression.length)];
-             const freq = getFrequencyFromDegree(randomRootDegree, 'melody');
-             if (freq) {
-                 const effectType = effectTypes[Math.floor(Math.random() * effectTypes.length)];
-                 const numNotes = Math.floor(Math.random() * 4) + 2;
-                 for(let i=0; i < numNotes; i++){
-                    const effectFreq = freq * Math.pow(1.05946, i*2 + (Math.random() - 0.5) * 4);
-                    self.postMessage({ type: 'playNote', note: { type: effectType, freq: effectFreq, dur: '4n', vel: Math.random() * 0.2 + 0.3 }, time: time + i * 0.15 });
-                 }
-             }
-        }
-        const randomDelay = Math.random() * 2000 + 1000; // 1 to 3 seconds
-        nextEffectTime = time + randomDelay / 1000;
-    }
-
 
     tickCount++;
 }
 
+// --- WORKER CONTROL ---
 
 function start() {
     stop(); 
     updateMusicContext();
     tickCount = 0;
-    const intervalSeconds = (60 / currentBpm) / (subdivisions / 4); // Interval for a 16th note
+    const intervalSeconds = (60 / currentBpm) / (subdivisions / 4);
 
     let expected = self.performance.now();
 
     const loop = () => {
         const now = self.performance.now();
         const drift = now - expected;
-        if (drift > intervalSeconds * 1000) {
-            console.warn("Autopilot worker drift is high. Resetting expected time.");
-            expected = now;
-        }
         
-        tick(expected / 1000); // Pass scheduled time in seconds
+        tick(expected / 1000);
 
         expected += intervalSeconds * 1000;
         timerId = setTimeout(loop, Math.max(0, intervalSeconds * 1000 - drift));
     }
     
-    nextEffectTime = self.performance.now() / 1000 + 2; // Schedule first effect 2s from now
     timerId = setTimeout(loop, intervalSeconds * 1000);
 }
 
@@ -253,8 +199,6 @@ function stop() {
     }
 }
 
-
-// --- WORKER EVENT HANDLER ---
 self.onmessage = function (event: MessageEvent<WorkerEvent>) {
     const { type } = event.data;
     switch (type) {
@@ -272,7 +216,7 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
         case 'setTempo':
             currentBpm = event.data.bpm;
             if (timerId !== null) { 
-                start(); // Restart the loop with the new tempo
+                start();
             }
             break;
         case 'setParts':

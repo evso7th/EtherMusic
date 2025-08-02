@@ -1,10 +1,6 @@
 
-// This file is a template and can be used as a base for new styles.
-// However, it is not directly used by the AutopilotEngine anymore.
-// The engine now dynamically loads workers from the /autopilot-styles/ directory.
-
 import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
-import type { InstrumentType } from './audio-engine';
+import type { InstrumentType } from '../audio-engine';
 import type { Unit } from 'tone/build/esm/core/type/Units';
 
 // --- TYPE DEFINITIONS ---
@@ -21,7 +17,7 @@ export type WorkerEvent =
     | { type: 'start' }
     | { type: 'stop' }
     | { type: 'setHarmony', key: MusicKey, scale: MusicScale }
-    | { type: 'setStyle', style: AutopilotStyle } // This is kept for potential future use but is managed by engine
+    | { type: 'setStyle', style: AutopilotStyle }
     | { type: 'setTempo', bpm: number }
     | { type: 'setParts', parts: Record<AutopilotPart, boolean> };
 
@@ -80,7 +76,6 @@ function getNoteFrequency(key: MusicKey, octave: number, interval: number): numb
     return Math.pow(2, (midiNote - 69) / 12) * A4;
 }
 
-
 function getScaleFrequenciesForOctaves(key: MusicKey, scale: MusicScale, octaves: number[]): number[] {
     const intervals = scaleIntervalMap[scale];
     if (!intervals) return [];
@@ -110,7 +105,6 @@ function updateMusicContext() {
     lastMelodyDegree = null;
 }
 
-
 function getFrequencyFromDegree(degree: number, part: keyof typeof scaleFrequencies): number | null {
     const freqs = scaleFrequencies[part];
     const scaleLength = scaleIntervals.length;
@@ -124,10 +118,8 @@ function getFrequencyFromDegree(degree: number, part: keyof typeof scaleFrequenc
     if (finalIndex >= 0 && finalIndex < freqs.length) {
         return freqs[finalIndex];
     }
-
     return null;
 }
-
 
 function getChordTones(rootDegree: number): number[] {
     const chordTones: number[] = [];
@@ -140,6 +132,22 @@ function getChordTones(rootDegree: number): number[] {
     return chordTones;
 }
 
+function generateArpeggio(beat: number, chordTonesDegrees: number[], patternLength: number, syncopation: number): number | null {
+    if (chordTonesDegrees.length === 0) return null;
+    const patterns = [
+        [0, 1, 2, 1], // up & down
+        [0, 2, 1, 2], // spread out
+        [2, 1, 0, 1], // down & up
+    ];
+    const selectedPattern = patterns[Math.floor(beat / 4) % patterns.length];
+    const patternIndex = (beat + syncopation) % patternLength;
+    const degreeIndex = selectedPattern[patternIndex % selectedPattern.length];
+
+    if (degreeIndex < chordTonesDegrees.length) {
+        return chordTonesDegrees[degreeIndex];
+    }
+    return null;
+}
 
 // --- STYLE-SPECIFIC GENERATORS ---
 function tick(time: number) {
@@ -160,11 +168,7 @@ function tick(time: number) {
 
     // Accompaniment
     if (enabledParts.accompaniment && (beat % 4 === 0)) {
-         const syncopation = (tickCount % 8 === 0) ? 1 : 0;
-        const arpPattern = [0, 1, 2, 1];
-        const patternIndex = (Math.floor(beat/2) + syncopation) % arpPattern.length;
-        const degree = chordToneDegrees[arpPattern[patternIndex]];
-
+        const degree = generateArpeggio(Math.floor(beat / 2), chordToneDegrees, 4, beat % 4);
         if (degree !== null) {
             const freq = getFrequencyFromDegree(degree, 'accompaniment');
             if (freq) {
@@ -211,20 +215,20 @@ function tick(time: number) {
                  }
              }
         }
-        const randomDelay = Math.random() * 2000 + 1000; // 1 to 3 seconds
+        const randomDelay = Math.random() * 2000 + 1000;
         nextEffectTime = time + randomDelay / 1000;
     }
-
 
     tickCount++;
 }
 
+// --- WORKER CONTROL ---
 
 function start() {
     stop(); 
     updateMusicContext();
     tickCount = 0;
-    const intervalSeconds = (60 / currentBpm) / (subdivisions / 4); // Interval for a 16th note
+    const intervalSeconds = (60 / currentBpm) / (subdivisions / 4);
 
     let expected = self.performance.now();
 
@@ -236,13 +240,13 @@ function start() {
             expected = now;
         }
         
-        tick(expected / 1000); // Pass scheduled time in seconds
+        tick(expected / 1000);
 
         expected += intervalSeconds * 1000;
         timerId = setTimeout(loop, Math.max(0, intervalSeconds * 1000 - drift));
     }
     
-    nextEffectTime = self.performance.now() / 1000 + 2; // Schedule first effect 2s from now
+    nextEffectTime = self.performance.now() / 1000 + 2;
     timerId = setTimeout(loop, intervalSeconds * 1000);
 }
 
@@ -253,8 +257,6 @@ function stop() {
     }
 }
 
-
-// --- WORKER EVENT HANDLER ---
 self.onmessage = function (event: MessageEvent<WorkerEvent>) {
     const { type } = event.data;
     switch (type) {
@@ -272,7 +274,7 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
         case 'setTempo':
             currentBpm = event.data.bpm;
             if (timerId !== null) { 
-                start(); // Restart the loop with the new tempo
+                start();
             }
             break;
         case 'setParts':
