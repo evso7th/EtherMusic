@@ -4,7 +4,7 @@
 
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
-import { Music, Waves, Drum, Bot, Anchor } from 'lucide-react';
+import { Music, Waves, Drum, Bot, Anchor, Sparkles } from 'lucide-react';
 import { Separator } from './ui/separator';
 
 type Volumes = { 
@@ -13,6 +13,7 @@ type Volumes = {
     latch: number; 
     drums: number; 
     autopilot: number;
+    effects: number;
 };
 
 type Effects = {
@@ -21,6 +22,7 @@ type Effects = {
     latch: { reverb: number, delay: number };
     drums: { reverb: number, delay: number };
     autopilot: { reverb: number, delay: number };
+    effects: { reverb: number, delay: number };
 };
 
 interface MixerControlsProps {
@@ -171,8 +173,9 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
             <Separator />
             
             <div className="space-y-4">
+                 <div className="text-xs text-center text-muted-foreground mb-3">Autopilot</div>
                  <InstrumentControls 
-                    label="Autopilot"
+                    label="Melody / Bass"
                     icon={Bot}
                     volume={volumes.autopilot}
                     reverb={effects.autopilot.reverb}
@@ -180,6 +183,16 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
                     onVolumeChange={(v) => handleVolumeChange('autopilot', v)}
                     onReverbChange={(v) => handleEffectChange('autopilot', 'reverb', v)}
                     onDelayChange={(v) => handleEffectChange('autopilot', 'delay', v)}
+                />
+                 <InstrumentControls 
+                    label="Effects"
+                    icon={Sparkles}
+                    volume={volumes.effects}
+                    reverb={effects.effects.reverb}
+                    delay={effects.effects.delay}
+                    onVolumeChange={(v) => handleVolumeChange('effects', v)}
+                    onReverbChange={(v) => handleEffectChange('effects', 'reverb', v)}
+                    onDelayChange={(v) => handleEffectChange('effects', 'delay', v)}
                 />
             </div>
         </div>

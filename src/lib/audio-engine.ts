@@ -14,7 +14,7 @@ type ActiveNote = {
     y: number;
 };
 
-export type AutopilotInstrument = 'melody' | 'bass' | 'accompaniment';
+export type AutopilotInstrument = 'melody' | 'bass' | 'accompaniment' | 'effect';
 
 
 export class AudioEngine {
@@ -34,6 +34,7 @@ export class AudioEngine {
         drums: Tone.Channel, 
         autopilotBass: Tone.Channel,
         accompaniment: Tone.Channel,
+        effects: Tone.Channel,
     };
     public fx!: { reverb: Tone.Reverb, delay: Tone.FeedbackDelay };
 
@@ -46,7 +47,8 @@ export class AudioEngine {
     private autopilotMelodySynths: Tone.Synth[] = [];
     private autopilotAccompanimentSynths: Tone.Synth[] = [];
     private autopilotBassSynths: Tone.Synth[] = [];
-    private nextAutopilotSynthIndex = { melody: 0, accompaniment: 0, bass: 0 };
+    private autopilotEffectsSynths: Tone.Synth[] = [];
+    private nextAutopilotSynthIndex = { melody: 0, accompaniment: 0, bass: 0, effect: 0 };
     
     private recorder!: Tone.Recorder;
     
@@ -89,6 +91,7 @@ export class AudioEngine {
             drums: new Tone.Channel(-9),
             autopilotBass: new Tone.Channel(-12),
             accompaniment: new Tone.Channel(-12),
+            effects: new Tone.Channel(-9),
         };
         
         // Connect channels to FX and destination
@@ -187,6 +190,7 @@ export class AudioEngine {
         this.drumMachine.setVolume(volumes.drums);
         this.channels.autopilotBass.volume.value = volumes.autopilot;
         this.channels.accompaniment.volume.value = volumes.autopilot;
+        this.channels.effects.volume.value = volumes.effects;
     }
 
     public setEffects(effects: Record<string, { reverb: number, delay: number }>) {
@@ -203,6 +207,8 @@ export class AudioEngine {
         this.channels.autopilotBass.send('delay', effects.autopilot.delay);
         this.channels.accompaniment.send('reverb', effects.autopilot.reverb);
         this.channels.accompaniment.send('delay', effects.autopilot.delay);
+        this.channels.effects.send('reverb', effects.effects.reverb);
+        this.channels.effects.send('delay', effects.effects.delay);
     }
     
     public setBeatPattern(patternName: string) {
@@ -337,11 +343,22 @@ export class AudioEngine {
                 synthPool = this.autopilotBassSynths;
                 synthIndex = 'bass';
                 break;
+            case 'effect':
+                synthPool = this.autopilotEffectsSynths;
+                synthIndex = 'effect';
+                break;
         }
 
         if (synthPool && synthIndex && synthPool.length > 0) {
             const synth = synthPool[this.nextAutopilotSynthIndex[synthIndex]];
-            synth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
+            if (note.type === 'effect' && typeof note.freq === 'number') {
+                // Special handling for effects with pitch sweep
+                synth.frequency.setValueAtTime(note.freq * 4, time); // Start high
+                synth.frequency.exponentialRampToValueAtTime(note.freq, time + note.dur);
+                synth.triggerAttackRelease(note.dur, time, note.vel);
+            } else {
+                synth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
+            }
             this.nextAutopilotSynthIndex[synthIndex] = (this.nextAutopilotSynthIndex[synthIndex] + 1) % synthPool.length;
         }
     }
@@ -352,6 +369,7 @@ export class AudioEngine {
         this.autopilotMelodySynths.forEach(s => s.dispose());
         this.autopilotAccompanimentSynths.forEach(s => s.dispose());
         this.autopilotBassSynths.forEach(s => s.dispose());
+        this.autopilotEffectsSynths.forEach(s => s.dispose());
         
         this.createAutopilotSynthPools();
          
@@ -388,6 +406,7 @@ export class AudioEngine {
         this.autopilotMelodySynths = [];
         this.autopilotAccompanimentSynths = [];
         this.autopilotBassSynths = [];
+        this.autopilotEffectsSynths = [];
 
         // Melody Synths (4 voices)
         const melodyOptions = {
@@ -410,19 +429,22 @@ export class AudioEngine {
 
         // Bass Synths (2 voices) - Bass Guitar-like sound
         const bassOptions = {
-            oscillator: { type: 'fatsawtooth', count: 2, spread: 30 },
-            envelope: {
-                attack: 0.01,
-                decay: 0.8,
-                sustain: 0.2,
-                release: 1.5,
-                attackCurve: 'linear',
-                decayCurve: 'exponential',
-                releaseCurve: 'exponential'
-            }
+            oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
+            envelope: { attack: 0.01, decay: 1.4, sustain: 0.1, release: 2 },
+            filter: { Q: 5, type: 'lowpass', rolloff: -24 },
+            filterEnvelope: { attack: 0.01, decay: 0.7, sustain: 0, release: 0, baseFrequency: 200, octaves: 1.5 }
         };
         for (let i = 0; i < 2; i++) {
             this.autopilotBassSynths.push(new Tone.Synth(bassOptions).connect(this.channels.autopilotBass));
+        }
+
+        // Effects Synths (2 voices) - Falling stars
+        const effectOptions = {
+            oscillator: { type: 'fmsine', modulationType: 'sine', harmonicity: 0.8 },
+            envelope: { attack: 0.01, decay: 0.8, sustain: 0, release: 0 },
+        };
+        for (let i = 0; i < 2; i++) {
+            this.autopilotEffectsSynths.push(new Tone.Synth(effectOptions).connect(this.channels.effects));
         }
     }
 

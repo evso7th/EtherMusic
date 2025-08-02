@@ -50,13 +50,14 @@ export class AutopilotEngine {
 
      private handleWorkerMessage(event: MessageEvent<WorkerResponse>) {
         if (event.data.type === 'patternGenerated') {
-            const { melody, accompaniment, bass } = event.data.pattern;
+            const { melody, accompaniment, bass, effects } = event.data.pattern;
 
             // Combine all events to schedule them
             const allEvents: NoteEventWithType[] = [
                 ...melody.map(n => ({ ...n, type: 'melody' as const })),
                 ...accompaniment.map(n => ({ ...n, type: 'accompaniment' as const })),
                 ...bass.map(n => ({ ...n, type: 'bass' as const })),
+                ...effects.map(n => ({ ...n, type: 'effect' as const })),
             ];
 
             allEvents.forEach((note) => {

@@ -12,13 +12,14 @@ type NoteEvent = {
 };
 
 export type NoteEventWithType = NoteEvent & {
-    type: 'melody' | 'accompaniment' | 'bass';
+    type: 'melody' | 'accompaniment' | 'bass' | 'effect';
 }
 
 type AutopilotPattern = {
     melody: NoteEvent[];
     accompaniment: NoteEvent[];
     bass: NoteEvent[];
+    effects: NoteEvent[];
 };
 
 // --- WORKER COMMUNICATION INTERFACES ---
@@ -131,6 +132,8 @@ function durationToSeconds(duration: string, bpm: number): number {
 // Helper to get a frequency from the correct octave based on probability
 function getFrequencyForPart(part: keyof typeof scaleFrequencies, degree?: number): number | null {
     const partFrequencies = scaleFrequencies[part];
+    if (!partFrequencies || partFrequencies.primary.length === 0) return null;
+
     const useRare = Math.random() < 0.15; // 15% chance to use a rare octave
 
     const availableFrequencies = (useRare && partFrequencies.rare.length > 0) 
@@ -171,7 +174,7 @@ function generatePattern() {
         updateMusicContext();
     }
     
-    const pattern: AutopilotPattern = { melody: [], accompaniment: [], bass: [] };
+    const pattern: AutopilotPattern = { melody: [], accompaniment: [], bass: [], effects: [] };
     const measureDuration = durationToSeconds('1m', currentBpm);
     const sixteenthNoteDuration = durationToSeconds('16n', currentBpm);
     const eighthNoteDuration = durationToSeconds('8n', currentBpm);
@@ -185,39 +188,37 @@ function generatePattern() {
         const chordRootDegree = progression[measure];
         
         // --- BASS (Slow, Rhythmic Pulses like a Bass Guitar) ---
-        const rootBassFreq = getFrequencyForPart('bass', chordRootDegree);
+        const bassRhythms = [
+            // "tuuuum____"
+            [{ time: 0, dur: halfNoteDuration + quarterNoteDuration }],
+            // "tuuu-dum---"
+            [{ time: 0, dur: halfNoteDuration }, { time: halfNoteDuration + eighthNoteDuration, dur: quarterNoteDuration }],
+            // "tu-dum---tu-dum---"
+            [{time: 0, dur: quarterNoteDuration}, {time: halfNoteDuration, dur: quarterNoteDuration}],
+        ];
+        const bassRhythm = bassRhythms[Math.floor(Math.random() * bassRhythms.length)];
         
-        if (rootBassFreq) {
-            // Rhythmic patterns for bass: time offset from measure start, duration
-            const bassRhythms = [
-                // "tuuuu-dum---"
-                [{ time: 0, dur: halfNoteDuration + quarterNoteDuration }],
-                // "tuuudu-- tuuudu--"
-                [{ time: 0, dur: halfNoteDuration }, {time: halfNoteDuration, dur: halfNoteDuration}],
-                 // "tu-dum--- tu-dum---"
-                [{time: 0, dur: quarterNoteDuration}, {time: quarterNoteDuration, dur: halfNoteDuration + quarterNoteDuration}],
-            ];
-            const bassRhythm = bassRhythms[Math.floor(Math.random() * bassRhythms.length)];
-            
-            bassRhythm.forEach(note => {
-                let time = measureStartTime + note.time;
-                if (Math.random() < 0.2) { // Syncopation
-                    time += (Math.random() < 0.5 ? 1 : -1) * eighthNoteDuration * 0.5;
-                }
-                
-                // Occasionally play the 5th of the chord instead of the root
-                const freq = (Math.random() < 0.1) 
-                    ? getFrequencyForPart('bass', chordRootDegree + 4) ?? rootBassFreq
-                    : rootBassFreq;
+        bassRhythm.forEach(note => {
+            const rootBassFreq = getFrequencyForPart('bass', chordRootDegree);
+            if (!rootBassFreq) return;
 
-                pattern.bass.push({
-                    time: time,
-                    freq: freq,
-                    dur: note.dur * 0.9, // Slightly shorter to avoid overlap
-                    vel: 0.8
-                });
+            let time = measureStartTime + note.time;
+            if (Math.random() < 0.2) { // Syncopation
+                time += (Math.random() < 0.5 ? 1 : -1) * eighthNoteDuration * 0.5;
+            }
+            
+            // Occasionally play the 5th of the chord instead of the root
+            const freq = (Math.random() < 0.2) 
+                ? getFrequencyForPart('bass', chordRootDegree + 4) ?? rootBassFreq
+                : rootBassFreq;
+
+            pattern.bass.push({
+                time: time,
+                freq: freq,
+                dur: note.dur * 0.9, // Slightly shorter to avoid overlap
+                vel: 0.8
             });
-        }
+        });
         
         // --- ACCOMPANIMENT (ARPEGGIO) ---
         const accompanimentChordTones = getChordTones(chordRootDegree, 'accompaniment');
@@ -239,9 +240,11 @@ function generatePattern() {
             }
         }
         
-        // --- MELODY ---
+        // --- MELODY & EFFECTS---
         for (let i = 0; i < 16; i++) { // 16th note resolution for the whole pattern
             const currentGlobalTime = measureStartTime + i * sixteenthNoteDuration;
+            
+            // MELODY
             if (Math.random() > 0.9) { // Sparser melody
                 const melodyFreq = getFrequencyForPart('melody');
                 if (melodyFreq) {
@@ -255,6 +258,19 @@ function generatePattern() {
                         dur: eighthNoteDuration * (Math.random() * 1.5 + 0.5),
                         vel: 0.6
                     });
+                }
+            }
+            
+            // EFFECTS
+            if (Math.random() > 0.98) { // Very rare effect
+                const effectFreq = getFrequencyForPart('melody'); // Use melody range for high notes
+                if (effectFreq) {
+                    pattern.effects.push({
+                        time: currentGlobalTime,
+                        freq: effectFreq,
+                        dur: halfNoteDuration * (Math.random() + 0.5),
+                        vel: 0.5
+                    })
                 }
             }
         }
