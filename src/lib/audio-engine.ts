@@ -257,7 +257,7 @@ export class AudioEngine {
         this.musicScale = scale;
         this.allowedFrequencies = {
             bass: this.getScaleFrequencies(key, scale, [2, 3]),
-            melody: this.getScaleFrequencies(key, scale, [4, 5]),
+            melody: this.getScaleFrequencies(key, scale, [3, 4, 5]),
         };
         this.latchEngine.setAllowedFrequencies(this.allowedFrequencies.bass);
     }
@@ -408,30 +408,30 @@ export class AudioEngine {
         this.autopilotBassSynths = [];
         this.autopilotEffectsSynths = [];
 
-        // Melody Synths (4 voices)
+        // Melody Synths (2 voices for performance)
         const melodyOptions = {
             oscillator: { type: 'sine' },
             envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 },
         };
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 2; i++) {
             this.autopilotMelodySynths.push(new Tone.Synth(melodyOptions).connect(this.channels.melody));
         }
         
-        // Accompaniment Synths (4 voices)
+        // Accompaniment Synths (2 voices for performance, simplified timbre)
         const accompanimentOptions = {
-            oscillator: { type: 'fatsine', count: 3, spread: 60 },
-            envelope: { attack: 0.2, decay: 0.9, sustain: 0.4, release: 1.4 },
-            volume: -6, // Synths can be loud
+            oscillator: { type: 'triangle' }, // Simplified timbre
+            envelope: { attack: 0.2, decay: 0.9, sustain: 0.1, release: 1.0 },
+            volume: -8,
         };
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 2; i++) {
             this.autopilotAccompanimentSynths.push(new Tone.Synth(accompanimentOptions).connect(this.channels.accompaniment));
         }
 
         // Bass Synths (2 voices) - Bass Guitar-like sound
         const bassOptions = {
             oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
-            envelope: { attack: 0.01, decay: 1.4, sustain: 0.1, release: 2 },
             filter: { Q: 5, type: 'lowpass', rolloff: -24 },
+            envelope: { attack: 0.01, decay: 1.4, sustain: 0.1, release: 2 },
             filterEnvelope: { attack: 0.01, decay: 0.7, sustain: 0, release: 0, baseFrequency: 200, octaves: 1.5 }
         };
         for (let i = 0; i < 2; i++) {
