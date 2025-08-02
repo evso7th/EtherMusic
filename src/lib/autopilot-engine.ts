@@ -38,7 +38,7 @@ export class AutopilotEngine {
         // This handler ensures that if the transport is started (e.g. by user pressing play)
         // and the autopilot is on, the worker will start generating music.
         Tone.Transport.on('start', () => {
-            if (this.isAutopilotOn) {
+             if (this.isAutopilotOn) {
                 this.postMessageToActiveWorker({ type: 'start' });
             }
         });
@@ -57,11 +57,20 @@ export class AutopilotEngine {
         }
 
         let workerPath: string;
+        // This mapping determines which worker file to load for each style.
+        // As more styles are created, they should be added here.
         switch(style) {
             case 'Toccata':
                 workerPath = './autopilot-styles/toccata.worker.ts';
                 break;
             case 'Ambient': // Default case
+            case 'House':
+            case 'Wind':
+            case 'Sequence':
+            case 'Chimes':
+            case 'Drone':
+            case 'Promenade':
+            case 'Space':
             default:
                  workerPath = './autopilot-styles/ambient.worker.ts';
                 break;
@@ -70,8 +79,7 @@ export class AutopilotEngine {
         try {
             // This special syntax is a hint for bundlers like Webpack/Vite/Next.js
             // to correctly handle the worker file and provide a web-accessible URL.
-            const workerUrl = new URL(workerPath, import.meta.url);
-            const worker = new Worker(workerUrl, { type: 'module' });
+            const worker = new Worker(new URL(workerPath, import.meta.url), { type: 'module' });
             
             worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
                 this.handleWorkerMessage(event, style);
@@ -81,6 +89,7 @@ export class AutopilotEngine {
             return worker;
         } catch (e) {
             console.error(`Failed to construct Worker for style ${style}:`, e);
+            // Fallback to the default ambient worker if the specified one fails
             if (style !== 'Ambient') {
                 return this.getWorker('Ambient');
             }
@@ -89,6 +98,7 @@ export class AutopilotEngine {
     }
     
     private handleWorkerMessage(event: MessageEvent<WorkerResponse>, style: AutopilotStyle) {
+        // Ignore messages from inactive workers
         if (this.currentStyle !== style || !this.isAutopilotOn) {
             return;
         }
@@ -121,28 +131,31 @@ export class AutopilotEngine {
     public setAutopilot(isOn: boolean, style: AutopilotStyle) {
         if (!this.isInitialized) return;
 
+        const wasOn = this.isAutopilotOn;
         const didStyleChange = this.currentStyle !== style;
+        
         this.isAutopilotOn = isOn;
+        this.currentStyle = style;
 
-        // If the style changed, we need to switch workers
-        if (didStyleChange) {
-            // Stop the old worker if it exists
-            this.postMessageToActiveWorker({ type: 'stop' });
-
-            // Get the new worker and sync its state
-            this.currentStyle = style;
+        if (!wasOn && isOn) { // --- Turning ON ---
             this.activeWorker = this.getWorker(style);
             this.syncWorkerState();
-        }
-
-        if (this.isAutopilotOn) {
-            // If the autopilot should be on, ensure the worker is started.
-            // This is safe to call even if the transport is paused; the worker will
-            // start generating notes once the transport starts.
-            this.postMessageToActiveWorker({ type: 'start' });
-        } else {
-            // If the autopilot is being turned off, stop the worker.
+            // The transport start event will trigger the worker's 'start' message
+        } else if (wasOn && !isOn) { // --- Turning OFF ---
             this.postMessageToActiveWorker({ type: 'stop' });
+            this.activeWorker = null;
+        } else if (wasOn && isOn && didStyleChange) { // --- Switching Style ---
+            // Stop the old worker
+            this.postMessageToActiveWorker({ type: 'stop' });
+            
+            // Get the new worker and sync its state
+            this.activeWorker = this.getWorker(style);
+            this.syncWorkerState();
+            
+            // If the transport is already playing, start the new worker immediately.
+            if (Tone.Transport.state === 'started') {
+                this.postMessageToActiveWorker({ type: 'start' });
+            }
         }
     }
 
