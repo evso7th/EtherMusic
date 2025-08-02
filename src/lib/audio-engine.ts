@@ -91,7 +91,7 @@ export class AudioEngine {
     
     // --- The Unified Voice Pool ---
     private voicePool: Voice[] = [];
-    private readonly MAX_VOICES = 16; // Total voices for the entire app
+    private readonly MAX_VOICES = 18; // Total voices for the entire app
     private presets: { [key in InstrumentType]?: any } = {};
 
     private allowedFrequencies = { bass: [] as number[], melody: [] as number[] };
@@ -274,7 +274,7 @@ export class AudioEngine {
             case 'synth': default: newOptions = { oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 }}; break;
         }
         this.presets.melody = { ...this.presets.melody, ...newOptions };
-        this.presets.autopilot_melody = { ...this.presets.autopilot_melody, ...newOptions };
+        this.presets.autopilot_melody = { ...this.presets.autopilot_melody, ...newOptions, portamento: 0.05 };
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
@@ -321,8 +321,15 @@ export class AudioEngine {
                 envelope: { attack: 0.01, decay: 0.3, sustain: 0.2, release: 0.8 },
                 filterEnvelope: { attack: 0.01, decay: 0.05, sustain: 0.8, release: 0.8, baseFrequency: 200, octaves: 1.5 }
             },
-            autopilot_accompaniment: { oscillator: { type: 'triangle8' }, envelope: { attack: 0.2, decay: 0.9, sustain: 0.1, release: 1.0 }, volume: -2 },
-            autopilot_melody: { oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } },
+            autopilot_accompaniment: { 
+                oscillator: { type: 'triangle8' }, 
+                envelope: { attack: 0.2, decay: 0.9, sustain: 0.1, release: 1.0 }
+            },
+            autopilot_melody: { 
+                portamento: 0.05,
+                oscillator: { type: 'fatsine4', spread: 40, count: 4 }, 
+                envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } 
+            },
             
             // Effect presets
             autopilot_effect_star: { oscillator: { type: 'fmsine', modulationType: 'sine', harmonicity: 0.8 }, envelope: { attack: 0.01, decay: 0.8, sustain: 0, release: 0.5 } },
