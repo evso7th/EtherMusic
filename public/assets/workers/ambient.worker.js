@@ -1,57 +1,35 @@
 
-import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
-import type { InstrumentType } from '../audio-engine';
-import type { Unit } from 'tone/build/esm/core/type/Units';
-
 // --- TYPE DEFINITIONS ---
-export type AutopilotPart = 'bass' | 'accompaniment' | 'melody' | 'effects';
-
-type NoteEvent = {
-    type: InstrumentType;
-    freq: number;
-    dur: Unit.Time;
-    vel: number;
-};
-
-export type WorkerEvent =
-    | { type: 'start' }
-    | { type: 'stop' }
-    | { type: 'setHarmony', key: MusicKey, scale: MusicScale }
-    | { type: 'setStyle', style: AutopilotStyle }
-    | { type: 'setTempo', bpm: number }
-    | { type: 'setParts', parts: Record<AutopilotPart, boolean> };
-
-export type WorkerResponse =
-    | { type: 'playNote', note: NoteEvent, time: number };
-
+// These types are duplicated here because workers cannot import from the main app bundle.
+// They are simplified and only contain what's necessary for the worker's logic.
 
 // --- WORKER STATE ---
-let timerId: any = null;
+let timerId = null;
 let tickCount = 0;
 const subdivisions = 16; 
 
-let currentKey: MusicKey = 'C';
-let currentScale: MusicScale = 'Major Pentatonic';
+let currentKey = 'C';
+let currentScale = 'Major Pentatonic';
 let currentBpm = 120;
-let scaleIntervals: number[] = [];
-let chordProgression: number[] = [0, 4, 5, 3]; 
+let scaleIntervals = [];
+let chordProgression = [0, 4, 5, 3]; 
 
-let lastMelodyDegree: number | null = null;
+let lastMelodyDegree = null;
 
-let enabledParts: Record<AutopilotPart, boolean> = {
+let enabledParts = {
     bass: true,
     accompaniment: true,
     melody: true,
     effects: true
 };
 
-let scaleFrequencies: Record<'bass' | 'accompaniment' | 'melody', number[]> = {
+let scaleFrequencies = {
     bass: [],
     accompaniment: [],
     melody: [],
 };
 
-const effectTypes: InstrumentType[] = [
+const effectTypes = [
     'autopilot_effect_star', 'autopilot_effect_meteor', 'autopilot_effect_warp', 'autopilot_effect_hole',
     'autopilot_effect_pulsar', 'autopilot_effect_nebula', 'autopilot_effect_comet', 'autopilot_effect_wind', 'autopilot_effect_echoes'
 ];
@@ -61,25 +39,25 @@ let nextEffectTime = 0;
 
 // --- MUSIC THEORY HELPERS ---
 
-const scaleIntervalMap: { [key in MusicScale]: number[] } = {
+const scaleIntervalMap = {
     'Major': [0, 2, 4, 5, 7, 9, 11],
     'Minor': [0, 2, 3, 5, 7, 8, 10],
     'Major Pentatonic': [0, 2, 4, 7, 9],
-    'Minor Pentatonic': ['0', '3', '5', '7', '10'].map(Number),
+    'Minor Pentatonic': [0, 3, 5, 7, 10],
 };
 
-function getNoteFrequency(key: MusicKey, octave: number, interval: number): number {
+function getNoteFrequency(key, octave, interval) {
     const A4 = 440;
-    const keyMap: {[key in MusicKey]: number} = { 'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5, 'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11 };
+    const keyMap = { 'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5, 'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11 };
     const keyIndex = keyMap[key];
     const midiNote = 12 * (octave + 1) + keyIndex + interval;
     return Math.pow(2, (midiNote - 69) / 12) * A4;
 }
 
-function getScaleFrequenciesForOctaves(key: MusicKey, scale: MusicScale, octaves: number[]): number[] {
+function getScaleFrequenciesForOctaves(key, scale, octaves) {
     const intervals = scaleIntervalMap[scale];
     if (!intervals) return [];
-    let allFrequencies: number[] = [];
+    let allFrequencies = [];
     octaves.forEach(octave => {
         intervals.forEach(interval => {
             allFrequencies.push(getNoteFrequency(key, octave, interval));
@@ -105,7 +83,7 @@ function updateMusicContext() {
     lastMelodyDegree = null;
 }
 
-function getFrequencyFromDegree(degree: number, part: keyof typeof scaleFrequencies): number | null {
+function getFrequencyFromDegree(degree, part) {
     const freqs = scaleFrequencies[part];
     const scaleLength = scaleIntervals.length;
 
@@ -121,8 +99,8 @@ function getFrequencyFromDegree(degree: number, part: keyof typeof scaleFrequenc
     return null;
 }
 
-function getChordTones(rootDegree: number): number[] {
-    const chordTones: number[] = [];
+function getChordTones(rootDegree) {
+    const chordTones = [];
     if (!scaleIntervals.length) return [];
     
     for (let i = 0; i < 3; i++) {
@@ -132,7 +110,7 @@ function getChordTones(rootDegree: number): number[] {
     return chordTones;
 }
 
-function generateArpeggio(beat: number, chordTonesDegrees: number[], patternLength: number, syncopation: number): number | null {
+function generateArpeggio(beat, chordTonesDegrees, patternLength, syncopation) {
     if (chordTonesDegrees.length === 0) return null;
     const patterns = [
         [0, 1, 2, 1], // up & down
@@ -150,7 +128,7 @@ function generateArpeggio(beat: number, chordTonesDegrees: number[], patternLeng
 }
 
 // --- STYLE-SPECIFIC GENERATORS ---
-function tick(time: number) {
+function tick(time) {
     const measure = Math.floor(tickCount / subdivisions);
     const beat = tickCount % subdivisions;
     
@@ -179,7 +157,7 @@ function tick(time: number) {
 
     // Melody
     if (enabledParts.melody && beat % 8 === 1 && Math.random() > 0.4) {
-        let nextDegree: number | null = null;
+        let nextDegree = null;
         
         if (lastMelodyDegree !== null) {
             if (Math.random() < 0.8) {
@@ -257,8 +235,8 @@ function stop() {
     }
 }
 
-self.onmessage = function (event: MessageEvent<WorkerEvent>) {
-    const { type } = event.data;
+self.onmessage = function (event) {
+    const { type, ...data } = event.data;
     switch (type) {
         case 'start':
             start();
@@ -267,18 +245,18 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             stop();
             break;
         case 'setHarmony':
-            currentKey = event.data.key;
-            currentScale = event.data.scale;
+            currentKey = data.key;
+            currentScale = data.scale;
             updateMusicContext();
             break;
         case 'setTempo':
-            currentBpm = event.data.bpm;
+            currentBpm = data.bpm;
             if (timerId !== null) { 
                 start();
             }
             break;
         case 'setParts':
-            enabledParts = event.data.parts;
+            enabledParts = data.parts;
             break;
     }
 };

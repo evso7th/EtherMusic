@@ -1,4 +1,6 @@
 
+'use client';
+
 import * as Tone from 'tone';
 import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
 import type { WorkerEvent, WorkerResponse, AutopilotPart } from './autopilot-worker';
@@ -57,10 +59,13 @@ export class AutopilotEngine {
             return workerCache[style]!;
         }
 
+        // --- CORRECTED LOGIC ---
+        // Files are now in the /public directory and served directly.
+        // We can reference them with a simple absolute path.
         let workerPath: string;
         switch(style) {
             case 'Toccata':
-                workerPath = './autopilot-styles/toccata.worker.ts';
+                workerPath = '/assets/workers/toccata.worker.js';
                 break;
             case 'Ambient':
             case 'House':
@@ -71,15 +76,14 @@ export class AutopilotEngine {
             case 'Promenade':
             case 'Space':
             default:
-                workerPath = './autopilot-styles/ambient.worker.ts';
+                workerPath = '/assets/workers/ambient.worker.js';
                 break;
         }
 
         try {
-            // This special syntax `new URL(path, import.meta.url)` is a hint for bundlers like Webpack/Vite/Next.js
-            // to correctly handle the worker file and provide a web-accessible URL.
-            // It MUST be constructed this way to work with Next.js's bundler.
-            const worker = new Worker(new URL(workerPath, import.meta.url), { type: 'module' });
+            // Create the worker using the public path.
+            // No need for `new URL` or `import.meta.url`.
+            const worker = new Worker(workerPath, { type: 'module' });
             
             worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
                 this.handleWorkerMessage(event, style);
@@ -88,7 +92,7 @@ export class AutopilotEngine {
             workerCache[style] = worker;
             return worker;
         } catch (e) {
-            console.error(`Failed to construct Worker for style ${style}:`, e);
+            console.error(`Failed to construct Worker for style ${style} from path ${workerPath}:`, e);
             // Fallback to the default ambient worker if the specified one fails
             if (style !== 'Ambient') {
                 return this.getWorker('Ambient');
@@ -132,14 +136,14 @@ export class AutopilotEngine {
         const wasOn = this.isAutopilotOn;
         const didStyleChange = this.currentStyle !== style;
 
-        this.isAutopilotOn = isOn;
-
         // --- Stop old worker if it was on and style changes or autopilot is turned off ---
         if (wasOn && (didStyleChange || !isOn)) {
             this.postMessageToActiveWorker({ type: 'stop' });
             this.activeWorker = null;
             this.currentStyle = null;
         }
+
+        this.isAutopilotOn = isOn;
 
         // --- Start new worker if it should be on ---
         if (isOn) {
