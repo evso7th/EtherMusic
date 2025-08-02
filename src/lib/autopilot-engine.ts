@@ -55,14 +55,15 @@ export class AutopilotEngine {
         
         let workerUrl: URL;
 
-        // This is a specific pattern to let Webpack/Next.js handle worker bundling.
-        // We create the new Worker with a special URL constructor syntax.
         try {
-            if (style === 'Toccata') {
-                 workerUrl = new URL('./autopilot-styles/toccata.worker.ts', import.meta.url);
-            } else {
-                // Default to ambient for any other style for now
-                workerUrl = new URL('./autopilot-styles/ambient.worker.ts', import.meta.url);
+            switch(style) {
+                case 'Toccata':
+                    workerUrl = new URL('./autopilot-styles/toccata.worker.ts', import.meta.url);
+                    break;
+                case 'Ambient':
+                default:
+                    workerUrl = new URL('./autopilot-styles/ambient.worker.ts', import.meta.url);
+                    break;
             }
         } catch (e) {
              console.error(`Could not create worker URL for style ${style}, falling back to ambient.`, e);
@@ -123,14 +124,13 @@ export class AutopilotEngine {
     public setAutopilot(isOn: boolean, style: AutopilotStyle) {
         if (!this.isInitialized) return;
 
-        const wasAutopilotOn = this.isAutopilotOn;
         const didStyleChange = this.currentStyle !== style;
         this.isAutopilotOn = isOn;
-        
+
         if (didStyleChange) {
             // Style has changed, we need to switch workers
             if (this.activeWorker) {
-                this.activeWorker.postMessage({ type: 'stop' });
+                this.postMessageToActiveWorker({ type: 'stop' });
             }
             
             this.currentStyle = style;
@@ -141,19 +141,14 @@ export class AutopilotEngine {
         }
 
         if (isOn) {
-            // Case 1: Turning autopilot ON from OFF state.
-            // Case 2: Autopilot was already ON, and the style changed.
-            if (!wasAutopilotOn || (wasAutopilotOn && didStyleChange)) {
-                 if (Tone.Transport.state === 'started') {
-                     // If transport is already running, we need to manually start the worker.
-                     this.handleTransportStart();
-                 }
+            // If music is playing, start the worker immediately.
+            // This handles both initial startup and style switching.
+            if (Tone.Transport.state === 'started') {
+                this.handleTransportStart();
             }
         } else {
-            // Case 3: Turning autopilot OFF.
-            if (wasAutopilotOn) {
-                this.handleTransportStop();
-            }
+            // If autopilot is turned off, stop the worker.
+            this.handleTransportStop();
         }
     }
 
