@@ -53,31 +53,37 @@ export class AutopilotEngine {
 
         console.log(`Creating worker for style: ${style}`);
         
-        let workerUrl: URL;
+        let workerPath: string;
+
+        switch(style) {
+            case 'Toccata':
+                workerPath = './autopilot-styles/toccata.worker.ts';
+                break;
+            case 'Ambient':
+            default:
+                 workerPath = './autopilot-styles/ambient.worker.ts';
+                break;
+        }
 
         try {
-            switch(style) {
-                case 'Toccata':
-                    workerUrl = new URL('./autopilot-styles/toccata.worker.ts', import.meta.url);
-                    break;
-                case 'Ambient':
-                default:
-                    workerUrl = new URL('./autopilot-styles/ambient.worker.ts', import.meta.url);
-                    break;
-            }
+            // This special syntax is a hint for bundlers like Webpack/Vite/Next.js
+            // to correctly handle the worker file.
+            const worker = new Worker(new URL(workerPath, import.meta.url), { type: 'module' });
+            
+            worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+                this.handleWorkerMessage(event, style);
+            };
+            
+            workerCache[style] = worker;
+            return worker;
         } catch (e) {
-             console.error(`Could not create worker URL for style ${style}, falling back to ambient.`, e);
-             workerUrl = new URL('./autopilot-styles/ambient.worker.ts', import.meta.url);
+            console.error(`Failed to construct Worker for style ${style}`, e);
+            // Fallback to ambient if something goes wrong, and ensure it's loaded.
+            if (style !== 'Ambient') {
+                return this.getWorker('Ambient');
+            }
+            throw e; // re-throw if even ambient fails
         }
-        
-        const worker = new Worker(workerUrl, { type: 'module' });
-        
-        worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
-            this.handleWorkerMessage(event, style);
-        };
-        
-        workerCache[style] = worker;
-        return worker;
     }
     
     private handleWorkerMessage(event: MessageEvent<WorkerResponse>, style: AutopilotStyle) {
@@ -127,28 +133,26 @@ export class AutopilotEngine {
         const didStyleChange = this.currentStyle !== style;
         this.isAutopilotOn = isOn;
 
+        // --- Logic for switching workers ---
         if (didStyleChange) {
-            // Style has changed, we need to switch workers
             if (this.activeWorker) {
                 this.postMessageToActiveWorker({ type: 'stop' });
             }
-            
             this.currentStyle = style;
             this.activeWorker = this.getWorker(style);
-            
-            // Sync the new worker with the latest state
             this.syncWorkerState();
         }
 
+        // --- Logic for starting or stopping the active worker ---
         if (isOn) {
-            // If music is playing, start the worker immediately.
-            // This handles both initial startup and style switching.
+            // If the transport is already running, we need to start the new worker.
+            // This handles the case of switching styles while music is playing.
             if (Tone.Transport.state === 'started') {
-                this.handleTransportStart();
+                 this.postMessageToActiveWorker({ type: 'start' });
             }
         } else {
             // If autopilot is turned off, stop the worker.
-            this.handleTransportStop();
+            this.postMessageToActiveWorker({ type: 'stop' });
         }
     }
 
