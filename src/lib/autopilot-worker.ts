@@ -40,10 +40,10 @@ type OctaveConfig = {
     rare: number[];
 };
 
-let scaleFrequencies: Record<'bass' | 'accompaniment' | 'melody', OctaveConfig> = {
-    bass: { primary: [2, 3], rare: [1] },
-    accompaniment: { primary: [3], rare: [2, 4] },
-    melody: { primary: [3, 4], rare: [5] },
+let scaleFrequencies: Record<'bass' | 'accompaniment' | 'melody', number[]> = {
+    bass: [],
+    accompaniment: [],
+    melody: [],
 };
 
 
@@ -79,20 +79,10 @@ function getScaleFrequenciesForOctaves(key: MusicKey, scale: MusicScale, octaves
 function updateMusicContext() {
     scaleIntervals = scaleIntervalMap[currentScale];
     
-    // We need to re-calculate the frequencies every time the harmony changes
     scaleFrequencies = {
-        bass: { 
-            primary: getScaleFrequenciesForOctaves(currentKey, currentScale, [2, 3]),
-            rare: getScaleFrequenciesForOctaves(currentKey, currentScale, [1]) 
-        },
-        accompaniment: { 
-            primary: getScaleFrequenciesForOctaves(currentKey, currentScale, [3]),
-            rare: getScaleFrequenciesForOctaves(currentKey, currentScale, [2, 4]) 
-        },
-        melody: { 
-            primary: getScaleFrequenciesForOctaves(currentKey, currentScale, [3, 4]),
-            rare: getScaleFrequenciesForOctaves(currentKey, currentScale, [5]) 
-        },
+        bass: getScaleFrequenciesForOctaves(currentKey, currentScale, [2, 3]),
+        accompaniment: getScaleFrequenciesForOctaves(currentKey, currentScale, [3]),
+        melody: getScaleFrequenciesForOctaves(currentKey, currentScale, [3, 4, 5]),
     };
 
     if (currentScale.includes('Major')) {
@@ -104,31 +94,30 @@ function updateMusicContext() {
 
 
 function getFrequencyFromDegree(degree: number, part: keyof typeof scaleFrequencies): number | null {
-    const octaves = scaleFrequencies[part];
-    if (!octaves || !octaves.primary || !octaves.primary.length) return null;
-
-    const targetFrequencies = Math.random() < 0.15 ? octaves.rare : octaves.primary;
+    const targetFrequencies = scaleFrequencies[part];
     if (!targetFrequencies || targetFrequencies.length === 0) return null;
 
     const scaleIndex = degree % scaleIntervals.length;
     const octaveOffset = Math.floor(degree / scaleIntervals.length);
     
-    const baseOctaveFreqs = getScaleFrequenciesForOctaves(currentKey, currentScale, [3]);
-    if(baseOctaveFreqs.length === 0 || !baseOctaveFreqs[scaleIndex]) return null;
+    // Find the base frequency in the first octave of the scale
+    const baseOctaveKey = getScaleFrequenciesForOctaves(currentKey, currentScale, [3]);
+    if(baseOctaveKey.length === 0 || !baseOctaveKey[scaleIndex]) return null;
     
-    const baseFreq = baseOctaveFreqs[scaleIndex];
+    const baseFreq = baseOctaveKey[scaleIndex];
     if (baseFreq === null || baseFreq === undefined) return null;
 
     const targetFreq = baseFreq * Math.pow(2, octaveOffset);
 
-    // Find the closest frequency in the allowed octaves
-    return targetFrequencies.reduce((prev, curr) => (Math.abs(curr - targetFreq) < Math.abs(prev - targetFreq) ? curr : prev));
+    // Find the closest frequency in the allowed octaves for that part
+    return targetFrequencies.reduce((prev, curr) => (Math.abs(curr - targetFreq) < Math.abs(prev - targetFreq) ? curr : prev), targetFrequencies[0] ?? 0);
 }
 
 
 function getChordTones(rootDegree: number, part: keyof typeof scaleFrequencies, count: number): (number | null)[] {
     const chordTones: (number | null)[] = [];
     for (let i = 0; i < count; i++) {
+        // Build a triad (root, 3rd, 5th) from the rootDegree
         const degree = rootDegree + i * 2;
         chordTones.push(getFrequencyFromDegree(degree, part));
     }
@@ -181,7 +170,8 @@ function tick() {
 
     // --- Effects ---
     if (Math.random() < 0.02) {
-        const freq = getFrequencyFromDegree(Math.floor(Math.random() * 7), 'melody');
+        const randomRoot = scaleIntervals[Math.floor(Math.random() * scaleIntervals.length)];
+        const freq = getFrequencyFromDegree(randomRoot, 'melody');
         if (freq) {
             self.postMessage({ type: 'playNote', note: { type: 'autopilot_effect', freq, dur: '2n', vel: 0.4 } });
         }
@@ -233,3 +223,4 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             break;
     }
 };
+
