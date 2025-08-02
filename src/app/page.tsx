@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
@@ -121,8 +120,8 @@ export default function Home() {
             await mainEngine.initialize();
             audioEngine.current = mainEngine;
             
+            // CRITICAL CHANGE: Instantiate AutopilotEngine only on the client, after AudioEngine is ready.
             const apEngine = new AutopilotEngine(mainEngine);
-            await apEngine.initialize();
             autopilotEngine.current = apEngine;
             
             // Sync initial state with the engines
@@ -188,9 +187,8 @@ export default function Home() {
         autopilotEngine.current?.setAutopilotParts(autopilotParts);
     }, [autopilotParts]);
     
-    // --- Auto-start playback when ready ---
     useEffect(() => {
-        if (isReady && !isPlaying) {
+        if (isReady) {
             handlePlayPause();
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -236,7 +234,7 @@ export default function Home() {
         const willBePlaying = !isPlaying;
         
         if (willBePlaying) {
-            audioEngine.current?.start();
+            await audioEngine.current?.start();
         } else {
             audioEngine.current?.pause();
         }
@@ -248,20 +246,17 @@ export default function Home() {
         
         autopilotEngine.current.setAutopilot(isAutopilotOn, autopilotStyle);
 
-        // If autopilot is turned on and music is not playing, start it.
-        if (isAutopilotOn && !isPlaying) {
-            handlePlayPause();
-        }
-    }, [isAutopilotOn, autopilotStyle, isReady, isPlaying, handlePlayPause]);
+    }, [isAutopilotOn, autopilotStyle, isReady]);
 
 
     const handleStop = useCallback(async () => {
         if (!isReady) return;
         audioEngine.current?.stop();
-        autopilotEngine.current?.setAutopilot(false, autopilotStyle);
+        if (isAutopilotOn) {
+            setIsAutopilotOn(false);
+        }
         setIsPlaying(false);
-        setIsAutopilotOn(false);
-    }, [isReady, autopilotStyle]);
+    }, [isReady, isAutopilotOn]);
 
     const handleRecord = useCallback(() => {
         toast({ title: "Recording Unavailable", description: "This feature is temporarily disabled." });
