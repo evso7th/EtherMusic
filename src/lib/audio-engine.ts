@@ -43,7 +43,7 @@ class Voice {
 
     release(duration?: Tone.Unit.Time) {
         if (duration) {
-            this.releaseTime = Tone.now() + Tone.toSeconds(duration);
+            this.releaseTime = Tone.now() + new Tone.Time(duration).toSeconds();
             this.synth.triggerRelease(this.releaseTime);
             Tone.Transport.scheduleOnce(() => {
                 this.isBusy = false;
@@ -156,7 +156,7 @@ export class AudioEngine {
 
     public startNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}) {
         const quantizedFreq = this.getClosestFrequency(freq, type);
-        const instrumentType = type === 'melody' ? 'melody' : 'bass';
+        const instrumentType = type === 'melody' ? 'melody' : 'manualBass';
 
         if (type === 'bass' && this.isBassLatchOn) {
             this.latchEngine.handleInteraction(pos, vol, quantizedFreq);
@@ -198,13 +198,11 @@ export class AudioEngine {
         // --- DEFENSIVE CHECK ---
         // Ensure the frequency is a valid number before proceeding.
         if (typeof note.freq !== 'number' || !isFinite(note.freq)) {
-            // console.warn("AudioEngine: Dropping autopilot note with invalid frequency:", note.freq);
             return;
         }
 
         const voice = this.getVoice(null, note.type);
         if (!voice) {
-            // console.log("No voice available for autopilot, dropping note.");
             return; 
         }
 
@@ -295,6 +293,7 @@ export class AudioEngine {
     private createPresets() {
         this.presets = {
             melody: { portamento: 0.02, oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } },
+            manualBass: { oscillator: { type: 'fatsawtooth', count: 3, spread: 20 }, envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 }},
             bass: { oscillator: { type: 'fatsawtooth', count: 3, spread: 20 }, envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 }},
             latch: { oscillator: { type: 'fatsawtooth', count: 3, spread: 20 }, envelope: { attack: 0.2, decay: 0.1, sustain: 1, release: 0.8 }},
             autopilot_melody: { oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } },
