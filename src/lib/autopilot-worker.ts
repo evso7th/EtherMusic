@@ -143,8 +143,24 @@ function getFrequencyForPart(part: keyof typeof scaleFrequencies, degree?: numbe
     if (availableFrequencies.length === 0) return null;
 
     if (degree !== undefined) {
-        const targetIndex = degree % availableFrequencies.length;
-        return availableFrequencies[targetIndex];
+        // Ensure degree is within the bounds of scaleIntervals
+        const safeDegree = degree % scaleIntervals.length;
+        // Find the corresponding frequency in the chosen octave set
+        const rootFreq = getNoteFrequency(currentKey, 0, scaleIntervals[safeDegree]); // get base frequency
+        
+        // Find the closest match in the available frequencies
+        let closestFreq = availableFrequencies[0];
+        let minDiff = Infinity;
+
+        for (const freq of availableFrequencies) {
+            // Compare pitch classes (modulo 12)
+            const diff = Math.abs( (12 * Math.log2(freq/rootFreq)) % 12 );
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestFreq = freq;
+            }
+        }
+        return closestFreq;
     }
     
     return availableFrequencies[Math.floor(Math.random() * availableFrequencies.length)];
@@ -155,19 +171,30 @@ function getChordTones(rootDegree: number, part: keyof typeof scaleFrequencies):
         ? scaleFrequencies[part].rare
         : scaleFrequencies[part].primary;
     
+    if (octaveSet.length === 0) return [];
+    
     const chordToneDegrees = [rootDegree, rootDegree + 2, rootDegree + 4];
-    return chordToneDegrees
-        .map(degree => octaveSet[degree % scaleIntervals.length])
-        .filter(Boolean); // Filter out undefined if degree is out of bounds
+    
+    return chordToneDegrees.map(degree => {
+        const targetInterval = scaleIntervals[degree % scaleIntervals.length];
+        const rootFreqOfNote = getNoteFrequency(currentKey, 0, targetInterval);
+        
+        let closestFreq = octaveSet[0];
+        let minDiff = Infinity;
+        
+        for (const freq of octaveSet) {
+             const diff = Math.abs( (12 * Math.log2(freq/rootFreqOfNote)) % 12 );
+             if (diff < minDiff) {
+                minDiff = diff;
+                closestFreq = freq;
+            }
+        }
+        return closestFreq;
+    }).filter((value, index, self) => self.indexOf(value) === index); // Filter for unique frequencies
 }
 
 
 // --- PATTERN GENERATION ---
-
-function generateChordProgression(): number[] {
-    const progressions = chordProgressions[currentScale] || chordProgressions['Major']!;
-    return progressions[Math.floor(Math.random() * progressions.length)];
-}
 
 function generatePattern() {
     if (scaleFrequencies.bass.primary.length === 0) {
@@ -187,14 +214,12 @@ function generatePattern() {
         const measureStartTime = measure * measureDuration;
         const chordRootDegree = progression[measure];
         
-        // --- BASS (Slow, Rhythmic Pulses like a Bass Guitar) ---
+        // --- BASS ---
         const bassRhythms = [
-            // "tuuuum____"
-            [{ time: 0, dur: halfNoteDuration + quarterNoteDuration }],
-            // "tuuu-dum---"
-            [{ time: 0, dur: halfNoteDuration }, { time: halfNoteDuration + eighthNoteDuration, dur: quarterNoteDuration }],
-            // "tu-dum---tu-dum---"
-            [{time: 0, dur: quarterNoteDuration}, {time: halfNoteDuration, dur: quarterNoteDuration}],
+            [{ time: 0, dur: halfNoteDuration + quarterNoteDuration, vel: 0.7 }],
+            [{ time: 0, dur: halfNoteDuration, vel: 0.8 }, { time: halfNoteDuration, dur: quarterNoteDuration, vel: 0.6 }],
+            [{ time: 0, dur: quarterNoteDuration, vel: 0.8 }, {time: quarterNoteDuration, dur: quarterNoteDuration, vel: 0.6}, {time: halfNoteDuration, dur: halfNoteDuration, vel: 0.7}],
+            [{ time: 0, dur: measureDuration, vel: 0.6 }],
         ];
         const bassRhythm = bassRhythms[Math.floor(Math.random() * bassRhythms.length)];
         
@@ -203,11 +228,10 @@ function generatePattern() {
             if (!rootBassFreq) return;
 
             let time = measureStartTime + note.time;
-            if (Math.random() < 0.2) { // Syncopation
+            if (Math.random() < 0.3) { // Syncopation
                 time += (Math.random() < 0.5 ? 1 : -1) * eighthNoteDuration * 0.5;
             }
             
-            // Occasionally play the 5th of the chord instead of the root
             const freq = (Math.random() < 0.2) 
                 ? getFrequencyForPart('bass', chordRootDegree + 4) ?? rootBassFreq
                 : rootBassFreq;
@@ -215,63 +239,68 @@ function generatePattern() {
             pattern.bass.push({
                 time: time,
                 freq: freq,
-                dur: note.dur * 0.9, // Slightly shorter to avoid overlap
-                vel: 0.8
+                dur: note.dur * 0.9,
+                vel: note.vel
             });
         });
         
-        // --- ACCOMPANIMENT (ARPEGGIO) ---
+        // --- ACCOMPANIMENT (ARPEGGIO with Syncopation) ---
         const accompanimentChordTones = getChordTones(chordRootDegree, 'accompaniment');
-
         if (accompanimentChordTones.length > 0) {
-            const arpPatterns = [ [0, 1, 2, 1], [0, 2, 1, 0], [0, 1, 0, 2] ];
+            const arpPatterns = [ [0, 1, 2, 1], [0, 2, 1, 0], [0, 1, 0, 2], [0, 1, 2, 0] ];
             const arpPattern = arpPatterns[Math.floor(Math.random() * arpPatterns.length)];
             
-            for (let i = 0; i < 4; i++) { // Quarter notes
-                const noteIndexInChord = arpPattern[i % arpPattern.length];
-                if (noteIndexInChord < accompanimentChordTones.length) {
-                    pattern.accompaniment.push({
-                        time: measureStartTime + i * quarterNoteDuration,
-                        freq: accompanimentChordTones[noteIndexInChord],
-                        dur: quarterNoteDuration,
-                        vel: 0.3
+            for (let i = 0; i < 8; i++) { // eighth notes resolution
+                 if (Math.random() > 0.35) { // Sparseness
+                    const noteIndexInChord = arpPattern[i % arpPattern.length];
+                    const freq = accompanimentChordTones[noteIndexInChord % accompanimentChordTones.length];
+                    if (freq) {
+                        let time = measureStartTime + i * eighthNoteDuration;
+                        if (Math.random() < 0.2) { // Syncopation chance
+                             time += (Math.random() - 0.5) * eighthNoteDuration;
+                        }
+                        pattern.accompaniment.push({
+                            time,
+                            freq: freq,
+                            dur: eighthNoteDuration * (Math.random() * 1.5 + 0.5),
+                            vel: 0.4 * Math.random() + 0.2
+                        });
+                    }
+                 }
+            }
+        }
+        
+        // --- MELODY (ARPEGGIATOR with Syncopation) ---
+        const melodyChordTones = getChordTones(chordRootDegree, 'melody');
+        if (melodyChordTones.length > 0) {
+            const numNotes = Math.random() > 0.7 ? 4 : 2; // Generate 2 or 4 notes in the measure
+            for (let i = 0; i < numNotes; i++) {
+                const freq = melodyChordTones[Math.floor(Math.random() * melodyChordTones.length)];
+                if (freq) {
+                    let time = measureStartTime + (i * (measureDuration / numNotes));
+                    if (Math.random() < 0.4) { // Syncopation
+                        time += (Math.random() - 0.5) * quarterNoteDuration;
+                    }
+                    pattern.melody.push({
+                        time,
+                        freq,
+                        dur: halfNoteDuration * (Math.random() * 1.5 + 0.5),
+                        vel: 0.5 * Math.random() + 0.4
                     });
                 }
             }
         }
-        
-        // --- MELODY & EFFECTS---
-        for (let i = 0; i < 16; i++) { // 16th note resolution for the whole pattern
-            const currentGlobalTime = measureStartTime + i * sixteenthNoteDuration;
             
-            // MELODY
-            if (Math.random() > 0.9) { // Sparser melody
-                const melodyFreq = getFrequencyForPart('melody');
-                if (melodyFreq) {
-                    let time = currentGlobalTime;
-                    if (Math.random() < 0.5) { // Syncopation
-                        time += (Math.random() - 0.5) * sixteenthNoteDuration * 0.5;
-                    }
-                    pattern.melody.push({
-                        time,
-                        freq: melodyFreq,
-                        dur: eighthNoteDuration * (Math.random() * 1.5 + 0.5),
-                        vel: 0.6
-                    });
-                }
-            }
-            
-            // EFFECTS
-            if (Math.random() > 0.98) { // Very rare effect
-                const effectFreq = getFrequencyForPart('melody'); // Use melody range for high notes
-                if (effectFreq) {
-                    pattern.effects.push({
-                        time: currentGlobalTime,
-                        freq: effectFreq,
-                        dur: halfNoteDuration * (Math.random() + 0.5),
-                        vel: 0.5
-                    })
-                }
+        // --- EFFECTS ---
+        if (Math.random() > 0.7) { // 30% chance of an effect per measure
+            const effectFreq = getFrequencyForPart('melody'); // Use melody range for high notes
+            if (effectFreq) {
+                pattern.effects.push({
+                    time: measureStartTime + Math.random() * measureDuration,
+                    freq: effectFreq,
+                    dur: halfNoteDuration * (Math.random() + 0.5),
+                    vel: 0.5
+                })
             }
         }
     }
