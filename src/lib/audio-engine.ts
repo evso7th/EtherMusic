@@ -319,13 +319,10 @@ export class AudioEngine {
         }
     }
     
-     public playAutopilotEvent(time: number, note: {type: AutopilotInstrument, freq: number | number[], dur: number, vel: number}) {
-        if (!this.isInitialized || !isFinite(time)) return;
-        
-        // If we are late, schedule for right now.
-        if (time < Tone.now()) {
-            time = Tone.now();
-        }
+     public playAutopilotEvent(note: {type: AutopilotInstrument, freq: number | number[], dur: Tone.Unit.Time, vel: number}) {
+        if (!this.isInitialized) return;
+
+        const time = Tone.now(); // Play immediately
 
         let synthPool: Tone.Synth[] | undefined;
         let synthIndex: keyof typeof this.nextAutopilotSynthIndex | undefined;
@@ -354,7 +351,7 @@ export class AudioEngine {
             if (note.type === 'effect' && typeof note.freq === 'number') {
                 // Special handling for effects with pitch sweep
                 synth.frequency.setValueAtTime(note.freq * 4, time); // Start high
-                synth.frequency.exponentialRampToValueAtTime(note.freq, time + note.dur);
+                synth.frequency.exponentialRampToValueAtTime(note.freq, time + Tone.Time(note.dur).toSeconds());
                 synth.triggerAttackRelease(note.dur, time, note.vel);
             } else {
                 synth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
@@ -366,14 +363,23 @@ export class AudioEngine {
     public stopAutopilotSynths() {
         if (!this.isInitialized) return;
         
-        this.autopilotMelodySynths.forEach(s => s.dispose());
-        this.autopilotAccompanimentSynths.forEach(s => s.dispose());
-        this.autopilotBassSynths.forEach(s => s.dispose());
-        this.autopilotEffectsSynths.forEach(s => s.dispose());
+        // This is a more robust way to stop all synths in pools
+        const allAutopilotSynths = [
+            ...this.autopilotMelodySynths,
+            ...this.autopilotAccompanimentSynths,
+            ...this.autopilotBassSynths,
+            ...this.autopilotEffectsSynths,
+        ];
+
+        allAutopilotSynths.forEach(synth => {
+            if (synth && !synth.disposed) {
+                synth.triggerRelease();
+                // We don't dispose them, just release. They get reconfigured/reused.
+            }
+        });
         
-        this.createAutopilotSynthPools();
-         
-        Tone.Transport.cancel();
+        // Reset indices
+        this.nextAutopilotSynthIndex = { melody: 0, accompaniment: 0, bass: 0, effect: 0 };
     }
 
     // --- PRIVATE METHODS ---
@@ -403,27 +409,32 @@ export class AudioEngine {
     
      private createAutopilotSynthPools() {
         // Clear existing pools
+        this.autopilotMelodySynths.forEach(s => s.dispose());
+        this.autopilotAccompanimentSynths.forEach(s => s.dispose());
+        this.autopilotBassSynths.forEach(s => s.dispose());
+        this.autopilotEffectsSynths.forEach(s => s.dispose());
+
         this.autopilotMelodySynths = [];
         this.autopilotAccompanimentSynths = [];
         this.autopilotBassSynths = [];
         this.autopilotEffectsSynths = [];
 
-        // Melody Synths (2 voices for performance)
+        // Melody Synths (4 voices for density)
         const melodyOptions = {
             oscillator: { type: 'sine' },
             envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 },
         };
-        for (let i = 0; i < 2; i++) {
+        for (let i = 0; i < 4; i++) {
             this.autopilotMelodySynths.push(new Tone.Synth(melodyOptions).connect(this.channels.melody));
         }
         
-        // Accompaniment Synths (2 voices for performance, simplified timbre)
+        // Accompaniment Synths (4 voices, simplified timbre)
         const accompanimentOptions = {
-            oscillator: { type: 'triangle' }, // Simplified timbre
+            oscillator: { type: 'fatsine' }, // Slightly more complex than triangle
             envelope: { attack: 0.2, decay: 0.9, sustain: 0.1, release: 1.0 },
             volume: -8,
         };
-        for (let i = 0; i < 2; i++) {
+        for (let i = 0; i < 4; i++) {
             this.autopilotAccompanimentSynths.push(new Tone.Synth(accompanimentOptions).connect(this.channels.accompaniment));
         }
 
