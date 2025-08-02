@@ -30,6 +30,7 @@ class Voice {
     public isBusy = false;
     public activePointerId: number | null = null;
     public instrumentType: InstrumentType | null = null;
+    private releaseTimeoutId: any = null;
 
     constructor() {
         // A generic synth configuration. It will be reconfigured on the fly.
@@ -52,6 +53,10 @@ class Voice {
     }
     
     attack(freq: number, vel: number, time: number | undefined, pointerId: number | null, type: InstrumentType) {
+        if (this.releaseTimeoutId) {
+            clearTimeout(this.releaseTimeoutId);
+            this.releaseTimeoutId = null;
+        }
         this.isBusy = true;
         this.activePointerId = pointerId;
         this.instrumentType = type;
@@ -65,15 +70,25 @@ class Voice {
             
             // Schedule the voice to become available again after it has audibly stopped.
             // Add a small buffer (50ms) to ensure the release envelope has completed.
-            setTimeout(() => {
+            const releaseDurationMs = new Tone.Time(duration).toMilliseconds() + new Tone.Time(this.synth.envelope.release).toMilliseconds() + 50;
+            
+            if (this.releaseTimeoutId) {
+                clearTimeout(this.releaseTimeoutId);
+            }
+
+            this.releaseTimeoutId = setTimeout(() => {
                 this.isBusy = false;
                 this.activePointerId = null;
                 this.instrumentType = null;
-            }, (new Tone.Time(duration).toSeconds() * 1000) + 50);
+                this.releaseTimeoutId = null;
+            }, releaseDurationMs);
         }
     }
     
     dispose() {
+        if (this.releaseTimeoutId) {
+            clearTimeout(this.releaseTimeoutId);
+        }
         this.synth.dispose();
     }
 }
@@ -118,7 +133,7 @@ export class AudioEngine {
             manualBass: new Tone.Channel(-6),
             latch: new Tone.Channel(-15),
             drums: new Tone.Channel(-9),
-            autopilot: new Tone.Channel(-9), // Raised volume for accompaniment
+            autopilot: new Tone.Channel(-12),
             effects: new Tone.Channel(-9),
         };
         
@@ -211,8 +226,7 @@ export class AudioEngine {
     }
     
     public playAutopilotEvent(note: {type: InstrumentType, freq: number, dur: Tone.Unit.Time, vel: number}, time?: number) {
-        if (!this.isInitialized || note.freq === null || note.freq === undefined) {
-             console.warn("Attempted to play autopilot note with invalid frequency:", note);
+         if (!this.isInitialized || note.freq === null || note.freq === undefined) {
              return;
         }
 
@@ -321,10 +335,10 @@ export class AudioEngine {
             
             // Autopilot presets
             autopilot_bass: {
-                oscillator: { type: "triangle" },
-                filter: { Q: 2, type: 'lowpass', rolloff: -12 },
-                envelope: { attack: 0.05, decay: 0.3, sustain: 0.4, release: 1 },
-                filterEnvelope: { attack: 0.05, decay: 0.2, sustain: 0.2, release: 1, baseFrequency: 100, octaves: 2 }
+                oscillator: { type: "fmsine", harmonicity: 0.5 },
+                filter: { Q: 1, type: 'lowpass', rolloff: -12 },
+                envelope: { attack: 0.1, decay: 0.3, sustain: 0.4, release: 1.2 },
+                filterEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.1, release: 1, baseFrequency: 80, octaves: 1.5 }
             },
             autopilot_accompaniment: { 
                 portamento: 0.01,

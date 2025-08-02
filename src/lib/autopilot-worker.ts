@@ -94,9 +94,9 @@ function updateMusicContext() {
     scaleIntervals = scaleIntervalMap[currentScale] || [];
     
     scaleFrequencies = {
-        bass: getScaleFrequenciesForOctaves(currentKey, currentScale, [1, 2]), // Limit bass to octaves 1 & 2
-        accompaniment: getScaleFrequenciesForOctaves(currentKey, currentScale, [2, 3]), // Accompaniment lower
-        melody: getScaleFrequenciesForOctaves(currentKey, currentScale, [3, 4, 5]),
+        bass: getScaleFrequenciesForOctaves(currentKey, currentScale, [2, 3]),
+        accompaniment: getScaleFrequenciesForOctaves(currentKey, currentScale, [3, 4]),
+        melody: getScaleFrequenciesForOctaves(currentKey, currentScale, [4, 5]),
     };
 
     if (currentScale.includes('Major')) {
@@ -135,9 +135,8 @@ function getChordTones(rootDegree: number): number[] {
     if (!scaleIntervals.length) return [];
     
     for (let i = 0; i < 3; i++) { // Get 3 notes for a triad (root, 3rd, 5th)
-        const degreeIndex = (rootDegree + i * 2) % scaleIntervals.length;
-        const octaveOffset = Math.floor((rootDegree + i * 2) / scaleIntervals.length);
-        chordTones.push(degreeIndex + octaveOffset * scaleIntervals.length);
+        const degreeIndex = (rootDegree + i * 2);
+        chordTones.push(degreeIndex);
     }
     return chordTones;
 }
@@ -146,9 +145,18 @@ function getChordTones(rootDegree: number): number[] {
 // --- STYLE-SPECIFIC GENERATORS ---
 function generateArpeggio(beat: number, chordTonesDegrees: number[], patternLength: number, syncopation: number): number | null {
     if (chordTonesDegrees.length === 0) return null;
+    // More varied arpeggio patterns
+    const patterns = [
+        [0, 1, 2, 1], // up & down
+        [0, 2, 1, 2], // spread out
+        [2, 1, 0, 1], // down & up
+    ];
+    const selectedPattern = patterns[Math.floor(beat / 4) % patterns.length];
     const patternIndex = (beat + syncopation) % patternLength;
-    if (patternIndex < chordTonesDegrees.length) {
-        return chordTonesDegrees[patternIndex];
+    const degreeIndex = selectedPattern[patternIndex % selectedPattern.length];
+
+    if (degreeIndex < chordTonesDegrees.length) {
+        return chordTonesDegrees[degreeIndex];
     }
     return null;
 }
@@ -163,9 +171,9 @@ function tick(time: number) {
     const chordToneDegrees = getChordTones(rootDegree);
 
     // --- Bass ---
-    const bassRhythm = [0, 4, 7, 10, 13]; // Syncopated bass rhythm
-    if (enabledParts.bass && bassRhythm.includes(beat % 16)) {
-        const degreeToPlay = Math.random() < 0.8 ? rootDegree : rootDegree + 2; // Play root or third
+    const bassRhythm = [0, 6, 8, 14];
+    if (enabledParts.bass && bassRhythm.includes(beat)) {
+        const degreeToPlay = Math.random() < 0.8 ? rootDegree : chordToneDegrees[1]; // Play root or third
         const freq = getFrequencyFromDegree(degreeToPlay, 'bass');
         if (freq) {
             self.postMessage({ type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '2n', vel: 0.8 }, time });
@@ -173,7 +181,7 @@ function tick(time: number) {
     }
 
     // --- Accompaniment ---
-    if (enabledParts.accompaniment && (beat % 2 === 0)) { // Play on every 8th note
+    if (enabledParts.accompaniment && (beat % 4 === 0)) {
         const degree = generateArpeggio(Math.floor(beat / 2), chordToneDegrees, 4, beat % 4);
         if (degree !== null) {
             const freq = getFrequencyFromDegree(degree, 'accompaniment');
@@ -184,8 +192,8 @@ function tick(time: number) {
     }
 
     // --- Melody ---
-    const melodyRhythm = [0, 3, 7, 10, 14]; // A sparse rhythm to make it feel like a solo
-    if (enabledParts.melody && melodyRhythm.includes(beat % 16)) {
+    const melodyRhythm = [0, 3, 7, 10, 14];
+    if (enabledParts.melody && melodyRhythm.includes(beat)) {
         let nextDegree: number | null = null;
         
         if (lastMelodyDegree !== null) {
@@ -210,19 +218,19 @@ function tick(time: number) {
 
     // --- Effects ---
     if (enabledParts.effects && time >= nextEffectTime) {
-        if (Math.random() < 0.3) { // Increased probability
+        if (Math.random() < 0.1) {
              const randomRootDegree = chordProgression[Math.floor(Math.random() * chordProgression.length)];
              const freq = getFrequencyFromDegree(randomRootDegree, 'melody');
              if (freq) {
                  const effectType = effectTypes[Math.floor(Math.random() * effectTypes.length)];
-                 const numNotes = Math.floor(Math.random() * 2) + 2; // 2-3 notes
+                 const numNotes = Math.floor(Math.random() * 3) + 2;
                  for(let i=0; i < numNotes; i++){
-                    const effectFreq = freq * Math.pow(1.05946, i*2); // step up a whole tone
+                    const effectFreq = freq * Math.pow(1.05946, i*2);
                     self.postMessage({ type: 'playNote', note: { type: effectType, freq: effectFreq, dur: '8n', vel: Math.random() * 0.3 + 0.2 }, time: time + i * 0.1 });
                  }
              }
         }
-        const randomDelay = Math.random() * 2000 + 1000; // 1 to 3 seconds
+        const randomDelay = Math.random() * 2000 + 1000;
         nextEffectTime = time + randomDelay;
     }
 
