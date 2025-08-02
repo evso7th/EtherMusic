@@ -17,6 +17,7 @@ class Voice {
     public releaseTime = 0;
 
     constructor() {
+        // A generic synth configuration. It will be reconfigured on the fly.
         this.synth = new Tone.Synth({
             oscillator: { type: 'triangle' },
             envelope: { attack: 0.02, decay: 0.1, sustain: 0.3, release: 1 },
@@ -24,13 +25,14 @@ class Voice {
     }
 
     isAvailable(): boolean {
+        // A voice is available if it's not busy.
         return !this.isBusy;
     }
     
     // Applies a preset and connects to the correct channel
     configure(preset: any, channel: Tone.Channel) {
         this.synth.set(preset);
-        this.synth.disconnect();
+        this.synth.disconnect(); // Important to disconnect before connecting to a new channel
         this.synth.connect(channel);
     }
     
@@ -42,19 +44,23 @@ class Voice {
     }
 
     release(duration?: Tone.Unit.Time) {
-        if (duration) {
-            this.releaseTime = Tone.now() + new Tone.Time(duration).toSeconds();
-            this.synth.triggerRelease(this.releaseTime);
-            Tone.Transport.scheduleOnce(() => {
+        if (this.isBusy) {
+            if (duration) {
+                // Schedule release and mark as not busy after release
+                this.releaseTime = Tone.now() + new Tone.Time(duration).toSeconds();
+                this.synth.triggerRelease(this.releaseTime);
+                Tone.Transport.scheduleOnce(() => {
+                    this.isBusy = false;
+                    this.activePointerId = null;
+                    this.instrumentType = null;
+                }, this.releaseTime);
+            } else {
+                // Immediate release
+                this.synth.triggerRelease();
                 this.isBusy = false;
                 this.activePointerId = null;
                 this.instrumentType = null;
-            }, this.releaseTime);
-        } else {
-            this.synth.triggerRelease();
-            this.isBusy = false;
-            this.activePointerId = null;
-            this.instrumentType = null;
+            }
         }
     }
     
@@ -77,7 +83,7 @@ export class AudioEngine {
     
     // --- The Unified Voice Pool ---
     private voicePool: Voice[] = [];
-    private readonly MAX_VOICES = 18; 
+    private readonly MAX_VOICES = 18; // Total voices for the entire app
     private presets: { [key in InstrumentType]: any } = {};
 
     private allowedFrequencies = { bass: [] as number[], melody: [] as number[] };
@@ -129,11 +135,11 @@ export class AudioEngine {
         Tone.getDestination().connect(recorder);
         
         this.isInitialized = true;
-        console.log(`AudioEngine initialized with a pool of ${this.MAX_VOICES} voices.`);
+        console.log(`AudioEngine initialized with a unified pool of ${this.MAX_VOICES} voices.`);
     }
 
     // --- Core Voice Management ---
-    private getVoice(pointerId: number | null = null, instrumentType: InstrumentType | null = null): Voice | null {
+    private getVoice(pointerId: number | null = null): Voice | null {
         // First, check for a voice with the same pointerId (for note updates)
         if (pointerId !== null) {
             const existing = this.voicePool.find(v => v.activePointerId === pointerId);
@@ -145,10 +151,8 @@ export class AudioEngine {
         if (voice) {
             return voice;
         }
-
-        // If no voices are free, try to steal one (voice stealing)
-        // For now, we just return null if no voice is available. A more advanced
-        // implementation could steal the oldest or quietest voice.
+        
+        // Voice stealing could be implemented here if needed, but for now, we just return null.
         return null;
     }
     
@@ -163,7 +167,7 @@ export class AudioEngine {
             return;
         }
         
-        const voice = this.getVoice(null, instrumentType);
+        const voice = this.getVoice();
         if (voice) {
             const channel = type === 'melody' ? this.channels.melody : this.channels.manualBass;
             voice.configure(this.presets[instrumentType], channel);
@@ -192,17 +196,18 @@ export class AudioEngine {
         }
     }
     
-    public playAutopilotEvent(note: {type: InstrumentType, freq: number | number[], dur: Tone.Unit.Time, vel: number}) {
+    public playAutopilotEvent(note: {type: InstrumentType, freq: number, dur: Tone.Unit.Time, vel: number}) {
         if (!this.isInitialized || note.type.startsWith('autopilot') === false) return;
         
         // --- DEFENSIVE CHECK ---
-        // Ensure the frequency is a valid number before proceeding.
         if (typeof note.freq !== 'number' || !isFinite(note.freq)) {
+            console.warn("AudioEngine: Attempted to play a note with invalid frequency.", note);
             return;
         }
 
-        const voice = this.getVoice(null, note.type);
+        const voice = this.getVoice();
         if (!voice) {
+            // console.warn("AudioEngine: No available voices for autopilot event.");
             return; 
         }
 
@@ -276,7 +281,7 @@ export class AudioEngine {
     
     // --- Latch specific methods ---
     public getLatchVoice(freq: number, vol: number): Voice | null {
-        const voice = this.getVoice(null, 'latch');
+        const voice = this.getVoice();
         if (voice) {
             voice.configure(this.presets.latch, this.channels.latch);
             voice.attack(freq, vol, null, 'latch');
@@ -292,13 +297,15 @@ export class AudioEngine {
     // --- Private Helpers ---
     private createPresets() {
         this.presets = {
+            // Manual playing presets
             melody: { portamento: 0.02, oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } },
             manualBass: { oscillator: { type: 'fatsawtooth', count: 3, spread: 20 }, envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 }},
-            bass: { oscillator: { type: 'fatsawtooth', count: 3, spread: 20 }, envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 }},
             latch: { oscillator: { type: 'fatsawtooth', count: 3, spread: 20 }, envelope: { attack: 0.2, decay: 0.1, sustain: 1, release: 0.8 }},
-            autopilot_melody: { oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } },
-            autopilot_accompaniment: { oscillator: { type: 'triangle' }, envelope: { attack: 0.2, decay: 0.9, sustain: 0.1, release: 1.0 }, volume: -8 },
+            
+            // Autopilot presets
             autopilot_bass: { oscillator: { type: 'fatsawtooth', count: 3, spread: 20 }, filter: { Q: 5, type: 'lowpass', rolloff: -24 }, envelope: { attack: 0.01, decay: 1.4, sustain: 0.1, release: 2 }, filterEnvelope: { attack: 0.01, decay: 0.7, sustain: 0, release: 0, baseFrequency: 200, octaves: 1.5 } },
+            autopilot_accompaniment: { oscillator: { type: 'triangle' }, envelope: { attack: 0.2, decay: 0.9, sustain: 0.1, release: 1.0 }, volume: -8 },
+            autopilot_melody: { oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } },
             autopilot_effect: { oscillator: { type: 'fmsine', modulationType: 'sine', harmonicity: 0.8 }, envelope: { attack: 0.01, decay: 0.8, sustain: 0, release: 0 } },
         };
     }
@@ -341,9 +348,9 @@ export class AudioEngine {
 
     public stop() {
         if (this.isInitialized) {
-            Tone.Transport.stop();
-            // Don't cancel transport events, as the worker manages its own time
             this.stopAllSounds();
+            // We stop the transport, which also stops the worker via an event listener in AutopilotEngine
+            Tone.Transport.stop();
         }
     }
 }

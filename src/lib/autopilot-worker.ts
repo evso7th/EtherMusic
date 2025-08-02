@@ -7,7 +7,7 @@ import type { Unit } from 'tone/build/esm/core/type/Units';
 
 type NoteEvent = {
     type: InstrumentType;
-    freq: number | number[]; 
+    freq: number;
     dur: Unit.Time;
     vel: number;
 };
@@ -26,19 +26,15 @@ export type WorkerResponse =
 // --- WORKER STATE ---
 let timerId: any = null;
 let tickCount = 0;
-const subdivisions = 16; 
+const subdivisions = 16; // 16th notes per measure
 
 let currentKey: MusicKey = 'C';
 let currentScale: MusicScale = 'Major Pentatonic';
 let currentStyle: AutopilotStyle = 'Ambient';
 let currentBpm = 120;
 let scaleIntervals: number[] = [];
-let chordProgression: number[] = [0, 4, 5, 3];
-
-type OctaveConfig = {
-    primary: number[];
-    rare: number[];
-};
+// A simple but effective chord progression based on scale degrees
+let chordProgression: number[] = [0, 4, 5, 3]; // I-V-vi-IV for Major
 
 let scaleFrequencies: Record<'bass' | 'accompaniment' | 'melody', number[]> = {
     bass: [],
@@ -76,6 +72,7 @@ function getScaleFrequenciesForOctaves(key: MusicKey, scale: MusicScale, octaves
     return allFrequencies.sort((a,b) => a - b);
 }
 
+// Recalculates all musical context based on current settings
 function updateMusicContext() {
     scaleIntervals = scaleIntervalMap[currentScale];
     
@@ -100,9 +97,8 @@ function getFrequencyFromDegree(degree: number, part: keyof typeof scaleFrequenc
     const scaleIndex = degree % scaleIntervals.length;
     const octaveOffset = Math.floor(degree / scaleIntervals.length);
     
-    // Find the base frequency in the first octave of the scale
-    const baseOctaveKey = getScaleFrequenciesForOctaves(currentKey, currentScale, [3]);
-    if(baseOctaveKey.length === 0 || !baseOctaveKey[scaleIndex]) return null;
+    const baseOctaveKey = getScaleFrequenciesForOctaves(currentKey, currentScale, [3]); // Using 3rd octave as a reference
+    if(baseOctaveKey.length <= scaleIndex) return null;
     
     const baseFreq = baseOctaveKey[scaleIndex];
     if (baseFreq === null || baseFreq === undefined) return null;
@@ -114,18 +110,22 @@ function getFrequencyFromDegree(degree: number, part: keyof typeof scaleFrequenc
 }
 
 
-function getChordTones(rootDegree: number, part: keyof typeof scaleFrequencies, count: number): (number | null)[] {
-    const chordTones: (number | null)[] = [];
+// Gets the frequencies for a triad (root, 3rd, 5th) based on a root degree
+function getChordTones(rootDegree: number, part: keyof typeof scaleFrequencies, count: number): number[] {
+    const chordTones: number[] = [];
     for (let i = 0; i < count; i++) {
-        // Build a triad (root, 3rd, 5th) from the rootDegree
-        const degree = rootDegree + i * 2;
-        chordTones.push(getFrequencyFromDegree(degree, part));
+        const degree = rootDegree + i * 2; // Build a triad (root, 3rd, 5th, etc.) from the rootDegree
+        const freq = getFrequencyFromDegree(degree, part);
+        if (freq) {
+            chordTones.push(freq);
+        }
     }
-    return chordTones.filter(f => f !== null); // Filter out null frequencies right away
+    return chordTones;
 }
 
 
 // --- THE "CONDUCTOR" ---
+// This function is called for every 16th note.
 function tick() {
     const measure = Math.floor(tickCount / subdivisions);
     const beat = tickCount % subdivisions;
@@ -133,7 +133,8 @@ function tick() {
     const rootDegree = chordProgression[measure % chordProgression.length];
 
     // --- Bass ---
-    if (beat % 8 === 0) { 
+    // Plays a pulsating, rhythmic bass line on the downbeats.
+    if (beat % 8 === 0) { // On the 1 and 3 of each measure (if measure is 4/4)
         const freq = getFrequencyFromDegree(rootDegree, 'bass');
         if (freq) {
              self.postMessage({ type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '2n', vel: 0.6 } });
@@ -141,13 +142,15 @@ function tick() {
     }
 
     // --- Accompaniment (Arpeggio) with Syncopation ---
-    const isAccompanimentTick = (beat + 1) % 2 === 0;
+    // Plays a dense arpeggio to create a harmonic pad.
+    const isAccompanimentTick = (beat + 1) % 2 === 0; // Play on off-beats
     if (isAccompanimentTick && Math.random() > 0.1) {
         const chordTones = getChordTones(rootDegree, 'accompaniment', 3);
         if (chordTones.length > 0) {
             const arpNoteIndex = Math.floor(beat / 2) % chordTones.length;
             const freq = chordTones[arpNoteIndex];
             if (freq) {
+                // Introduce syncopation: a small chance to play a note slightly off the grid
                 const isSyncopated = Math.random() < 0.2;
                 if (!isSyncopated) {
                      self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '8n', vel: 0.3 } });
@@ -156,10 +159,12 @@ function tick() {
         }
     }
     
-    // --- Melody (Arpeggio) ---
+    // --- Melody (Solo Phrases) ---
+    // Plays a more sparse, but more prominent melodic line.
     if (beat % 4 === 0 && Math.random() < 0.75) {
         const chordTones = getChordTones(rootDegree, 'melody', 5);
         if (chordTones.length > 0) {
+            // Pick a random note from the higher parts of the chord to make it more melodic
             const arpNoteIndex = (Math.floor(beat / 4) + Math.floor(Math.random() * 3)) % chordTones.length;
             const freq = chordTones[arpNoteIndex];
             if (freq) {
@@ -168,8 +173,10 @@ function tick() {
         }
     }
 
-    // --- Effects ---
+    // --- Effects (Falling Stars / Meteors) ---
+    // A small chance to play a special effect.
     if (Math.random() < 0.02) {
+        // Choose a random high note from the scale
         const randomRoot = scaleIntervals[Math.floor(Math.random() * scaleIntervals.length)];
         const freq = getFrequencyFromDegree(randomRoot, 'melody');
         if (freq) {
@@ -210,7 +217,7 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
         case 'setHarmony':
             currentKey = event.data.key;
             currentScale = event.data.scale;
-            updateMusicContext(); // Recalculate frequencies when harmony changes
+            updateMusicContext();
             break;
         case 'setStyle':
             currentStyle = event.data.style;
@@ -223,4 +230,3 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             break;
     }
 };
-
