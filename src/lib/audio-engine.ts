@@ -51,7 +51,7 @@ class Voice {
         this.synth.connect(channel);
     }
     
-    attack(freq: number, vel: number, time: number, pointerId: number | null, type: InstrumentType) {
+    attack(freq: number, vel: number, time: number | undefined, pointerId: number | null, type: InstrumentType) {
         this.isBusy = true;
         this.activePointerId = pointerId;
         this.instrumentType = type;
@@ -60,14 +60,16 @@ class Voice {
 
     release(duration: Tone.Unit.Time = 0) {
         if (this.isBusy) {
-            const releaseDuration = new Tone.Time(duration).toSeconds() > 0 ? new Tone.Time(duration).toSeconds() : 0.05;
-            this.synth.triggerRelease();
+            const releaseTime = Tone.now() + new Tone.Time(duration).toSeconds();
+            this.synth.triggerRelease(releaseTime);
             
+            // Schedule the voice to become available again after it has audibly stopped.
+            // Add a small buffer (50ms) to ensure the release envelope has completed.
             setTimeout(() => {
                 this.isBusy = false;
                 this.activePointerId = null;
                 this.instrumentType = null;
-            }, releaseDuration * 1000 + 50);
+            }, (new Tone.Time(duration).toSeconds() * 1000) + 50);
         }
     }
     
@@ -116,7 +118,7 @@ export class AudioEngine {
             manualBass: new Tone.Channel(-6),
             latch: new Tone.Channel(-15),
             drums: new Tone.Channel(-9),
-            autopilot: new Tone.Channel(-12),
+            autopilot: new Tone.Channel(-9), // Raised volume for accompaniment
             effects: new Tone.Channel(-9),
         };
         
@@ -160,6 +162,7 @@ export class AudioEngine {
         }
         
         // Voice stealing could be implemented here if needed, but for now, we just return null.
+        console.warn("No available voices in the pool.");
         return null;
     }
     
@@ -202,13 +205,16 @@ export class AudioEngine {
 
         const voice = this.getVoice(pointerId);
         if (voice) {
-            voice.release();
+            voice.release(0.1); // Give a short release for manual notes
             this.orbManager.removeOrb(pointerId);
         }
     }
     
-    public playAutopilotEvent(note: {type: InstrumentType, freq: number, dur: Tone.Unit.Time, vel: number}) {
-        if (!this.isInitialized || note.freq === null || note.freq === undefined) return;
+    public playAutopilotEvent(note: {type: InstrumentType, freq: number, dur: Tone.Unit.Time, vel: number}, time?: number) {
+        if (!this.isInitialized || note.freq === null || note.freq === undefined) {
+             console.warn("Attempted to play autopilot note with invalid frequency:", note);
+             return;
+        }
 
         const voice = this.getVoice();
         if (!voice) {
@@ -224,13 +230,12 @@ export class AudioEngine {
         const channel = note.type.startsWith('autopilot_effect') ? this.channels.effects : this.channels.autopilot;
         
         voice.configure(preset, channel);
-        const time = Tone.now();
         voice.attack(note.freq, note.vel, time, null, note.type);
         voice.release(note.dur);
     }
 
     public stopAllSounds() {
-        this.voicePool.forEach(voice => voice.release());
+        this.voicePool.forEach(voice => voice.release(0.1));
         this.orbManager.removeAllOrbs('melody');
         this.orbManager.removeAllOrbs('bass');
         this.latchEngine.stopAll();
@@ -295,14 +300,14 @@ export class AudioEngine {
         const voice = this.getVoice();
         if (voice) {
             const time = Tone.now();
-            voice.configure(this.presets.latch, this.channels.latch);
+            voice.configure(this.presets.latch!, this.channels.latch);
             voice.attack(freq, vol, time, null, 'latch');
         }
         return voice;
     }
     
     public releaseLatchVoice(voice: Voice) {
-        voice.release();
+        voice.release(0.5); // Give a gentle release for latched notes
     }
 
 
@@ -316,10 +321,10 @@ export class AudioEngine {
             
             // Autopilot presets
             autopilot_bass: {
-                oscillator: { type: "fmsine", harmonicity: 0.8, modulationIndex: 2 },
-                filter: { Q: 1, type: 'lowpass', rolloff: -12 },
-                envelope: { attack: 0.01, decay: 0.3, sustain: 0.2, release: 0.8 },
-                filterEnvelope: { attack: 0.01, decay: 0.05, sustain: 0.8, release: 0.8, baseFrequency: 200, octaves: 1.5 }
+                oscillator: { type: "triangle" },
+                filter: { Q: 2, type: 'lowpass', rolloff: -12 },
+                envelope: { attack: 0.05, decay: 0.3, sustain: 0.4, release: 1 },
+                filterEnvelope: { attack: 0.05, decay: 0.2, sustain: 0.2, release: 1, baseFrequency: 100, octaves: 2 }
             },
             autopilot_accompaniment: { 
                 portamento: 0.01,
