@@ -14,13 +14,13 @@ class Voice {
     public isBusy = false;
     public activePointerId: number | null = null;
     public instrumentType: InstrumentType | null = null;
+    public releaseTime = 0;
 
-    constructor(output: Tone.Output) {
+    constructor() {
         this.synth = new Tone.Synth({
-            // A generic, reasonably performant starting point
             oscillator: { type: 'triangle' },
             envelope: { attack: 0.02, decay: 0.1, sustain: 0.3, release: 1 },
-        }).connect(output);
+        });
     }
 
     isAvailable(): boolean {
@@ -41,11 +41,21 @@ class Voice {
         this.synth.triggerAttack(freq, undefined, vel);
     }
 
-    release() {
-        this.synth.triggerRelease();
-        this.isBusy = false;
-        this.activePointerId = null;
-        this.instrumentType = null;
+    release(duration?: Tone.Unit.Time) {
+        if (duration) {
+            this.releaseTime = Tone.now() + Tone.toSeconds(duration);
+            this.synth.triggerRelease(this.releaseTime);
+            Tone.Transport.scheduleOnce(() => {
+                this.isBusy = false;
+                this.activePointerId = null;
+                this.instrumentType = null;
+            }, this.releaseTime);
+        } else {
+            this.synth.triggerRelease();
+            this.isBusy = false;
+            this.activePointerId = null;
+            this.instrumentType = null;
+        }
     }
     
     dispose() {
@@ -67,7 +77,7 @@ export class AudioEngine {
     
     // --- The Unified Voice Pool ---
     private voicePool: Voice[] = [];
-    private readonly MAX_VOICES = 16; // Hard limit for performance
+    private readonly MAX_VOICES = 18; 
     private presets: { [key in InstrumentType]: any } = {};
 
     private allowedFrequencies = { bass: [] as number[], melody: [] as number[] };
@@ -107,10 +117,7 @@ export class AudioEngine {
         
         // --- Create the Unified Voice Pool ---
         for (let i = 0; i < this.MAX_VOICES; i++) {
-            // A dummy output, we will reconnect each voice on the fly
-            const dummyOutput = new Tone.Channel(0);
-            this.voicePool.push(new Voice(dummyOutput));
-            dummyOutput.dispose();
+            this.voicePool.push(new Voice());
         }
         
         this.latchEngine = new LatchEngine(this, this.orbManager);
@@ -126,14 +133,25 @@ export class AudioEngine {
     }
 
     // --- Core Voice Management ---
-    private getVoice(pointerId: number | null = null): Voice | null {
+    private getVoice(pointerId: number | null = null, instrumentType: InstrumentType | null = null): Voice | null {
+        // First, check for a voice with the same pointerId (for note updates)
         if (pointerId !== null) {
             const existing = this.voicePool.find(v => v.activePointerId === pointerId);
             if (existing) return existing;
         }
-        return this.voicePool.find(v => v.isAvailable()) || null;
-    }
 
+        // Find the first available voice
+        let voice = this.voicePool.find(v => v.isAvailable());
+        if (voice) {
+            return voice;
+        }
+
+        // If no voices are free, try to steal one (voice stealing)
+        // For now, we just return null if no voice is available. A more advanced
+        // implementation could steal the oldest or quietest voice.
+        return null;
+    }
+    
     // --- Theremin Interaction ---
 
     public startNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}) {
@@ -145,7 +163,7 @@ export class AudioEngine {
             return;
         }
         
-        const voice = this.getVoice();
+        const voice = this.getVoice(null, instrumentType);
         if (voice) {
             const channel = type === 'melody' ? this.channels.melody : this.channels.manualBass;
             voice.configure(this.presets[instrumentType], channel);
@@ -174,28 +192,27 @@ export class AudioEngine {
         }
     }
     
-     public playAutopilotEvent(note: {type: InstrumentType, freq: number | number[], dur: Tone.Unit.Time, vel: number}) {
+    public playAutopilotEvent(note: {type: InstrumentType, freq: number | number[], dur: Tone.Unit.Time, vel: number}) {
         if (!this.isInitialized || note.type.startsWith('autopilot') === false) return;
+        
+        // --- DEFENSIVE CHECK ---
+        // Ensure the frequency is a valid number before proceeding.
+        if (typeof note.freq !== 'number' || !isFinite(note.freq)) {
+            // console.warn("AudioEngine: Dropping autopilot note with invalid frequency:", note.freq);
+            return;
+        }
 
-        const time = Tone.now();
-        const voice = this.getVoice();
-        if (!voice) return; // Drop note if no voices available
+        const voice = this.getVoice(null, note.type);
+        if (!voice) {
+            // console.log("No voice available for autopilot, dropping note.");
+            return; 
+        }
 
         const channel = note.type === 'autopilot_effect' ? this.channels.effects : this.channels.autopilot;
         voice.configure(this.presets[note.type], channel);
         
-        voice.instrumentType = note.type;
-        voice.isBusy = true;
-        
-        voice.synth.triggerAttack(note.freq as number, time, note.vel);
-        
-        // Schedule release
-        Tone.Transport.scheduleOnce(() => {
-            // Check if the voice hasn't been re-assigned
-            if(voice.instrumentType === note.type){
-                voice.release();
-            }
-        }, `+${note.dur}`);
+        voice.attack(note.freq, note.vel, null, note.type);
+        voice.release(note.dur);
     }
 
     public stopAllSounds() {
@@ -261,7 +278,7 @@ export class AudioEngine {
     
     // --- Latch specific methods ---
     public getLatchVoice(freq: number, vol: number): Voice | null {
-        const voice = this.getVoice();
+        const voice = this.getVoice(null, 'latch');
         if (voice) {
             voice.configure(this.presets.latch, this.channels.latch);
             voice.attack(freq, vol, null, 'latch');
@@ -277,10 +294,10 @@ export class AudioEngine {
     // --- Private Helpers ---
     private createPresets() {
         this.presets = {
-            melody: { portamento: 0.02 },
+            melody: { portamento: 0.02, oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } },
             bass: { oscillator: { type: 'fatsawtooth', count: 3, spread: 20 }, envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 }},
             latch: { oscillator: { type: 'fatsawtooth', count: 3, spread: 20 }, envelope: { attack: 0.2, decay: 0.1, sustain: 1, release: 0.8 }},
-            autopilot_melody: { oscillator: { type: 'sine' }, envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 } },
+            autopilot_melody: { oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } },
             autopilot_accompaniment: { oscillator: { type: 'triangle' }, envelope: { attack: 0.2, decay: 0.9, sustain: 0.1, release: 1.0 }, volume: -8 },
             autopilot_bass: { oscillator: { type: 'fatsawtooth', count: 3, spread: 20 }, filter: { Q: 5, type: 'lowpass', rolloff: -24 }, envelope: { attack: 0.01, decay: 1.4, sustain: 0.1, release: 2 }, filterEnvelope: { attack: 0.01, decay: 0.7, sustain: 0, release: 0, baseFrequency: 200, octaves: 1.5 } },
             autopilot_effect: { oscillator: { type: 'fmsine', modulationType: 'sine', harmonicity: 0.8 }, envelope: { attack: 0.01, decay: 0.8, sustain: 0, release: 0 } },
@@ -326,10 +343,8 @@ export class AudioEngine {
     public stop() {
         if (this.isInitialized) {
             Tone.Transport.stop();
-            Tone.Transport.cancel(); // Clear all scheduled events
+            // Don't cancel transport events, as the worker manages its own time
             this.stopAllSounds();
         }
     }
 }
-
-    

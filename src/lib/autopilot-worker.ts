@@ -117,6 +117,8 @@ function getFrequencyFromDegree(degree: number, part: keyof typeof scaleFrequenc
     if(baseOctaveFreqs.length === 0 || !baseOctaveFreqs[scaleIndex]) return null;
     
     const baseFreq = baseOctaveFreqs[scaleIndex];
+    if (baseFreq === null || baseFreq === undefined) return null;
+
     const targetFreq = baseFreq * Math.pow(2, octaveOffset);
 
     // Find the closest frequency in the allowed octaves
@@ -130,7 +132,7 @@ function getChordTones(rootDegree: number, part: keyof typeof scaleFrequencies, 
         const degree = rootDegree + i * 2;
         chordTones.push(getFrequencyFromDegree(degree, part));
     }
-    return chordTones;
+    return chordTones.filter(f => f !== null); // Filter out null frequencies right away
 }
 
 
