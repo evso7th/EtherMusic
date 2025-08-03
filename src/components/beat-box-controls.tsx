@@ -57,6 +57,7 @@ type Effects = {
     drums: { reverb: number, delay: number };
     autopilot: { reverb: number, delay: number };
     effects: { reverb: number, delay: number };
+    ebass: { reverb: number, delay: number };
 };
 
 interface BeatBoxControlsProps {
@@ -335,6 +336,7 @@ export function BeatBoxControls({
                                     onVolumeChange={onVolumeChange}
                                     effects={effects}
                                     onEffectChange={onEffectChange}
+                                    isMobile={isMobile}
                                 />
                             </div>
                         </ScrollArea>
@@ -505,6 +507,7 @@ export function BeatBoxControls({
                                     onVolumeChange={onVolumeChange}
                                     effects={effects}
                                     onEffectChange={onEffectChange}
+                                    isMobile={isMobile}
                                 />
                             </div>
                         </ScrollArea>
