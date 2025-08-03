@@ -451,6 +451,17 @@ export class AudioEngine {
                     modulationEnvelope: { attack: 0.01, decay: 1.0, sustain: 0, release: 1.0 }
                 }
             },
+            'G-Drops': {
+                type: 'FMSynth',
+                options: {
+                    harmonicity: 0.5,
+                    modulationIndex: 3.5,
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.01, decay: 0.7, sustain: 0.1, release: 0.4 },
+                    modulation: { type: 'triangle' },
+                    modulationEnvelope: { attack: 0.01, decay: 0.5, sustain: 0, release: 0.2 }
+                }
+            },
             // Autopilot presets
             autopilot_bass: {
                 type: 'Synth',
@@ -522,4 +533,3 @@ export class AudioEngine {
         }
     }
 }
-
