@@ -130,10 +130,12 @@ export class AudioEngine {
     // --- The Unified Voice Pool ---
     private voicePool: Voice[] = [];
     private readonly MAX_VOICES = 18; // Total voices for the entire app
-    private presets: { [key in InstrumentType]?: any } = {};
+    private presets: { [key: string]: any } = {};
 
     private allowedFrequencies = { bass: [] as number[], melody: [] as number[] };
     private isBassLatchOn = false;
+    private currentMelodyInstrument: Instrument = 'theremin';
+    private currentBassInstrument: Instrument = 'synth';
     
     constructor(orbManager: OrbManager) {
         this.orbManager = orbManager;
@@ -208,8 +210,7 @@ export class AudioEngine {
     public startNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}) {
         if (!this.isInitialized) return;
         const quantizedFreq = this.getClosestFrequency(freq, type);
-        const instrumentType = type === 'melody' ? 'melody' : 'manualBass';
-
+        
         if (type === 'bass' && this.isBassLatchOn) {
             this.latchEngine.handleInteraction(pos, vol, quantizedFreq);
             return;
@@ -219,7 +220,12 @@ export class AudioEngine {
         if (voice) {
             const time = Tone.now();
             const channel = type === 'melody' ? this.channels.melody : this.channels.manualBass;
-            voice.configure(this.presets[instrumentType], channel);
+            const instrumentType = type === 'melody' ? 'melody' : 'manualBass';
+            const instrumentName = type === 'melody' ? this.currentMelodyInstrument : this.currentBassInstrument;
+            const presetKey = `${instrumentName}_${type}`;
+            const preset = this.presets[presetKey] || this.presets[instrumentName];
+
+            voice.configure(preset, channel);
             voice.attack(quantizedFreq, vol*vol, time, pointerId, instrumentType);
             this.orbManager.addOrb(pointerId, type, pos.x, pos.y);
         }
@@ -259,7 +265,15 @@ export class AudioEngine {
             return; 
         }
 
-        const preset = this.presets[note.type];
+        // Determine the preset based on the autopilot part
+        let preset;
+        if (note.type === 'autopilot_melody' || note.type === 'autopilot_accompaniment') {
+            const presetKey = `${this.currentMelodyInstrument}_melody`; // Autopilot melody/accomp follows melody pad instrument
+            preset = this.presets[presetKey] || this.presets[this.currentMelodyInstrument];
+        } else {
+             preset = this.presets[note.type];
+        }
+
         if (!preset) {
             console.warn(`AudioEngine: No preset for instrument type "${note.type}"`);
             return;
@@ -307,7 +321,7 @@ export class AudioEngine {
         this.drumMachine.setBeatPattern(patternName);
     }
 
-    private getInstrumentPreset(instrument: Instrument): any {
+    private getInstrumentPreset(instrument: Instrument, type: 'melody' | 'bass' = 'melody'): any {
         switch (instrument) {
             case 'organ':
                 return {
@@ -332,22 +346,29 @@ export class AudioEngine {
             case 'theremin':
                 return { type: 'Synth', options: { oscillator: { type: 'sine' }, envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 } } };
             case 'glass':
-                return {
-                    type: 'FMSynth',
-                    options: {
-                        harmonicity: 1.4, // Non-integer for bell-like quality
-                        modulationIndex: 20,
-                        oscillator: { type: 'sine' },
-                        envelope: { attack: 0.001, decay: 1.6, sustain: 0, release: 1.6 },
-                        modulation: { type: 'square' },
-                        modulationEnvelope: {
-                            attack: 0.002,
-                            decay: 0.4,
-                            sustain: 0,
-                            release: 0.4
+                 if (type === 'bass') {
+                    // Deep, pure bell tone for bass
+                    return {
+                        type: 'Synth',
+                        options: {
+                            oscillator: { type: 'sine' },
+                            envelope: { attack: 0.001, decay: 2.0, sustain: 0, release: 2.0 }
                         }
-                    }
-                };
+                    };
+                } else {
+                    // Bright, complex bell tone for melody
+                    return {
+                        type: 'FMSynth',
+                        options: {
+                            harmonicity: 1.4,
+                            modulationIndex: 20,
+                            oscillator: { type: 'sine' },
+                            envelope: { attack: 0.001, decay: 1.6, sustain: 0, release: 1.6 },
+                            modulation: { type: 'square' },
+                            modulationEnvelope: { attack: 0.002, decay: 0.4, sustain: 0, release: 0.4 }
+                        }
+                    };
+                }
             case 'synth':
             default:
                 return { type: 'Synth', options: { oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } } };
@@ -355,18 +376,11 @@ export class AudioEngine {
     }
     
     public setMelodyInstrument(instrument: Instrument) {
-        const newPreset = this.getInstrumentPreset(instrument);
-        this.presets.melody = { ...newPreset };
-        this.presets.autopilot_melody = { ...newPreset, options: { ...newPreset.options, portamento: 0.05 } };
-        this.presets.autopilot_accompaniment = {...newPreset, options: {...newPreset.options, portamento: 0.01}}
+        this.currentMelodyInstrument = instrument;
     }
 
     public setBassInstrument(instrument: Instrument) {
-        const newPreset = this.getInstrumentPreset(instrument);
-        this.presets.manualBass = { ...newPreset };
-        this.presets.latch = { ...newPreset };
-        // Optionally, update autopilot bass as well if desired
-        // this.presets.autopilot_bass = { ...this.presets.autopilot_bass, ...newOptions };
+        this.currentBassInstrument = instrument;
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
@@ -387,7 +401,10 @@ export class AudioEngine {
         const voice = this.getVoice();
         if (voice) {
             const time = Tone.now();
-            voice.configure(this.presets.latch!, this.channels.latch);
+            const presetKey = `${this.currentBassInstrument}_bass`;
+            const preset = this.presets[presetKey] || this.presets[this.currentBassInstrument];
+
+            voice.configure(preset, this.channels.latch);
             voice.attack(freq, vol, time, null, 'latch');
         }
         return voice;
@@ -400,12 +417,20 @@ export class AudioEngine {
 
     // --- Private Helpers ---
     private createPresets() {
+        const instruments: Instrument[] = ['synth', 'organ', 'theremin', 'glass', 'mellotron'];
+        const types: ('melody' | 'bass')[] = ['melody', 'bass'];
+
+        instruments.forEach(inst => {
+            types.forEach(type => {
+                const presetKey = `${inst}_${type}`;
+                this.presets[presetKey] = this.getInstrumentPreset(inst, type);
+            });
+            // Fallback preset
+            this.presets[inst] = this.getInstrumentPreset(inst);
+        });
+
         this.presets = {
-            // Manual playing presets
-            melody: this.getInstrumentPreset('theremin'),
-            manualBass: this.getInstrumentPreset('synth'),
-            latch: this.getInstrumentPreset('synth'),
-            
+            ...this.presets,
             // Autopilot presets
             autopilot_bass: {
                 type: 'Synth',
@@ -416,23 +441,6 @@ export class AudioEngine {
                     filterEnvelope: { attack: 0.05, decay: 0.2, sustain: 0.1, release: 1, baseFrequency: 200, octaves: 1.5 }
                 }
             },
-            autopilot_accompaniment: { 
-                type: 'Synth',
-                options: {
-                    portamento: 0.01,
-                    oscillator: { type: 'triangle8' }, 
-                    envelope: { attack: 0.2, decay: 0.9, sustain: 0.1, release: 1.0 }
-                }
-            },
-            autopilot_melody: { 
-                type: 'Synth',
-                options: {
-                    portamento: 0.05,
-                    oscillator: { type: 'fatsine4', spread: 40, count: 4 }, 
-                    envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } 
-                }
-            },
-            
             // Effect presets
             autopilot_effect_star: { type: 'FMSynth', options: { oscillator: { type: 'fmsine', modulationType: 'sine', harmonicity: 0.8 }, envelope: { attack: 0.01, decay: 0.8, sustain: 0, release: 0.5 } } },
             autopilot_effect_meteor: { type: 'NoiseSynth', options: { noise: { type: 'white' }, filter: { type: 'bandpass', Q: 15 }, envelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.2, attackCurve: 'exponential' } } },
