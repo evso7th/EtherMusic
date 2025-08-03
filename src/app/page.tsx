@@ -115,7 +115,7 @@ export default function Home() {
     }, []);
 
     const initializeAudio = useCallback(async () => {
-        if (isReady || audioEngine.current) return;
+        if (isReady) return;
         
         if (!orbManager.current) {
             orbManager.current = new OrbManager();
@@ -193,35 +193,30 @@ export default function Home() {
     }, [autopilotParts]);
     
     useEffect(() => {
-        if (isReady) {
+        if (isReady && isAppStarted) {
             handlePlayPause();
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isReady]);
+    }, [isReady, isAppStarted]);
 
     // Autopilot Style Change Handler
-    const handleAutopilotStyleChange = useCallback((style: AutopilotStyle) => {
+    const handleAutopilotStyleChange = useCallback((newStyle: AutopilotStyle) => {
         const oldStyle = autopilotStyle;
-        setAutopilotStyle(style);
+        setAutopilotStyle(newStyle);
 
-        // If we are switching TO Toccata
-        if (style === 'Toccata') {
-            // Save current settings only if we are not already in Toccata
-            if (oldStyle !== 'Toccata') {
-                previousMelodySettings.current = {
-                    instrument: melodyInstrument,
-                    key: musicKey,
-                    scale: musicScale,
-                };
-            }
-            // Set Toccata-specific settings
+        // If switching TO Toccata from something else
+        if (newStyle === 'Toccata' && oldStyle !== 'Toccata') {
+            previousMelodySettings.current = {
+                instrument: melodyInstrument,
+                key: musicKey,
+                scale: musicScale,
+            };
             setMelodyInstrument('organ');
             setMusicKey('D');
             setMusicScale('Minor');
         } 
-        // If we are switching FROM Toccata to something else
-        else if (oldStyle === 'Toccata' && style !== 'Toccata') {
-            // Restore previous settings
+        // If switching FROM Toccata to something else
+        else if (oldStyle === 'Toccata' && newStyle !== 'Toccata') {
             setMelodyInstrument(previousMelodySettings.current.instrument);
             setMusicKey(previousMelodySettings.current.key);
             setMusicScale(previousMelodySettings.current.scale);
@@ -267,12 +262,9 @@ export default function Home() {
         if (!isReady) return;
         const willBePlaying = !isPlaying;
         
-        if (willBePlaying) {
-            await audioEngine.current?.start();
-        } else {
-            audioEngine.current?.pause();
-        }
+        await audioEngine.current?.setPlaying(willBePlaying);
         setIsPlaying(willBePlaying);
+
     }, [isReady, isPlaying]);
 
     useEffect(() => {
@@ -433,7 +425,7 @@ export default function Home() {
                         <MemoizedThereminPad
                             onInteraction={handleThereminInteraction}
                             type="bass"
-                            frequencyRange={[43, 262]}
+                            frequencyRange={[43.65, 261.63]}
                             color="hsl(var(--accent))"
                             isLatchOn={isBassLatchOn}
                             onLatchToggle={setIsBassLatchOn}
@@ -508,5 +500,3 @@ export default function Home() {
         </div>
     );
 }
-
-    

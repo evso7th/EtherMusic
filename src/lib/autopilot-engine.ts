@@ -20,13 +20,11 @@ export class AutopilotEngine {
         key: MusicKey;
         scale: MusicScale;
         parts: Record<AutopilotPart, boolean>;
-        style: AutopilotStyle;
     } = {
         bpm: 90,
         key: 'C',
         scale: 'Major Pentatonic',
         parts: { bass: true, accompaniment: true, melody: true, effects: true },
-        style: 'Ambient'
     };
 
     constructor(audioEngine: AudioEngine) {
@@ -45,6 +43,9 @@ export class AutopilotEngine {
         Tone.Transport.on('stop', () => {
             this.postMessageToActiveWorker({ type: 'stop' });
             this.tickLoop?.stop();
+        });
+        Tone.Transport.on('pause', () => {
+             this.postMessageToActiveWorker({ type: 'stop' });
         });
     }
     
@@ -76,17 +77,24 @@ export class AutopilotEngine {
         }
 
         const workerPath = `/assets/workers/${workerFileName}`;
-        const worker = new Worker(workerPath, { type: 'module' });
-        
-        worker.onmessage = this.handleWorkerMessage;
-        worker.onerror = (e) => console.error(`Error in worker ${style}:`, e);
-
-        workerCache[style] = worker;
-        return worker;
+        try {
+            const worker = new Worker(workerPath, { type: 'module' });
+            workerCache[style] = worker;
+            return worker;
+        } catch (e) {
+            console.error(`Failed to load worker for style ${style}:`, e);
+            // Return a dummy worker or handle the error gracefully
+            // For now, re-throwing might be okay for debugging.
+            throw e;
+        }
     }
     
     private postMessageToActiveWorker(message: WorkerEvent) {
-        this.activeWorker?.postMessage(message);
+        try {
+            this.activeWorker?.postMessage(message);
+        } catch (e) {
+            console.error("Failed to post message to worker:", e, "Message:", message);
+        }
     }
     
     public setTempo(bpm: number) {
@@ -101,7 +109,7 @@ export class AutopilotEngine {
             type: 'setHarmony', 
             key, 
             scale,
-            bassOctaves: [2, 3], // BASS OCTAVE CHANGE
+            bassOctaves: [2, 3], 
             melodyOctaves: [4, 5],
             accompanimentOctaves: [3, 4]
         });
@@ -114,31 +122,30 @@ export class AutopilotEngine {
     
     public setAutopilot(isOn: boolean, style: AutopilotStyle) {
         const styleChanged = this.currentStyle !== style;
-        
+
         if (this.activeWorker && (!isOn || styleChanged)) {
             this.postMessageToActiveWorker({ type: 'stop' });
-            // We don't terminate workers anymore, just stop them.
-            // This allows us to keep them in cache and reuse them.
+            this.activeWorker.onmessage = null; // Detach listener
+            this.activeWorker = null;
         }
 
         this.isAutopilotOn = isOn;
         this.currentStyle = style;
-        this.lastKnownState.style = style;
 
         if (isOn) {
-            this.activeWorker = this.getWorker(style);
-            this.syncWorkerState();
-            this.postMessageToActiveWorker({ type: 'start' });
+            try {
+                this.activeWorker = this.getWorker(style);
+                this.activeWorker.onmessage = this.handleWorkerMessage;
+                this.syncWorkerState();
 
-            if (Tone.Transport.state !== 'started') {
-                 // If transport is stopped, we still need to start it to run the loop
-                 // This ensures autopilot works even if drums are off.
-                this.audioEngine.start();
+                if (Tone.Transport.state === 'started') {
+                    this.postMessageToActiveWorker({ type: 'start' });
+                }
+            } catch (e) {
+                console.error(`Could not set up autopilot for style ${style}`, e);
+                this.isAutopilotOn = false;
+                this.activeWorker = null;
             }
-        } else {
-             if (this.activeWorker) {
-                 this.postMessageToActiveWorker({ type: 'stop' });
-             }
         }
     }
 
@@ -147,13 +154,13 @@ export class AutopilotEngine {
         this.setTempo(this.lastKnownState.bpm);
         this.setHarmony(this.lastKnownState.key, this.lastKnownState.scale);
         this.setAutopilotParts(this.lastKnownState.parts);
-        this.postMessageToActiveWorker({ type: 'setStyle', style: this.lastKnownState.style });
     }
 
     public dispose() {
         this.tickLoop?.dispose();
         Tone.Transport.off('start');
         Tone.Transport.off('stop');
+        Tone.Transport.off('pause');
         Object.values(workerCache).forEach(worker => worker?.terminate());
         this.activeWorker = null;
     }

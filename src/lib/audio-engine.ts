@@ -322,7 +322,7 @@ export class AudioEngine {
     }
 
     public setBassLatch(isLatchOn: boolean) {
-        this.isBassLatchOn = isLatchOn;
+        this.isLatchOn = isLatchOn;
         this.latchEngine.setLatch(isLatchOn);
     }
     
@@ -403,24 +403,29 @@ export class AudioEngine {
         return freqs.reduce((prev, curr) => (Math.abs(curr - targetFreq) < Math.abs(prev - targetFreq) ? curr : prev));
     }
     
-    public start() {
-        if (this.isInitialized && Tone.Transport.state !== 'started') {
-            Tone.Transport.start();
-            this.latchEngine.startAll();
-        }
-    }
-
-    public pause() {
-        if (this.isInitialized && Tone.Transport.state === 'started') {
-            Tone.Transport.pause();
-            this.latchEngine.pauseAll();
+    public async setPlaying(isPlaying: boolean) {
+        if (!this.isInitialized) return;
+        
+        if (isPlaying) {
+            if (Tone.Transport.state !== 'started') {
+                await Tone.start(); // Ensure context is running
+                Tone.Transport.start();
+                this.latchEngine.startAll();
+            }
+        } else {
+            if (Tone.Transport.state === 'started') {
+                Tone.Transport.pause();
+                this.latchEngine.pauseAll();
+            }
         }
     }
 
     public stop() {
         if (this.isInitialized) {
             this.stopAllSounds();
-            Tone.Transport.stop();
+            if (Tone.Transport.state !== 'stopped') {
+                Tone.Transport.stop();
+            }
         }
     }
 }
