@@ -399,7 +399,7 @@ export default function Home() {
                         <MemoizedThereminPad
                             onInteraction={handleThereminInteraction}
                             type="bass"
-                            frequencyRange={[55, 440]}
+                            frequencyRange={[43, 262]}
                             color="hsl(var(--accent))"
                             isLatchOn={isBassLatchOn}
                             onLatchToggle={setIsBassLatchOn}

@@ -315,7 +315,7 @@ export class AudioEngine {
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
         this.allowedFrequencies = {
-            bass: this.getScaleFrequencies(key, scale, [1, 2]),
+            bass: this.getScaleFrequencies(key, scale, [1, 2, 3]),
             melody: this.getScaleFrequencies(key, scale, [3, 4, 5]),
         };
         this.latchEngine.setAllowedFrequencies(this.allowedFrequencies.bass);
