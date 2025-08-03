@@ -31,7 +31,7 @@ class Voice {
     public activePointerId: number | null = null;
     public instrumentType: InstrumentType | null = null;
     private releaseEventId: Tone.ToneEventId | null = null;
-    public lfo: Tone.LFO | null = null; // For Mellotron effect
+    private isMellotron = false;
 
     constructor() {
         // A generic synth configuration. It will be reconfigured on the fly.
@@ -47,26 +47,23 @@ class Voice {
     }
     
     // Applies a preset and connects to the correct channel
-    configure(preset: any, channel: Tone.Channel, instrument: MelodyInstrument | null = null) {
-        if (this.lfo) {
-            this.lfo.stop();
-            this.lfo.dispose();
-            this.lfo = null;
-        }
-
+    configure(preset: any, channel: Tone.Channel, instrument: MelodyInstrument | null = null, mellotronLFO: Tone.LFO | null) {
         this.synth.set(preset);
         this.synth.disconnect(); // Important to disconnect before connecting to a new channel
         this.synth.connect(channel);
 
-        if (instrument === 'mellotron') {
-            this.lfo = new Tone.LFO({
-                frequency: 0.2, // Slow "wow"
-                type: "sine",
-                min: -5, // Cents to detune down
-                max: 5,  // Cents to detune up
-            }).start();
+        // Disconnect from LFO if it was previously connected
+        if (this.isMellotron && mellotronLFO) {
             // @ts-ignore
-            this.lfo.connect(this.synth.detune);
+             mellotronLFO.disconnect(this.synth.detune);
+        }
+
+        this.isMellotron = instrument === 'mellotron';
+        
+        // Connect to the shared LFO if the instrument is mellotron
+        if (this.isMellotron && mellotronLFO) {
+            // @ts-ignore
+            mellotronLFO.connect(this.synth.detune);
         }
     }
     
@@ -81,7 +78,7 @@ class Voice {
         this.synth.triggerAttack(freq, time, vel);
     }
 
-    release(duration: Tone.Unit.Time = 0) {
+    release(duration: Tone.Unit.Time = 0, mellotronLFO: Tone.LFO | null) {
         if (this.isBusy) {
             const releaseStartTime = Tone.now() + new Tone.Time(duration).toSeconds();
             this.synth.triggerRelease(releaseStartTime);
@@ -99,17 +96,31 @@ class Voice {
                 this.activePointerId = null;
                 this.instrumentType = null;
                 this.releaseEventId = null;
+
+                // Disconnect from the LFO after the note has finished
+                if (this.isMellotron && mellotronLFO) {
+                    // @ts-ignore
+                    mellotronLFO.disconnect(this.synth.detune);
+                    this.isMellotron = false;
+                }
             }, releaseEndTime);
         }
     }
 
-    attackRelease(freq: number, dur: Tone.Unit.Time, time: number, vel: number, type: InstrumentType) {
+    attackRelease(freq: number, dur: Tone.Unit.Time, time: number, vel: number, type: InstrumentType, mellotronLFO: Tone.LFO | null) {
         if (this.releaseEventId) {
             Tone.Transport.clear(this.releaseEventId);
         }
         this.isBusy = true;
         this.activePointerId = null; 
         this.instrumentType = type;
+
+        const isAPMellotron = (type === 'autopilot_melody' || type === 'autopilot_accompaniment') && this.isMellotron;
+
+        if (isAPMellotron && mellotronLFO) {
+            // @ts-ignore
+            mellotronLFO.connect(this.synth.detune);
+        }
 
         this.synth.triggerAttackRelease(freq, dur, time, vel);
         
@@ -120,15 +131,16 @@ class Voice {
             this.isBusy = false;
             this.instrumentType = null;
             this.releaseEventId = null;
+            if (isAPMellotron && mellotronLFO) {
+                // @ts-ignore
+                mellotronLFO.disconnect(this.synth.detune);
+            }
         }, time + totalDuration);
     }
     
     dispose() {
         if (this.releaseEventId) {
             Tone.Transport.clear(this.releaseEventId);
-        }
-        if (this.lfo) {
-            this.lfo.dispose();
         }
         this.synth.dispose();
     }
@@ -154,6 +166,9 @@ export class AudioEngine {
     private allowedFrequencies = { bass: [] as number[], melody: [] as number[] };
     private isBassLatchOn = false;
     private currentMelodyInstrument: MelodyInstrument = 'theremin';
+    
+    // --- Optimizations ---
+    private mellotronLFO: Tone.LFO | null = null;
 
     constructor(orbManager: OrbManager) {
         this.orbManager = orbManager;
@@ -184,6 +199,15 @@ export class AudioEngine {
             channel.connect(this.fx.delay);
             channel.toDestination();
         }
+
+        // --- Create Global LFO for Mellotron ---
+        this.mellotronLFO = new Tone.LFO({
+            frequency: 0.2,
+            type: "sine",
+            min: -5,
+            max: 5,
+        }).start();
+
 
         this.createPresets();
         
@@ -240,7 +264,7 @@ export class AudioEngine {
             const time = Tone.now();
             const channel = type === 'melody' ? this.channels.melody : this.channels.manualBass;
             const instrument = type === 'melody' ? this.currentMelodyInstrument : null;
-            voice.configure(this.presets[instrumentType], channel, instrument);
+            voice.configure(this.presets[instrumentType], channel, instrument, this.mellotronLFO);
             voice.attack(quantizedFreq, vol*vol, time, pointerId, instrumentType);
             this.orbManager.addOrb(pointerId, type, pos.x, pos.y);
         }
@@ -265,7 +289,7 @@ export class AudioEngine {
 
         const voice = this.getVoice(pointerId);
         if (voice) {
-            voice.release(0.1); // Give a short release for manual notes
+            voice.release(0.1, this.mellotronLFO); // Give a short release for manual notes
             this.orbManager.removeOrb(pointerId);
         }
     }
@@ -289,12 +313,12 @@ export class AudioEngine {
         const channel = note.type.startsWith('autopilot_effect') ? this.channels.effects : this.channels.autopilot;
         const instrument = (note.type === 'autopilot_melody' || note.type === 'autopilot_accompaniment') ? this.currentMelodyInstrument : null;
 
-        voice.configure(preset, channel, instrument);
-        voice.attackRelease(note.freq, note.dur, time, note.vel, note.type);
+        voice.configure(preset, channel, instrument, this.mellotronLFO);
+        voice.attackRelease(note.freq, note.dur, time, note.vel, note.type, this.mellotronLFO);
     }
 
     public stopAllSounds() {
-        this.voicePool.forEach(voice => voice.release(0.1));
+        this.voicePool.forEach(voice => voice.release(0.1, this.mellotronLFO));
         this.orbManager.removeAllOrbs('melody');
         this.orbManager.removeAllOrbs('bass');
         this.latchEngine.stopAll();
@@ -365,6 +389,7 @@ export class AudioEngine {
         }
         this.presets.melody = { ...this.presets.melody, ...newOptions };
         this.presets.autopilot_melody = { ...this.presets.autopilot_melody, ...newOptions, portamento: 0.05 };
+        this.presets.autopilot_accompaniment = {...this.presets.autopilot_accompaniment, ...newOptions, portamento: 0.01}
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
@@ -385,14 +410,14 @@ export class AudioEngine {
         const voice = this.getVoice();
         if (voice) {
             const time = Tone.now();
-            voice.configure(this.presets.latch!, this.channels.latch);
+            voice.configure(this.presets.latch!, this.channels.latch, null, null); // Latch doesn't use LFO
             voice.attack(freq, vol, time, null, 'latch');
         }
         return voice;
     }
     
     public releaseLatchVoice(voice: Voice) {
-        voice.release(0.5); // Give a gentle release for latched notes
+        voice.release(0.5, null); // Give a gentle release for latched notes
     }
 
 

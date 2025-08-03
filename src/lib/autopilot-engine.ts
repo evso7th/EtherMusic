@@ -59,7 +59,10 @@ export class AutopilotEngine {
 
     private getWorker(style: AutopilotStyle): Worker {
         if (workerCache[style]) {
-            return workerCache[style]!;
+            const worker = workerCache[style]!;
+            // Re-attach the message handler as it might have been cleared
+            worker.onmessage = this.handleWorkerMessage;
+            return worker;
         }
 
         let workerFileName: string;
@@ -79,12 +82,11 @@ export class AutopilotEngine {
         const workerPath = `/assets/workers/${workerFileName}`;
         try {
             const worker = new Worker(workerPath, { type: 'module' });
+            worker.onmessage = this.handleWorkerMessage;
             workerCache[style] = worker;
             return worker;
         } catch (e) {
             console.error(`Failed to load worker for style ${style}:`, e);
-            // Return a dummy worker or handle the error gracefully
-            // For now, re-throwing might be okay for debugging.
             throw e;
         }
     }
@@ -110,7 +112,7 @@ export class AutopilotEngine {
             key, 
             scale,
             bassOctaves: [2, 3], 
-            melodyOctaves: [4, 5],
+            melodyOctaves: [3, 4, 5],
             accompanimentOctaves: [3, 4]
         });
     }
@@ -123,9 +125,10 @@ export class AutopilotEngine {
     public setAutopilot(isOn: boolean, style: AutopilotStyle) {
         const styleChanged = this.currentStyle !== style;
 
+        // If turning off, or changing style, stop the current worker
         if (this.activeWorker && (!isOn || styleChanged)) {
             this.postMessageToActiveWorker({ type: 'stop' });
-            this.activeWorker.onmessage = null; // Detach listener
+            this.activeWorker.onmessage = null; // Detach listener to prevent memory leaks
             this.activeWorker = null;
         }
 
@@ -135,17 +138,25 @@ export class AutopilotEngine {
         if (isOn) {
             try {
                 this.activeWorker = this.getWorker(style);
-                this.activeWorker.onmessage = this.handleWorkerMessage;
                 this.syncWorkerState();
-
+                
+                // If transport is already running, tell the new worker to start
                 if (Tone.Transport.state === 'started') {
                     this.postMessageToActiveWorker({ type: 'start' });
+                } else {
+                    // If transport is stopped, let's start it.
+                    // This handles the case where autopilot is turned on before play is pressed.
+                    this.audioEngine.setPlaying(true);
                 }
+
             } catch (e) {
                 console.error(`Could not set up autopilot for style ${style}`, e);
                 this.isAutopilotOn = false;
                 this.activeWorker = null;
             }
+        } else if (Tone.Transport.state === 'started' && !this.audioEngine.drumMachine.isPlaying()){
+            // If we turn off autopilot and the drum machine is also off, stop the transport
+             this.audioEngine.setPlaying(false);
         }
     }
 
