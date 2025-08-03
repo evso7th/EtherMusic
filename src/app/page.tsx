@@ -37,8 +37,8 @@ export const tempos: Tempo[] = [
     { name: 'Allegretto', bpm: 130 },
 ];
 
-export type Instrument = 'synth' | 'organ' | 'theremin' | 'glass' | 'mellotron' | 'ebass';
-const instruments: Instrument[] = ['synth', 'organ', 'theremin', 'glass', 'mellotron', 'ebass'];
+export type Instrument = 'synth' | 'organ' | 'theremin' | 'E-Bells' | 'mellotron' | 'ebass';
+const instruments: Instrument[] = ['synth', 'organ', 'theremin', 'E-Bells', 'mellotron', 'ebass'];
 
 export type MusicKey = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B';
 export const musicKeys: MusicKey[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -81,7 +81,8 @@ export default function Home() {
         latch: { reverb: -60, delay: -60 },
         drums: { reverb: -60, delay: -60 },
         autopilot: { reverb: -60, delay: -60 },
-        effects: { reverb: -6, delay: -6 }
+        effects: { reverb: -6, delay: -6 },
+        ebass: { reverb: -60, delay: -60 }
     });
     const [activePattern, setActivePattern] = useState<(typeof beatPatterns)[number]>(beatPatterns.find(p => p.name === 'Off')!);
     const [melodyInstrument, setMelodyInstrument] = useState<Instrument>('theremin');
@@ -512,3 +513,5 @@ export default function Home() {
         </div>
     );
 }
+
+    

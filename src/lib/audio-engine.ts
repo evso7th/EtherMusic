@@ -170,9 +170,10 @@ export class AudioEngine {
             drums: new Tone.Channel(-9),
             autopilot: new Tone.Channel(-10),
             effects: new Tone.Channel(-6),
+            ebass: new Tone.Channel(-6),
         };
         
-        for (const channel of Object.values(this.channels)) {
+        for (const [key, channel] of Object.entries(this.channels)) {
             channel.connect(this.fx.reverb);
             channel.connect(this.fx.delay);
             channel.toDestination();
@@ -230,13 +231,17 @@ export class AudioEngine {
         const voice = this.getVoice();
         if (voice) {
             const time = Tone.now();
-            const channel = type === 'melody' ? this.channels.melody : this.channels.manualBass;
             const instrumentName = type === 'melody' ? this.currentMelodyInstrument : this.currentBassInstrument;
             
+            // Special channel handling for e-bass
+            const channel = (instrumentName === 'ebass') 
+                ? this.channels.ebass 
+                : (type === 'melody' ? this.channels.melody : this.channels.manualBass);
+
             const presetKey = `${instrumentName}_${type}`;
             let preset = this.presets[presetKey];
             
-            // If there's no type-specific preset (e.g. 'glass_bass'), fall back to the generic one (e.g. 'glass')
+            // If there's no type-specific preset (e.g. 'E-Bells_bass'), fall back to the generic one (e.g. 'E-Bells')
             if (!preset) {
                 preset = this.presets[instrumentName];
             }
@@ -324,9 +329,10 @@ export class AudioEngine {
         this.channels.drums.volume.value = volumes.drums;
         this.channels.autopilot.volume.value = volumes.autopilot;
         this.channels.effects.volume.value = volumes.effects;
+        this.channels.ebass.volume.value = volumes.manualBass; // E-Bass uses manualBass volume
     }
 
-    public setEffects(effects: Record<string, { reverb: number, delay: number }>) {
+    public setEffects(effects: Record<string, any>) {
         for (const key in this.channels) {
             if (effects[key]) {
                 this.channels[key].send('reverb', effects[key].reverb);
@@ -365,11 +371,15 @@ export class AudioEngine {
         const voice = this.getVoice();
         if (voice) {
             const time = Tone.now();
-            const presetKey = `${this.currentBassInstrument}_bass`;
-            const preset = this.presets[presetKey] || this.presets[this.currentBassInstrument];
+            const instrumentName = this.currentBassInstrument;
+            const presetKey = `${instrumentName}_bass`;
+            const preset = this.presets[presetKey] || this.presets[instrumentName];
+            
+            // Special channel handling for e-bass
+            const channel = (instrumentName === 'ebass') ? this.channels.ebass : this.channels.latch;
 
             if (preset) {
-                voice.configure(preset, this.channels.latch);
+                voice.configure(preset, channel);
                 voice.attack(freq, vol, time, null, 'latch');
             }
         }
@@ -410,7 +420,7 @@ export class AudioEngine {
                     modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.2 }
                 }
             },
-            glass_melody: {
+            'E-Bells_melody': {
                 type: 'FMSynth',
                 options: {
                     harmonicity: 1.4,
@@ -421,15 +431,15 @@ export class AudioEngine {
                     modulationEnvelope: { attack: 0.002, decay: 0.4, sustain: 0, release: 0.4 }
                 }
             },
-            glass_bass: {
+            'E-Bells_bass': {
                 type: 'FMSynth',
                 options: {
                     harmonicity: 1.4,
-                    modulationIndex: 10,
+                    modulationIndex: 15, // Increased "metal"
                     oscillator: { type: 'sine' },
-                    envelope: { attack: 0.01, decay: 1.5, sustain: 0.05, release: 2.5 },
+                    envelope: { attack: 0.01, decay: 1.5, sustain: 0, release: 2.5 }, // Ensured sustain is 0
                     modulation: { type: 'square' },
-                    modulationEnvelope: { attack: 0.01, decay: 1.0, sustain: 0, release: 1.0 }
+                    modulationEnvelope: { attack: 0.01, decay: 1.0, sustain: 0, release: 1.0 } // Ensured sustain is 0
                 }
             },
             // Autopilot presets
@@ -503,3 +513,5 @@ export class AudioEngine {
         }
     }
 }
+
+    
