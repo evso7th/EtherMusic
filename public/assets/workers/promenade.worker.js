@@ -1,16 +1,47 @@
 
 // --- TYPE DEFINITIONS (SHARED) ---
-let state = {
+/**
+ * @typedef {'bass' | 'accompaniment' | 'melody' | 'effects'} AutopilotPart
+ * @typedef {'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B'} MusicKey
+ * @typedef {'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentatonic'} MusicScale
+ * @typedef {string} InstrumentType
+ * @typedef {import('tone/build/esm/core/type/Units').Unit.Time} Time
+ */
+
+/**
+ * @typedef {object} NoteEvent
+ * @property {InstrumentType} type
+ * @property {number} freq
+ * @property {Time} dur
+ * @property {number} vel
+ */
+
+/**
+ * @typedef {object} WorkerResponse
+ * @property {'playNote'} type
+ * @property {NoteEvent} note
+ * @property {number} time
+ */
+
+
+// --- WORKER STATE ---
+const state = {
     tickCount: 0,
-    currentKey: 'C',
+    currentKey: 'G',
     currentScale: 'Major',
-    currentBpm: 120,
-    scaleIntervals: [],
-    chordProgression: [0, 4, 5, 3], // I-V-vi-IV
-    enabledParts: { bass: true, accompaniment: true, melody: true, effects: false },
-    scaleFrequencies: { bass: [], accompaniment: [], melody: [] },
+    currentBpm: 70, // Slow, stately tempo
+    enabledParts: { bass: true, accompaniment: true, melody: true, effects: true },
+    scaleFrequencies: {
+        bass: [],
+        accompaniment: [],
+        melody: [],
+    },
+    chordProgression: [0, 4, 1, 5], // I-V-ii-vi
+    lastMelodyDegree: null,
 };
 
+
+// --- MUSIC THEORY HELPERS ---
 const scaleIntervalMap = {
     'Major': [0, 2, 4, 5, 7, 9, 11],
     'Minor': [0, 2, 3, 5, 7, 8, 10],
@@ -39,18 +70,24 @@ function getScaleFrequenciesForOctaves(key, scale, octaves) {
 }
 
 function updateMusicContext() {
-    state.scaleIntervals = scaleIntervalMap[state.currentScale] || [];
     state.scaleFrequencies = {
-        bass: getScaleFrequenciesForOctaves(state.currentKey, state.currentScale, [1]),
-        accompaniment: getScaleFrequenciesForOctaves(state.currentKey, state.currentScale, [2, 3]),
-        melody: getScaleFrequenciesForOctaves(state.currentKey, state.currentScale, [4]),
+        bass: getScaleFrequenciesForOctaves(state.currentKey, state.currentScale, [1, 2]),
+        accompaniment: getScaleFrequenciesForOctaves(state.currentKey, state.currentScale, [3, 4]),
+        melody: getScaleFrequenciesForOctaves(state.currentKey, state.currentScale, [4, 5]),
     };
-    state.chordProgression = state.currentScale.includes('Major') ? [0, 4, 5, 3] : [0, 5, 3, 6];
+
+    if (state.currentScale.includes('Major')) {
+        state.chordProgression = [0, 4, 1, 5]; // I-V-ii-vi - majestic progression
+    } else {
+        state.chordProgression = [0, 5, 3, 4]; // i-VI-iv-V
+    }
+    state.lastMelodyDegree = null;
 }
 
 function getFrequencyFromDegree(degree, part) {
     const freqs = state.scaleFrequencies[part];
-    const scaleLength = state.scaleIntervals.length;
+    const scaleLength = (scaleIntervalMap[state.currentScale] || []).length;
+
     if (!freqs || freqs.length === 0 || !scaleLength) return null;
     
     const noteIndexInScale = (degree % scaleLength + scaleLength) % scaleLength;
@@ -64,46 +101,56 @@ function getFrequencyFromDegree(degree, part) {
 }
 
 function getChordTones(rootDegree) {
-    if (!state.scaleIntervals.length) return [];
-    // Returns a full chord: root, third, fifth
-    return [0, 2, 4].map(i => rootDegree + i);
+    const chordTones = [];
+     if (!(state.currentScale in scaleIntervalMap)) return [];
+    
+    for (let i = 0; i < 3; i++) {
+        const degreeIndex = (rootDegree + i * 2);
+        chordTones.push(degreeIndex);
+    }
+    return chordTones;
 }
 
-// --- STYLE-SPECIFIC GENERATOR: PROMENADE ---
-function tick(time) {
-    const subdivisions = 16;
-    const measure = Math.floor(state.tickCount / subdivisions);
-    const beat = state.tickCount % subdivisions;
+
+// --- STYLE-SPECIFIC GENERATOR ---
+function generateMusic(time) {
+    const measure = Math.floor(state.tickCount / 16);
+    const beatInMeasure = state.tickCount % 16;
     
-    // Change chord every 2 beats (8 subdivisions)
-    const chordIndex = Math.floor(beat / 8) % state.chordProgression.length;
+    const chordIndex = measure % state.chordProgression.length;
     const rootDegree = state.chordProgression[chordIndex];
     const chordToneDegrees = getChordTones(rootDegree);
 
-    // Play a full, stately chord on beats 1 and 3
-    if (state.enabledParts.accompaniment && (beat === 0 || beat === 8)) {
-        // Bass part
-        const bassFreq = getFrequencyFromDegree(rootDegree, 'bass');
-        if (bassFreq) {
-             self.postMessage({ type: 'playNote', note: { type: 'autopilot_bass', freq: bassFreq, dur: '4n', vel: 0.9 }, time });
-        }
-
-        // Accompaniment chord tones
-        const accomFreq1 = getFrequencyFromDegree(chordToneDegrees[1], 'accompaniment');
-        if (accomFreq1) {
-             self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq: accomFreq1, dur: '4n', vel: 0.7 }, time });
-        }
-        const accomFreq2 = getFrequencyFromDegree(chordToneDegrees[2], 'accompaniment');
-        if (accomFreq2) {
-             self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq: accomFreq2, dur: '4n', vel: 0.7 }, time });
+    // Bass: Plays a heavy, half-note on the first beat of each measure.
+    if (state.enabledParts.bass && beatInMeasure === 0) {
+        const freq = getFrequencyFromDegree(rootDegree, 'bass');
+        if (freq) {
+            /** @type {NoteEvent} */
+            const note = { type: 'autopilot_bass', freq, dur: '2n', vel: 0.9 };
+            self.postMessage({ type: 'playNote', note, time });
         }
     }
-     // Simple melody on top
-    if (state.enabledParts.melody && (beat === 4 || beat === 12)) {
-        const melodyDegree = chordToneDegrees[0] + state.scaleIntervals.length; // An octave higher
+
+    // Accompaniment: Plays the full chord on the first and third beat of the measure.
+    if (state.enabledParts.accompaniment && (beatInMeasure === 0 || beatInMeasure === 8)) {
+        chordToneDegrees.forEach((degree, index) => {
+             const freq = getFrequencyFromDegree(degree, 'accompaniment');
+             if (freq) {
+                /** @type {NoteEvent} */
+                const note = { type: 'autopilot_accompaniment', freq, dur: '2n', vel: 0.6 - (index * 0.1) };
+                self.postMessage({ type: 'playNote', note, time: time + index * 0.01 }); // Strum effect
+             }
+        });
+    }
+
+    // Melody: A simple, stately melody that follows the chord changes.
+    if (state.enabledParts.melody && beatInMeasure === 0) {
+        const melodyDegree = chordToneDegrees[0] + 7; // The root note, one octave up.
         const freq = getFrequencyFromDegree(melodyDegree, 'melody');
         if (freq) {
-            self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '8n', vel: 0.8 }, time });
+            /** @type {NoteEvent} */
+            const note = { type: 'autopilot_melody', freq, dur: '1n', vel: 0.7 };
+            self.postMessage({ type: 'playNote', note, time });
         }
     }
     
@@ -122,7 +169,7 @@ self.onmessage = function (event) {
             state.tickCount = 0;
             break;
         case 'tick':
-            tick(data.time);
+            generateMusic(data.time);
             break;
         case 'setHarmony':
             state.currentKey = data.key;
@@ -134,11 +181,6 @@ self.onmessage = function (event) {
             break;
         case 'setParts':
             state.enabledParts = data.parts;
-            break;
-        case 'setStyle':
-             if (data.style === 'Promenade') {
-                state.currentScale = 'Major';
-            }
             break;
     }
 };

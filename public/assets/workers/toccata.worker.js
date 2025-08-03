@@ -1,17 +1,47 @@
 
 // --- TYPE DEFINITIONS (SHARED) ---
-let state = {
+/**
+ * @typedef {'bass' | 'accompaniment' | 'melody' | 'effects'} AutopilotPart
+ * @typedef {'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B'} MusicKey
+ * @typedef {'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentatonic'} MusicScale
+ * @typedef {string} InstrumentType
+ * @typedef {import('tone/build/esm/core/type/Units').Unit.Time} Time
+ */
+
+/**
+ * @typedef {object} NoteEvent
+ * @property {InstrumentType} type
+ * @property {number} freq
+ * @property {Time} dur
+ * @property {number} vel
+ */
+
+/**
+ * @typedef {object} WorkerResponse
+ * @property {'playNote'} type
+ * @property {NoteEvent} note
+ * @property {number} time
+ */
+
+
+// --- WORKER STATE ---
+const state = {
     tickCount: 0,
-    currentKey: 'C',
+    currentKey: 'A', // Toccata and Fugue in D minor is classic, but A minor is also dramatic
     currentScale: 'Minor',
-    currentBpm: 120,
-    scaleIntervals: [],
+    currentBpm: 140, // Faster tempo
+    enabledParts: { bass: true, accompaniment: true, melody: true, effects: true },
+    scaleFrequencies: {
+        bass: [],
+        accompaniment: [],
+        melody: [],
+    },
     chordProgression: [0, 3, 4, 0], // i-iv-V-i
     lastMelodyDegree: null,
-    enabledParts: { bass: true, accompaniment: true, melody: true, effects: false },
-    scaleFrequencies: { bass: [], accompaniment: [], melody: [] },
 };
 
+
+// --- MUSIC THEORY HELPERS ---
 const scaleIntervalMap = {
     'Major': [0, 2, 4, 5, 7, 9, 11],
     'Minor': [0, 2, 3, 5, 7, 8, 10],
@@ -40,19 +70,24 @@ function getScaleFrequenciesForOctaves(key, scale, octaves) {
 }
 
 function updateMusicContext() {
-    state.scaleIntervals = scaleIntervalMap[state.currentScale] || [];
     state.scaleFrequencies = {
         bass: getScaleFrequenciesForOctaves(state.currentKey, state.currentScale, [1, 2]),
         accompaniment: getScaleFrequenciesForOctaves(state.currentKey, state.currentScale, [3, 4]),
-        melody: getScaleFrequenciesForOctaves(state.currentKey, state.currentScale, [4, 5]),
+        melody: getScaleFrequenciesForOctaves(state.currentKey, state.currentScale, [4, 5, 6]), // Higher range
     };
-    state.chordProgression = state.currentScale.includes('Major') ? [0, 4, 5, 3] : [0, 3, 4, 0];
+
+    if (state.currentScale.includes('Major')) {
+        state.chordProgression = [0, 4, 5, 3]; // I-V-vi-IV
+    } else {
+        state.chordProgression = [0, 3, 4, 0]; // i-iv-V-i
+    }
     state.lastMelodyDegree = null;
 }
 
 function getFrequencyFromDegree(degree, part) {
     const freqs = state.scaleFrequencies[part];
-    const scaleLength = state.scaleIntervals.length;
+    const scaleLength = (scaleIntervalMap[state.currentScale] || []).length;
+
     if (!freqs || freqs.length === 0 || !scaleLength) return null;
     
     const noteIndexInScale = (degree % scaleLength + scaleLength) % scaleLength;
@@ -66,53 +101,74 @@ function getFrequencyFromDegree(degree, part) {
 }
 
 function getChordTones(rootDegree) {
-    if (!state.scaleIntervals.length) return [];
-    return [0, 2, 4].map(i => rootDegree + i);
+    const chordTones = [];
+    if (!(state.currentScale in scaleIntervalMap)) return [];
+    
+    for (let i = 0; i < 3; i++) {
+        const degreeIndex = (rootDegree + i * 2);
+        chordTones.push(degreeIndex);
+    }
+    return chordTones;
 }
 
-// --- STYLE-SPECIFIC GENERATOR: TOCCATA ---
-function tick(time) {
-    const subdivisions = 16;
-    const measure = Math.floor(state.tickCount / subdivisions);
-    const beat = state.tickCount % subdivisions;
+
+// --- STYLE-SPECIFIC GENERATOR ---
+function generateMusic(time) {
+    const measure = Math.floor(state.tickCount / 16);
+    const beatInMeasure = state.tickCount % 16;
     
-    const chordIndex = Math.floor(measure / 2) % state.chordProgression.length;
+    const chordIndex = measure % state.chordProgression.length;
     const rootDegree = state.chordProgression[chordIndex];
     const chordToneDegrees = getChordTones(rootDegree);
 
-    // Bass: Plays on the downbeat of each measure
-    if (state.enabledParts.bass && beat === 0) {
+    // Bass: Plays a driving, quarter-note rhythm.
+    if (state.enabledParts.bass && beatInMeasure % 4 === 0) {
         const freq = getFrequencyFromDegree(rootDegree, 'bass');
         if (freq) {
-            self.postMessage({ type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '2n', vel: 0.9 }, time });
+             /** @type {NoteEvent} */
+            const note = { type: 'autopilot_bass', freq, dur: '4n', vel: 0.9 };
+            self.postMessage({ type: 'playNote', note, time });
         }
     }
 
-    // Accompaniment: Fast arpeggio
+    // Accompaniment: Plays a rapid, continuous 16th-note arpeggio.
     if (state.enabledParts.accompaniment) {
-        const arpPattern = [0, 1, 2, 1, 2, 1, 0, 1]; // 16th note arpeggio
-        const patternIndex = beat % arpPattern.length;
+        const arpPattern = [0, 1, 2, 1, 2, 1, 0, 1]; // More complex pattern
+        const patternIndex = beatInMeasure % arpPattern.length;
         const degree = chordToneDegrees[arpPattern[patternIndex]];
-        const freq = getFrequencyFromDegree(degree, 'accompaniment');
-        if (freq) {
-            self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '16n', vel: 0.6 }, time });
+
+        if (degree !== null) {
+            const freq = getFrequencyFromDegree(degree, 'accompaniment');
+            if (freq) {
+                 /** @type {NoteEvent} */
+                const note = { type: 'autopilot_accompaniment', freq, dur: '16n', vel: 0.6 };
+                self.postMessage({ type: 'playNote', note, time });
+            }
         }
     }
 
-    // Melody: Less frequent, but dramatic leaps
-    if (state.enabledParts.melody && beat % 16 === 0 && Math.random() > 0.3) {
-        const leap = Math.random() > 0.5 ? 3 : -3; // leap up or down a 4th/5th
-        let nextDegree = (state.lastMelodyDegree !== null) 
-            ? state.lastMelodyDegree + leap
-            : chordToneDegrees[0] + 7; // start high
-        
-        const freq = getFrequencyFromDegree(nextDegree, 'melody');
+    // Melody: Plays a dramatic, high-pitched note at the start of each measure.
+    if (state.enabledParts.melody && beatInMeasure === 0) {
+        // High note, often the 5th of the chord for drama
+        const highDegree = chordToneDegrees[2] + 7; // An octave higher than the 5th
+        const freq = getFrequencyFromDegree(highDegree, 'melody');
         if (freq) {
-            self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '2n', vel: 0.8 }, time });
-            state.lastMelodyDegree = nextDegree;
+            /** @type {NoteEvent} */
+            const note = { type: 'autopilot_melody', freq, dur: '2n', vel: 0.8 };
+            self.postMessage({ type: 'playNote', note, time });
         }
     }
     
+    // Effects: Rare but powerful "meteor" effects.
+    if (state.enabledParts.effects && beatInMeasure === 0 && Math.random() < 0.1) {
+        const freq = getFrequencyFromDegree(rootDegree + 12, 'melody'); // High octave
+        if (freq) {
+             /** @type {NoteEvent} */
+            const note = { type: 'autopilot_effect_meteor', freq, dur: '8n', vel: 0.7 };
+            self.postMessage({ type: 'playNote', note, time });
+        }
+    }
+
     state.tickCount++;
 }
 
@@ -122,14 +178,13 @@ self.onmessage = function (event) {
     switch (type) {
         case 'start':
             state.tickCount = 0;
-            state.lastMelodyDegree = null;
             updateMusicContext();
             break;
         case 'stop':
             state.tickCount = 0;
             break;
         case 'tick':
-            tick(data.time);
+            generateMusic(data.time);
             break;
         case 'setHarmony':
             state.currentKey = data.key;
@@ -141,11 +196,6 @@ self.onmessage = function (event) {
             break;
         case 'setParts':
             state.enabledParts = data.parts;
-            break;
-        case 'setStyle':
-            if (data.style === 'Toccata') {
-                state.currentScale = 'Minor';
-            }
             break;
     }
 };
