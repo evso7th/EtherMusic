@@ -360,7 +360,7 @@ export class AudioEngine {
     }
 
     public setBassLatch(isLatchOn: boolean) {
-        this.isLatchOn = isLatchOn;
+        this.isBassLatchOn = isLatchOn;
         this.latchEngine.setLatch(isLatchOn);
     }
     
