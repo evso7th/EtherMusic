@@ -30,7 +30,7 @@ class Voice {
     public isBusy = false;
     public activePointerId: number | null = null;
     public instrumentType: InstrumentType | null = null;
-    private releaseEventId: Tone.ToneEventId | null = null;
+    private releaseTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
     constructor() {
         // We start with a generic synth. It will be replaced by configure().
@@ -59,40 +59,39 @@ class Voice {
     }
     
     attack(freq: number, vel: number, time: number | undefined, pointerId: number | null, type: InstrumentType) {
-        if (this.releaseEventId) {
-            Tone.Transport.clear(this.releaseEventId);
-            this.releaseEventId = null;
+        if (this.releaseTimeoutId) {
+            clearTimeout(this.releaseTimeoutId);
+            this.releaseTimeoutId = null;
         }
         this.isBusy = true;
         this.activePointerId = pointerId;
         this.instrumentType = type;
         this.synth.triggerAttack(freq, time, vel);
     }
-
+    
     release(duration: Tone.Unit.Time = 0) {
         if (this.isBusy) {
             const releaseStartTime = Tone.now() + new Tone.Time(duration).toSeconds();
             this.synth.triggerRelease(releaseStartTime);
 
-            if (this.releaseEventId) {
-                Tone.Transport.clear(this.releaseEventId);
+            if (this.releaseTimeoutId) {
+                clearTimeout(this.releaseTimeoutId);
             }
             
-            const releaseTime = new Tone.Time(this.synth.envelope.release).toSeconds();
-            const releaseEndTime = releaseStartTime + releaseTime + 0.05; // Add 50ms buffer
-
-            this.releaseEventId = Tone.Transport.scheduleOnce(() => {
+            const releaseTimeMs = new Tone.Time(this.synth.envelope.release).toMilliseconds();
+            
+            this.releaseTimeoutId = setTimeout(() => {
                 this.isBusy = false;
                 this.activePointerId = null;
                 this.instrumentType = null;
-                this.releaseEventId = null;
-            }, releaseEndTime);
+                this.releaseTimeoutId = null;
+            }, releaseTimeMs + 50); // Add 50ms buffer
         }
     }
 
     attackRelease(freq: number, dur: Tone.Unit.Time, time: number, vel: number, type: InstrumentType) {
-        if (this.releaseEventId) {
-            Tone.Transport.clear(this.releaseEventId);
+        if (this.releaseTimeoutId) {
+            clearTimeout(this.releaseTimeoutId);
         }
         this.isBusy = true;
         this.activePointerId = null; 
@@ -100,18 +99,20 @@ class Voice {
 
         this.synth.triggerAttackRelease(freq, dur, time, vel);
         
-        const totalDuration = new Tone.Time(dur).toSeconds() + new Tone.Time(this.synth.envelope.release).toSeconds();
+        const totalDurationMs = (new Tone.Time(dur).toMilliseconds() + new Tone.Time(this.synth.envelope.release).toMilliseconds());
+        
+        const scheduledReleaseTime = (time - Tone.now()) * 1000;
 
-        this.releaseEventId = Tone.Transport.scheduleOnce(() => {
+        this.releaseTimeoutId = setTimeout(() => {
             this.isBusy = false;
             this.instrumentType = null;
-            this.releaseEventId = null;
-        }, time + totalDuration);
+            this.releaseTimeoutId = null;
+        }, scheduledReleaseTime + totalDurationMs + 50);
     }
     
     dispose() {
-        if (this.releaseEventId) {
-            Tone.Transport.clear(this.releaseEventId);
+        if (this.releaseTimeoutId) {
+            clearTimeout(this.releaseTimeoutId);
         }
         this.synth.dispose();
     }
@@ -229,14 +230,15 @@ export class AudioEngine {
                 ? this.channels.ebass 
                 : (type === 'melody' ? this.channels.melody : this.channels.manualBass);
 
-            const presetKey = `${instrumentName}_${type}`;
-            let preset = this.presets[presetKey];
-            
-            // If there's no type-specific preset (e.g. 'E-Bells_bass'), fall back to the generic one (e.g. 'E-Bells')
-            if (!preset) {
-                preset = this.presets[instrumentName];
+            let presetKey: string;
+            if (instrumentName === 'E-Bells') {
+                presetKey = `E-Bells_${type}`;
+            } else {
+                 presetKey = instrumentName;
             }
-
+            
+            const preset = this.presets[presetKey];
+            
             if (preset) {
                 voice.configure(preset, channel);
                 voice.attack(quantizedFreq, vol*vol, time, pointerId, type);
@@ -250,10 +252,12 @@ export class AudioEngine {
         const voice = this.getVoice(pointerId);
         if (voice) {
             const quantizedFreq = this.getClosestFrequency(freq, type);
-            // @ts-ignore
-            voice.synth.frequency.rampTo(quantizedFreq, 0.01);
-            // @ts-ignore
-            voice.synth.volume.rampTo(Tone.gainToDb(vol * vol), 0.01);
+            if (voice.synth.frequency) {
+                voice.synth.frequency.value = quantizedFreq;
+            }
+            if (voice.synth.volume) {
+                 voice.synth.volume.value = Tone.gainToDb(vol * vol);
+            }
             this.orbManager.updateOrb(pointerId, pos.x, pos.y);
         }
     }
@@ -282,8 +286,11 @@ export class AudioEngine {
         // Determine the preset based on the autopilot part
         let preset;
         if (note.type === 'autopilot_melody' || note.type === 'autopilot_accompaniment') {
-            const presetKey = `${this.currentMelodyInstrument}_melody`; // Autopilot melody/accomp follows melody pad instrument
-            preset = this.presets[presetKey] || this.presets[this.currentMelodyInstrument];
+             if (this.currentMelodyInstrument === 'E-Bells') {
+                preset = this.presets['E-Bells_melody'];
+            } else {
+                preset = this.presets[this.currentMelodyInstrument];
+            }
         } else {
              preset = this.presets[note.type];
         }
@@ -363,8 +370,14 @@ export class AudioEngine {
         if (voice) {
             const time = Tone.now();
             const instrumentName = this.currentBassInstrument;
-            const presetKey = `${instrumentName}_bass`;
-            const preset = this.presets[presetKey] || this.presets[instrumentName];
+            
+            let presetKey: string;
+            if (instrumentName === 'E-Bells') {
+                presetKey = 'E-Bells_bass';
+            } else {
+                 presetKey = instrumentName;
+            }
+            const preset = this.presets[presetKey];
             
             // Special channel handling for e-bass
             const channel = (instrumentName === 'ebass') ? this.channels.ebass : this.channels.latch;
@@ -431,11 +444,11 @@ export class AudioEngine {
                 type: 'FMSynth',
                 options: {
                     harmonicity: 1.4,
-                    modulationIndex: 15, // Increased "metal"
+                    modulationIndex: 15,
                     oscillator: { type: 'sine' },
-                    envelope: { attack: 0.01, decay: 1.5, sustain: 0, release: 2.5 }, // Ensured sustain is 0
+                    envelope: { attack: 0.01, decay: 1.5, sustain: 0, release: 2.5 },
                     modulation: { type: 'square' },
-                    modulationEnvelope: { attack: 0.01, decay: 1.0, sustain: 0, release: 1.0 } // Ensured sustain is 0
+                    modulationEnvelope: { attack: 0.01, decay: 1.0, sustain: 0, release: 1.0 }
                 }
             },
             // Autopilot presets
@@ -509,3 +522,4 @@ export class AudioEngine {
         }
     }
 }
+
