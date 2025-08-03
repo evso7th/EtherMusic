@@ -26,18 +26,15 @@ export type InstrumentType =
 
 // A "Voice" represents a single synthesizer and its current state.
 class Voice {
-    public synth: Tone.Synth;
+    public synth: any; // Can be Tone.Synth or Tone.FMSynth etc.
     public isBusy = false;
     public activePointerId: number | null = null;
     public instrumentType: InstrumentType | null = null;
     private releaseEventId: Tone.ToneEventId | null = null;
 
     constructor() {
-        // A generic synth configuration. It will be reconfigured on the fly.
-        this.synth = new Tone.Synth({
-            oscillator: { type: 'triangle' },
-            envelope: { attack: 0.02, decay: 0.1, sustain: 0.3, release: 1 },
-        });
+        // We start with a generic synth. It will be replaced by configure().
+        this.synth = new Tone.Synth();
     }
 
     isAvailable(): boolean {
@@ -47,9 +44,16 @@ class Voice {
     
     // Applies a preset and connects to the correct channel
     configure(preset: any, channel: Tone.Channel) {
-        this.synth.set(preset);
-        this.synth.disconnect(); // Important to disconnect before connecting to a new channel
-        this.synth.connect(channel);
+        // Dispose of the old synth to prevent memory leaks
+        this.synth.dispose();
+
+        if (preset.type === 'FMSynth') {
+            this.synth = new Tone.FMSynth(preset.options).connect(channel);
+        } else if (preset.type === 'AMSynth') {
+            this.synth = new Tone.AMSynth(preset.options).connect(channel);
+        } else { // Default to standard Synth
+            this.synth = new Tone.Synth(preset.options).connect(channel);
+        }
     }
     
     attack(freq: number, vel: number, time: number | undefined, pointerId: number | null, type: InstrumentType) {
@@ -307,40 +311,60 @@ export class AudioEngine {
         switch (instrument) {
             case 'organ':
                 return {
-                    oscillator: { type: 'fatsawtooth', count: 2, spread: 30 },
-                    envelope: { attack: 0.1, decay: 0.4, sustain: 0.8, release: 1.5 }
+                    type: 'Synth',
+                    options: {
+                        oscillator: { type: 'fatsawtooth', count: 2, spread: 30 },
+                        envelope: { attack: 0.1, decay: 0.4, sustain: 0.8, release: 1.5 }
+                    }
                 };
             case 'mellotron':
-                return {
-                     oscillator: {
-                        type: "vibrato",
-                        frequency: 4,
-                        depth: 0.2,
-                        type: "sine"
-                    },
-                    envelope: { attack: 0.2, decay: 0.1, sustain: 0.8, release: 0.5, attackCurve: 'exponential' }
+                 return {
+                    type: 'Synth',
+                    options: {
+                        oscillator: {
+                            type: 'vibrato',
+                            frequency: 4,
+                            depth: 0.2,
+                        } as any,
+                        envelope: { attack: 0.2, decay: 0.1, sustain: 0.8, release: 0.5, attackCurve: 'exponential' }
+                    }
                 };
             case 'theremin':
-                return { oscillator: { type: 'sine' }, envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 } };
+                return { type: 'Synth', options: { oscillator: { type: 'sine' }, envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 } } };
             case 'glass':
-                return { oscillator: { type: 'fmsine', harmonicity: 1.5, modulationIndex: 5 }, envelope: { attack: 0.01, decay: 1.2, sustain: 0, release: 1.2 } };
+                return {
+                    type: 'FMSynth',
+                    options: {
+                        harmonicity: 1.4, // Non-integer for bell-like quality
+                        modulationIndex: 20,
+                        oscillator: { type: 'sine' },
+                        envelope: { attack: 0.001, decay: 1.6, sustain: 0, release: 1.6 },
+                        modulation: { type: 'square' },
+                        modulationEnvelope: {
+                            attack: 0.002,
+                            decay: 0.4,
+                            sustain: 0,
+                            release: 0.4
+                        }
+                    }
+                };
             case 'synth':
             default:
-                return { oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } };
+                return { type: 'Synth', options: { oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } } };
         }
     }
     
     public setMelodyInstrument(instrument: Instrument) {
-        const newOptions = this.getInstrumentPreset(instrument);
-        this.presets.melody = { ...this.presets.melody, ...newOptions };
-        this.presets.autopilot_melody = { ...this.presets.autopilot_melody, ...newOptions, portamento: 0.05 };
-        this.presets.autopilot_accompaniment = {...this.presets.autopilot_accompaniment, ...newOptions, portamento: 0.01}
+        const newPreset = this.getInstrumentPreset(instrument);
+        this.presets.melody = { ...newPreset };
+        this.presets.autopilot_melody = { ...newPreset, options: { ...newPreset.options, portamento: 0.05 } };
+        this.presets.autopilot_accompaniment = {...newPreset, options: {...newPreset.options, portamento: 0.01}}
     }
 
     public setBassInstrument(instrument: Instrument) {
-        const newOptions = this.getInstrumentPreset(instrument);
-        this.presets.manualBass = { ...this.presets.manualBass, ...newOptions };
-        this.presets.latch = { ...this.presets.latch, ...newOptions };
+        const newPreset = this.getInstrumentPreset(instrument);
+        this.presets.manualBass = { ...newPreset };
+        this.presets.latch = { ...newPreset };
         // Optionally, update autopilot bass as well if desired
         // this.presets.autopilot_bass = { ...this.presets.autopilot_bass, ...newOptions };
     }
@@ -378,38 +402,47 @@ export class AudioEngine {
     private createPresets() {
         this.presets = {
             // Manual playing presets
-            melody: { portamento: 0.02, ...this.getInstrumentPreset('theremin') },
-            manualBass: { ...this.getInstrumentPreset('synth') },
-            latch: { ...this.getInstrumentPreset('synth') },
+            melody: this.getInstrumentPreset('theremin'),
+            manualBass: this.getInstrumentPreset('synth'),
+            latch: this.getInstrumentPreset('synth'),
             
             // Autopilot presets
             autopilot_bass: {
-                oscillator: { type: "fmsine", harmonicity: 0.5 },
-                filter: { Q: 1, type: 'lowpass', rolloff: -12 },
-                envelope: { attack: 0.1, decay: 0.3, sustain: 0.4, release: 1.2 },
-                filterEnvelope: { attack: 0.05, decay: 0.2, sustain: 0.1, release: 1, baseFrequency: 200, octaves: 1.5 }
+                type: 'Synth',
+                options: {
+                    oscillator: { type: "fmsine", harmonicity: 0.5 },
+                    filter: { Q: 1, type: 'lowpass', rolloff: -12 },
+                    envelope: { attack: 0.1, decay: 0.3, sustain: 0.4, release: 1.2 },
+                    filterEnvelope: { attack: 0.05, decay: 0.2, sustain: 0.1, release: 1, baseFrequency: 200, octaves: 1.5 }
+                }
             },
             autopilot_accompaniment: { 
-                portamento: 0.01,
-                oscillator: { type: 'triangle8' }, 
-                envelope: { attack: 0.2, decay: 0.9, sustain: 0.1, release: 1.0 }
+                type: 'Synth',
+                options: {
+                    portamento: 0.01,
+                    oscillator: { type: 'triangle8' }, 
+                    envelope: { attack: 0.2, decay: 0.9, sustain: 0.1, release: 1.0 }
+                }
             },
             autopilot_melody: { 
-                portamento: 0.05,
-                oscillator: { type: 'fatsine4', spread: 40, count: 4 }, 
-                envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } 
+                type: 'Synth',
+                options: {
+                    portamento: 0.05,
+                    oscillator: { type: 'fatsine4', spread: 40, count: 4 }, 
+                    envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } 
+                }
             },
             
             // Effect presets
-            autopilot_effect_star: { oscillator: { type: 'fmsine', modulationType: 'sine', harmonicity: 0.8 }, envelope: { attack: 0.01, decay: 0.8, sustain: 0, release: 0.5 } },
-            autopilot_effect_meteor: { noise: { type: 'white' }, filter: { type: 'bandpass', Q: 15 }, envelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.2, attackCurve: 'exponential' } },
-            autopilot_effect_warp: { noise: { type: 'pink', playbackRate: 0.2 }, filter: { type: 'lowpass', Q: 2 }, envelope: { attack: 0.5, decay: 0.8, sustain: 0.1, release: 1 } },
-            autopilot_effect_hole: { oscillator: { type: 'amsine', harmonicity: 0.2 }, envelope: { attack: 2, decay: 2, sustain: 0, release: 1 } },
-            autopilot_effect_pulsar: { oscillator: { type: 'pwm', modulationFrequency: 0.2 }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.2 } },
-            autopilot_effect_nebula: { oscillator: { type: 'fatsawtooth', count: 5, spread: 80 }, envelope: { attack: 1.5, decay: 2, sustain: 0.5, release: 2 } },
-            autopilot_effect_comet: { oscillator: { type: 'pulse', width: 0.1 }, envelope: { attack: 0.01, decay: 0.5, sustain: 0, release: 0.8 } },
-            autopilot_effect_wind: { noise: { type: 'brown' }, filter: { type: 'bandpass', Q: 8 }, envelope: { attack: 2, decay: 5, sustain: 0.1, release: 3 } },
-            autopilot_effect_echoes: { oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.5 } },
+            autopilot_effect_star: { type: 'FMSynth', options: { oscillator: { type: 'fmsine', modulationType: 'sine', harmonicity: 0.8 }, envelope: { attack: 0.01, decay: 0.8, sustain: 0, release: 0.5 } } },
+            autopilot_effect_meteor: { type: 'NoiseSynth', options: { noise: { type: 'white' }, filter: { type: 'bandpass', Q: 15 }, envelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.2, attackCurve: 'exponential' } } },
+            autopilot_effect_warp: { type: 'NoiseSynth', options: { noise: { type: 'pink', playbackRate: 0.2 }, filter: { type: 'lowpass', Q: 2 }, envelope: { attack: 0.5, decay: 0.8, sustain: 0.1, release: 1 } } },
+            autopilot_effect_hole: { type: 'AMSynth', options: { oscillator: { type: 'amsine', harmonicity: 0.2 }, envelope: { attack: 2, decay: 2, sustain: 0, release: 1 } } },
+            autopilot_effect_pulsar: { type: 'Synth', options: { oscillator: { type: 'pwm', modulationFrequency: 0.2 }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.2 } } },
+            autopilot_effect_nebula: { type: 'Synth', options: { oscillator: { type: 'fatsawtooth', count: 5, spread: 80 }, envelope: { attack: 1.5, decay: 2, sustain: 0.5, release: 2 } } },
+            autopilot_effect_comet: { type: 'Synth', options: { oscillator: { type: 'pulse', width: 0.1 }, envelope: { attack: 0.01, decay: 0.5, sustain: 0, release: 0.8 } } },
+            autopilot_effect_wind: { type: 'NoiseSynth', options: { noise: { type: 'brown' }, filter: { type: 'bandpass', Q: 8 }, envelope: { attack: 2, decay: 5, sustain: 0.1, release: 3 } } },
+            autopilot_effect_echoes: { type: 'Synth', options: { oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.5 } } },
         };
     }
 
