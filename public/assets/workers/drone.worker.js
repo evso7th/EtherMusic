@@ -1,7 +1,39 @@
-// drone.worker.js - Pink Floyd "Echoes" inspired drone
-'use strict';
 
-// --- TYPE DEFINITIONS (from a shared source if possible, but duplicated for worker self-containment) ---
+// --- AUTOPILOT-WORKER: DRONE ---
+// This worker creates a deep, slowly evolving soundscape inspired by Pink Floyd's "Echoes".
+// It features a very slow bass drone, a sustained pad-like accompaniment, and sparse, high-frequency "ping" effects.
+
+// --- TYPE DEFINITIONS (provided by the AutopilotEngine) ---
+// NoteEvent, WorkerEvent, WorkerResponse, MusicKey, MusicScale, InstrumentType, Unit, AutopilotPart
+
+// --- WORKER STATE ---
+let state = {
+    // Music Theory
+    currentKey: 'C',
+    currentScale: 'Minor',
+    scaleIntervals: [],
+    chordProgression: [], // Will be set based on scale
+    scaleFrequencies: {
+        bass: [],
+        accompaniment: [],
+        melody: [],
+    },
+    // Timing & Sequencing
+    tickCount: 0,
+    subdivisions: 16, // 16th notes
+    currentBpm: 90,
+    nextEffectTime: 0,
+    // Enabled Parts
+    enabledParts: {
+        bass: true,
+        accompaniment: true, // Now enabled for the pad sound
+        melody: false,       // Melody is intentionally sparse/off in this style
+        effects: true,
+    },
+};
+
+// --- MUSIC THEORY HELPERS ---
+
 const scaleIntervalMap = {
     'Major': [0, 2, 4, 5, 7, 9, 11],
     'Minor': [0, 2, 3, 5, 7, 8, 10],
@@ -17,41 +49,6 @@ function getNoteFrequency(key, octave, interval) {
     return Math.pow(2, (midiNote - 69) / 12) * A4;
 }
 
-// --- WORKER STATE ---
-let state = {
-    isRunning: false,
-    tickCount: 0,
-    currentKey: 'C',
-    currentScale: 'Major Pentatonic',
-    scaleIntervals: [],
-    chordProgression: [0, 4, 5, 3],
-    enabledParts: { bass: true, accompaniment: true, melody: true, effects: true },
-    scaleFrequencies: {
-        bass: [],
-        accompaniment: [],
-        melody: [],
-    },
-    lastBassTime: 0,
-    lastEffectTime: 0,
-    bassNoteDuration: '1m', // Each bass note lasts for 4 measures (1m = 4 measures in Tone.js)
-};
-
-// --- MUSIC THEORY & UTILS ---
-function updateMusicContext() {
-    state.scaleIntervals = scaleIntervalMap[state.currentScale] || [];
-    const bassOctaves = [1, 2]; // Very low octaves for the drone
-    const melodyOctaves = [5, 6]; // High octaves for the "ping"
-
-    state.scaleFrequencies.bass = getScaleFrequenciesForOctaves(state.currentKey, state.currentScale, bassOctaves);
-    state.scaleFrequencies.melody = getScaleFrequenciesForOctaves(state.currentKey, state.currentScale, melodyOctaves);
-
-    if (state.currentScale.includes('Major')) {
-        state.chordProgression = [0, 4, 5, 3]; // I-V-vi-IV
-    } else {
-        state.chordProgression = [0, 5, 3, 6]; // i-VI-IV-VII
-    }
-}
-
 function getScaleFrequenciesForOctaves(key, scale, octaves) {
     const intervals = scaleIntervalMap[scale];
     if (!intervals) return [];
@@ -61,12 +58,13 @@ function getScaleFrequenciesForOctaves(key, scale, octaves) {
             allFrequencies.push(getNoteFrequency(key, octave, interval));
         });
     });
-    return allFrequencies.sort((a,b) => a - b);
+    return allFrequencies.sort((a, b) => a - b);
 }
 
 function getFrequencyFromDegree(degree, part) {
     const freqs = state.scaleFrequencies[part];
     const scaleLength = state.scaleIntervals.length;
+
     if (!freqs || freqs.length === 0 || !scaleLength) return null;
 
     const noteIndexInScale = (degree % scaleLength + scaleLength) % scaleLength;
@@ -76,87 +74,97 @@ function getFrequencyFromDegree(degree, part) {
     return (finalIndex >= 0 && finalIndex < freqs.length) ? freqs[finalIndex] : null;
 }
 
-// --- CORE WORKER LOGIC ---
-function tick(time) {
-    if (!state.isRunning) return;
+// --- WORKER LOGIC ---
 
-    const subdivisions = 64; // 4 measures * 16th notes
-    const measure = Math.floor(state.tickCount / 16);
-    const chordIndex = Math.floor(measure / 4) % state.chordProgression.length;
-    const rootDegree = state.chordProgression[chordIndex];
+function tick(time) {
+    const measure = Math.floor(state.tickCount / state.subdivisions);
+    const beat = state.tickCount % state.subdivisions;
+
+    // The entire drone revolves around one chord for a long time
+    const rootDegree = state.chordProgression[Math.floor(measure / 4) % state.chordProgression.length];
 
     // --- Bass Drone ---
-    // Trigger a new bass note only every 4 measures (64 ticks at 16th notes)
-    if (state.enabledParts.bass && state.tickCount % subdivisions === 0) {
+    // Plays a new note only once every 4 measures (16 beats)
+    if (state.enabledParts.bass && (state.tickCount % (state.subdivisions * 4) === 0)) {
         const freq = getFrequencyFromDegree(rootDegree, 'bass');
         if (freq) {
             self.postMessage({
                 type: 'playNote',
-                note: {
-                    type: 'autopilot_bass',
-                    freq: freq,
-                    dur: state.bassNoteDuration,
-                    vel: 0.7
-                },
-                time: time
+                note: { type: 'autopilot_bass', freq, dur: '4m', vel: 0.7 },
+                time
             });
         }
     }
 
-    // --- "Echoes" Ping Effect ---
-    // Trigger a high, clear "ping" very rarely.
-    // Let's try every 8 measures (128 ticks), but with some randomness.
-    if (state.enabledParts.effects && state.tickCount % 128 === 0 && Math.random() < 0.8) {
-        const pingDegree = state.chordProgression[Math.floor(Math.random() * state.chordProgression.length)] + (state.scaleIntervals.length * 3);
-        const freq = getFrequencyFromDegree(pingDegree, 'melody');
+    // --- Accompaniment (Enveloping Pad) ---
+    // Plays a long, sustained note from the chord every 2 measures
+    if (state.enabledParts.accompaniment && (state.tickCount % (state.subdivisions * 2) === 0)) {
+        // Choose the third or fifth of the chord for the pad
+        const degree = rootDegree + (Math.random() < 0.5 ? 2 : 4);
+        const freq = getFrequencyFromDegree(degree, 'accompaniment');
         if (freq) {
-             self.postMessage({
+            self.postMessage({
                 type: 'playNote',
-                note: {
-                    type: 'autopilot_effect_echoes',
-                    freq: freq,
-                    dur: '2n',
-                    vel: 0.8
-                },
-                time: time
+                note: { type: 'autopilot_accompaniment', freq, dur: '2m', vel: 0.35 },
+                time
             });
         }
     }
-    
-    // Disable accompaniment and regular melody for this style
-    // state.enabledParts.accompaniment = false;
-    // state.enabledParts.melody = false;
+
+    // --- Effects ("Pings") ---
+    // Triggers effects more frequently
+    if (state.enabledParts.effects && time >= state.nextEffectTime) {
+         if (Math.random() < 0.3) { // Increased probability from 0.1 to 0.3
+             // Choose a high note from the scale for the "ping"
+            const degree = rootDegree + 7 + Math.floor(Math.random() * 5); // High root + octave + random interval
+            const freq = getFrequencyFromDegree(degree, 'melody');
+             if (freq) {
+                 self.postMessage({
+                     type: 'playNote',
+                     note: { type: 'autopilot_effect_echoes', freq, dur: '8n', vel: 0.6 },
+                     time
+                 });
+             }
+         }
+        // Schedule the next effect check
+        state.nextEffectTime = time + (Math.random() * 4 + 2); // 2 to 6 seconds
+    }
 
     state.tickCount++;
 }
 
-// --- EVENT HANDLER ---
+// --- MAIN EVENT HANDLER ---
 self.onmessage = function (event) {
     const { type, ...data } = event.data;
+
     switch (type) {
         case 'start':
-            if (!state.isRunning) {
-                state.isRunning = true;
-                state.tickCount = 0;
-                updateMusicContext();
-            }
+            state.tickCount = 0;
+            state.nextEffectTime = performance.now() / 1000 + 3; // Schedule first effect
             break;
         case 'stop':
-            state.isRunning = false;
+            state.tickCount = 0;
             break;
         case 'tick':
             tick(data.time);
             break;
+        case 'setTempo':
+            state.currentBpm = data.bpm;
+            break;
         case 'setHarmony':
             state.currentKey = data.key;
             state.currentScale = data.scale;
-            updateMusicContext();
+            state.scaleIntervals = scaleIntervalMap[data.scale] || [];
+            state.scaleFrequencies = {
+                bass: getScaleFrequenciesForOctaves(data.key, data.scale, data.bassOctaves),
+                accompaniment: getScaleFrequenciesForOctaves(data.key, data.scale, data.accompanimentOctaves),
+                melody: getScaleFrequenciesForOctaves(data.key, data.scale, data.melodyOctaves),
+            };
+            // Set a simple, slow chord progression
+            state.chordProgression = data.scale.includes('Major') ? [0, 4] : [0, 3]; // I-V or i-iv
             break;
         case 'setParts':
             state.enabledParts = data.parts;
-            break;
-        case 'setTempo':
-            // Tempo doesn't drastically change the logic here, but good to have
             break;
     }
 };
