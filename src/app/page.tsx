@@ -36,8 +36,8 @@ export const tempos: Tempo[] = [
     { name: 'Allegretto', bpm: 130 },
 ];
 
-export type MelodyInstrument = 'synth' | 'organ' | 'theremin' | 'glass';
-const melodyInstruments: MelodyInstrument[] = ['synth', 'organ', 'theremin', 'glass'];
+export type MelodyInstrument = 'synth' | 'organ' | 'theremin' | 'glass' | 'mellotron';
+const melodyInstruments: MelodyInstrument[] = ['synth', 'organ', 'theremin', 'glass', 'mellotron'];
 
 export type MusicKey = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B';
 export const musicKeys: MusicKey[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];

@@ -26,11 +26,12 @@ export type InstrumentType =
 
 // A "Voice" represents a single synthesizer and its current state.
 class Voice {
-    public synth: Tone.Synth;
+    public synth: Tone.Synth | Tone.PolySynth;
     public isBusy = false;
     public activePointerId: number | null = null;
     public instrumentType: InstrumentType | null = null;
     private releaseEventId: Tone.ToneEventId | null = null;
+    public lfo: Tone.LFO | null = null; // For Mellotron effect
 
     constructor() {
         // A generic synth configuration. It will be reconfigured on the fly.
@@ -46,10 +47,27 @@ class Voice {
     }
     
     // Applies a preset and connects to the correct channel
-    configure(preset: any, channel: Tone.Channel) {
+    configure(preset: any, channel: Tone.Channel, instrument: MelodyInstrument | null = null) {
+        if (this.lfo) {
+            this.lfo.stop();
+            this.lfo.dispose();
+            this.lfo = null;
+        }
+
         this.synth.set(preset);
         this.synth.disconnect(); // Important to disconnect before connecting to a new channel
         this.synth.connect(channel);
+
+        if (instrument === 'mellotron') {
+            this.lfo = new Tone.LFO({
+                frequency: 0.2, // Slow "wow"
+                type: "sine",
+                min: -5, // Cents to detune down
+                max: 5,  // Cents to detune up
+            }).start();
+            // @ts-ignore
+            this.lfo.connect(this.synth.detune);
+        }
     }
     
     attack(freq: number, vel: number, time: number | undefined, pointerId: number | null, type: InstrumentType) {
@@ -72,6 +90,7 @@ class Voice {
                 Tone.Transport.clear(this.releaseEventId);
             }
             
+            // @ts-ignore
             const releaseTime = new Tone.Time(this.synth.envelope.release).toSeconds();
             const releaseEndTime = releaseStartTime + releaseTime + 0.05; // Add 50ms buffer
 
@@ -94,6 +113,7 @@ class Voice {
 
         this.synth.triggerAttackRelease(freq, dur, time, vel);
         
+        // @ts-ignore
         const totalDuration = new Tone.Time(dur).toSeconds() + new Tone.Time(this.synth.envelope.release).toSeconds();
 
         this.releaseEventId = Tone.Transport.scheduleOnce(() => {
@@ -106,6 +126,9 @@ class Voice {
     dispose() {
         if (this.releaseEventId) {
             Tone.Transport.clear(this.releaseEventId);
+        }
+        if (this.lfo) {
+            this.lfo.dispose();
         }
         this.synth.dispose();
     }
@@ -130,6 +153,7 @@ export class AudioEngine {
 
     private allowedFrequencies = { bass: [] as number[], melody: [] as number[] };
     private isBassLatchOn = false;
+    private currentMelodyInstrument: MelodyInstrument = 'theremin';
 
     constructor(orbManager: OrbManager) {
         this.orbManager = orbManager;
@@ -215,7 +239,8 @@ export class AudioEngine {
         if (voice) {
             const time = Tone.now();
             const channel = type === 'melody' ? this.channels.melody : this.channels.manualBass;
-            voice.configure(this.presets[instrumentType], channel);
+            const instrument = type === 'melody' ? this.currentMelodyInstrument : null;
+            voice.configure(this.presets[instrumentType], channel, instrument);
             voice.attack(quantizedFreq, vol*vol, time, pointerId, instrumentType);
             this.orbManager.addOrb(pointerId, type, pos.x, pos.y);
         }
@@ -226,7 +251,9 @@ export class AudioEngine {
         const voice = this.getVoice(pointerId);
         if (voice) {
             const quantizedFreq = this.getClosestFrequency(freq, type);
+            // @ts-ignore
             voice.synth.frequency.rampTo(quantizedFreq, 0.01);
+            // @ts-ignore
             voice.synth.volume.rampTo(Tone.gainToDb(vol * vol), 0.01);
             this.orbManager.updateOrb(pointerId, pos.x, pos.y);
         }
@@ -260,8 +287,9 @@ export class AudioEngine {
         }
         
         const channel = note.type.startsWith('autopilot_effect') ? this.channels.effects : this.channels.autopilot;
-        
-        voice.configure(preset, channel);
+        const instrument = (note.type === 'autopilot_melody' || note.type === 'autopilot_accompaniment') ? this.currentMelodyInstrument : null;
+
+        voice.configure(preset, channel, instrument);
         voice.attackRelease(note.freq, note.dur, time, note.vel, note.type);
     }
 
@@ -302,17 +330,34 @@ export class AudioEngine {
     }
     
     public setMelodyInstrument(instrument: MelodyInstrument) {
+        this.currentMelodyInstrument = instrument;
         let newOptions;
         switch (instrument) {
             case 'organ': 
-                newOptions = {
+                 newOptions = {
                     oscillator: { 
                         type: 'fatsawtooth',
-                        count: 3,
-                        spread: 20
+                        count: 2,
+                        spread: 30
                     }, 
                     envelope: { attack: 0.1, decay: 0.4, sustain: 0.8, release: 1.5 }
                 }; 
+                break;
+            case 'mellotron':
+                newOptions = {
+                    oscillator: {
+                        type: 'fatsquare',
+                        count: 3,
+                        spread: 20
+                    },
+                    envelope: {
+                        attack: 0.2,
+                        decay: 0.1,
+                        sustain: 0.8,
+                        release: 0.5,
+                        attackCurve: 'exponential'
+                    }
+                };
                 break;
             case 'theremin': newOptions = { oscillator: { type: 'sine' }, envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 }}; break;
             case 'glass': newOptions = { oscillator: { type: 'fmsine', harmonicity: 1.5, modulationIndex: 5 }, envelope: { attack: 0.01, decay: 1.2, sustain: 0, release: 1.2 }}; break;
