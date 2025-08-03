@@ -69,7 +69,7 @@ export class AutopilotEngine {
         switch(style) {
             case 'Toccata':     workerFileName = 'toccata.worker.js'; break;
             case 'Promenade':   workerFileName = 'promenade.worker.js'; break;
-            case 'House':       workerFileName = 'house.worker.js'; break;
+            case 'Trance':      workerFileName = 'trance.worker.js'; break;
             case 'Wind':        workerFileName = 'wind.worker.js'; break;
             case 'Sequence':    workerFileName = 'sequence.worker.js'; break;
             case 'Chimes':      workerFileName = 'chimes.worker.js'; break;
@@ -87,6 +87,11 @@ export class AutopilotEngine {
             return worker;
         } catch (e) {
             console.error(`Failed to load worker for style ${style}:`, e);
+            // Fallback to ambient if the specific worker fails
+            if (style !== 'Ambient') {
+                console.log('Falling back to Ambient worker.');
+                return this.getWorker('Ambient');
+            }
             throw e;
         }
     }
