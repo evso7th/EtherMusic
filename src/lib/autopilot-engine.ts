@@ -71,7 +71,6 @@ export class AutopilotEngine {
             case 'Toccata':     workerFileName = 'toccata.worker.js'; break;
             case 'Promenade':   workerFileName = 'promenade.worker.js'; break;
             case 'Trance':      workerFileName = 'trance.worker.js'; break;
-            case 'Wind':        workerFileName = 'wind.worker.js'; break;
             case 'Sequence':    workerFileName = 'sequence.worker.js'; break;
             case 'Chimes':      workerFileName = 'chimes.worker.js'; break;
             case 'Drone':       workerFileName = 'drone.worker.js'; break;

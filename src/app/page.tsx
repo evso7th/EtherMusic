@@ -46,8 +46,8 @@ export const musicKeys: MusicKey[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G',
 export type MusicScale = 'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentatonic';
 export const musicScales: MusicScale[] = ['Major', 'Minor', 'Major Pentatonic', 'Minor Pentatonic'];
 
-export type AutopilotStyle = 'Ambient' | 'Trance' | 'Wind' | 'Sequence' | 'Chimes' | 'Drone' | 'Toccata' | 'Promenade' | 'Space';
-export const autopilotStyles: AutopilotStyle[] = ['Ambient', 'Trance', 'Wind', 'Sequence', 'Chimes', 'Drone', 'Toccata', 'Promenade', 'Space'];
+export type AutopilotStyle = 'Ambient' | 'Trance' | 'Sequence' | 'Chimes' | 'Drone' | 'Toccata' | 'Promenade' | 'Space';
+export const autopilotStyles: AutopilotStyle[] = ['Ambient', 'Trance', 'Sequence', 'Chimes', 'Drone', 'Toccata', 'Promenade', 'Space'];
 
 
 const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
