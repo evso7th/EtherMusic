@@ -51,6 +51,15 @@ class Voice {
             this.synth = new Tone.FMSynth(preset.options).connect(channel);
         } else if (preset.type === 'AMSynth') {
             this.synth = new Tone.AMSynth(preset.options).connect(channel);
+        } else if (preset.type === 'Vibrato') {
+            this.synth = new Tone.Synth({
+                oscillator: {
+                    type: 'vibrato',
+                    frequency: 4,
+                    depth: 0.1,
+                } as any, // Cast to any to handle custom oscillator type
+                envelope: preset.options.envelope
+            }).connect(channel);
         } else { // Default to standard Synth
             this.synth = new Tone.Synth(preset.options).connect(channel);
         }
@@ -220,13 +229,12 @@ export class AudioEngine {
         if (voice) {
             const time = Tone.now();
             const channel = type === 'melody' ? this.channels.melody : this.channels.manualBass;
-            const instrumentType = type === 'melody' ? 'melody' : 'manualBass';
             const instrumentName = type === 'melody' ? this.currentMelodyInstrument : this.currentBassInstrument;
             const presetKey = `${instrumentName}_${type}`;
             const preset = this.presets[presetKey] || this.presets[instrumentName];
 
             voice.configure(preset, channel);
-            voice.attack(quantizedFreq, vol*vol, time, pointerId, instrumentType);
+            voice.attack(quantizedFreq, vol*vol, time, pointerId, type);
             this.orbManager.addOrb(pointerId, type, pos.x, pos.y);
         }
     }
@@ -333,13 +341,8 @@ export class AudioEngine {
                 };
             case 'mellotron':
                  return {
-                    type: 'Synth',
+                    type: 'Vibrato',
                     options: {
-                        oscillator: {
-                            type: 'vibrato',
-                            frequency: 4,
-                            depth: 0.2,
-                        } as any,
                         envelope: { attack: 0.2, decay: 0.1, sustain: 0.8, release: 0.5, attackCurve: 'exponential' }
                     }
                 };
@@ -347,12 +350,16 @@ export class AudioEngine {
                 return { type: 'Synth', options: { oscillator: { type: 'sine' }, envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 } } };
             case 'glass':
                  if (type === 'bass') {
-                    // Deep, pure bell tone for bass
+                    // Deep, resonant bell tone for bass
                     return {
-                        type: 'Synth',
+                        type: 'FMSynth',
                         options: {
+                            harmonicity: 0.5, // Lower harmonicity for deeper, cleaner tone
+                            modulationIndex: 10,
                             oscillator: { type: 'sine' },
-                            envelope: { attack: 0.001, decay: 2.0, sustain: 0, release: 2.0 }
+                            envelope: { attack: 0.01, decay: 4.0, sustain: 0, release: 4.0 }, // Longer decay and release
+                            modulation: { type: 'sine' },
+                            modulationEnvelope: { attack: 0.01, decay: 3, sustain: 0, release: 3 }
                         }
                     };
                 } else {
