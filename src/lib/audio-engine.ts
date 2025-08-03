@@ -243,8 +243,8 @@ export class AudioEngine {
         }
     }
     
-    public playAutopilotEvent(note: {type: InstrumentType, freq: number, dur: Tone.Unit.Time, vel: number}, time?: number) {
-         if (!this.isInitialized || note.freq === null || note.freq === undefined || !time) {
+    public playAutopilotEvent(note: {type: InstrumentType, freq: number, dur: Tone.Unit.Time, vel: number}, time: number) {
+         if (!this.isInitialized || note.freq === null || note.freq === undefined) {
              return;
         }
 
@@ -420,7 +420,6 @@ export class AudioEngine {
     public stop() {
         if (this.isInitialized) {
             this.stopAllSounds();
-            // We stop the transport, which also stops the worker via an event listener in AutopilotEngine
             Tone.Transport.stop();
         }
     }

@@ -1,57 +1,16 @@
-// --- TYPE DEFINITIONS (must be self-contained) ---
-// Note: We can't import types from the main project, so we redefine them here.
 
-/**
- * @typedef {'bass' | 'accompaniment' | 'melody' | 'effects'} AutopilotPart
- * @typedef {'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B'} MusicKey
- * @typedef {'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentatonic'} MusicScale
- * @typedef {string} InstrumentType - e.g., 'autopilot_bass', 'autopilot_melody'
- * @typedef {number | string} ToneTime - e.g., '4n', 0.5
- */
-
-/**
- * @typedef {object} NoteEvent
- * @property {InstrumentType} type
- * @property {number} freq
- * @property {ToneTime} dur
- * @property {number} vel
- */
-
-/**
- * @typedef {object} WorkerResponse
- * @property {'playNote'} type
- * @property {NoteEvent} note
- * @property {number} time - The precise time from performance.now() to play the note
- */
-
-
-// --- WORKER STATE ---
-let timerId = null;
-let tickCount = 0;
-const subdivisions = 16; 
-
-let currentKey = 'D';
-let currentScale = 'Minor'; // Toccata and Fugue in D Minor
-let currentBpm = 140; // Faster default for Toccata
-let scaleIntervals = []; 
-let chordProgression = [0, 4, 3, 6]; // i-v-iv-VII - a dramatic progression
-
-let lastMelodyDegree = null;
-
-let enabledParts = {
-    bass: true,
-    accompaniment: true,
-    melody: true,
-    effects: false // Effects don't fit the Toccata style well
+// --- TYPE DEFINITIONS (SHARED) ---
+let state = {
+    tickCount: 0,
+    currentKey: 'C',
+    currentScale: 'Minor',
+    currentBpm: 120,
+    scaleIntervals: [],
+    chordProgression: [0, 3, 4, 0], // i-iv-V-i
+    lastMelodyDegree: null,
+    enabledParts: { bass: true, accompaniment: true, melody: true, effects: false },
+    scaleFrequencies: { bass: [], accompaniment: [], melody: [] },
 };
-
-let scaleFrequencies = {
-    bass: [],
-    accompaniment: [],
-    melody: [],
-};
-
-// --- MUSIC THEORY HELPERS (same as ambient) ---
 
 const scaleIntervalMap = {
     'Major': [0, 2, 4, 5, 7, 9, 11],
@@ -81,30 +40,21 @@ function getScaleFrequenciesForOctaves(key, scale, octaves) {
 }
 
 function updateMusicContext() {
-    scaleIntervals = scaleIntervalMap[currentScale] || [];
-    
-    scaleFrequencies = {
-        bass: getScaleFrequenciesForOctaves(currentKey, currentScale, [1, 2]),
-        accompaniment: getScaleFrequenciesForOctaves(currentKey, currentScale, [2, 3]),
-        melody: getScaleFrequenciesForOctaves(currentKey, currentScale, [4, 5]),
+    state.scaleIntervals = scaleIntervalMap[state.currentScale] || [];
+    state.scaleFrequencies = {
+        bass: getScaleFrequenciesForOctaves(state.currentKey, state.currentScale, [1, 2]),
+        accompaniment: getScaleFrequenciesForOctaves(state.currentKey, state.currentScale, [3, 4]),
+        melody: getScaleFrequenciesForOctaves(state.currentKey, state.currentScale, [4, 5]),
     };
-
-    if (currentScale.includes('Major')) {
-        chordProgression = [0, 4, 5, 3]; // I-V-vi-IV
-    } else {
-        chordProgression = [0, 4, 3, 6]; // i-v-iv-VII (using v instead of V for minor feel)
-    }
-    lastMelodyDegree = 0; // Start melody from root
+    state.chordProgression = state.currentScale.includes('Major') ? [0, 4, 5, 3] : [0, 3, 4, 0];
+    state.lastMelodyDegree = null;
 }
 
 function getFrequencyFromDegree(degree, part) {
-    const freqs = scaleFrequencies[part];
-    const scaleLength = scaleIntervals.length;
-
+    const freqs = state.scaleFrequencies[part];
+    const scaleLength = state.scaleIntervals.length;
     if (!freqs || freqs.length === 0 || !scaleLength) return null;
     
-    degree = Math.floor(degree);
-
     const noteIndexInScale = (degree % scaleLength + scaleLength) % scaleLength;
     const octaveOffset = Math.floor(degree / scaleLength);
     const finalIndex = noteIndexInScale + (octaveOffset * scaleLength);
@@ -112,136 +62,90 @@ function getFrequencyFromDegree(degree, part) {
     if (finalIndex >= 0 && finalIndex < freqs.length) {
         return freqs[finalIndex];
     }
-    return freqs[Math.max(0, Math.min(freqs.length - 1, finalIndex))];
+    return null;
 }
 
 function getChordTones(rootDegree) {
-    const chordTones = [];
-    if (!scaleIntervals.length) return [];
-    
-    for (let i = 0; i < 3; i++) {
-        const degreeIndex = (rootDegree + i * 2);
-        chordTones.push(degreeIndex);
-    }
-    return chordTones;
+    if (!state.scaleIntervals.length) return [];
+    return [0, 2, 4].map(i => rootDegree + i);
 }
 
-
-// --- TOCCATA STYLE GENERATOR ---
+// --- STYLE-SPECIFIC GENERATOR: TOCCATA ---
 function tick(time) {
-    const measure = Math.floor(tickCount / subdivisions);
-    const beat = tickCount % subdivisions;
+    const subdivisions = 16;
+    const measure = Math.floor(state.tickCount / subdivisions);
+    const beat = state.tickCount % subdivisions;
     
-    const chordIndex = Math.floor(measure) % chordProgression.length;
-    const rootDegree = chordProgression[chordIndex];
+    const chordIndex = Math.floor(measure / 2) % state.chordProgression.length;
+    const rootDegree = state.chordProgression[chordIndex];
     const chordToneDegrees = getChordTones(rootDegree);
 
-    // Bass: Rapid, driving 8th notes
-    if (enabledParts.bass && beat % 4 === 0) { // Play on every 8th note
+    // Bass: Plays on the downbeat of each measure
+    if (state.enabledParts.bass && beat === 0) {
         const freq = getFrequencyFromDegree(rootDegree, 'bass');
         if (freq) {
-            /** @type {WorkerResponse} */
-            const message = { type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '8n', vel: 0.9 }, time };
-            self.postMessage(message);
+            self.postMessage({ type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '2n', vel: 0.9 }, time });
         }
     }
 
-    // Accompaniment: Fast, relentless 16th-note arpeggios
-    if (enabledParts.accompaniment && (beat % 2 === 0)) { // Play on every 16th note, slightly offset
-        const arpPattern = [0, 1, 2, 1, 2, 3, 4, 3]; // Fast, complex arp
+    // Accompaniment: Fast arpeggio
+    if (state.enabledParts.accompaniment) {
+        const arpPattern = [0, 1, 2, 1, 2, 1, 0, 1]; // 16th note arpeggio
         const patternIndex = beat % arpPattern.length;
-        const degree = chordToneDegrees[arpPattern[patternIndex] % chordToneDegrees.length];
-
-        if (degree !== undefined) {
-            const freq = getFrequencyFromDegree(degree, 'accompaniment');
-            if (freq) {
-                 /** @type {WorkerResponse} */
-                const message = { type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '16n', vel: 0.6 }, time };
-                self.postMessage(message);
-            }
+        const degree = chordToneDegrees[arpPattern[patternIndex]];
+        const freq = getFrequencyFromDegree(degree, 'accompaniment');
+        if (freq) {
+            self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '16n', vel: 0.6 }, time });
         }
     }
 
-    // Melody: Dramatic, virtuosic runs
-    if (enabledParts.melody && beat % 4 === 0) { // Play every 8th note
-        let nextDegree;
+    // Melody: Less frequent, but dramatic leaps
+    if (state.enabledParts.melody && beat % 16 === 0 && Math.random() > 0.3) {
+        const leap = Math.random() > 0.5 ? 3 : -3; // leap up or down a 4th/5th
+        let nextDegree = (state.lastMelodyDegree !== null) 
+            ? state.lastMelodyDegree + leap
+            : chordToneDegrees[0] + 7; // start high
         
-        // Create long, sweeping runs up and down the scale
-        const direction = Math.sin((tickCount / 16) * Math.PI) > 0 ? 1 : -1;
-        nextDegree = lastMelodyDegree + direction;
-        
-        // Keep it within a reasonable range
-        if (nextDegree > 14 || nextDegree < 0) {
-            nextDegree = (lastMelodyDegree > 7) ? 0 : 7;
-        }
-
         const freq = getFrequencyFromDegree(nextDegree, 'melody');
         if (freq) {
-            /** @type {WorkerResponse} */
-            const message = { type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '8n', vel: 0.8 }, time };
-            self.postMessage(message);
-            lastMelodyDegree = nextDegree;
+            self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '2n', vel: 0.8 }, time });
+            state.lastMelodyDegree = nextDegree;
         }
     }
     
-    tickCount++;
+    state.tickCount++;
 }
 
-
-// --- WORKER CONTROL ---
-function start() {
-    stop(); 
-    updateMusicContext();
-    tickCount = 0;
-    const intervalSeconds = (60 / currentBpm) / (subdivisions / 4);
-
-    let expected = self.performance.now() + intervalSeconds * 1000;
-
-    const loop = () => {
-        const now = self.performance.now();
-        const drift = now - expected;
-        if (drift > intervalSeconds * 1000) {
-            // High drift, skip a tick but don't reset expected time, to catch up.
-        } else {
-            tick(expected / 1000); 
-        }
-        
-        expected += intervalSeconds * 1000;
-        timerId = setTimeout(loop, Math.max(0, intervalSeconds * 1000 - drift));
-    }
-    
-    timerId = setTimeout(loop, intervalSeconds * 1000);
-}
-
-function stop() {
-    if (timerId !== null) {
-        clearTimeout(timerId);
-        timerId = null;
-    }
-}
-
+// --- WORKER EVENT HANDLER ---
 self.onmessage = function (event) {
     const { type, ...data } = event.data;
     switch (type) {
         case 'start':
-            start();
+            state.tickCount = 0;
+            state.lastMelodyDegree = null;
+            updateMusicContext();
             break;
         case 'stop':
-            stop();
+            state.tickCount = 0;
+            break;
+        case 'tick':
+            tick(data.time);
             break;
         case 'setHarmony':
-            currentKey = data.key;
-            currentScale = data.scale;
+            state.currentKey = data.key;
+            state.currentScale = data.scale;
             updateMusicContext();
             break;
         case 'setTempo':
-            currentBpm = data.bpm;
-            if (timerId !== null) { 
-                start();
-            }
+            state.currentBpm = data.bpm;
             break;
         case 'setParts':
-            enabledParts = data.parts;
+            state.enabledParts = data.parts;
+            break;
+        case 'setStyle':
+            if (data.style === 'Toccata') {
+                state.currentScale = 'Minor';
+            }
             break;
     }
 };

@@ -1,53 +1,15 @@
-// --- TYPE DEFINITIONS (must be self-contained) ---
-/**
- * @typedef {'bass' | 'accompaniment' | 'melody' | 'effects'} AutopilotPart
- * @typedef {'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B'} MusicKey
- * @typedef {'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentatonic'} MusicScale
- * @typedef {string} InstrumentType - e.g., 'autopilot_bass', 'autopilot_melody'
- * @typedef {number | string} ToneTime - e.g., '4n', 0.5
- */
 
-/**
- * @typedef {object} NoteEvent
- * @property {InstrumentType} type
- * @property {number} freq
- * @property {ToneTime} dur
- * @property {number} vel
- */
-
-/**
- * @typedef {object} WorkerResponse
- * @property {'playNote'} type
- * @property {NoteEvent} note
- * @property {number} time - The precise time from performance.now() to play the note
- */
-
-
-// --- WORKER STATE ---
-let timerId = null;
-let tickCount = 0;
-const subdivisions = 16; 
-
-let currentKey = 'G';
-let currentScale = 'Major'; // Promenade is typically major key
-let currentBpm = 70; // Slow, stately tempo
-let scaleIntervals = []; 
-let chordProgression = [0, 3, 4, 0]; // I-IV-V-I - a classic, strong progression
-
-let enabledParts = {
-    bass: true,
-    accompaniment: true,
-    melody: true,
-    effects: false
+// --- TYPE DEFINITIONS (SHARED) ---
+let state = {
+    tickCount: 0,
+    currentKey: 'C',
+    currentScale: 'Major',
+    currentBpm: 120,
+    scaleIntervals: [],
+    chordProgression: [0, 4, 5, 3], // I-V-vi-IV
+    enabledParts: { bass: true, accompaniment: true, melody: true, effects: false },
+    scaleFrequencies: { bass: [], accompaniment: [], melody: [] },
 };
-
-let scaleFrequencies = {
-    bass: [],
-    accompaniment: [],
-    melody: [],
-};
-
-// --- MUSIC THEORY HELPERS (same as other workers) ---
 
 const scaleIntervalMap = {
     'Major': [0, 2, 4, 5, 7, 9, 11],
@@ -77,25 +39,20 @@ function getScaleFrequenciesForOctaves(key, scale, octaves) {
 }
 
 function updateMusicContext() {
-    scaleIntervals = scaleIntervalMap[currentScale] || [];
-    
-    scaleFrequencies = {
-        bass: getScaleFrequenciesForOctaves(currentKey, currentScale, [1, 2]),
-        accompaniment: getScaleFrequenciesForOctaves(currentKey, currentScale, [3, 4]),
-        melody: getScaleFrequenciesForOctaves(currentKey, currentScale, [4, 5]),
+    state.scaleIntervals = scaleIntervalMap[state.currentScale] || [];
+    state.scaleFrequencies = {
+        bass: getScaleFrequenciesForOctaves(state.currentKey, state.currentScale, [1]),
+        accompaniment: getScaleFrequenciesForOctaves(state.currentKey, state.currentScale, [2, 3]),
+        melody: getScaleFrequenciesForOctaves(state.currentKey, state.currentScale, [4]),
     };
-    
-    chordProgression = [0, 3, 4, 0];
+    state.chordProgression = state.currentScale.includes('Major') ? [0, 4, 5, 3] : [0, 5, 3, 6];
 }
 
 function getFrequencyFromDegree(degree, part) {
-    const freqs = scaleFrequencies[part];
-    const scaleLength = scaleIntervals.length;
-
+    const freqs = state.scaleFrequencies[part];
+    const scaleLength = state.scaleIntervals.length;
     if (!freqs || freqs.length === 0 || !scaleLength) return null;
     
-    degree = Math.floor(degree);
-
     const noteIndexInScale = (degree % scaleLength + scaleLength) % scaleLength;
     const octaveOffset = Math.floor(degree / scaleLength);
     const finalIndex = noteIndexInScale + (octaveOffset * scaleLength);
@@ -103,117 +60,85 @@ function getFrequencyFromDegree(degree, part) {
     if (finalIndex >= 0 && finalIndex < freqs.length) {
         return freqs[finalIndex];
     }
-    return freqs[Math.max(0, Math.min(freqs.length - 1, finalIndex))];
+    return null;
 }
 
 function getChordTones(rootDegree) {
-    const chordTones = [];
-    if (!scaleIntervals.length) return [];
-    
-    // Full triad
-    for (let i = 0; i < 3; i++) {
-        const degreeIndex = (rootDegree + i * 2);
-        chordTones.push(degreeIndex);
-    }
-    return chordTones;
+    if (!state.scaleIntervals.length) return [];
+    // Returns a full chord: root, third, fifth
+    return [0, 2, 4].map(i => rootDegree + i);
 }
 
-
-// --- PROMENADE STYLE GENERATOR ---
+// --- STYLE-SPECIFIC GENERATOR: PROMENADE ---
 function tick(time) {
-    const measure = Math.floor(tickCount / subdivisions);
-    const beat = tickCount % subdivisions;
+    const subdivisions = 16;
+    const measure = Math.floor(state.tickCount / subdivisions);
+    const beat = state.tickCount % subdivisions;
     
-    const chordIndex = Math.floor(measure) % chordProgression.length;
-    const rootDegree = chordProgression[chordIndex];
+    // Change chord every 2 beats (8 subdivisions)
+    const chordIndex = Math.floor(beat / 8) % state.chordProgression.length;
+    const rootDegree = state.chordProgression[chordIndex];
     const chordToneDegrees = getChordTones(rootDegree);
 
-    // Stately, walking rhythm with chords. Play on 1 and 3.
-    const isPlayingBeat = (beat === 0 || beat === 8);
-    
-    if (isPlayingBeat) {
-        // Bass: Root note of the chord, strong and clear.
-        if (enabledParts.bass) {
-            const freq = getFrequencyFromDegree(rootDegree, 'bass');
-            if (freq) {
-                /** @type {WorkerResponse} */
-                const message = { type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '4n', vel: 0.9 }, time };
-                self.postMessage(message);
-            }
+    // Play a full, stately chord on beats 1 and 3
+    if (state.enabledParts.accompaniment && (beat === 0 || beat === 8)) {
+        // Bass part
+        const bassFreq = getFrequencyFromDegree(rootDegree, 'bass');
+        if (bassFreq) {
+             self.postMessage({ type: 'playNote', note: { type: 'autopilot_bass', freq: bassFreq, dur: '4n', vel: 0.9 }, time });
         }
-    
-        // Accompaniment and Melody play the full chord together for a powerful, majestic sound.
-        if (enabledParts.accompaniment) {
-            chordToneDegrees.forEach((degree, index) => {
-                const part = (index < 2) ? 'accompaniment' : 'melody';
-                const freq = getFrequencyFromDegree(degree, part);
-                if (freq) {
-                    /** @type {WorkerResponse} */
-                    const message = { type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '4n', vel: 0.7 - (index * 0.1) }, time };
-                     self.postMessage(message);
-                }
-            });
+
+        // Accompaniment chord tones
+        const accomFreq1 = getFrequencyFromDegree(chordToneDegrees[1], 'accompaniment');
+        if (accomFreq1) {
+             self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq: accomFreq1, dur: '4n', vel: 0.7 }, time });
+        }
+        const accomFreq2 = getFrequencyFromDegree(chordToneDegrees[2], 'accompaniment');
+        if (accomFreq2) {
+             self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq: accomFreq2, dur: '4n', vel: 0.7 }, time });
+        }
+    }
+     // Simple melody on top
+    if (state.enabledParts.melody && (beat === 4 || beat === 12)) {
+        const melodyDegree = chordToneDegrees[0] + state.scaleIntervals.length; // An octave higher
+        const freq = getFrequencyFromDegree(melodyDegree, 'melody');
+        if (freq) {
+            self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '8n', vel: 0.8 }, time });
         }
     }
     
-    tickCount++;
+    state.tickCount++;
 }
 
-
-// --- WORKER CONTROL ---
-function start() {
-    stop(); 
-    updateMusicContext();
-    tickCount = 0;
-    const intervalSeconds = (60 / currentBpm) / (subdivisions / 4);
-
-    let expected = self.performance.now() + intervalSeconds * 1000;
-
-    const loop = () => {
-        const now = self.performance.now();
-        const drift = now - expected;
-        if (drift > intervalSeconds * 1000) {
-            // High drift, skip
-        } else {
-            tick(expected / 1000); 
-        }
-        
-        expected += intervalSeconds * 1000;
-        timerId = setTimeout(loop, Math.max(0, intervalSeconds * 1000 - drift));
-    }
-    
-    timerId = setTimeout(loop, intervalSeconds * 1000);
-}
-
-function stop() {
-    if (timerId !== null) {
-        clearTimeout(timerId);
-        timerId = null;
-    }
-}
-
+// --- WORKER EVENT HANDLER ---
 self.onmessage = function (event) {
     const { type, ...data } = event.data;
     switch (type) {
         case 'start':
-            start();
+            state.tickCount = 0;
+            updateMusicContext();
             break;
         case 'stop':
-            stop();
+            state.tickCount = 0;
+            break;
+        case 'tick':
+            tick(data.time);
             break;
         case 'setHarmony':
-            currentKey = data.key;
-            currentScale = data.scale;
+            state.currentKey = data.key;
+            state.currentScale = data.scale;
             updateMusicContext();
             break;
         case 'setTempo':
-            currentBpm = data.bpm;
-            if (timerId !== null) { 
-                start();
-            }
+            state.currentBpm = data.bpm;
             break;
         case 'setParts':
-            enabledParts = data.parts;
+            state.enabledParts = data.parts;
+            break;
+        case 'setStyle':
+             if (data.style === 'Promenade') {
+                state.currentScale = 'Major';
+            }
             break;
     }
 };
