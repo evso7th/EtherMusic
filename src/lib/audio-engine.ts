@@ -422,10 +422,14 @@ export class AudioEngine {
                 }
             },
             glass_bass: {
-                type: 'Synth',
+                type: 'FMSynth',
                 options: {
+                    harmonicity: 1.4,
+                    modulationIndex: 10,
                     oscillator: { type: 'sine' },
-                    envelope: { attack: 0.01, decay: 1.0, sustain: 0.1, release: 1.5 },
+                    envelope: { attack: 0.01, decay: 1.5, sustain: 0.05, release: 2.5 },
+                    modulation: { type: 'square' },
+                    modulationEnvelope: { attack: 0.01, decay: 1.0, sustain: 0, release: 1.0 }
                 }
             },
             // Autopilot presets
