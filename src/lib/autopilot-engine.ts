@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import * as Tone from 'tone';
@@ -159,7 +160,7 @@ export class AutopilotEngine {
                 this.isAutopilotOn = false;
                 this.activeWorker = null;
             }
-        } else if (Tone.Transport.state === 'started' && !this.audioEngine.drumMachine.isPlaying()){
+        } else if (Tone.Transport.state === 'started' && this.audioEngine.drumMachine.currentBeatPatternName === 'Off'){
             // If we turn off autopilot and the drum machine is also off, stop the transport
              this.audioEngine.setPlaying(false);
         }
