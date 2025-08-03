@@ -53,15 +53,6 @@ class Voice {
             this.synth = new Tone.FMSynth(preset.options).connect(channel);
         } else if (preset.type === 'AMSynth') {
             this.synth = new Tone.AMSynth(preset.options).connect(channel);
-        } else if (preset.type === 'Vibrato') {
-            this.synth = new Tone.Synth({
-                oscillator: {
-                    type: 'vibrato',
-                    frequency: 4,
-                    depth: 0.1,
-                } as any, // Cast to any to handle custom oscillator type
-                envelope: preset.options.envelope
-            }).connect(channel);
         } else { // Default to standard Synth
             this.synth = new Tone.Synth(preset.options).connect(channel);
         }
@@ -404,9 +395,14 @@ export class AudioEngine {
             },
             theremin: { type: 'Synth', options: { oscillator: { type: 'sine' }, envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 } } },
             mellotron: {
-                type: 'Vibrato',
+                type: 'FMSynth',
                 options: {
-                    envelope: { attack: 0.2, decay: 0.1, sustain: 0.8, release: 0.5, attackCurve: 'exponential' }
+                    harmonicity: 3,
+                    modulationIndex: 0.5,
+                    oscillator: { type: "sine" },
+                    envelope: { attack: 0.1, decay: 0.2, sustain: 0.4, release: 0.8 },
+                    modulation: { type: "sine" },
+                    modulationEnvelope: { attack: 0.2, decay: 0.5, sustain: 0.1, release: 0.8 }
                 }
             },
             ebass: {
@@ -513,5 +509,3 @@ export class AudioEngine {
         }
     }
 }
-
-    
