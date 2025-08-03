@@ -307,12 +307,11 @@ export class AudioEngine {
             case 'organ': 
                 newOptions = {
                     oscillator: { 
-                        type: 'fatsine',
-                        count: 4,
-                        spread: 30,
-                        detune: 10,
+                        type: 'fatsawtooth',
+                        count: 3,
+                        spread: 20
                     }, 
-                    envelope: { attack: 0.2, decay: 0.3, sustain: 0.9, release: 1.2 }
+                    envelope: { attack: 0.1, decay: 0.4, sustain: 0.8, release: 1.5 }
                 }; 
                 break;
             case 'theremin': newOptions = { oscillator: { type: 'sine' }, envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 }}; break;
