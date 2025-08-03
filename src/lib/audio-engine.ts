@@ -45,7 +45,9 @@ class Voice {
     // Applies a preset and connects to the correct channel
     configure(preset: any, channel: Tone.Channel) {
         // Dispose of the old synth to prevent memory leaks
-        this.synth.dispose();
+        if (this.synth) {
+            this.synth.dispose();
+        }
 
         if (preset.type === 'FMSynth') {
             this.synth = new Tone.FMSynth(preset.options).connect(channel);
@@ -230,12 +232,20 @@ export class AudioEngine {
             const time = Tone.now();
             const channel = type === 'melody' ? this.channels.melody : this.channels.manualBass;
             const instrumentName = type === 'melody' ? this.currentMelodyInstrument : this.currentBassInstrument;
+            
             const presetKey = `${instrumentName}_${type}`;
-            const preset = this.presets[presetKey] || this.presets[instrumentName];
+            let preset = this.presets[presetKey];
+            
+            // If there's no type-specific preset (e.g. 'glass_bass'), fall back to the generic one (e.g. 'glass')
+            if (!preset) {
+                preset = this.presets[instrumentName];
+            }
 
-            voice.configure(preset, channel);
-            voice.attack(quantizedFreq, vol*vol, time, pointerId, type);
-            this.orbManager.addOrb(pointerId, type, pos.x, pos.y);
+            if (preset) {
+                voice.configure(preset, channel);
+                voice.attack(quantizedFreq, vol*vol, time, pointerId, type);
+                this.orbManager.addOrb(pointerId, type, pos.x, pos.y);
+            }
         }
     }
 
@@ -328,59 +338,6 @@ export class AudioEngine {
     public setBeatPattern(patternName: string) {
         this.drumMachine.setBeatPattern(patternName);
     }
-
-    private getInstrumentPreset(instrument: Instrument, type: 'melody' | 'bass' = 'melody'): any {
-        switch (instrument) {
-            case 'organ':
-                return {
-                    type: 'Synth',
-                    options: {
-                        oscillator: { type: 'fatsawtooth', count: 2, spread: 30 },
-                        envelope: { attack: 0.1, decay: 0.4, sustain: 0.8, release: 1.5 }
-                    }
-                };
-            case 'mellotron':
-                 return {
-                    type: 'Vibrato',
-                    options: {
-                        envelope: { attack: 0.2, decay: 0.1, sustain: 0.8, release: 0.5, attackCurve: 'exponential' }
-                    }
-                };
-            case 'theremin':
-                return { type: 'Synth', options: { oscillator: { type: 'sine' }, envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 } } };
-            case 'glass':
-                 if (type === 'bass') {
-                    // Deep, resonant bell tone for bass
-                    return {
-                        type: 'FMSynth',
-                        options: {
-                            harmonicity: 0.5, // Lower harmonicity for deeper, cleaner tone
-                            modulationIndex: 10,
-                            oscillator: { type: 'sine' },
-                            envelope: { attack: 0.01, decay: 4.0, sustain: 0, release: 4.0 }, // Longer decay and release
-                            modulation: { type: 'sine' },
-                            modulationEnvelope: { attack: 0.01, decay: 3, sustain: 0, release: 3 }
-                        }
-                    };
-                } else {
-                    // Bright, complex bell tone for melody
-                    return {
-                        type: 'FMSynth',
-                        options: {
-                            harmonicity: 1.4,
-                            modulationIndex: 20,
-                            oscillator: { type: 'sine' },
-                            envelope: { attack: 0.001, decay: 1.6, sustain: 0, release: 1.6 },
-                            modulation: { type: 'square' },
-                            modulationEnvelope: { attack: 0.002, decay: 0.4, sustain: 0, release: 0.4 }
-                        }
-                    };
-                }
-            case 'synth':
-            default:
-                return { type: 'Synth', options: { oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } } };
-        }
-    }
     
     public setMelodyInstrument(instrument: Instrument) {
         this.currentMelodyInstrument = instrument;
@@ -411,8 +368,10 @@ export class AudioEngine {
             const presetKey = `${this.currentBassInstrument}_bass`;
             const preset = this.presets[presetKey] || this.presets[this.currentBassInstrument];
 
-            voice.configure(preset, this.channels.latch);
-            voice.attack(freq, vol, time, null, 'latch');
+            if (preset) {
+                voice.configure(preset, this.channels.latch);
+                voice.attack(freq, vol, time, null, 'latch');
+            }
         }
         return voice;
     }
@@ -424,20 +383,51 @@ export class AudioEngine {
 
     // --- Private Helpers ---
     private createPresets() {
-        const instruments: Instrument[] = ['synth', 'organ', 'theremin', 'glass', 'mellotron'];
-        const types: ('melody' | 'bass')[] = ['melody', 'bass'];
-
-        instruments.forEach(inst => {
-            types.forEach(type => {
-                const presetKey = `${inst}_${type}`;
-                this.presets[presetKey] = this.getInstrumentPreset(inst, type);
-            });
-            // Fallback preset
-            this.presets[inst] = this.getInstrumentPreset(inst);
-        });
-
         this.presets = {
-            ...this.presets,
+            synth: { type: 'Synth', options: { oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } } },
+            organ: {
+                type: 'Synth',
+                options: {
+                    oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
+                    envelope: { attack: 0.05, decay: 0.2, sustain: 0.7, release: 1.2 }
+                }
+            },
+            theremin: { type: 'Synth', options: { oscillator: { type: 'sine' }, envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 } } },
+            mellotron: {
+                type: 'Vibrato',
+                options: {
+                    envelope: { attack: 0.2, decay: 0.1, sustain: 0.8, release: 0.5, attackCurve: 'exponential' }
+                }
+            },
+            ebass: {
+                type: 'FMSynth',
+                options: {
+                    harmonicity: 1,
+                    modulationIndex: 3.5,
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.01, decay: 0.3, sustain: 0.1, release: 0.5 },
+                    modulation: { type: 'square' },
+                    modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.2 }
+                }
+            },
+            glass_melody: {
+                type: 'FMSynth',
+                options: {
+                    harmonicity: 1.4,
+                    modulationIndex: 20,
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.001, decay: 1.6, sustain: 0, release: 1.6 },
+                    modulation: { type: 'square' },
+                    modulationEnvelope: { attack: 0.002, decay: 0.4, sustain: 0, release: 0.4 }
+                }
+            },
+            glass_bass: {
+                type: 'Synth',
+                options: {
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.01, decay: 1.0, sustain: 0.1, release: 1.5 },
+                }
+            },
             // Autopilot presets
             autopilot_bass: {
                 type: 'Synth',
