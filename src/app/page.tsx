@@ -36,8 +36,8 @@ export const tempos: Tempo[] = [
     { name: 'Allegretto', bpm: 130 },
 ];
 
-export type MelodyInstrument = 'synth' | 'organ' | 'theremin' | 'glass' | 'mellotron';
-const melodyInstruments: MelodyInstrument[] = ['synth', 'organ', 'theremin', 'glass', 'mellotron'];
+export type Instrument = 'synth' | 'organ' | 'theremin' | 'glass' | 'mellotron';
+const instruments: Instrument[] = ['synth', 'organ', 'theremin', 'glass', 'mellotron'];
 
 export type MusicKey = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B';
 export const musicKeys: MusicKey[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -83,7 +83,8 @@ export default function Home() {
         effects: { reverb: -6, delay: -6 }
     });
     const [activePattern, setActivePattern] = useState<(typeof beatPatterns)[number]>(beatPatterns.find(p => p.name === 'Off')!);
-    const [melodyInstrument, setMelodyInstrument] = useState<MelodyInstrument>('theremin');
+    const [melodyInstrument, setMelodyInstrument] = useState<Instrument>('theremin');
+    const [bassInstrument, setBassInstrument] = useState<Instrument>('synth');
     const [musicKey, setMusicKey] = useState<MusicKey>('C');
     const [musicScale, setMusicScale] = useState<MusicScale>('Major Pentatonic');
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
@@ -134,6 +135,7 @@ export default function Home() {
             mainEngine.setVolumes(volumes);
             mainEngine.setEffects(effects);
             mainEngine.setMelodyInstrument(melodyInstrument);
+            mainEngine.setBassInstrument(bassInstrument);
             mainEngine.setHarmony(musicKey, musicScale);
             mainEngine.setBeatPattern(activePattern.name);
             
@@ -150,7 +152,7 @@ export default function Home() {
                 variant: "destructive"
             });
         }
-    }, [isReady, activeTempo.bpm, volumes, effects, melodyInstrument, musicKey, musicScale, activePattern.name, toast]);
+    }, [isReady, activeTempo.bpm, volumes, effects, melodyInstrument, bassInstrument, musicKey, musicScale, activePattern.name, toast]);
     
 
     // --- State Sync with Audio Engine ---
@@ -183,6 +185,12 @@ export default function Home() {
             audioEngine.current?.setMelodyInstrument(melodyInstrument);
         }
     }, [melodyInstrument, isReady]);
+
+    useEffect(() => {
+        if (isReady) {
+            audioEngine.current?.setBassInstrument(bassInstrument);
+        }
+    }, [bassInstrument, isReady]);
     
     useEffect(() => {
         audioEngine.current?.setBassLatch(isBassLatchOn);
@@ -429,6 +437,9 @@ export default function Home() {
                             color="hsl(var(--accent))"
                             isLatchOn={isBassLatchOn}
                             onLatchToggle={setIsBassLatchOn}
+                            instruments={instruments}
+                            activeInstrument={bassInstrument}
+                            onInstrumentChange={setBassInstrument}
                             isPolyphonic
                         />
                         <MemoizedThereminPad
@@ -436,7 +447,7 @@ export default function Home() {
                             type="melody"
                             frequencyRange={[220, 1760]}
                             color="hsl(var(--primary))"
-                            instruments={melodyInstruments}
+                            instruments={instruments}
                             activeInstrument={melodyInstrument}
                             onInstrumentChange={setMelodyInstrument}
                             musicKeys={musicKeys}

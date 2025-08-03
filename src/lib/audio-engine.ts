@@ -1,7 +1,7 @@
 
 
 import * as Tone from 'tone';
-import type { MelodyInstrument, MusicKey, MusicScale } from '@/app/page';
+import type { Instrument, MusicKey, MusicScale } from '@/app/page';
 import { LatchEngine } from './latch-engine';
 import { DrumMachine } from './drum-machine';
 import { OrbManager } from './orb-manager';
@@ -26,7 +26,7 @@ export type InstrumentType =
 
 // A "Voice" represents a single synthesizer and its current state.
 class Voice {
-    public synth: Tone.Synth | Tone.PolySynth;
+    public synth: Tone.Synth;
     public isBusy = false;
     public activePointerId: number | null = null;
     public instrumentType: InstrumentType | null = null;
@@ -72,7 +72,6 @@ class Voice {
                 Tone.Transport.clear(this.releaseEventId);
             }
             
-            // @ts-ignore
             const releaseTime = new Tone.Time(this.synth.envelope.release).toSeconds();
             const releaseEndTime = releaseStartTime + releaseTime + 0.05; // Add 50ms buffer
 
@@ -95,7 +94,6 @@ class Voice {
 
         this.synth.triggerAttackRelease(freq, dur, time, vel);
         
-        // @ts-ignore
         const totalDuration = new Tone.Time(dur).toSeconds() + new Tone.Time(this.synth.envelope.release).toSeconds();
 
         this.releaseEventId = Tone.Transport.scheduleOnce(() => {
@@ -132,7 +130,6 @@ export class AudioEngine {
 
     private allowedFrequencies = { bass: [] as number[], melody: [] as number[] };
     private isBassLatchOn = false;
-    private currentMelodyInstrument: MelodyInstrument = 'theremin';
     
     constructor(orbManager: OrbManager) {
         this.orbManager = orbManager;
@@ -305,45 +302,47 @@ export class AudioEngine {
     public setBeatPattern(patternName: string) {
         this.drumMachine.setBeatPattern(patternName);
     }
-    
-    public setMelodyInstrument(instrument: MelodyInstrument) {
-        this.currentMelodyInstrument = instrument;
-        let newOptions;
+
+    private getInstrumentPreset(instrument: Instrument): any {
         switch (instrument) {
-            case 'organ': 
-                 newOptions = {
-                    oscillator: { 
-                        type: 'fatsawtooth',
-                        count: 2,
-                        spread: 30
-                    }, 
+            case 'organ':
+                return {
+                    oscillator: { type: 'fatsawtooth', count: 2, spread: 30 },
                     envelope: { attack: 0.1, decay: 0.4, sustain: 0.8, release: 1.5 }
-                }; 
-                break;
-            case 'mellotron':
-                newOptions = {
-                    oscillator: {
-                        type: "vibrato",
-                        frequency: 4, // The frequency of the vibrato
-                        depth: 0.2, // The depth of the vibrato
-                        type: "sine" // The shape of the vibrato
-                    },
-                    envelope: {
-                        attack: 0.2,
-                        decay: 0.1,
-                        sustain: 0.8,
-                        release: 0.5,
-                        attackCurve: 'exponential'
-                    }
                 };
-                break;
-            case 'theremin': newOptions = { oscillator: { type: 'sine' }, envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 }}; break;
-            case 'glass': newOptions = { oscillator: { type: 'fmsine', harmonicity: 1.5, modulationIndex: 5 }, envelope: { attack: 0.01, decay: 1.2, sustain: 0, release: 1.2 }}; break;
-            case 'synth': default: newOptions = { oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 }}; break;
+            case 'mellotron':
+                return {
+                     oscillator: {
+                        type: "vibrato",
+                        frequency: 4,
+                        depth: 0.2,
+                        type: "sine"
+                    },
+                    envelope: { attack: 0.2, decay: 0.1, sustain: 0.8, release: 0.5, attackCurve: 'exponential' }
+                };
+            case 'theremin':
+                return { oscillator: { type: 'sine' }, envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 } };
+            case 'glass':
+                return { oscillator: { type: 'fmsine', harmonicity: 1.5, modulationIndex: 5 }, envelope: { attack: 0.01, decay: 1.2, sustain: 0, release: 1.2 } };
+            case 'synth':
+            default:
+                return { oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } };
         }
+    }
+    
+    public setMelodyInstrument(instrument: Instrument) {
+        const newOptions = this.getInstrumentPreset(instrument);
         this.presets.melody = { ...this.presets.melody, ...newOptions };
         this.presets.autopilot_melody = { ...this.presets.autopilot_melody, ...newOptions, portamento: 0.05 };
         this.presets.autopilot_accompaniment = {...this.presets.autopilot_accompaniment, ...newOptions, portamento: 0.01}
+    }
+
+    public setBassInstrument(instrument: Instrument) {
+        const newOptions = this.getInstrumentPreset(instrument);
+        this.presets.manualBass = { ...this.presets.manualBass, ...newOptions };
+        this.presets.latch = { ...this.presets.latch, ...newOptions };
+        // Optionally, update autopilot bass as well if desired
+        // this.presets.autopilot_bass = { ...this.presets.autopilot_bass, ...newOptions };
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
@@ -379,9 +378,9 @@ export class AudioEngine {
     private createPresets() {
         this.presets = {
             // Manual playing presets
-            melody: { portamento: 0.02, oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } },
-            manualBass: { oscillator: { type: 'fatsawtooth', count: 3, spread: 20 }, envelope: { attack: 0.05, decay: 0.1, sustain: 0.4, release: 0.8 }},
-            latch: { oscillator: { type: 'fatsawtooth', count: 3, spread: 20 }, envelope: { attack: 0.2, decay: 0.1, sustain: 1, release: 0.8 }},
+            melody: { portamento: 0.02, ...this.getInstrumentPreset('theremin') },
+            manualBass: { ...this.getInstrumentPreset('synth') },
+            latch: { ...this.getInstrumentPreset('synth') },
             
             // Autopilot presets
             autopilot_bass: {

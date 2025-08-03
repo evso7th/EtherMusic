@@ -11,9 +11,10 @@ import { Label } from '@/components/ui/label';
 import { Anchor, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { MelodyInstrument, MusicKey, MusicScale } from '@/app/page';
+import type { Instrument, MusicKey, MusicScale } from '@/app/page';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from './ui/scroll-area';
+import { Separator } from './ui/separator';
 
 interface ThereminPadProps {
     type: 'melody' | 'bass';
@@ -22,10 +23,10 @@ interface ThereminPadProps {
     color: string;
     isPolyphonic?: boolean;
     isDisabled?: boolean;
+    instruments?: Instrument[];
+    activeInstrument?: Instrument;
+    onInstrumentChange?: (instrument: Instrument) => void;
     // Melody specific
-    instruments?: MelodyInstrument[];
-    activeInstrument?: MelodyInstrument;
-    onInstrumentChange?: (instrument: MelodyInstrument) => void;
     musicKeys?: MusicKey[];
     activeKey?: MusicKey;
     onKeyChange?: (key: MusicKey) => void;
@@ -113,46 +114,22 @@ export function ThereminPad({
         }
     }, [onInteraction, type, calculateInteraction, isDisabled]);
     
-    const renderMelodyControls = () => (
+     const renderSettingsControls = () => (
         <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
             <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 capitalize border-primary text-primary hover:bg-primary hover:text-primary-foreground">
+                <Button variant="outline" size="sm" className={cn("h-8 capitalize",
+                    type === 'melody' ? "border-primary text-primary hover:bg-primary hover:text-primary-foreground" : "border-accent text-accent hover:bg-accent hover:text-accent-foreground"
+                )}>
                     <SlidersHorizontal className="w-4 h-4 mr-0 sm:mr-2" />
                     <span className="hidden sm:inline">Settings</span>
                 </Button>
             </SheetTrigger>
             <SheetContent>
                 <SheetHeader>
-                    <SheetTitle>Melody Settings</SheetTitle>
+                    <SheetTitle>{padTitles[type]} Settings</SheetTitle>
                 </SheetHeader>
                  <ScrollArea className="h-[85vh]">
                     <div className="py-4 pr-4 space-y-6">
-                        {musicKeys && activeKey && onKeyChange && (
-                            <div className="space-y-2">
-                                <Label>Music Key</Label>
-                                <Select value={activeKey} onValueChange={onKeyChange}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Key" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {musicKeys.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        )}
-                        {musicScales && activeScale && onScaleChange && (
-                            <div className="space-y-2">
-                                <Label>Music Scale</Label>
-                                <Select value={activeScale} onValueChange={onScaleChange}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Scale" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {musicScales.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        )}
                         {instruments && activeInstrument && onInstrumentChange && (
                             <div className="space-y-2">
                                 <Label>Instrument</Label>
@@ -168,6 +145,41 @@ export function ThereminPad({
                                 </Select>
                             </div>
                         )}
+                        
+                        {type === 'melody' && (
+                            <>
+                                <Separator />
+                                {musicKeys && activeKey && onKeyChange && (
+                                    <div className="space-y-2">
+                                        <Label>Music Key</Label>
+                                        <Select value={activeKey} onValueChange={onKeyChange}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Key" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {musicKeys.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+                                {musicScales && activeScale && onScaleChange && (
+                                    <div className="space-y-2">
+                                        <Label>Music Scale</Label>
+                                        <Select value={activeScale} onValueChange={onScaleChange}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Scale" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {musicScales.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+                             </>
+                        )}
+                        
+                         <Separator />
+
                         <Button 
                             onClick={() => setIsSettingsOpen(false)} 
                             className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground"
@@ -181,16 +193,6 @@ export function ThereminPad({
         </Sheet>
     );
 
-    const renderBassControls = () => (
-        <>
-            {onLatchToggle && (
-                <div className="flex items-center space-x-1 h-8">
-                    <Switch id="latch-mode" checked={isLatchOn} onCheckedChange={onLatchToggle} />
-                    <Label htmlFor="latch-mode" className="flex items-center gap-1 text-xs"><Anchor className="w-3 h-3" /> Latch</Label>
-                </div>
-            )}
-        </>
-    );
 
     const [title, subtitle] = padTitles[type].split(' ');
 
@@ -205,7 +207,13 @@ export function ThereminPad({
         >
             <CardHeader className="flex-shrink-0 flex flex-row items-center justify-end p-2">
                 <div className="flex items-center gap-2">
-                   {type === 'melody' ? renderMelodyControls() : renderBassControls()}
+                    {renderSettingsControls()}
+                    {type === 'bass' && onLatchToggle && (
+                        <div className="flex items-center space-x-1 h-8">
+                            <Switch id="latch-mode" checked={isLatchOn} onCheckedChange={onLatchToggle} />
+                            <Label htmlFor="latch-mode" className="flex items-center gap-1 text-xs"><Anchor className="w-3 h-3" /> Latch</Label>
+                        </div>
+                    )}
                 </div>
             </CardHeader>
             <CardContent className="flex-grow p-0">
@@ -234,5 +242,3 @@ export function ThereminPad({
         </Card>
     );
 }
-
-    
