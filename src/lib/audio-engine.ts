@@ -304,7 +304,17 @@ export class AudioEngine {
     public setMelodyInstrument(instrument: MelodyInstrument) {
         let newOptions;
         switch (instrument) {
-            case 'organ': newOptions = { oscillator: { type: 'fatsawtooth', count: 3, spread: 20 }, envelope: { attack: 0.05, decay: 0.3, sustain: 0.9, release: 0.8 }}; break;
+            case 'organ': 
+                newOptions = {
+                    oscillator: { 
+                        type: 'fatsine',
+                        count: 4,
+                        spread: 30,
+                        detune: 10,
+                    }, 
+                    envelope: { attack: 0.2, decay: 0.3, sustain: 0.9, release: 1.2 }
+                }; 
+                break;
             case 'theremin': newOptions = { oscillator: { type: 'sine' }, envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 }}; break;
             case 'glass': newOptions = { oscillator: { type: 'fmsine', harmonicity: 1.5, modulationIndex: 5 }, envelope: { attack: 0.01, decay: 1.2, sustain: 0, release: 1.2 }}; break;
             case 'synth': default: newOptions = { oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 }}; break;
@@ -315,7 +325,7 @@ export class AudioEngine {
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
         this.allowedFrequencies = {
-            bass: this.getScaleFrequencies(key, scale, [1, 2, 3]),
+            bass: this.getScaleFrequencies(key, scale, [2, 3]),
             melody: this.getScaleFrequencies(key, scale, [3, 4, 5]),
         };
         this.latchEngine.setAllowedFrequencies(this.allowedFrequencies.bass);
