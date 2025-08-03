@@ -95,6 +95,12 @@ export default function Home() {
         melody: true,
         effects: true
     });
+    const previousMelodySettings = useRef({
+        instrument: melodyInstrument,
+        key: musicKey,
+        scale: musicScale,
+    });
+
 
     // --- Engine Ref ---
     const audioEngine = useRef<AudioEngine>();
@@ -120,7 +126,6 @@ export default function Home() {
             await mainEngine.initialize();
             audioEngine.current = mainEngine;
             
-            // CRITICAL CHANGE: Instantiate AutopilotEngine only on the client, after AudioEngine is ready.
             const apEngine = new AutopilotEngine(mainEngine);
             autopilotEngine.current = apEngine;
             
@@ -193,6 +198,35 @@ export default function Home() {
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isReady]);
+
+    // Autopilot Style Change Handler
+    const handleAutopilotStyleChange = useCallback((style: AutopilotStyle) => {
+        const oldStyle = autopilotStyle;
+        setAutopilotStyle(style);
+
+        // If we are switching TO Toccata
+        if (style === 'Toccata') {
+            // Save current settings only if we are not already in Toccata
+            if (oldStyle !== 'Toccata') {
+                previousMelodySettings.current = {
+                    instrument: melodyInstrument,
+                    key: musicKey,
+                    scale: musicScale,
+                };
+            }
+            // Set Toccata-specific settings
+            setMelodyInstrument('organ');
+            setMusicKey('D');
+            setMusicScale('Minor');
+        } 
+        // If we are switching FROM Toccata to something else
+        else if (oldStyle === 'Toccata' && style !== 'Toccata') {
+            // Restore previous settings
+            setMelodyInstrument(previousMelodySettings.current.instrument);
+            setMusicKey(previousMelodySettings.current.key);
+            setMusicScale(previousMelodySettings.current.scale);
+        }
+    }, [autopilotStyle, melodyInstrument, musicKey, musicScale]);
 
     // --- UI Event Handlers ---
     const handleStartApp = useCallback(async () => {
@@ -438,7 +472,7 @@ export default function Home() {
                             onAutopilotToggle={setIsAutopilotOn}
                             autopilotStyles={autopilotStyles}
                             activeAutopilotStyle={autopilotStyle}
-                            onAutopilotStyleChange={setAutopilotStyle}
+                            onAutopilotStyleChange={handleAutopilotStyleChange}
                             autopilotParts={autopilotParts}
                             onAutopilotPartsChange={setAutopilotParts}
                             isMobile={isMobile}
@@ -463,7 +497,7 @@ export default function Home() {
                         onAutopilotToggle={setIsAutopilotOn}
                         autopilotStyles={autopilotStyles}
                         activeAutopilotStyle={autopilotStyle}
-                        onAutopilotStyleChange={setAutopilotStyle}
+                        onAutopilotStyleChange={handleAutopilotStyleChange}
                         autopilotParts={autopilotParts}
                         onAutopilotPartsChange={setAutopilotParts}
                         isMobile={isMobile}
@@ -474,3 +508,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
