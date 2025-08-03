@@ -1,6 +1,4 @@
 // --- TYPE DEFINITIONS (must be self-contained) ---
-// Note: We can't import types from the main project, so we redefine them here.
-
 /**
  * @typedef {'bass' | 'accompaniment' | 'melody' | 'effects'} AutopilotPart
  * @typedef {'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B'} MusicKey
@@ -30,19 +28,17 @@ let timerId = null;
 let tickCount = 0;
 const subdivisions = 16; 
 
-let currentKey = 'D';
-let currentScale = 'Minor'; // Toccata and Fugue in D Minor
-let currentBpm = 140; // Faster default for Toccata
+let currentKey = 'G';
+let currentScale = 'Major'; // Promenade is typically major key
+let currentBpm = 70; // Slow, stately tempo
 let scaleIntervals = []; 
-let chordProgression = [0, 4, 3, 6]; // i-v-iv-VII - a dramatic progression
-
-let lastMelodyDegree = null;
+let chordProgression = [0, 3, 4, 0]; // I-IV-V-I - a classic, strong progression
 
 let enabledParts = {
     bass: true,
     accompaniment: true,
     melody: true,
-    effects: false // Effects don't fit the Toccata style well
+    effects: false
 };
 
 let scaleFrequencies = {
@@ -51,7 +47,7 @@ let scaleFrequencies = {
     melody: [],
 };
 
-// --- MUSIC THEORY HELPERS (same as ambient) ---
+// --- MUSIC THEORY HELPERS (same as other workers) ---
 
 const scaleIntervalMap = {
     'Major': [0, 2, 4, 5, 7, 9, 11],
@@ -85,16 +81,11 @@ function updateMusicContext() {
     
     scaleFrequencies = {
         bass: getScaleFrequenciesForOctaves(currentKey, currentScale, [1, 2]),
-        accompaniment: getScaleFrequenciesForOctaves(currentKey, currentScale, [2, 3]),
+        accompaniment: getScaleFrequenciesForOctaves(currentKey, currentScale, [3, 4]),
         melody: getScaleFrequenciesForOctaves(currentKey, currentScale, [4, 5]),
     };
-
-    if (currentScale.includes('Major')) {
-        chordProgression = [0, 4, 5, 3]; // I-V-vi-IV
-    } else {
-        chordProgression = [0, 4, 3, 6]; // i-v-iv-VII (using v instead of V for minor feel)
-    }
-    lastMelodyDegree = 0; // Start melody from root
+    
+    chordProgression = [0, 3, 4, 0];
 }
 
 function getFrequencyFromDegree(degree, part) {
@@ -119,6 +110,7 @@ function getChordTones(rootDegree) {
     const chordTones = [];
     if (!scaleIntervals.length) return [];
     
+    // Full triad
     for (let i = 0; i < 3; i++) {
         const degreeIndex = (rootDegree + i * 2);
         chordTones.push(degreeIndex);
@@ -127,7 +119,7 @@ function getChordTones(rootDegree) {
 }
 
 
-// --- TOCCATA STYLE GENERATOR ---
+// --- PROMENADE STYLE GENERATOR ---
 function tick(time) {
     const measure = Math.floor(tickCount / subdivisions);
     const beat = tickCount % subdivisions;
@@ -136,51 +128,31 @@ function tick(time) {
     const rootDegree = chordProgression[chordIndex];
     const chordToneDegrees = getChordTones(rootDegree);
 
-    // Bass: Rapid, driving 8th notes
-    if (enabledParts.bass && beat % 4 === 0) { // Play on every 8th note
-        const freq = getFrequencyFromDegree(rootDegree, 'bass');
-        if (freq) {
-            /** @type {WorkerResponse} */
-            const message = { type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '8n', vel: 0.9 }, time };
-            self.postMessage(message);
-        }
-    }
-
-    // Accompaniment: Fast, relentless 16th-note arpeggios
-    if (enabledParts.accompaniment && (beat % 2 === 0)) { // Play on every 16th note, slightly offset
-        const arpPattern = [0, 1, 2, 1, 2, 3, 4, 3]; // Fast, complex arp
-        const patternIndex = beat % arpPattern.length;
-        const degree = chordToneDegrees[arpPattern[patternIndex] % chordToneDegrees.length];
-
-        if (degree !== undefined) {
-            const freq = getFrequencyFromDegree(degree, 'accompaniment');
+    // Stately, walking rhythm with chords. Play on 1 and 3.
+    const isPlayingBeat = (beat === 0 || beat === 8);
+    
+    if (isPlayingBeat) {
+        // Bass: Root note of the chord, strong and clear.
+        if (enabledParts.bass) {
+            const freq = getFrequencyFromDegree(rootDegree, 'bass');
             if (freq) {
-                 /** @type {WorkerResponse} */
-                const message = { type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '16n', vel: 0.6 }, time };
+                /** @type {WorkerResponse} */
+                const message = { type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '4n', vel: 0.9 }, time };
                 self.postMessage(message);
             }
         }
-    }
-
-    // Melody: Dramatic, virtuosic runs
-    if (enabledParts.melody && beat % 4 === 0) { // Play every 8th note
-        let nextDegree;
-        
-        // Create long, sweeping runs up and down the scale
-        const direction = Math.sin((tickCount / 16) * Math.PI) > 0 ? 1 : -1;
-        nextDegree = lastMelodyDegree + direction;
-        
-        // Keep it within a reasonable range
-        if (nextDegree > 14 || nextDegree < 0) {
-            nextDegree = (lastMelodyDegree > 7) ? 0 : 7;
-        }
-
-        const freq = getFrequencyFromDegree(nextDegree, 'melody');
-        if (freq) {
-            /** @type {WorkerResponse} */
-            const message = { type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '8n', vel: 0.8 }, time };
-            self.postMessage(message);
-            lastMelodyDegree = nextDegree;
+    
+        // Accompaniment and Melody play the full chord together for a powerful, majestic sound.
+        if (enabledParts.accompaniment) {
+            chordToneDegrees.forEach((degree, index) => {
+                const part = (index < 2) ? 'accompaniment' : 'melody';
+                const freq = getFrequencyFromDegree(degree, part);
+                if (freq) {
+                    /** @type {WorkerResponse} */
+                    const message = { type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '4n', vel: 0.7 - (index * 0.1) }, time };
+                     self.postMessage(message);
+                }
+            });
         }
     }
     
@@ -201,7 +173,7 @@ function start() {
         const now = self.performance.now();
         const drift = now - expected;
         if (drift > intervalSeconds * 1000) {
-            // High drift, skip a tick but don't reset expected time, to catch up.
+            // High drift, skip
         } else {
             tick(expected / 1000); 
         }

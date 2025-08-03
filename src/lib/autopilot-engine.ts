@@ -31,7 +31,7 @@ export class AutopilotEngine {
 
     constructor(audioEngine: AudioEngine) {
         this.audioEngine = audioEngine;
-        // The initialize method will now be called from page.tsx to ensure it's client-side only
+        this.initialize();
     }
 
     public initialize() {
@@ -59,12 +59,13 @@ export class AutopilotEngine {
             return workerCache[style]!;
         }
 
-        // Files are in the /public directory and served directly.
-        // We can reference them with a simple absolute path.
         let workerPath: string;
         switch(style) {
             case 'Toccata':
                 workerPath = '/assets/workers/toccata.worker.js';
+                break;
+            case 'Promenade':
+                workerPath = '/assets/workers/promenade.worker.js';
                 break;
             case 'Ambient':
             case 'House':
@@ -72,19 +73,16 @@ export class AutopilotEngine {
             case 'Sequence':
             case 'Chimes':
             case 'Drone':
-            case 'Promenade':
             case 'Space':
             default:
-                 // Fallback for styles that don't have a dedicated worker yet
                 workerPath = '/assets/workers/ambient.worker.js';
                 break;
         }
 
         try {
-            // Create the worker using the public path.
+            // This is the correct way to create a worker from a publicly served file.
             const worker = new Worker(workerPath, { type: 'module' });
             
-            // CRITICAL FIX: Set up the message handler when the worker is created.
             worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
                 this.handleWorkerMessage(event, style);
             };
