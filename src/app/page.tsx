@@ -76,13 +76,13 @@ export default function Home() {
     const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
     const [volumes, setVolumes] = useState({ melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, effects: -6 });
     const [effects, setEffects] = useState({
-        melody: { reverb: -60, delay: -60 },
-        manualBass: { reverb: -60, delay: -60 },
-        latch: { reverb: -60, delay: -60 },
-        drums: { reverb: -60, delay: -60 },
-        autopilot: { reverb: -60, delay: -60 },
+        melody: { reverb: -Infinity, delay: -60 },
+        manualBass: { reverb: -Infinity, delay: -60 },
+        latch: { reverb: -Infinity, delay: -60 },
+        drums: { reverb: -Infinity, delay: -60 },
+        autopilot: { reverb: -Infinity, delay: -60 },
         effects: { reverb: -6, delay: -6 },
-        ebass: { reverb: -60, delay: -60 }
+        ebass: { reverb: -Infinity, delay: -60 }
     });
     const [activePattern, setActivePattern] = useState<(typeof beatPatterns)[number]>(beatPatterns.find(p => p.name === 'Off')!);
     const [melodyInstrument, setMelodyInstrument] = useState<Instrument>('theremin');
