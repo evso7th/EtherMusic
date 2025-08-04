@@ -206,9 +206,8 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
             <Separator />
             
             <div className="space-y-4">
-                 <div className="text-xs text-center text-muted-foreground mb-3">Autopilot</div>
                  <InstrumentControls 
-                    label="Melody / Bass"
+                    label="Autopilot"
                     icon={Bot}
                     volume={volumes.autopilot}
                     reverb={effects.autopilot.reverb}
