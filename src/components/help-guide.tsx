@@ -36,14 +36,14 @@ There are two large, glowing pads. They are your main instruments.
 
 ### Melody Pad (Right, Purple)
 
-*   This is for your main tune. You can play up to four notes at once (it's polyphonic).
+*   This is for your main tune. You can play up to three notes at once (it's polyphonic).
 *   **Settings:** Use the \`Settings\` button at the top of the pad to open a panel where you can change the **Instrument** (\`synth\`, \`organ\`, etc.), **Music Key**, and **Music Scale** to match your mood.
 
 ### Bass Pad (Left, Blue)
 
-*   This is for your bass line. It's polyphonic, so you can play up to four notes at the same time to create chords.
+*   This is for your bass line. It's polyphonic, so you can play up to three notes at the same time to create chords.
 *   **Latch (\`Anchor\` Icon):** "Holds" notes for you. Tap the switch to turn Latch mode on.
-    *   **To add a note:** Tap on the pad. A glowing orb will appear. You can have up to four notes latched at once.
+    *   **To add a note:** Tap on the pad. A glowing orb will appear. You can have up to three notes latched at once.
     *   **To remove a note:** Tap on an existing orb to stop that specific note.
 
 ## Bottom Control Bar

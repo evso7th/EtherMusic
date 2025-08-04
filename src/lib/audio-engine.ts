@@ -133,8 +133,8 @@ export class AudioEngine {
     // --- The Unified Voice Pool ---
     private voicePool: Voice[] = [];
     private readonly MAX_VOICES = 18; // Total voices for the entire app
-    private readonly MAX_MELODY_VOICES = 4;
-    private readonly MAX_BASS_VOICES = 4;
+    private readonly MAX_MELODY_VOICES = 3;
+    private readonly MAX_BASS_VOICES = 3;
     private presets: { [key: string]: any } = {};
 
     private allowedFrequencies = { bass: [] as number[], melody: [] as number[] };

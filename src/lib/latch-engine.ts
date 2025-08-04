@@ -6,7 +6,7 @@ import type { AudioEngine } from './audio-engine';
 import type { OrbManager } from './orb-manager';
 
 const NOTE_PROXIMITY_THRESHOLD = 35;
-const MAX_LATCHED_NOTES = 4;
+const MAX_LATCHED_NOTES = 3;
 
 type LatchedBassNote = {
     id: number;
