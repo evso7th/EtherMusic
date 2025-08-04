@@ -17,12 +17,7 @@ export class OrbManager {
     private padElements: { [key in OrbType]?: HTMLElement | null } = {};
 
     constructor() {
-        if (typeof document !== 'undefined') {
-            // We cache the pad elements to avoid repeated DOM queries
-            this.padElements['melody'] = document.getElementById('theremin-pad-melody');
-            this.padElements['bass'] = document.getElementById('theremin-pad-bass');
-            this.padElements['latch'] = document.getElementById('theremin-pad-bass'); // Latch orbs appear on the bass pad
-        }
+        // Defer DOM access until methods are called
     }
 
     private getPadElement(type: OrbType): HTMLElement | null {
@@ -32,6 +27,7 @@ export class OrbManager {
         }
         // If not cached, query the DOM and cache it
         const padId = (type === 'bass' || type === 'latch') ? 'theremin-pad-bass' : 'theremin-pad-melody';
+        if (typeof document === 'undefined') return null;
         const element = document.getElementById(padId);
         if (element) {
             this.padElements[type] = element;
@@ -55,13 +51,11 @@ export class OrbManager {
         orbEl.style.backgroundColor = color;
         orbEl.style.boxShadow = `0 0 20px ${color}, 0 0 30px ${color}`;
         orbEl.style.transform = `translate(${x}px, ${y}px)`;
-        // This tells the browser to optimize for transform changes (hardware acceleration)
         orbEl.style.willChange = 'transform, box-shadow, opacity';
         
         pad.appendChild(orbEl);
         this.orbs.set(id, { element: orbEl, type });
 
-        // Fade in
         requestAnimationFrame(() => {
             orbEl.style.opacity = '1';
         });
@@ -79,9 +73,7 @@ export class OrbManager {
     public removeOrb(id: number) {
         const orb = this.orbs.get(id);
         if (orb) {
-            // Fade out
             orb.element.style.opacity = '0';
-            // Remove from DOM after transition
             setTimeout(() => {
                 orb.element.remove();
             }, 300); 

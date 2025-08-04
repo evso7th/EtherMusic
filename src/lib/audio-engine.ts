@@ -5,6 +5,8 @@ import type { Instrument, MusicKey, MusicScale } from '@/app/page';
 import { LatchEngine } from './latch-engine';
 import { DrumMachine } from './drum-machine';
 import { OrbManager } from './orb-manager';
+import type { NoteEvent } from './autopilot-worker';
+
 
 export type InstrumentPart = 
     | 'melody'
@@ -91,7 +93,7 @@ class Voice {
 
 export class AudioEngine {
     public isInitialized = false;
-    private orbManager: OrbManager | null = null;
+    private orbManager: OrbManager;
     public drumMachine!: DrumMachine;
     private latchEngine!: LatchEngine;
 
@@ -110,15 +112,14 @@ export class AudioEngine {
         autopilot: 'synth'
     };
 
-    constructor(orbManager?: OrbManager) {
-        if (orbManager) {
-            this.orbManager = orbManager;
-        }
+    constructor(orbManager: OrbManager) {
+        this.orbManager = orbManager;
     }
 
     public async initialize() {
         if (this.isInitialized) return;
         await Tone.start();
+        Tone.Transport.set({ bpm: 90, swing: 0, timeSignature: 4 });
 
         // Master FX & Channels
         this.fx = {
@@ -249,7 +250,6 @@ export class AudioEngine {
 
         const availableVoice = pool.find(v => v.isAvailable());
         if (!availableVoice) {
-            // console.warn(`No available voices in pool: ${part}`);
             return null;
         }
         return availableVoice;
@@ -270,7 +270,7 @@ export class AudioEngine {
         if (voice) {
             const time = Tone.now();
             voice.attack(quantizedFreq, vol*vol, time, pointerId);
-            this.orbManager?.addOrb(pointerId, type, pos.x, pos.y);
+            this.orbManager.addOrb(pointerId, type, pos.x, pos.y);
         }
     }
 
@@ -281,7 +281,7 @@ export class AudioEngine {
             const quantizedFreq = this.getClosestFrequency(freq, type);
             if (voice.synth.frequency) voice.synth.frequency.value = quantizedFreq;
             if (voice.synth.volume) voice.synth.volume.value = Tone.gainToDb(vol * vol);
-            this.orbManager?.updateOrb(pointerId, pos.x, pos.y);
+            this.orbManager.updateOrb(pointerId, pos.x, pos.y);
         }
     }
 
@@ -290,16 +290,14 @@ export class AudioEngine {
         const voice = this.getVoiceFromPool(type, pointerId);
         if (voice) {
             voice.release();
-            this.orbManager?.removeOrb(pointerId);
+            this.orbManager.removeOrb(pointerId);
         }
     }
 
-    public playAutopilotEvent(note: {type: InstrumentPart, freq: number, dur: Tone.Unit.Time, vel: number}, time: number) {
+    public scheduleAutopilotNote(note: NoteEvent, time: number) {
         if (!this.isInitialized || note.freq === null || note.freq === undefined) return;
-
-        // Reconfigure effects pool on the fly for variety
         if (note.type === 'autopilot_effects') {
-             const effectName = note.freq > 500 ? 'autopilot_effect_star' : 'autopilot_effect_meteor'; // Example logic
+             const effectName = note.freq > 500 ? 'autopilot_effect_star' : 'autopilot_effect_meteor';
              this.reconfigurePool('autopilot_effects', effectName);
         }
         
@@ -311,10 +309,8 @@ export class AudioEngine {
     
     public stopAllSounds() {
         this.voicePools.forEach(pool => pool.forEach(voice => voice.release(0.1)));
-        if (this.orbManager) {
-            this.orbManager.removeAllOrbs('melody');
-            this.orbManager.removeAllOrbs('bass');
-        }
+        this.orbManager.removeAllOrbs('melody');
+        this.orbManager.removeAllOrbs('bass');
         this.latchEngine.stopAll();
         if (this.isInitialized) this.drumMachine.stop();
     }

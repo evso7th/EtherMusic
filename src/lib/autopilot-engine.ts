@@ -4,8 +4,11 @@
 
 import * as Tone from 'tone';
 import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
-import type { WorkerEvent, WorkerResponse, AutopilotPart } from './autopilot-worker';
+import type { WorkerEvent, WorkerResponse, AutopilotPart, NoteEvent } from './autopilot-worker';
 import type { AudioEngine } from './audio-engine';
+
+const LOOKAHEAD_TIME = 0.2; // seconds, how far ahead to schedule
+const SCHEDULE_INTERVAL = 100; // ms, how often to check for scheduling
 
 export class AutopilotEngine {
     private audioEngine: AudioEngine;
@@ -13,13 +16,16 @@ export class AutopilotEngine {
     private currentStyle: AutopilotStyle = 'Ambient';
     private isAutopilotOn = false;
     
+    private noteCache: NoteEvent[] = [];
+    private nextMeasureToGenerate = 0;
+    private schedulerId: number | null = null;
+    private isGenerating = false;
+
     private lastKnownState: {
-        bpm: number;
         key: MusicKey;
         scale: MusicScale;
         parts: Record<AutopilotPart, boolean>;
     } = {
-        bpm: 90,
         key: 'C',
         scale: 'Major Pentatonic',
         parts: { bass: true, accompaniment: true, melody: true, effects: true },
@@ -27,34 +33,62 @@ export class AutopilotEngine {
 
     constructor(audioEngine: AudioEngine) {
         this.audioEngine = audioEngine;
-        this.setWorker(this.currentStyle); // Pre-load the default worker
+        this.setWorker();
     }
 
     private handleWorkerMessage = (event: MessageEvent<WorkerResponse>) => {
-        if (!this.isAutopilotOn) return;
-        const { type, note } = event.data;
-        if (type === 'playNote' && note) {
-            // Schedule the note to be played 'now' as decided by the worker's internal clock
-            this.audioEngine.playAutopilotEvent(note, Tone.now());
+        if (event.data.type === 'measureGenerated') {
+            this.noteCache.push(...event.data.notes);
+            this.isGenerating = false;
+        }
+    }
+    
+    private scheduleNotes = () => {
+        const now = Tone.now();
+        const scheduleUntil = now + LOOKAHEAD_TIME;
+
+        while(this.noteCache.length > 0 && this.noteCache[0].time < scheduleUntil) {
+            const noteToSchedule = this.noteCache.shift();
+            if (noteToSchedule) {
+                this.audioEngine.scheduleAutopilotNote(noteToSchedule, noteToSchedule.time);
+            }
         }
     }
 
-    private setWorker(style: AutopilotStyle): Worker {
-        // Since we have a single worker file, we just create one instance
+    private requestNextMeasureIfNeeded() {
+        if (this.isGenerating) return;
+
+        const currentMeasure = Tone.Transport.position.toString().split(':')[0];
+        const lookaheadMeasure = parseFloat(currentMeasure) + 1;
+
+        if (this.nextMeasureToGenerate <= lookaheadMeasure) {
+             this.isGenerating = true;
+             this.postMessageToActiveWorker({
+                type: 'generateMeasure',
+                measure: this.nextMeasureToGenerate,
+            });
+            this.nextMeasureToGenerate++;
+        }
+    }
+    
+    private mainLoop = () => {
+        if (!this.isAutopilotOn) return;
+        this.requestNextMeasureIfNeeded();
+        this.scheduleNotes();
+    }
+
+    private setWorker(): void {
         if (this.activeWorker) {
-            this.activeWorker.onmessage = null; // Clean up old listener
-            this.activeWorker.terminate(); // Terminate the old worker
+            this.activeWorker.onmessage = null;
+            this.activeWorker.terminate();
         }
         const workerPath = `/assets/workers/ambient.worker.js`;
         try {
-            const worker = new Worker(workerPath, { type: 'module' });
-            worker.onmessage = this.handleWorkerMessage;
-            this.activeWorker = worker;
-            this.syncWorkerState(); // Sync state with the new worker instance
-            return worker;
+            this.activeWorker = new Worker(workerPath, { type: 'module' });
+            this.activeWorker.onmessage = this.handleWorkerMessage;
+            this.syncWorkerState();
         } catch (e) {
             console.error(`Failed to load worker:`, e);
-            throw e;
         }
     }
     
@@ -63,8 +97,8 @@ export class AutopilotEngine {
     }
     
     public setTempo(bpm: number) {
-        this.lastKnownState.bpm = bpm;
-        this.postMessageToActiveWorker({ type: 'setTempo', bpm: bpm });
+        // The main engine controls tempo, so we don't need to inform the worker
+        // as it now works in measures, not absolute time.
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
@@ -74,49 +108,74 @@ export class AutopilotEngine {
             type: 'setHarmony', 
             key, 
             scale,
-            bassOctaves: [2, 3], 
-            melodyOctaves: [4, 5],
-            accompanimentOctaves: [3, 4]
         });
+        this.resetAutopilot();
     }
 
     public setAutopilotParts(parts: Record<AutopilotPart, boolean>) {
         this.lastKnownState.parts = parts;
         this.postMessageToActiveWorker({ type: 'setParts', parts: parts });
+        this.resetAutopilot();
     }
     
     public setStyle(style: AutopilotStyle) {
         if (this.currentStyle === style) return;
         this.currentStyle = style;
         this.postMessageToActiveWorker({ type: 'setStyle', style });
+        this.resetAutopilot();
     }
 
     public setAutopilot(isOn: boolean, style: AutopilotStyle) {
+        if (this.isAutopilotOn === isOn && this.currentStyle === style) return;
+
         this.isAutopilotOn = isOn;
-        this.setStyle(style); // Always update the style
+        this.setStyle(style);
         
         if (isOn) {
-            if (Tone.Transport.state !== 'started') {
-                this.audioEngine.setPlaying(true);
-            }
-            this.postMessageToActiveWorker({ type: 'start' });
+            this.start();
         } else {
-            this.postMessageToActiveWorker({ type: 'stop' });
-            if (Tone.Transport.state === 'started' && this.audioEngine.drumMachine.currentBeatPatternName === 'Off'){
-                 this.audioEngine.setPlaying(false);
-            }
+            this.stop();
         }
+    }
+
+    private start() {
+        if (this.schedulerId !== null) return;
+        this.resetAutopilot();
+        this.schedulerId = setInterval(this.mainLoop, SCHEDULE_INTERVAL) as any;
+        if (Tone.Transport.state !== 'started') {
+            this.audioEngine.setPlaying(true);
+        }
+    }
+
+    private stop() {
+        if (this.schedulerId !== null) {
+            clearInterval(this.schedulerId);
+            this.schedulerId = null;
+        }
+        this.noteCache = [];
+        // Optional: could send a stop message to the worker to halt generation
+        if (Tone.Transport.state === 'started' && this.audioEngine.drumMachine.currentBeatPatternName === 'Off'){
+             this.audioEngine.setPlaying(false);
+        }
+    }
+
+    private resetAutopilot() {
+        this.noteCache = [];
+        this.nextMeasureToGenerate = Math.floor(Tone.Transport.now() / Tone.Time('1m').toSeconds());
+        this.isGenerating = false;
+        // Tell worker to clear its state if necessary
+        this.postMessageToActiveWorker({ type: 'reset' });
     }
 
     private syncWorkerState() {
         if (!this.activeWorker) return;
-        this.setTempo(this.lastKnownState.bpm);
         this.setHarmony(this.lastKnownState.key, this.lastKnownState.scale);
         this.setAutopilotParts(this.lastKnownState.parts);
         this.setStyle(this.currentStyle);
     }
 
     public dispose() {
+        this.stop();
         this.activeWorker?.terminate();
         this.activeWorker = null;
     }
