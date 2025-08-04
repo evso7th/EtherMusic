@@ -16,19 +16,19 @@ The application's logic is cleanly divided into three specialized engines:
 
 - **`AutopilotEngine` (`src/lib/autopilot-engine.ts`):** The "brain" of the automatic music generation.
     - Its primary responsibility is to manage the lifecycle of the music generation logic.
-    - It dynamically loads, runs, and communicates with the appropriate **Web Worker** for the selected autopilot style.
-    - It acts as a bridge, passing UI settings (key, scale, tempo, active parts) to the worker and forwarding generated notes from the worker to the `AudioEngine`.
+    - It dynamically loads, runs, and communicates with a **single Web Worker** that contains the logic for all autopilot styles.
+    - It acts as a bridge, passing UI settings (style, key, scale, tempo, active parts) to the worker and forwarding generated notes from the worker to the `AudioEngine`.
 
 - **`DrumMachine` (`src/lib/drum-machine.ts`):** Manages the rhythm section.
     - It loads high-quality drum samples.
     - It uses `Tone.Part` to schedule and loop drum patterns, ensuring perfect synchronization with the master `Tone.Transport`.
 
-## 2. Autopilot Logic via Web Workers
+## 2. Autopilot Logic via a Single Web Worker
 
 This is a critical performance and architectural feature.
 
-- **Isolation:** All complex music generation algorithms for each style (`Ambient`, `Toccata`, `Space`, etc.) are located in a single, dedicated Web Worker file (`/public/assets/workers/ambient.worker.js`). This prevents the main UI thread from freezing during heavy computations.
-- **Dynamic Loading:** The `AutopilotEngine` dynamically instantiates the worker file. This makes the system modular and easy to extend with new styles without touching the core engine logic, as all style logic is contained within the single worker file.
+- **Isolation:** All complex music generation algorithms for every style (`Ambient`, `Toccata`, `Space`, etc.) are located in a **single, dedicated Web Worker file** (`/public/assets/workers/ambient.worker.js`). This prevents the main UI thread from freezing during heavy computations.
+- **Dynamic Loading & Modularity:** The `AutopilotEngine` dynamically instantiates the single worker file. It then tells the worker which style to use via `postMessage`. This makes the system modular and easy to extend with new styles (by adding logic within the worker) without touching the core engine.
 
 ## 3. Unidirectional Data Flow and UI as the Source of Truth
 
@@ -48,10 +48,10 @@ This is a critical performance and architectural feature.
     2. The `isAutopilotOn` state changes to `true`.
     3. A `useEffect` hook, which depends on `[isAutopilotOn, autopilotStyle]`, is triggered.
     4. It calls `autopilotEngine.current.setAutopilot(true, newStyle)`.
-    5. The `AutopilotEngine` loads the worker, syncs its state (tempo, key, etc.), and sends it a `'start'` message.
+    5. The `AutopilotEngine` loads the worker, sends it the new style (`'setStyle'`), syncs its state (tempo, key, etc.), and sends it a `'start'` message.
 
 - **Note Generation and Playback:**
-    1. The active Web Worker generates a musical event (a note or a series of notes).
+    1. The active Web Worker generates a musical event (a note or a series of notes) based on the current style.
     2. The worker sends the note data back to the main thread via `self.postMessage({ type: 'playNote', ... })`.
     3. The `AutopilotEngine`'s `onmessage` handler receives the event.
     4. It immediately calls `this.audioEngine.playAutopilotEvent(note, time)`, passing the note to the `AudioEngine`.
