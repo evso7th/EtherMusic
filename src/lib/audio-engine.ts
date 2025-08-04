@@ -49,12 +49,16 @@ class Voice {
             this.synth.dispose();
         }
 
+        const options = { ...preset.options };
+
         if (preset.type === 'FMSynth') {
-            this.synth = new Tone.FMSynth(preset.options).connect(channel);
+            options.polyphony = 1; // Force monophonic for manual play
+            this.synth = new Tone.FMSynth(options).connect(channel);
         } else if (preset.type === 'AMSynth') {
-            this.synth = new Tone.AMSynth(preset.options).connect(channel);
+            options.polyphony = 1; // Force monophonic for manual play
+            this.synth = new Tone.AMSynth(options).connect(channel);
         } else { // Default to standard Synth
-            this.synth = new Tone.Synth(preset.options).connect(channel);
+            this.synth = new Tone.Synth(options).connect(channel);
         }
     }
     
@@ -444,7 +448,6 @@ export class AudioEngine {
             'E-Bells_melody': {
                 type: 'FMSynth',
                 options: {
-                    polyphony: 1,
                     harmonicity: 1.4,
                     modulationIndex: 20,
                     oscillator: { type: 'sine' },
@@ -456,7 +459,6 @@ export class AudioEngine {
             'E-Bells_bass': {
                 type: 'FMSynth',
                 options: {
-                    polyphony: 1,
                     harmonicity: 1.4,
                     modulationIndex: 15,
                     oscillator: { type: 'sine' },
