@@ -28,46 +28,62 @@ export type WorkerResponse =
     | { type: 'playNote', note: NoteEvent, time: number };
 
 
+// --- MUSICAL PATTERN DEFINITIONS ---
+
+type PatternNote = {
+    degree: number;      // Scale degree (e.g., 0 for root, 1 for next note in scale)
+    dur: Unit.Time;    // Duration (e.g., '4n', '8n')
+    vel: number;       // Velocity (0-1)
+};
+
+// A pattern is an array of notes for each tick of a 16-tick measure.
+type Pattern = (PatternNote | null)[];
+
+interface StylePatterns {
+    bass: {
+        grooves: Pattern[];
+    };
+    accompaniment: {
+        grooves: Pattern[];
+        fills: Pattern[];
+    };
+    melody: {
+        grooves: Pattern[];
+        fills: Pattern[];
+    };
+    effects: {
+        probability: number; // Chance to play an effect per measure
+    }
+}
+
 // --- WORKER STATE ---
-let timerId: any = null;
 let tickCount = 0;
-const subdivisions = 16; 
+const SUBDIVISIONS = 16; 
 
 let currentKey: MusicKey = 'C';
 let currentScale: MusicScale = 'Major Pentatonic';
 let currentStyle: AutopilotStyle = 'Ambient';
-let currentBpm = 120;
-let scaleIntervals: number[] = [];
-let chordProgression: number[] = [0, 4, 5, 3]; 
-
-let lastMelodyDegree: number | null = null;
-let lastAccompanimentDegree: number | null = null;
-
-let enabledParts: Record<AutopilotPart, boolean> = {
-    bass: true,
-    accompaniment: true,
-    melody: true,
-    effects: true
-};
+let enabledParts: Record<AutopilotPart, boolean> = { bass: true, accompaniment: true, melody: true, effects: true };
 
 let scaleFrequencies: Record<'bass' | 'accompaniment' | 'melody', number[]> = {
-    bass: [],
-    accompaniment: [],
-    melody: [],
+    bass: [], accompaniment: [], melody: [],
 };
+let scaleIntervals: number[] = [];
 
-const effectTypes: InstrumentType[] = [
-    'autopilot_effect_star', 'autopilot_effect_meteor', 'autopilot_effect_warp', 'autopilot_effect_hole',
-    'autopilot_effect_pulsar', 'autopilot_effect_nebula', 'autopilot_effect_comet', 'autopilot_effect_wind', 'autopilot_effect_echoes'
-];
+// This state holds the currently selected patterns for the measure
+let activePatterns = {
+    bass: null as Pattern | null,
+    accompaniment: null as Pattern | null,
+    melody: null as Pattern | null,
+}
 
-// --- MUSIC THEORY HELPERS ---
+// --- MUSIC THEORY & UTILITIES ---
 
 const scaleIntervalMap: { [key in MusicScale]: number[] } = {
     'Major': [0, 2, 4, 5, 7, 9, 11],
     'Minor': [0, 2, 3, 5, 7, 8, 10],
     'Major Pentatonic': [0, 2, 4, 7, 9],
-    'Minor Pentatonic': ['0', '3', '5', '7', '10'].map(Number),
+    'Minor Pentatonic': [0, 3, 5, 7, 10],
 };
 
 function getNoteFrequency(key: MusicKey, octave: number, interval: number): number {
@@ -77,7 +93,6 @@ function getNoteFrequency(key: MusicKey, octave: number, interval: number): numb
     const midiNote = 12 * (octave + 1) + keyIndex + interval;
     return Math.pow(2, (midiNote - 69) / 12) * A4;
 }
-
 
 function getScaleFrequenciesForOctaves(key: MusicKey, scale: MusicScale, octaves: number[]): number[] {
     const intervals = scaleIntervalMap[scale];
@@ -91,34 +106,11 @@ function getScaleFrequenciesForOctaves(key: MusicKey, scale: MusicScale, octaves
     return allFrequencies.sort((a,b) => a - b);
 }
 
-function updateMusicContext(data: any) {
-    currentKey = data.key;
-    currentScale = data.scale;
-    scaleIntervals = scaleIntervalMap[currentScale] || [];
-    
-    scaleFrequencies = {
-        bass: getScaleFrequenciesForOctaves(currentKey, currentScale, data.bassOctaves),
-        accompaniment: getScaleFrequenciesForOctaves(currentKey, currentScale, data.accompanimentOctaves),
-        melody: getScaleFrequenciesForOctaves(currentKey, currentScale, data.melodyOctaves),
-    };
-
-    if (currentScale.includes('Major')) {
-        chordProgression = [0, 4, 5, 3]; // I-V-vi-IV
-    } else {
-        chordProgression = [0, 5, 3, 6]; // i-VI-IV-VII
-    }
-    lastMelodyDegree = null;
-    lastAccompanimentDegree = null;
-}
-
-
 function getFrequencyFromDegree(degree: number, part: keyof typeof scaleFrequencies): number | null {
     const freqs = scaleFrequencies[part];
     const scaleLength = scaleIntervals.length;
-
     if (!freqs || freqs.length === 0 || !scaleLength) return null;
     
-    // Correctly handle negative degrees and large degrees with modulo
     const noteIndexInScale = degree >= 0 ? degree % scaleLength : (degree % scaleLength + scaleLength) % scaleLength;
     const octaveOffset = Math.floor(degree / scaleLength);
     const finalIndex = noteIndexInScale + (octaveOffset * scaleLength);
@@ -126,225 +118,262 @@ function getFrequencyFromDegree(degree: number, part: keyof typeof scaleFrequenc
     if (finalIndex >= 0 && finalIndex < freqs.length) {
         return freqs[finalIndex];
     }
-    // Return null if the calculated index is out of bounds for the available octaves
     return null;
 }
 
+const effectTypes: InstrumentType[] = ['autopilot_effect_star', 'autopilot_effect_meteor', 'autopilot_effect_comet', 'autopilot_effect_echoes'];
 
-function getChordTones(rootDegree: number): number[] {
-    const chordTones: number[] = [];
-    if (!scaleIntervals.length) return [];
+// --- PATTERN LIBRARY ---
+
+const patternLibrary: Record<AutopilotStyle, StylePatterns> = {
+    // Each style defines its own library of patterns
+    Ambient: {
+        bass: {
+            grooves: [
+                [{ degree: 0, dur: '1m', vel: 0.7 }, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+            ]
+        },
+        accompaniment: {
+            grooves: [
+                [{ degree: 0, dur: '2n', vel: 0.4 }, null, null, null, null, null, null, null, { degree: 4, dur: '2n', vel: 0.4 }, null, null, null, null, null, null, null]
+            ],
+            fills: [
+                [{ degree: 2, dur: '1n', vel: 0.5 }, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null]
+            ]
+        },
+        melody: {
+            grooves: [
+                [null, null, null, { degree: 7, dur: '2n', vel: 0.6 }, null, null, null, null, null, null, { degree: 9, dur: '2n', vel: 0.6 }, null, null, null, null, null],
+            ],
+            fills: [
+                 [null, null, { degree: 11, dur: '1n', vel: 0.65 }, null, null, null, null, null, null, null, null, null, null, null, null, null],
+            ]
+        },
+        effects: { probability: 0.1 }
+    },
+    Trance: {
+        bass: {
+            grooves: [
+                [{ degree: 0, dur: '4n', vel: 0.9 }, null, null, null, { degree: 0, dur: '4n', vel: 0.9 }, null, null, null, { degree: 0, dur: '4n', vel: 0.9 }, null, null, null, { degree: 0, dur: '4n', vel: 0.9 }, null, null, null],
+            ]
+        },
+        accompaniment: {
+            grooves: [
+                 [null, null, { degree: 4, dur: '8n', vel: 0.5 }, null, null, null, { degree: 5, dur: '8n', vel: 0.5 }, null, null, null, { degree: 4, dur: '8n', vel: 0.5 }, null, null, null, { degree: 7, dur: '8n', vel: 0.5 }, null],
+            ],
+            fills: [
+                [null, null, { degree: 7, dur: '4n', vel: 0.6 }, null, null, null, { degree: 9, dur: '4n', vel: 0.6 }, null, null, null, { degree: 11, dur: '4n', vel: 0.6 }, null, { degree: 12, dur: '4n', vel: 0.6 }, null, null, null]
+            ]
+        },
+        melody: {
+            grooves: [
+                [null, null, null, null, null, { degree: 7, dur: '8n', vel: 0.7 }, null, { degree: 9, dur: '8n', vel: 0.7 }, null, { degree: 7, dur: '8n', vel: 0.7 }, null, { degree: 9, dur: '8n', vel: 0.7 }, null, { degree: 11, dur: '8n', vel: 0.7 }, null, { degree: 9, dur: '8n', vel: 0.7 }]
+            ],
+            fills: [
+                [{ degree: 12, dur: '4n', vel: 0.8 }, null, null, null, { degree: 11, dur: '4n', vel: 0.8 }, null, null, null, { degree: 9, dur: '4n', vel: 0.8 }, null, null, null, { degree: 7, dur: '4n', vel: 0.8 }, null, null, null],
+            ]
+        },
+        effects: { probability: 0.05 }
+    },
+    // Add other styles here...
+    Sequence: {
+        bass: { grooves: [[{ degree: 0, dur: '2n', vel: 0.8 }, null, null, null, null, null, null, null, { degree: 0, dur: '2n', vel: 0.8 }, null, null, null, null, null, null, null]] },
+        accompaniment: { 
+            grooves: [[{ degree: 0, dur: '16n', vel: 0.5 }, { degree: 2, dur: '16n', vel: 0.5 }, { degree: 4, dur: '16n', vel: 0.5 }, { degree: 5, dur: '16n', vel: 0.5 }, { degree: 4, dur: '16n', vel: 0.5 }, { degree: 2, dur: '16n', vel: 0.5 }, { degree: 0, dur: '16n', vel: 0.5 }, null, { degree: 0, dur: '16n', vel: 0.5 }, { degree: 2, dur: '16n', vel: 0.5 }, { degree: 4, dur: '16n', vel: 0.5 }, { degree: 5, dur: '16n', vel: 0.5 }, { degree: 4, dur: '16n', vel: 0.5 }, { degree: 2, dur: '16n', vel: 0.5 }, { degree: 0, dur: '16n', vel: 0.5 }, null ]],
+            fills: [[{ degree: 7, dur: '8n', vel: 0.6 }, null, { degree: 9, dur: '8n', vel: 0.6 }, null, { degree: 11, dur: '8n', vel: 0.6 }, null, { degree: 9, dur: '8n', vel: 0.6 }, null, { degree: 7, dur: '8n', vel: 0.6 }, null, { degree: 5, dur: '8n', vel: 0.6 }, null, { degree: 4, dur: '8n', vel: 0.6 }, null, { degree: 2, dur: '8n', vel: 0.6 }, null,]]
+        },
+        melody: {
+            grooves: [[null, null, null, null, { degree: 7, dur: '4n', vel: 0.7 }, null, null, null, null, null, null, null, { degree: 9, dur: '4n', vel: 0.7 }, null, null, null]],
+            fills: [[{ degree: 12, dur: '2n', vel: 0.75 }, null, null, null, null, null, null, null, { degree: 11, dur: '2n', vel: 0.75 }, null, null, null, null, null, null, null]]
+        },
+        effects: { probability: 0.15 }
+    },
+    Chimes: {
+        bass: { grooves: [[{ degree: 0, dur: '1n', vel: 0.7}, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null]] },
+        accompaniment: {
+            grooves: [[null, { degree: 4, dur: '8n', vel: 0.5}, null, { degree: 7, dur: '8n', vel: 0.5}, null, { degree: 11, dur: '8n', vel: 0.5}, null, { degree: 7, dur: '8n', vel: 0.5}, null, { degree: 4, dur: '8n', vel: 0.5}, null, { degree: 7, dur: '8n', vel: 0.5}, null, { degree: 11, dur: '8n', vel: 0.5}, null, { degree: 7, dur: '8n', vel: 0.5} ]],
+            fills: [[{ degree: 2, dur: '4n', vel: 0.6 }, null, null, null, { degree: 5, dur: '4n', vel: 0.6 }, null, null, null, { degree: 7, dur: '4n', vel: 0.6 }, null, null, null, { degree: 10, dur: '4n', vel: 0.6 }, null, null, null]]
+        },
+        melody: {
+            grooves: [[null, null, null, null, null, null, null, { degree: 12, dur: '2n', vel: 0.7 }, null, null, null, null, null, null, null, null ]],
+            fills: [[{ degree: 14, dur: '1n', vel: 0.8}, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ]]
+        },
+        effects: { probability: 0.25 }
+    },
+     Drone: {
+        bass: { grooves: [[{ degree: 0, dur: '1m', vel: 0.6 }, null, null, null, null, null, null, null, { degree: -5, dur: '1m', vel: 0.6 }, null, null, null, null, null, null, null]] },
+        accompaniment: { grooves: [[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null]], fills: [[]] },
+        melody: { grooves: [[],[]], fills: [[]] },
+        effects: { probability: 0.4 }
+    },
+    Toccata: {
+        bass: { grooves: [[{ degree: 0, dur: '2n', vel: 0.9 }, null, null, null, null, null, null, null, { degree: -2, dur: '2n', vel: 0.85 }, null, null, null, null, null, null, null]] },
+        accompaniment: {
+            grooves: [
+                [ { degree: 0, dur: '16n', vel: 0.6 }, { degree: 2, dur: '16n', vel: 0.5 }, { degree: 4, dur: '16n', vel: 0.6 }, { degree: 2, dur: '16n', vel: 0.5 }, { degree: 5, dur: '16n', vel: 0.6 }, { degree: 4, dur: '16n', vel: 0.5 }, { degree: 7, dur: '16n', vel: 0.6 }, { degree: 5, dur: '16n', vel: 0.5 }, { degree: 4, dur: '16n', vel: 0.6 }, { degree: 2, dur: '16n', vel: 0.5 }, { degree: 0, dur: '16n', vel: 0.6 }, null, null, null, null, null ]
+            ],
+            fills: [
+                [ { degree: 7, dur: '8n', vel: 0.7 }, null, { degree: 9, dur: '8n', vel: 0.7 }, null, { degree: 11, dur: '8n', vel: 0.7 }, null, { degree: 12, dur: '8n', vel: 0.7 }, null, { degree: 11, dur: '8n', vel: 0.7 }, null, { degree: 9, dur: '8n', vel: 0.7 }, null, { degree: 7, dur: '8n', vel: 0.7 }, null, null, null ],
+            ]
+        },
+        melody: {
+            grooves: [
+                [ null, null, null, null, null, null, null, null, { degree: 12, dur: '2n.', vel: 0.8 }, null, null, null, null, null, null, null ]
+            ],
+            fills: [
+                [ { degree: 12, dur: '16n', vel: 0.8 }, { degree: 11, dur: '16n', vel: 0.8 }, { degree: 12, dur: '16n', vel: 0.8 }, { degree: 9, dur: '16n', vel: 0.8 }, { degree: 7, dur: '16n', vel: 0.8 }, null, null, null, { degree: 5, dur: '2n', vel: 0.8 }, null, null, null, null, null, null, null ]
+            ]
+        },
+        effects: { probability: 0.1 }
+    },
+    Promenade: {
+        bass: {
+            grooves: [
+                [{ degree: 0, dur: '4n', vel: 0.8 }, null, null, null, { degree: 0, dur: '4n', vel: 0.8 }, null, null, null, { degree: -3, dur: '4n', vel: 0.75 }, null, null, null, { degree: -3, dur: '4n', vel: 0.75 }, null, null, null]
+            ]
+        },
+        accompaniment: {
+            grooves: [
+                [null, null, { degree: 4, dur: '4n', vel: 0.6 }, null, null, null, { degree: 5, dur: '4n', vel: 0.6 }, null, null, null, { degree: 0, dur: '4n', vel: 0.6 }, null, null, null, { degree: 2, dur: '4n', vel: 0.6 }, null]
+            ],
+            fills: [
+                [{ degree: 7, dur: '2n', vel: 0.65 }, null, null, null, null, null, null, null, { degree: 5, dur: '2n', vel: 0.65 }, null, null, null, null, null, null, null]
+            ]
+        },
+        melody: {
+            grooves: [
+                 [null, null, null, null, { degree: 9, dur: '1n', vel: 0.7 }, null, null, null, null, null, null, null, null, null, null, null]
+            ],
+            fills: [
+                [{ degree: 12, dur: '2n', vel: 0.7 }, null, null, null, null, null, null, null, { degree: 11, dur: '2n', vel: 0.7 }, null, null, null, null, null, null, null]
+            ]
+        },
+        effects: { probability: 0.0 }
+    },
+    Space: {
+        bass: {
+            grooves: [
+                [{ degree: 0, dur: '1m', vel: 0.7 }, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null]
+            ]
+        },
+        accompaniment: {
+            grooves: [
+                [{ degree: 0, dur: '8n', vel: 0.5 }, null, { degree: 4, dur: '8n', vel: 0.5 }, null, { degree: 7, dur: '8n', vel: 0.5 }, null, { degree: 4, dur: '8n', vel: 0.5 }, null, { degree: 0, dur: '8n', vel: 0.5 }, null, { degree: 4, dur: '8n', vel: 0.5 }, null, { degree: 7, dur: '8n', vel: 0.5 }, null, { degree: 4, dur: '8n', vel: 0.5 }, null]
+            ],
+            fills: [
+                [{ degree: 2, dur: '2n', vel: 0.55 }, null, null, null, null, null, null, null, { degree: 5, dur: '2n', vel: 0.55 }, null, null, null, null, null, null, null]
+            ]
+        },
+        melody: {
+            grooves: [
+                [null, null, null, null, null, null, null, null, { degree: 9, dur: '1n', vel: 0.6 }, null, null, null, null, null, null, null],
+                [],
+            ],
+            fills: [
+                 [null, null, { degree: 11, dur: '1n', vel: 0.65 }, null, null, null, null, null, null, null, null, null, null, null, null, null],
+            ]
+        },
+        effects: { probability: 0.3 }
+    },
+};
+
+// --- CORE LOGIC ---
+
+function chooseNewPatternsForMeasure(measure: number) {
+    const style = patternLibrary[currentStyle];
+    if (!style) return;
+
+    const chooseRandom = (arr: any[]) => arr[Math.floor(Math.random() * arr.length)];
     
-    for (let i = 0; i < 3; i++) {
-        // Gets the degrees 0, 2, 4 from the rootDegree of the scale
-        const degreeIndex = (rootDegree + i * 2);
-        chordTones.push(degreeIndex);
-    }
-    return chordTones;
-}
-
-
-// --- OPTIMIZED STYLE-SPECIFIC GENERATORS ---
-
-//Accompaniment Fill (re-usable and simple)
-function generateAccompanimentFill(time: number, beat: number, measure: number, rootDegree: number, chordToneDegrees: number[]) {
-    if (measure % 4 !== 3) return; // Only on the 4th measure
-
-    // Simple pattern on quarter notes
-    if (beat % 4 === 0) { 
-        const pattern = [0, 1, 2, 1]; // indexes of chordToneDegrees
-        const noteDegree = chordToneDegrees[pattern[Math.floor(beat/4) % pattern.length]];
-        const freq = getFrequencyFromDegree(noteDegree, 'accompaniment');
-        if (freq) {
-             self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '4n', vel: 0.5 }, time });
-        }
-    }
-}
-
-// Melody Improvisation (re-usable and simple)
-function generateImprovisation(time: number, beat: number, rootDegree: number, chordToneDegrees: number[]) {
-     // Play only on specific beats to create rhythm and pauses. This is much cheaper than running complex logic on every tick.
-    const melodyRhythm = [0, 3, 6, 10, 14]; // A simple, syncopated rhythm
-    if (!melodyRhythm.includes(beat)) return;
-
-    let nextDegree: number;
-    if (lastMelodyDegree === null) {
-        nextDegree = chordToneDegrees[0];
-    } else {
-        // Simple logic: 80% chance to move one step, 20% chance to jump.
-        const isStep = Math.random() > 0.2;
-        const direction = Math.random() > 0.5 ? 1 : -1;
-        const distance = isStep ? 1 : (Math.random() > 0.5 ? 2 : 3); // step or jump of 2 or 3
-        nextDegree = lastMelodyDegree + (direction * distance);
-    }
-
-    const freq = getFrequencyFromDegree(nextDegree, 'melody');
+    activePatterns.bass = chooseRandom(style.bass.grooves);
     
-    if (freq) {
-        const duration = Math.random() > 0.3 ? '8n' : '4n'; // Rhythmic variety
-        self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: duration, vel: 0.7 }, time });
-        lastMelodyDegree = nextDegree;
-    } else {
-        // If we jump out of bounds, reset to a safe note
-        lastMelodyDegree = chordToneDegrees[0];
-    }
-}
-
-
-function generateEffects(time: number, rootDegree: number, probability = 0.05) {
-    if (enabledParts.effects && Math.random() < probability) {
-         const freq = getFrequencyFromDegree(rootDegree + 7, 'melody');
-         if (freq) {
-             const effectType = effectTypes[Math.floor(Math.random() * effectTypes.length)];
-             const effectFreq = freq * (Math.random() * 1.5 + 0.5);
-             self.postMessage({ type: 'playNote', note: { type: effectType, freq: effectFreq, dur: '2n', vel: Math.random() * 0.2 + 0.2 }, time });
-         }
-    }
-}
-
-// --- MAIN GENERATOR FUNCTION ---
-// This function gets called on every tick and dispatches to the correct style logic.
-// The style logic is now much simpler.
-
-function playPattern(time: number, beat: number, pattern: number[], degreeSource: number[], instrument: 'accompaniment' | 'melody', noteType: InstrumentType, duration: Unit.Time, velocity: number) {
-    if (pattern.includes(beat)) {
-        const noteIndex = pattern.indexOf(beat) % degreeSource.length;
-        const degree = degreeSource[noteIndex];
-        const freq = getFrequencyFromDegree(degree, instrument);
-        if (freq) {
-            self.postMessage({ type: 'playNote', note: { type: noteType, freq, dur: duration, vel: velocity }, time });
-        }
-    }
-}
-
-function generateMusic(time: number, beat: number, measure: number, rootDegree: number, chordToneDegrees: number[]) {
-
-    // --- SHARED BASS LOGIC (very simple) ---
-    if (enabledParts.bass && beat === 0) {
-        const freq = getFrequencyFromDegree(rootDegree, 'bass');
-        if (freq) {
-            self.postMessage({ type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '1m', vel: 0.8 }, time });
-        }
-    }
-
-    // --- ACCOMPANIMENT ---
-    if (enabledParts.accompaniment && measure % 4 !== 3) {
-        let arpPattern: number[] = [];
-        switch(currentStyle) {
-            case 'Toccata':
-            case 'Chimes':
-            case 'Sequence':
-                arpPattern = [0, 2, 4, 6, 8, 10, 12, 14]; // Fast 16ths
-                break;
-            case 'Promenade':
-            case 'Trance':
-                arpPattern = [0, 4, 8, 12]; // Quarter notes
-                break;
-            case 'Ambient':
-            case 'Drone':
-            case 'Space':
-            default:
-                arpPattern = [0, 8]; // Half notes
-                break;
-        }
-        playPattern(time, beat, arpPattern, chordToneDegrees, 'accompaniment', 'autopilot_accompaniment', '8n', 0.5);
-    }
+    // Every 4th measure, play a fill, otherwise a groove.
+    const isFillMeasure = measure % 4 === 3;
     
-    // --- FILLS & MELODY ---
-    if (enabledParts.accompaniment) {
-        generateAccompanimentFill(time, beat, measure, rootDegree, chordToneDegrees);
-    }
-    if (enabledParts.melody) {
-        generateImprovisation(time, beat, rootDegree, chordToneDegrees);
-    }
+    activePatterns.accompaniment = isFillMeasure && style.accompaniment.fills.length > 0 
+        ? chooseRandom(style.accompaniment.fills)
+        : chooseRandom(style.accompaniment.grooves);
 
-    // --- EFFECTS ---
-    generateEffects(time, rootDegree);
+    activePatterns.melody = isFillMeasure && style.melody.fills.length > 0
+        ? chooseRandom(style.melody.fills)
+        : chooseRandom(style.melody.grooves);
+    
+    // Handle effects separately
+    if (enabledParts.effects && Math.random() < style.effects.probability) {
+        const effectType = effectTypes[Math.floor(Math.random() * effectTypes.length)];
+        const freq = getFrequencyFromDegree(Math.floor(Math.random() * 12), 'melody');
+        if (freq) {
+             self.postMessage({ type: 'playNote', note: { type: effectType, freq, dur: '1n', vel: Math.random() * 0.3 + 0.2 }, time: 0 }); // time is ignored here, will be scheduled by main thread
+        }
+    }
 }
 
 
 function tick(time: number) {
-    const measure = Math.floor(tickCount / subdivisions);
-    const beat = tickCount % subdivisions;
-    
-    const chordIndex = Math.floor(measure / 2) % chordProgression.length;
-    const rootDegree = chordProgression[chordIndex];
-    const chordToneDegrees = getChordTones(rootDegree);
+    const measure = Math.floor(tickCount / SUBDIVISIONS);
+    const beatInMeasure = tickCount % SUBDIVISIONS;
 
-    generateMusic(time, beat, measure, rootDegree, chordToneDegrees);
+    // At the start of a new measure, pick patterns
+    if (beatInMeasure === 0) {
+        chooseNewPatternsForMeasure(measure);
+    }
     
+    const parts: AutopilotPart[] = ['bass', 'accompaniment', 'melody'];
+    for (const partName of parts) {
+        if (!enabledParts[partName]) continue;
+
+        // @ts-ignore
+        const pattern: Pattern | null = activePatterns[partName];
+        if (!pattern) continue;
+
+        const note = pattern[beatInMeasure];
+        if (note) {
+            // Translate scale degree to frequency
+            const freq = getFrequencyFromDegree(note.degree, partName as keyof typeof scaleFrequencies);
+            if (freq) {
+                const noteEvent: NoteEvent = {
+                    // @ts-ignore
+                    type: `autopilot_${partName}`,
+                    freq: freq,
+                    dur: note.dur,
+                    vel: note.vel,
+                };
+                 self.postMessage({ type: 'playNote', note: noteEvent, time: time });
+            }
+        }
+    }
+
     tickCount++;
 }
 
-function start() {
-    stop(); 
-    tickCount = 0;
-    lastMelodyDegree = null;
-    lastAccompanimentDegree = null;
-    
-    // This uses a precise loop based on performance.now() to avoid drift
-    const intervalSeconds = (60 / currentBpm) / (subdivisions / 4); 
-    let expected = self.performance.now() + intervalSeconds * 1000;
-    
-    const loop = () => {
-        const drift = self.performance.now() - expected;
-        // if (drift > intervalSeconds * 1000) {
-        //     // Resync if drift is too high
-        //     expected = self.performance.now();
-        // }
-        
-        // Use a fixed time for Tone.js scheduling, not the drifted time
-        // This is a placeholder for where the 'tick' would be called from the main thread.
-        // The main thread will now be responsible for sending 'tick' messages at the right time.
 
-        expected += intervalSeconds * 1000;
-        timerId = setTimeout(loop, Math.max(0, intervalSeconds * 1000 - drift));
-    }
-    // The loop is no longer started here. It will be driven by 'tick' messages from AutopilotEngine.
-}
-
-function stop() {
-    if (timerId !== null) {
-        clearTimeout(timerId);
-        timerId = null;
-    }
-}
-
+// --- MESSAGE HANDLER ---
 self.onmessage = function (event: MessageEvent<WorkerEvent>) {
     const { type, ...data } = event.data;
     switch (type) {
         case 'start':
-            // start(); // Deprecated: main thread will drive ticks
-            tickCount = 0;
-            lastMelodyDegree = null;
-            break;
         case 'stop':
-            // stop(); // Deprecated
             tickCount = 0;
-            lastMelodyDegree = null;
             break;
         case 'setHarmony':
-            // @ts-ignore
-            updateMusicContext(data);
-            break;
-        case 'setTempo':
-            // @ts-ignore
-            currentBpm = data.bpm;
+            currentKey = data.key;
+            currentScale = data.scale;
+            scaleIntervals = scaleIntervalMap[currentScale] || [];
+            scaleFrequencies = {
+                bass: getScaleFrequenciesForOctaves(currentKey, currentScale, data.bassOctaves),
+                accompaniment: getScaleFrequenciesForOctaves(currentKey, currentScale, data.accompanimentOctaves),
+                melody: getScaleFrequenciesForOctaves(currentKey, currentScale, data.melodyOctaves),
+            };
+            tickCount = 0;
             break;
         case 'setParts':
-            // @ts-ignore
             enabledParts = data.parts;
             break;
         case 'setStyle':
-            // @ts-ignore
             currentStyle = data.style;
-            lastMelodyDegree = null;
-            lastAccompanimentDegree = null;
             tickCount = 0;
             break;
         case 'tick':
-            // This is the new heart of the worker. It only computes when told to.
-            // @ts-ignore
             tick(data.time);
             break;
     }
