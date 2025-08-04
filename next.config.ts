@@ -2,28 +2,23 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  output: 'export',
+  // This option includes the static export mode.
+  // Next.js will automatically create an `out` folder with the finished files.
+  output: process.env.NODE_ENV === 'production' ? 'export' : undefined,
+  
+  // Disables Next.js image optimization, which is required for static export.
+  images: {
+    unoptimized: true,
+  },
+
+  // These options help prevent the build from failing due to TypeScript or ESLint errors.
+  // Recommended for deployment stability.
   typescript: {
     ignoreBuildErrors: true,
   },
   eslint: {
     ignoreDuringBuilds: true,
   },
-  images: {
-    unoptimized: true,
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'placehold.co',
-        port: '',
-        pathname: '/**',
-      },
-    ],
-  },
-  devIndicators: false,
-  // This is needed to allow cross-origin requests in the dev environment.
-  allowedDevOrigins: ['**.cloudworkstations.dev'],
 };
 
 export default nextConfig;
