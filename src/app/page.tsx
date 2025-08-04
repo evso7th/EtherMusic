@@ -225,10 +225,7 @@ export default function Home() {
     // Autopilot Style Change Handler
     const handleAutopilotStyleChange = useCallback((newStyle: AutopilotStyle) => {
         setAutopilotStyle(newStyle);
-        if (isReady) {
-            autopilotEngine.current?.setStyle(newStyle); // Inform the engine about the style change
-        }
-    }, [isReady]);
+    }, []);
 
     // --- UI Event Handlers ---
     const handleStartApp = useCallback(async () => {
@@ -274,10 +271,8 @@ export default function Home() {
 
     useEffect(() => {
         if (!isReady || !autopilotEngine.current) return;
-        
-        autopilotEngine.current.setAutopilot(isAutopilotOn, autopilotStyle);
-
-    }, [isAutopilotOn, autopilotStyle, isReady]);
+        autopilotEngine.current.setAutopilot(isAutopilotOn, autopilotStyle, isPlaying);
+    }, [isAutopilotOn, autopilotStyle, isPlaying, isReady]);
 
 
     const handleStop = useCallback(async () => {
@@ -515,4 +510,3 @@ export default function Home() {
         </div>
     );
 }
-

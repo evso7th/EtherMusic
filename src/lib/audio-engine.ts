@@ -250,6 +250,7 @@ export class AudioEngine {
 
         const availableVoice = pool.find(v => v.isAvailable());
         if (!availableVoice) {
+            // console.warn(`No available voice in pool for part: ${part}`);
             return null;
         }
         return availableVoice;
@@ -294,6 +295,12 @@ export class AudioEngine {
         }
     }
 
+     public getAbsoluteTimeForNote(note: NoteEvent): number {
+        const timePerMeasure = Tone.Time('1m').toSeconds();
+        const timePerSubdivision = timePerMeasure / 16;
+        return (note.measure * timePerMeasure) + (note.subdivision * timePerSubdivision);
+    }
+
     public scheduleAutopilotNote(note: NoteEvent, time: number) {
         if (!this.isInitialized || note.freq === null || note.freq === undefined) return;
         if (note.part === 'autopilot_effects') {
@@ -309,8 +316,7 @@ export class AudioEngine {
     
     public stopAllSounds() {
         this.voicePools.forEach(pool => pool.forEach(voice => voice.release(0.1)));
-        this.orbManager.removeAllOrbs('melody');
-        this.orbManager.removeAllOrbs('bass');
+        this.orbManager.removeAllOrbs();
         this.latchEngine.stopAll();
         if (this.isInitialized) this.drumMachine.stop();
     }

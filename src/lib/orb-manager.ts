@@ -81,11 +81,9 @@ export class OrbManager {
         }
     }
 
-    public removeAllOrbs(type: OrbType) {
-        for (const [id, orb] of this.orbs.entries()) {
-            if (orb.type === type) {
-                this.removeOrb(id);
-            }
+    public removeAllOrbs() {
+        for (const [id] of this.orbs.entries()) {
+            this.removeOrb(id);
         }
     }
 }

@@ -12,7 +12,8 @@ export type NoteEvent = {
     freq: number;
     dur: Unit.Time;
     vel: number;
-    time: number; // Absolute time in seconds from transport start
+    measure: number; // The measure this note belongs to
+    subdivision: number; // The 16th note subdivision within the measure
 };
 
 export type WorkerEvent =
@@ -227,8 +228,6 @@ function generateMeasure(measure: number): NoteEvent[] {
     const style = patternLibrary[currentStyle];
     if (!style) return [];
 
-    const timePerMeasure = (240 / 120) * (4/4); // Assume 120 bpm, 4/4 time for duration calculation
-    const measureStartTime = measure * timePerMeasure;
     const notes: NoteEvent[] = [];
 
     const chooseRandom = (arr: any[]) => arr.length > 0 ? arr[Math.floor(Math.random() * arr.length)] : null;
@@ -250,13 +249,13 @@ function generateMeasure(measure: number): NoteEvent[] {
             if (noteData) {
                 const freq = getFrequencyFromDegree(noteData.degree, style.baseOctaves[partName]);
                 if (freq) {
-                    const time = measureStartTime + (i / SUBDIVISIONS) * timePerMeasure;
                     notes.push({
                         part: `autopilot_${partName}` as InstrumentPart,
                         freq,
                         dur: noteData.dur,
                         vel: noteData.vel,
-                        time,
+                        measure,
+                        subdivision: i,
                     });
                 }
             }
@@ -264,11 +263,11 @@ function generateMeasure(measure: number): NoteEvent[] {
     }
 
     if (enabledParts.effects && Math.random() < style.effects.probability) {
-        const time = measureStartTime + Math.random() * timePerMeasure;
+        const subdivision = Math.floor(Math.random() * SUBDIVISIONS);
         const freq = getFrequencyFromDegree(Math.floor(Math.random() * 12) + 5, style.baseOctaves.melody);
         if (freq) {
              notes.push({
-                 part: 'autopilot_effects', freq, dur: '1n', vel: Math.random() * 0.3 + 0.2, time
+                 part: 'autopilot_effects', freq, dur: '1n', vel: Math.random() * 0.3 + 0.2, measure, subdivision
              });
         }
     }
