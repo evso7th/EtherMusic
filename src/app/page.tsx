@@ -169,8 +169,10 @@ export default function Home() {
     }, [effects]);
 
     useEffect(() => {
-        audioEngine.current?.drumMachine.setBeatPattern(activePattern.name);
-    }, [activePattern]);
+        if (isReady) {
+            audioEngine.current?.drumMachine.setBeatPattern(activePattern.name);
+        }
+    }, [activePattern, isReady]);
     
     useEffect(() => {
         if (isReady) {
@@ -198,12 +200,16 @@ export default function Home() {
     }, [autopilotInstrument, isReady]);
     
     useEffect(() => {
-        audioEngine.current?.setBassLatch(isBassLatchOn);
-    }, [isBassLatchOn]);
+        if (isReady) {
+            audioEngine.current?.setBassLatch(isBassLatchOn);
+        }
+    }, [isBassLatchOn, isReady]);
 
     useEffect(() => {
-        autopilotEngine.current?.setAutopilotParts(autopilotParts);
-    }, [autopilotParts]);
+        if (isReady) {
+            autopilotEngine.current?.setAutopilotParts(autopilotParts);
+        }
+    }, [autopilotParts, isReady]);
     
     useEffect(() => {
         if (isAppStarted && !isReady) {
@@ -219,8 +225,10 @@ export default function Home() {
     // Autopilot Style Change Handler
     const handleAutopilotStyleChange = useCallback((newStyle: AutopilotStyle) => {
         setAutopilotStyle(newStyle);
-        autopilotEngine.current?.setStyle(newStyle); // Inform the engine about the style change
-    }, []);
+        if (isReady) {
+            autopilotEngine.current?.setStyle(newStyle); // Inform the engine about the style change
+        }
+    }, [isReady]);
 
     // --- UI Event Handlers ---
     const handleStartApp = useCallback(async () => {
@@ -508,4 +516,3 @@ export default function Home() {
     );
 }
 
-    

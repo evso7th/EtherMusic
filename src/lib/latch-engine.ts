@@ -20,11 +20,11 @@ type LatchedBassNote = {
 export class LatchEngine {
     private isLatchOn = false;
     private audioEngine: AudioEngine;
-    private orbManager: OrbManager;
+    private orbManager: OrbManager | null;
     private latchedNotes = new Map<number, LatchedBassNote>();
     private allowedFrequencies: number[] = [];
 
-    constructor(audioEngine: AudioEngine, orbManager: OrbManager) {
+    constructor(audioEngine: AudioEngine, orbManager: OrbManager | null) {
         this.audioEngine = audioEngine;
         this.orbManager = orbManager;
     }
@@ -77,7 +77,7 @@ export class LatchEngine {
                     voice: voice,
                 };
                 this.latchedNotes.set(newId, newNote);
-                this.orbManager.addOrb(newId, 'latch', pos.x, pos.y);
+                this.orbManager?.addOrb(newId, 'latch', pos.x, pos.y);
             }
         }
     }
@@ -98,7 +98,7 @@ export class LatchEngine {
         if(noteToRelease && noteToRelease.voice) {
             this.audioEngine.releaseLatchVoice(noteToRelease.voice);
             this.latchedNotes.delete(noteId);
-            this.orbManager.removeOrb(noteId);
+            this.orbManager?.removeOrb(noteId);
         }
     }
 }
