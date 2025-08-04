@@ -6,6 +6,7 @@ import type { AudioEngine } from './audio-engine';
 import type { OrbManager } from './orb-manager';
 
 const NOTE_PROXIMITY_THRESHOLD = 35;
+const MAX_LATCHED_NOTES = 4;
 
 type LatchedBassNote = {
     id: number;
@@ -59,6 +60,12 @@ export class LatchEngine {
         if (existingEntryId !== undefined) {
             this.releaseAndRemoveNote(existingEntryId);
         } else {
+            // If we've reached the limit, remove the oldest note
+            if (this.latchedNotes.size >= MAX_LATCHED_NOTES) {
+                const oldestNoteId = this.latchedNotes.keys().next().value;
+                this.releaseAndRemoveNote(oldestNoteId);
+            }
+
             // Get a voice from the main engine
             const voice = this.audioEngine.getLatchVoice(quantizedFreq, vol);
             if (voice) {

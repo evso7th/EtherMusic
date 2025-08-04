@@ -133,6 +133,8 @@ export class AudioEngine {
     // --- The Unified Voice Pool ---
     private voicePool: Voice[] = [];
     private readonly MAX_VOICES = 18; // Total voices for the entire app
+    private readonly MAX_MELODY_VOICES = 4;
+    private readonly MAX_BASS_VOICES = 4;
     private presets: { [key: string]: any } = {};
 
     private allowedFrequencies = { bass: [] as number[], melody: [] as number[] };
@@ -213,6 +215,16 @@ export class AudioEngine {
 
     public startNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}) {
         if (!this.isInitialized) return;
+        
+        const activeVoicesOfType = this.voicePool.filter(v => v.instrumentType === type && !v.isAvailable()).length;
+
+        if (type === 'melody' && activeVoicesOfType >= this.MAX_MELODY_VOICES) {
+            return;
+        }
+        if (type === 'bass' && activeVoicesOfType >= this.MAX_BASS_VOICES) {
+            return;
+        }
+
         const quantizedFreq = this.getClosestFrequency(freq, type);
         
         if (type === 'bass' && this.isBassLatchOn) {
