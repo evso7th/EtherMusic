@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
@@ -114,11 +113,9 @@ export default function Home() {
     }, []);
 
     const initializeAudio = useCallback(async () => {
-        if (isReady) return;
+        if (isReady || audioEngine.current) return;
         
-        if (!orbManager.current) {
-            orbManager.current = new OrbManager();
-        }
+        orbManager.current = new OrbManager();
 
         try {
             const mainEngine = new AudioEngine(orbManager.current);
@@ -126,20 +123,27 @@ export default function Home() {
             audioEngine.current = mainEngine;
             
             const apEngine = new AutopilotEngine(mainEngine);
-            autopilotEngine.current = apEngine; // Assign ref here
+            autopilotEngine.current = apEngine; 
             
             // Sync initial state with the engines
-            mainEngine.setTempo(activeTempo.bpm);
-            mainEngine.setVolumes(volumes);
-            mainEngine.setEffects(effects);
-            mainEngine.setMelodyInstrument(melodyInstrument);
-            mainEngine.setBassInstrument(bassInstrument);
-            mainEngine.setAutopilotInstrument(autopilotInstrument);
-            mainEngine.setHarmony(musicKey, musicScale);
-            mainEngine.setBeatPattern(activePattern.name);
+            mainEngine.setTempo(tempos[2].bpm);
+            mainEngine.setVolumes({ melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, effects: -6, ebass: -6 });
+            mainEngine.setEffects({
+                melody: { reverb: -Infinity, delay: -60 },
+                manualBass: { reverb: -Infinity, delay: -60 },
+                latch: { reverb: -Infinity, delay: -60 },
+                drums: { reverb: -Infinity, delay: -60 },
+                autopilot: { reverb: -Infinity, delay: -60 },
+                effects: { reverb: -6, delay: -6 },
+                ebass: { reverb: -Infinity, delay: -60 }
+            });
+            mainEngine.setMelodyInstrument('theremin');
+            mainEngine.setBassInstrument('synth');
+            mainEngine.setAutopilotInstrument('synth');
+            mainEngine.setHarmony('C', 'Major Pentatonic');
+            mainEngine.setBeatPattern('Off');
             
-            apEngine.setTempo(activeTempo.bpm);
-            apEngine.setHarmony(musicKey, musicScale);
+            apEngine.setHarmony('C', 'Major Pentatonic');
             
             setIsReady(true);
             console.log('Audio engines initialized and ready.');
@@ -151,148 +155,98 @@ export default function Home() {
                 variant: "destructive"
             });
         }
-    }, [isReady, activeTempo.bpm, volumes, effects, melodyInstrument, bassInstrument, autopilotInstrument, musicKey, musicScale, activePattern.name, toast]);
-    
-
-    // --- State Sync with Audio Engine ---
-    useEffect(() => {
-        audioEngine.current?.setTempo(activeTempo.bpm);
-        autopilotEngine.current?.setTempo(activeTempo.bpm);
-    }, [activeTempo]);
-
-    useEffect(() => {
-        audioEngine.current?.setVolumes(volumes);
-    }, [volumes]);
-
-    useEffect(() => {
-        audioEngine.current?.setEffects(effects);
-    }, [effects]);
-
-    useEffect(() => {
-        if (isReady) {
-            audioEngine.current?.drumMachine.setBeatPattern(activePattern.name);
-        }
-    }, [activePattern, isReady]);
-    
-    useEffect(() => {
-        if (isReady) {
-            audioEngine.current?.setHarmony(musicKey, musicScale);
-            autopilotEngine.current?.setHarmony(musicKey, musicScale);
-        }
-    }, [musicKey, musicScale, isReady]);
-
-    useEffect(() => {
-        if (isReady) {
-            audioEngine.current?.setMelodyInstrument(melodyInstrument);
-        }
-    }, [melodyInstrument, isReady]);
-
-    useEffect(() => {
-        if (isReady) {
-            audioEngine.current?.setBassInstrument(bassInstrument);
-        }
-    }, [bassInstrument, isReady]);
-
-    useEffect(() => {
-        if (isReady) {
-            audioEngine.current?.setAutopilotInstrument(autopilotInstrument);
-        }
-    }, [autopilotInstrument, isReady]);
-    
-    useEffect(() => {
-        if (isReady) {
-            audioEngine.current?.setBassLatch(isBassLatchOn);
-        }
-    }, [isBassLatchOn, isReady]);
-
-    useEffect(() => {
-        if (isReady) {
-            autopilotEngine.current?.setAutopilotParts(autopilotParts);
-        }
-    }, [autopilotParts, isReady]);
-    
-    useEffect(() => {
-        if (isAppStarted && !isReady) {
-            // This will be triggered once after the app starts and engines are initializing.
-            // We set a flag or directly call initializeAudio.
-        } else if (isAppStarted && isReady) {
-            // This means engines are ready, now we can play.
-            handlePlayPause();
-        }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isReady, isAppStarted]);
-
-    // Autopilot Style Change Handler
-    const handleAutopilotStyleChange = useCallback((newStyle: AutopilotStyle) => {
-        setAutopilotStyle(newStyle);
+    }, [isReady, toast]);
+    
+    // --- UI Event Handlers ---
+    const handleTempoChange = useCallback((tempo: Tempo) => {
+        setActiveTempo(tempo);
+        audioEngine.current?.setTempo(tempo.bpm);
     }, []);
 
-    // --- UI Event Handlers ---
-    const handleStartApp = useCallback(async () => {
-        // Stop and reset background audio if it's playing
-        if (backgroundAudioRef.current && !backgroundAudioRef.current.paused) {
-            backgroundAudioRef.current.pause();
-            backgroundAudioRef.current.currentTime = 0;
-        }
+    const handleVolumeChange = useCallback((newVolumes: typeof volumes) => {
+        setVolumes(newVolumes);
+        audioEngine.current?.setVolumes(newVolumes);
+    }, []);
+
+    const handleEffectChange = useCallback((newEffects: typeof effects) => {
+        setEffects(newEffects);
+        audioEngine.current?.setEffects(newEffects);
+    }, []);
+
+    const handlePatternChange = useCallback((pattern: (typeof beatPatterns)[number]) => {
+        setActivePattern(pattern);
+        audioEngine.current?.drumMachine.setBeatPattern(pattern.name);
+    }, []);
+
+    const handleHarmonyChange = useCallback((key: MusicKey, scale: MusicScale) => {
+        setMusicKey(key);
+        setMusicScale(scale);
+        audioEngine.current?.setHarmony(key, scale);
+        autopilotEngine.current?.setHarmony(key, scale);
+    }, []);
     
-        // Play transition sound
-        const audio = new Audio('/assets/sounds/transition.webm');
-        audio.play().catch(e => console.error("Error playing transition sound:", e));
+    const handleMelodyInstrumentChange = useCallback((instrument: Instrument) => {
+        setMelodyInstrument(instrument);
+        audioEngine.current?.setMelodyInstrument(instrument);
+    }, []);
+
+    const handleBassInstrumentChange = useCallback((instrument: Instrument) => {
+        setBassInstrument(instrument);
+        audioEngine.current?.setBassInstrument(instrument);
+    }, []);
+
+    const handleAutopilotInstrumentChange = useCallback((instrument: Instrument) => {
+        setAutopilotInstrument(instrument);
+        audioEngine.current?.setAutopilotInstrument(instrument);
+    }, []);
     
-        // Immediately try to enter fullscreen on mobile, before any async operations
-        if (isMobile) {
-             try {
-                if (document.documentElement.requestFullscreen) {
-                    await document.documentElement.requestFullscreen();
-                } else if ((document.documentElement as any).webkitRequestFullscreen) {
-                    await (document.documentElement as any).webkitRequestFullscreen();
-                } else if ((document.documentElement as any).msRequestFullscreen) {
-                    await (document.documentElement as any).msRequestFullscreen();
-                }
-            } catch (err) {
-                 console.error(`Error attempting to enable full-screen mode: ${(err as Error).message} (${(err as Error).name})`);
-            }
-        }
-    
-        // Set the app as started to show the preloader
-        setIsAppStarted(true);
-    
-        // Now, initialize the audio engines
-        await initializeAudio();
-    
-    }, [isMobile, initializeAudio]);
+    const handleLatchToggle = useCallback((isOn: boolean) => {
+        setIsBassLatchOn(isOn);
+        audioEngine.current?.setBassLatch(isOn);
+    }, []);
+
+    const handleAutopilotPartsChange = useCallback((parts: Record<AutopilotPart, boolean>) => {
+        setAutopilotParts(parts);
+        autopilotEngine.current?.setAutopilotParts(parts);
+    }, []);
+
+    const handleAutopilotToggle = useCallback((isOn: boolean) => {
+        setIsAutopilotOn(isOn);
+        autopilotEngine.current?.setAutopilot(isOn, autopilotStyle, isPlaying);
+    }, [autopilotStyle, isPlaying]);
+
+    const handleAutopilotStyleChange = useCallback((newStyle: AutopilotStyle) => {
+        setAutopilotStyle(newStyle);
+        autopilotEngine.current?.setStyle(newStyle);
+    }, []);
     
     const handlePlayPause = useCallback(async () => {
         if (!audioEngine.current) return;
         const willBePlaying = !isPlaying;
         await audioEngine.current.setPlaying(willBePlaying);
         setIsPlaying(willBePlaying);
-    }, [isPlaying]);
-
-    useEffect(() => {
-        if (!isReady || !autopilotEngine.current) return;
-        autopilotEngine.current.setAutopilot(isAutopilotOn, autopilotStyle, isPlaying);
-    }, [isAutopilotOn, autopilotStyle, isPlaying, isReady]);
-
-
+        autopilotEngine.current?.setAutopilot(isAutopilotOn, autopilotStyle, willBePlaying);
+    }, [isPlaying, isAutopilotOn, autopilotStyle]);
+    
     const handleStop = useCallback(async () => {
         if (!audioEngine.current) return;
         audioEngine.current.stop();
+        autopilotEngine.current?.stop();
         if (isAutopilotOn) {
-            setIsAutopilotOn(false);
+            // Keep autopilot 'on' conceptually, but stop it's playback
+             autopilotEngine.current?.setAutopilot(isAutopilotOn, autopilotStyle, false);
         }
         setIsPlaying(false);
-    }, [isAutopilotOn]);
+    }, [isAutopilotOn, autopilotStyle]);
 
     const handleRecord = useCallback(() => {
         toast({ title: "Recording Unavailable", description: "This feature is temporarily disabled." });
     }, [toast]);
-
-    const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
+    
+     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isReady || !audioEngine.current) return;
-
         const engine = audioEngine.current;
-
         if (state === 'down' && data) {
             engine.startNote(type, data.pointerId, data.frequency, data.volume, {x: data.x, y: data.y});
         } else if (state === 'move' && data) {
@@ -301,13 +255,31 @@ export default function Home() {
             engine.stopNote(type, data.pointerId);
         }
     }, [isReady]);
-    
-    const handleStartScreenInteraction = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-        // Prevent background audio from playing if the button is clicked
-        if ((e.target as HTMLElement).closest('button')) {
-            return;
-        }
 
+    const handleStartApp = useCallback(async () => {
+        if (backgroundAudioRef.current && !backgroundAudioRef.current.paused) {
+            backgroundAudioRef.current.pause();
+            backgroundAudioRef.current.currentTime = 0;
+        }
+        const audio = new Audio('/assets/sounds/transition.webm');
+        audio.play().catch(e => console.error("Error playing transition sound:", e));
+        if (isMobile) {
+             try {
+                if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen();
+                else if ((document.documentElement as any).webkitRequestFullscreen) await (document.documentElement as any).webkitRequestFullscreen();
+            } catch (err) { console.error("Error fullscreening:", err); }
+        }
+        setIsAppStarted(true);
+    }, [isMobile]);
+    
+    useEffect(() => {
+        if (isAppStarted && !isReady) {
+            initializeAudio();
+        }
+    }, [isAppStarted, isReady, initializeAudio]);
+
+    const handleStartScreenInteraction = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+        if ((e.target as HTMLElement).closest('button')) return;
         if (backgroundAudioRef.current && backgroundAudioRef.current.paused) {
             backgroundAudioRef.current.volume = 0.3;
             backgroundAudioRef.current.play().catch(error => console.error("Error playing background audio:", error));
@@ -360,17 +332,12 @@ export default function Home() {
             
              <div className={cn(
                 "relative z-10 flex h-full",
-                // Portrait mode: classic vertical layout
                 "portrait:flex-col portrait:p-2 md:p-6 lg:p-8",
-                 // Landscape mode: sidebars layout
                 "landscape:flex-row landscape:p-1 landscape:gap-1"
             )}>
-                {/* --- HEADER / LEFT SIDEBAR --- */}
                 <header className={cn(
                     "flex-shrink-0",
-                    // Portrait mode header
                     "portrait:flex portrait:items-center portrait:justify-between portrait:mb-2",
-                    // Landscape mode sidebar
                     "landscape:flex landscape:flex-col landscape:items-center landscape:justify-center landscape:w-16 landscape:gap-4"
                 )}>
                      <div className="portrait:block landscape:hidden">
@@ -386,15 +353,7 @@ export default function Home() {
                                         <DialogTitle>What is This?</DialogTitle>
                                     </DialogHeader>
                                     <div className="text-sm text-muted-foreground space-y-4 py-4">
-                                        <p>
-                                            It's a virtual music box, a "Neuro Meditation Sound Processor." Think of it as an instrument that anyone can play, regardless of musical ability. You don't need to learn notes or chords. Just move your fingers and listen to what happens.
-                                        </p>
-                                        <p>
-                                            Our application is at the intersection of a creative tool, a meditation aid, and a digital wellness gadget. It is not for professional musicians, but for a wide audience that appreciates ambient music, mindfulness, and is looking for new forms of self-expression and relaxation.
-                                        </p>
-                                         <p>
-                                            Enjoy the process and let the music you create reflect your inner state.
-                                        </p>
+                                        <p>It's a virtual music box, a "Neuro Meditation Sound Processor."</p>
                                     </div>
                                 </DialogContent>
                             </Dialog>
@@ -405,10 +364,7 @@ export default function Home() {
                              </>
                         )}
                     </div>
-                    <div className={cn(
-                        "flex items-center gap-1 md:gap-2",
-                        "landscape:flex-col" // Stack playback controls vertically in landscape
-                    )}>
+                    <div className={cn("flex items-center gap-1 md:gap-2", "landscape:flex-col")}>
                          <PlaybackControls
                             isPlaying={isPlaying}
                             isRecording={isRecording}
@@ -420,7 +376,6 @@ export default function Home() {
                     </div>
                 </header>
 
-                 {/* --- MAIN CONTENT (PADS) --- */}
                  <main className="flex-grow flex flex-col gap-2 overflow-hidden">
                      <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-2 landscape:grid-cols-2 landscape:gap-1">
                         <MemoizedThereminPad
@@ -429,10 +384,10 @@ export default function Home() {
                             frequencyRange={[43.65, 261.63]}
                             color="hsl(var(--accent))"
                             isLatchOn={isBassLatchOn}
-                            onLatchToggle={setIsBassLatchOn}
-                            instruments={instruments.filter(i => i !== 'theremin' && i !== 'G-Drops')} // Filter out instruments not suitable for bass
+                            onLatchToggle={handleLatchToggle}
+                            instruments={instruments.filter(i => i !== 'theremin' && i !== 'G-Drops')}
                             activeInstrument={bassInstrument}
-                            onInstrumentChange={setBassInstrument}
+                            onInstrumentChange={handleBassInstrumentChange}
                             isPolyphonic
                         />
                         <MemoizedThereminPad
@@ -440,15 +395,15 @@ export default function Home() {
                             type="melody"
                             frequencyRange={[220, 1760]}
                             color="hsl(var(--primary))"
-                            instruments={instruments.filter(i => i !== 'ebass')} // Filter out e-bass from melody
+                            instruments={instruments.filter(i => i !== 'ebass')}
                             activeInstrument={melodyInstrument}
-                            onInstrumentChange={setMelodyInstrument}
+                            onInstrumentChange={handleMelodyInstrumentChange}
                             musicKeys={musicKeys}
                             activeKey={musicKey}
-                            onKeyChange={setMusicKey}
+                            onKeyChange={(k) => handleHarmonyChange(k, musicScale)}
                             musicScales={musicScales}
                             activeScale={musicScale}
-                            onScaleChange={setMusicScale}
+                            onScaleChange={(s) => handleHarmonyChange(musicKey, s)}
                             isPolyphonic
                         />
                     </div>
@@ -456,53 +411,52 @@ export default function Home() {
                         <BeatBoxControls
                             patterns={beatPatterns}
                             activePattern={activePattern}
-                            onPatternChange={setActivePattern}
+                            onPatternChange={handlePatternChange}
                             tempos={tempos}
                             activeTempo={activeTempo}
-                            onTempoChange={setActiveTempo}
+                            onTempoChange={handleTempoChange}
                             volumes={volumes}
-                            onVolumeChange={setVolumes}
+                            onVolumeChange={handleVolumeChange}
                             effects={effects}
-                            onEffectChange={setEffects}
+                            onEffectChange={handleEffectChange}
                             isAutopilotOn={isAutopilotOn}
-                            onAutopilotToggle={setIsAutopilotOn}
+                            onAutopilotToggle={handleAutopilotToggle}
                             autopilotStyles={autopilotStyles}
                             activeAutopilotStyle={autopilotStyle}
                             onAutopilotStyleChange={handleAutopilotStyleChange}
                             autopilotInstrument={autopilotInstrument}
-                            onAutopilotInstrumentChange={setAutopilotInstrument}
+                            onAutopilotInstrumentChange={handleAutopilotInstrumentChange}
                             autopilotParts={autopilotParts}
-                            onAutopilotPartsChange={setAutopilotParts}
+                            onAutopilotPartsChange={handleAutopilotPartsChange}
                             isMobile={isMobile}
                             instruments={instruments.filter(i => i !== 'ebass')}
                         />
                     </div>
                 </main>
 
-                {/* --- RIGHT SIDEBAR --- */}
                 <div className="portrait:hidden landscape:flex landscape:flex-col landscape:items-center landscape:justify-center landscape:w-16 landscape:gap-2">
                      <BeatBoxControls
                         patterns={beatPatterns}
                         activePattern={activePattern}
-                        onPatternChange={setActivePattern}
+                        onPatternChange={handlePatternChange}
                         tempos={tempos}
                         activeTempo={activeTempo}
-                        onTempoChange={setActiveTempo}
+                        onTempoChange={handleTempoChange}
                         volumes={volumes}
-                        onVolumeChange={setVolumes}
+                        onVolumeChange={handleVolumeChange}
                         effects={effects}
-                        onEffectChange={setEffects}
+                        onEffectChange={handleEffectChange}
                         isAutopilotOn={isAutopilotOn}
-                        onAutopilotToggle={setIsAutopilotOn}
+                        onAutopilotToggle={handleAutopilotToggle}
                         autopilotStyles={autopilotStyles}
                         activeAutopilotStyle={autopilotStyle}
                         onAutopilotStyleChange={handleAutopilotStyleChange}
                         autopilotInstrument={autopilotInstrument}
-                        onAutopilotInstrumentChange={setAutopilotInstrument}
+                        onAutopilotInstrumentChange={handleAutopilotInstrumentChange}
                         autopilotParts={autopilotParts}
-                        onAutopilotPartsChange={setAutopilotParts}
+                        onAutopilotPartsChange={handleAutopilotPartsChange}
                         isMobile={isMobile}
-                        isLandscape={true} // Pass landscape prop
+                        isLandscape={true}
                         instruments={instruments.filter(i => i !== 'ebass')}
                     />
                 </div>

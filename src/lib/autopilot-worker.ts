@@ -1,5 +1,4 @@
 
-
 import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
 import type { InstrumentPart } from './audio-engine';
 import type { Unit } from 'tone/build/esm/core/type/Units';
@@ -12,8 +11,8 @@ export type NoteEvent = {
     freq: number;
     dur: Unit.Time;
     vel: number;
-    measure: number; // The measure this note belongs to
-    subdivision: number; // The 16th note subdivision within the measure
+    measure: number; 
+    subdivision: number; 
 };
 
 export type WorkerEvent =
@@ -236,7 +235,7 @@ function generateMeasure(measure: number): NoteEvent[] {
 
     const parts: ('bass' | 'accompaniment' | 'melody')[] = ['bass', 'accompaniment', 'melody'];
     for (const partName of parts) {
-        if (!enabledParts[partName]) continue;
+        if (!enabledParts[partName as AutopilotPart]) continue;
 
         const partStyle = style[partName as keyof typeof style] as any;
         const pattern: Pattern | null = (isFillMeasure && partStyle.fills?.length > 0)
@@ -280,22 +279,29 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
     const { type, ...data } = event.data;
     switch (type) {
         case 'generateMeasure':
-            const notes = generateMeasure(data.measure);
-            self.postMessage({ type: 'measureGenerated', notes, measure: data.measure });
+            if ('measure' in data) {
+                const notes = generateMeasure(data.measure as number);
+                self.postMessage({ type: 'measureGenerated', notes, measure: data.measure });
+            }
             break;
         case 'setHarmony':
-            currentKey = data.key;
-            currentScale = data.scale;
-            scaleIntervals = scaleIntervalMap[currentScale] || [];
+             if ('key' in data && 'scale' in data) {
+                currentKey = data.key as MusicKey;
+                currentScale = data.scale as MusicScale;
+                scaleIntervals = scaleIntervalMap[currentScale] || [];
+            }
             break;
         case 'setParts':
-            enabledParts = data.parts as Record<AutopilotPart, boolean>;
+            if ('parts' in data) {
+                 enabledParts = data.parts as Record<AutopilotPart, boolean>;
+            }
             break;
         case 'setStyle':
-            currentStyle = data.style;
+            if('style' in data) {
+                currentStyle = data.style as AutopilotStyle;
+            }
             break;
         case 'reset':
-            // Could add logic here to reset any internal state if needed
             break;
     }
 };

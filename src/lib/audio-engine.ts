@@ -1,5 +1,4 @@
 
-
 import * as Tone from 'tone';
 import type { Instrument, MusicKey, MusicScale } from '@/app/page';
 import { LatchEngine } from './latch-engine';
@@ -172,12 +171,10 @@ export class AudioEngine {
             autopilot_effects: this.channels.effects
         };
         
-        // Create dedicated pools
         for (const part of Object.keys(poolSizes) as InstrumentPart[]) {
             const size = poolSizes[part];
             const channel = partToChannel[part];
             const pool: Voice[] = [];
-            // We create a dummy preset just to instantiate the voices. They will be reconfigured later.
             const initialPreset = this.presets['synth'];
             for (let i = 0; i < size; i++) {
                 pool.push(new Voice(initialPreset, channel, part));
@@ -185,14 +182,13 @@ export class AudioEngine {
             this.voicePools.set(part, pool);
         }
         
-        // Initial configuration
         this.reconfigurePool('melody', this.currentInstruments.melody);
         this.reconfigurePool('bass', this.currentInstruments.bass);
         this.reconfigurePool('latch', this.currentInstruments.bass);
         this.reconfigurePool('autopilot_melody', this.currentInstruments.autopilot);
         this.reconfigurePool('autopilot_accompaniment', this.currentInstruments.autopilot);
         this.reconfigurePool('autopilot_bass', 'autopilot_bass');
-        this.reconfigurePool('autopilot_effects', 'autopilot_effect_star'); // a default
+        this.reconfigurePool('autopilot_effects', 'autopilot_effect_star');
     }
 
     private reconfigurePool(part: InstrumentPart, instrumentName: Instrument | string) {
@@ -203,7 +199,6 @@ export class AudioEngine {
         
         if (pool && preset && channel) {
             pool.forEach(voice => {
-                // This is where we would re-create the synth if needed. For now, we assume synths don't change type mid-flight
                  if (voice.synth.name !== preset.type) {
                      voice.synth.dispose();
                      if (preset.type === 'FMSynth') voice.synth = new Tone.FMSynth(preset.options).connect(channel);
@@ -231,7 +226,7 @@ export class AudioEngine {
     
     private getPresetKey(part: InstrumentPart, instrumentName: string | Instrument): string {
          if (instrumentName === 'E-Bells') {
-            return (part === 'melody' || part === 'autopilot_melody' || part === 'autopilot_accompaniment') ? 'E-Bells_melody' : 'E-Bells_bass';
+            return (part === 'melody' || part.startsWith('autopilot_')) ? 'E-Bells_melody' : 'E-Bells_bass';
         }
         if (part === 'autopilot_effects' || part === 'autopilot_bass') {
             return instrumentName;
@@ -250,14 +245,11 @@ export class AudioEngine {
 
         const availableVoice = pool.find(v => v.isAvailable());
         if (!availableVoice) {
-            // console.warn(`No available voice in pool for part: ${part}`);
             return null;
         }
         return availableVoice;
     }
     
-    // --- Public Methods ---
-
     public startNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}) {
         if (!this.isInitialized) return;
         const quantizedFreq = this.getClosestFrequency(freq, type);
@@ -298,13 +290,17 @@ export class AudioEngine {
      public getAbsoluteTimeForNote(note: NoteEvent): number {
         const timePerMeasure = Tone.Time('1m').toSeconds();
         const timePerSubdivision = timePerMeasure / 16;
-        return (note.measure * timePerMeasure) + (note.subdivision * timePerSubdivision);
+        const noteOffset = (note.measure * timePerMeasure) + (note.subdivision * timePerSubdivision);
+        const transportStartTime = Tone.Transport.seconds;
+        // This calculation seems complex. Let's simplify. Tone.Transport handles timing.
+        // We can use Tone.Time to calculate the future time relative to the transport's start.
+        return Tone.Time(`${note.measure}:${Math.floor(note.subdivision/4)}:${note.subdivision % 4}`).toSeconds();
     }
 
     public scheduleAutopilotNote(note: NoteEvent, time: number) {
         if (!this.isInitialized || note.freq === null || note.freq === undefined) return;
         if (note.part === 'autopilot_effects') {
-             const effectName = note.freq > 500 ? 'autopilot_effect_star' : 'autopilot_effect_meteor';
+             const effectName = Math.random() > 0.5 ? 'autopilot_effect_star' : 'autopilot_effect_meteor';
              this.reconfigurePool('autopilot_effects', effectName);
         }
         
@@ -321,9 +317,18 @@ export class AudioEngine {
         if (this.isInitialized) this.drumMachine.stop();
     }
     
-    public setTempo(bpm: number) { Tone.Transport.bpm.value = bpm; }
+    public stopAllAutopilotSounds() {
+        this.voicePools.forEach((pool, part) => {
+            if (part.startsWith('autopilot_')) {
+                pool.forEach(voice => voice.release(0.1));
+            }
+        });
+    }
+
+    public setTempo(bpm: number) { if(this.isInitialized) Tone.Transport.bpm.value = bpm; }
 
     public setVolumes(volumes: Record<string, number>) {
+        if(!this.isInitialized) return;
         this.channels.melody.volume.value = volumes.melody;
         this.channels.manualBass.volume.value = volumes.manualBass;
         this.channels.latch.volume.value = volumes.latch;
@@ -334,6 +339,7 @@ export class AudioEngine {
     }
 
     public setEffects(effects: Record<string, any>) {
+        if(!this.isInitialized) return;
         for (const key in this.channels) {
             if (effects[key]) {
                 this.channels[key].send('reverb', effects[key].reverb);
@@ -345,23 +351,27 @@ export class AudioEngine {
     public setBeatPattern(patternName: string) { if(this.isInitialized) this.drumMachine.setBeatPattern(patternName); }
     
     public setMelodyInstrument(instrument: Instrument) {
+        if(!this.isInitialized) return;
         this.currentInstruments.melody = instrument;
         this.reconfigurePool('melody', instrument);
     }
 
     public setBassInstrument(instrument: Instrument) {
+        if(!this.isInitialized) return;
         this.currentInstruments.bass = instrument;
         this.reconfigurePool('bass', instrument);
-        this.reconfigurePool('latch', instrument); // Latch follows bass instrument
+        this.reconfigurePool('latch', instrument);
     }
 
     public setAutopilotInstrument(instrument: Instrument) {
+        if(!this.isInitialized) return;
         this.currentInstruments.autopilot = instrument;
         this.reconfigurePool('autopilot_melody', instrument);
         this.reconfigurePool('autopilot_accompaniment', instrument);
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
+        if(!this.isInitialized) return;
         this.allowedFrequencies = {
             bass: this.getScaleFrequencies(key, scale, [2, 3]),
             melody: this.getScaleFrequencies(key, scale, [3, 4, 5]),
@@ -370,6 +380,7 @@ export class AudioEngine {
     }
 
     public setBassLatch(isLatchOn: boolean) {
+        if(!this.isInitialized) return;
         this.isBassLatchOn = isLatchOn;
         this.latchEngine.setLatch(isLatchOn);
     }
@@ -397,7 +408,10 @@ export class AudioEngine {
     public stop() {
         if (this.isInitialized) {
             this.stopAllSounds();
-            if (Tone.Transport.state !== 'stopped') Tone.Transport.stop();
+            if (Tone.Transport.state !== 'stopped') {
+                Tone.Transport.stop();
+                Tone.Transport.cancel();
+            };
         }
     }
     

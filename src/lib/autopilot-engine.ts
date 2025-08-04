@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import * as Tone from 'tone';
@@ -8,7 +7,7 @@ import type { WorkerEvent, WorkerResponse, AutopilotPart, NoteEvent } from './au
 import type { AudioEngine } from './audio-engine';
 
 const LOOKAHEAD_TIME = 0.2; // seconds, how far ahead to schedule
-const SCHEDULE_INTERVAL = 100; // ms, how often to check for scheduling
+const SCHEDULE_INTERVAL = '16n'; // a 16th note, how often to check for scheduling
 
 export class AutopilotEngine {
     private audioEngine: AudioEngine;
@@ -18,9 +17,9 @@ export class AutopilotEngine {
     
     private noteCache: NoteEvent[] = [];
     private nextMeasureToGenerate = 0;
-    private schedulerId: number | null = null;
+    private schedulerEventId: number | null = null;
     private isGenerating = false;
-    private isPlaying = false; // Track playback state internally
+    private isPlaying = false; 
 
     private lastKnownState: {
         key: MusicKey;
@@ -40,6 +39,10 @@ export class AutopilotEngine {
     private handleWorkerMessage = (event: MessageEvent<WorkerResponse>) => {
         if (event.data.type === 'measureGenerated') {
             this.noteCache.push(...event.data.notes);
+            this.noteCache.sort((a, b) => {
+                if (a.measure !== b.measure) return a.measure - b.measure;
+                return a.subdivision - b.subdivision;
+            });
             this.isGenerating = false;
         }
     }
@@ -49,41 +52,33 @@ export class AutopilotEngine {
         const scheduleUntil = now + LOOKAHEAD_TIME;
 
         while(this.noteCache.length > 0) {
-            // We assume the first note in the cache is the next one to be scheduled.
-            // Let's check if we can schedule it.
-            const nextNoteTime = this.audioEngine.getAbsoluteTimeForNote(this.noteCache[0]);
+            const absoluteNoteTime = this.audioEngine.getAbsoluteTimeForNote(this.noteCache[0]);
             
-            if (nextNoteTime < scheduleUntil) {
+            if (absoluteNoteTime < scheduleUntil) {
                  const noteToSchedule = this.noteCache.shift();
                  if (noteToSchedule) {
-                    this.audioEngine.scheduleAutopilotNote(noteToSchedule, nextNoteTime);
+                    this.audioEngine.scheduleAutopilotNote(noteToSchedule, absoluteNoteTime);
                  }
             } else {
-                // Next note is too far in the future, break the loop
                 break;
             }
         }
     }
 
     private requestNextMeasureIfNeeded() {
-        if (this.isGenerating || !this.isPlaying) return;
+        if (this.isGenerating || !this.isPlaying || !this.isAutopilotOn) return;
 
-        // Calculate how many measures are fully scheduled in the cache
-        let lastMeasureInCache = -1;
-        if(this.noteCache.length > 0) {
-            lastMeasureInCache = this.noteCache[this.noteCache.length - 1].measure;
-        }
-
-        // If the last scheduled measure is less than the current measure + a buffer, generate more
         const currentMeasure = Math.floor(Tone.Transport.position.toString().split(':')[0]);
-        if (lastMeasureInCache < currentMeasure + 1) {
-             this.isGenerating = true;
-             // Ensure we generate starting from the right measure
-             this.nextMeasureToGenerate = Math.max(currentMeasure, lastMeasureInCache + 1);
-             this.postMessageToActiveWorker({
+        const bufferMeasures = 2;
+        
+        // If the cache is running low (e.g., less than 2 measures ahead), generate more.
+        if(this.nextMeasureToGenerate <= currentMeasure + bufferMeasures) {
+            this.isGenerating = true;
+            this.postMessageToActiveWorker({
                 type: 'generateMeasure',
                 measure: this.nextMeasureToGenerate,
             });
+            this.nextMeasureToGenerate++;
         }
     }
     
@@ -112,11 +107,6 @@ export class AutopilotEngine {
         this.activeWorker?.postMessage(message);
     }
     
-    public setTempo(bpm: number) {
-        // The main engine controls tempo, so we don't need to inform the worker
-        // as it now works in measures, not absolute time.
-    }
-
     public setHarmony(key: MusicKey, scale: MusicScale) {
         this.lastKnownState.key = key;
         this.lastKnownState.scale = scale;
@@ -142,8 +132,6 @@ export class AutopilotEngine {
     }
 
     public setAutopilot(isOn: boolean, style: AutopilotStyle, isPlaying: boolean) {
-        if (this.isAutopilotOn === isOn && this.currentStyle === style && this.isPlaying === isPlaying) return;
-        
         this.isPlaying = isPlaying;
         this.isAutopilotOn = isOn;
         this.setStyle(style);
@@ -155,27 +143,37 @@ export class AutopilotEngine {
         }
     }
 
-    private start() {
-        if (this.schedulerId !== null) return;
+    public start() {
+        if (this.schedulerEventId !== null) return;
         this.resetAutopilot();
-        this.mainLoop(); // Run once immediately
-        this.schedulerId = setInterval(this.mainLoop, SCHEDULE_INTERVAL) as any;
+        this.schedulerEventId = Tone.Transport.scheduleRepeat(this.mainLoop, SCHEDULE_INTERVAL);
     }
 
-    private stop() {
-        if (this.schedulerId !== null) {
-            clearInterval(this.schedulerId);
-            this.schedulerId = null;
+    public stop() {
+        if (this.schedulerEventId !== null) {
+            Tone.Transport.clear(this.schedulerEventId);
+            this.schedulerEventId = null;
         }
-        // Don't clear the cache, just stop scheduling
+        this.audioEngine.stopAllAutopilotSounds();
+        this.noteCache = [];
+        this.nextMeasureToGenerate = 0;
+        this.isGenerating = false;
     }
 
     private resetAutopilot() {
         this.noteCache = [];
         this.nextMeasureToGenerate = 0;
         this.isGenerating = false;
-        // Tell worker to clear its state if necessary
         this.postMessageToActiveWorker({ type: 'reset' });
+        
+        // If it's currently running, restart to apply changes immediately
+        if (this.isAutopilotOn && this.isPlaying) {
+            if (this.schedulerEventId !== null) {
+                Tone.Transport.clear(this.schedulerEventId);
+                this.schedulerEventId = null;
+            }
+            this.start();
+        }
     }
 
     private syncWorkerState() {
