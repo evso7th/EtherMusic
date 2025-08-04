@@ -49,6 +49,7 @@ type Volumes = {
     drums: number; 
     autopilot: number;
     effects: number;
+    ebass: number;
 };
 
 type Effects = {
@@ -68,9 +69,9 @@ interface BeatBoxControlsProps {
     tempos: Tempo[];
     activeTempo: Tempo;
     onTempoChange: (tempo: Tempo) => void;
-    volumes: Volumes;
+    initialVolumes: Volumes;
     onVolumeChange: (volumes: Volumes) => void;
-    effects: Effects;
+    initialEffects: Effects;
     onEffectChange: (effects: Effects) => void;
     isAutopilotOn: boolean;
     onAutopilotToggle: (isOn: boolean) => void;
@@ -128,7 +129,7 @@ const AutopilotDebugDialog = ({
                                     htmlFor={`check-${part}`}
                                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 capitalize"
                                 >
-                                    {part}
+                                    {part.replace('autopilot_', '')}
                                 </label>
                             </div>
                         ))}
@@ -146,9 +147,9 @@ export function BeatBoxControls({
     tempos,
     activeTempo,
     onTempoChange,
-    volumes,
+    initialVolumes,
     onVolumeChange,
-    effects,
+    initialEffects,
     onEffectChange,
     isAutopilotOn,
     onAutopilotToggle,
@@ -353,9 +354,9 @@ export function BeatBoxControls({
                         <ScrollArea className="h-auto max-h-[70vh]">
                             <div className="pr-4">
                                 <MixerControls 
-                                    volumes={volumes} 
+                                    initialVolumes={initialVolumes} 
                                     onVolumeChange={onVolumeChange}
-                                    effects={effects}
+                                    initialEffects={initialEffects}
                                     onEffectChange={onEffectChange}
                                     isMobile={isMobile}
                                 />
@@ -538,9 +539,9 @@ export function BeatBoxControls({
                         <ScrollArea className="h-auto max-h-[70vh]">
                              <div className="pr-4">
                                 <MixerControls 
-                                    volumes={volumes} 
+                                    initialVolumes={initialVolumes} 
                                     onVolumeChange={onVolumeChange}
-                                    effects={effects}
+                                    initialEffects={initialEffects}
                                     onEffectChange={onEffectChange}
                                     isMobile={isMobile}
                                 />

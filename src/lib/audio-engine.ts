@@ -245,6 +245,7 @@ export class AudioEngine {
 
         const availableVoice = pool.find(v => v.isAvailable());
         if (!availableVoice) {
+            // console.warn(`No available voice in pool for part: ${part}`);
             return null;
         }
         return availableVoice;
@@ -287,27 +288,22 @@ export class AudioEngine {
         }
     }
 
-     public getAbsoluteTimeForNote(note: NoteEvent): number {
-        const timePerMeasure = Tone.Time('1m').toSeconds();
-        const timePerSubdivision = timePerMeasure / 16;
-        const noteOffset = (note.measure * timePerMeasure) + (note.subdivision * timePerSubdivision);
-        const transportStartTime = Tone.Transport.seconds;
-        // This calculation seems complex. Let's simplify. Tone.Transport handles timing.
-        // We can use Tone.Time to calculate the future time relative to the transport's start.
-        return Tone.Time(`${note.measure}:${Math.floor(note.subdivision/4)}:${note.subdivision % 4}`).toSeconds();
-    }
-
-    public scheduleAutopilotNote(note: NoteEvent, time: number) {
+    public scheduleAutopilotNote(note: NoteEvent) {
         if (!this.isInitialized || note.freq === null || note.freq === undefined) return;
+        
+        const time = `${note.measure}:${Math.floor(note.subdivision/4)}:${note.subdivision % 4}`;
+
         if (note.part === 'autopilot_effects') {
              const effectName = Math.random() > 0.5 ? 'autopilot_effect_star' : 'autopilot_effect_meteor';
              this.reconfigurePool('autopilot_effects', effectName);
         }
         
-        const voice = this.getVoiceFromPool(note.part);
-        if (voice) {
-            voice.attackRelease(note.freq, note.dur, time, note.vel);
-        }
+        Tone.Transport.scheduleOnce((time) => {
+            const voice = this.getVoiceFromPool(note.part);
+            if (voice) {
+                voice.attackRelease(note.freq, note.dur, time, note.vel);
+            }
+        }, time);
     }
     
     public stopAllSounds() {
@@ -323,6 +319,8 @@ export class AudioEngine {
                 pool.forEach(voice => voice.release(0.1));
             }
         });
+        // This is important to clear any scheduled but not yet played notes.
+        Tone.Transport.cancel();
     }
 
     public setTempo(bpm: number) { if(this.isInitialized) Tone.Transport.bpm.value = bpm; }

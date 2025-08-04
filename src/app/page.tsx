@@ -73,16 +73,6 @@ export default function Home() {
     const [isPlaying, setIsPlaying] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
-    const [volumes, setVolumes] = useState({ melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, effects: -6, ebass: -6 });
-    const [effects, setEffects] = useState({
-        melody: { reverb: -Infinity, delay: -60 },
-        manualBass: { reverb: -Infinity, delay: -60 },
-        latch: { reverb: -Infinity, delay: -60 },
-        drums: { reverb: -Infinity, delay: -60 },
-        autopilot: { reverb: -Infinity, delay: -60 },
-        effects: { reverb: -6, delay: -6 },
-        ebass: { reverb: -Infinity, delay: -60 }
-    });
     const [activePattern, setActivePattern] = useState<(typeof beatPatterns)[number]>(beatPatterns.find(p => p.name === 'Off')!);
     const [melodyInstrument, setMelodyInstrument] = useState<Instrument>('theremin');
     const [bassInstrument, setBassInstrument] = useState<Instrument>('synth');
@@ -164,13 +154,11 @@ export default function Home() {
         audioEngine.current?.setTempo(tempo.bpm);
     }, []);
 
-    const handleVolumeChange = useCallback((newVolumes: typeof volumes) => {
-        setVolumes(newVolumes);
+    const handleVolumeChange = useCallback((newVolumes: any) => {
         audioEngine.current?.setVolumes(newVolumes);
     }, []);
 
-    const handleEffectChange = useCallback((newEffects: typeof effects) => {
-        setEffects(newEffects);
+    const handleEffectChange = useCallback((newEffects: any) => {
         audioEngine.current?.setEffects(newEffects);
     }, []);
 
@@ -230,15 +218,11 @@ export default function Home() {
     }, [isPlaying, isAutopilotOn, autopilotStyle]);
     
     const handleStop = useCallback(async () => {
-        if (!audioEngine.current) return;
+        if (!audioEngine.current || !autopilotEngine.current) return;
         audioEngine.current.stop();
-        autopilotEngine.current?.stop();
-        if (isAutopilotOn) {
-            // Keep autopilot 'on' conceptually, but stop it's playback
-             autopilotEngine.current?.setAutopilot(isAutopilotOn, autopilotStyle, false);
-        }
+        autopilotEngine.current.stop();
         setIsPlaying(false);
-    }, [isAutopilotOn, autopilotStyle]);
+    }, []);
 
     const handleRecord = useCallback(() => {
         toast({ title: "Recording Unavailable", description: "This feature is temporarily disabled." });
@@ -285,6 +269,18 @@ export default function Home() {
             backgroundAudioRef.current.play().catch(error => console.error("Error playing background audio:", error));
         }
     }, []);
+
+    // Initial state for volumes and effects to pass to the MixerControls
+    const initialVolumes = useRef({ melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, effects: -6, ebass: -6 });
+    const initialEffects = useRef({
+        melody: { reverb: -Infinity, delay: -60 },
+        manualBass: { reverb: -Infinity, delay: -60 },
+        latch: { reverb: -Infinity, delay: -60 },
+        drums: { reverb: -Infinity, delay: -60 },
+        autopilot: { reverb: -Infinity, delay: -60 },
+        effects: { reverb: -6, delay: -6 },
+        ebass: { reverb: -Infinity, delay: -60 }
+    });
 
     if (!isClient) {
         return <Preloader />;
@@ -415,9 +411,9 @@ export default function Home() {
                             tempos={tempos}
                             activeTempo={activeTempo}
                             onTempoChange={handleTempoChange}
-                            volumes={volumes}
+                            initialVolumes={initialVolumes.current}
                             onVolumeChange={handleVolumeChange}
-                            effects={effects}
+                            initialEffects={initialEffects.current}
                             onEffectChange={handleEffectChange}
                             isAutopilotOn={isAutopilotOn}
                             onAutopilotToggle={handleAutopilotToggle}
@@ -442,9 +438,9 @@ export default function Home() {
                         tempos={tempos}
                         activeTempo={activeTempo}
                         onTempoChange={handleTempoChange}
-                        volumes={volumes}
+                        initialVolumes={initialVolumes.current}
                         onVolumeChange={handleVolumeChange}
-                        effects={effects}
+                        initialEffects={initialEffects.current}
                         onEffectChange={handleEffectChange}
                         isAutopilotOn={isAutopilotOn}
                         onAutopilotToggle={handleAutopilotToggle}

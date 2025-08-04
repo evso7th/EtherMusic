@@ -38,40 +38,19 @@ export class AutopilotEngine {
 
     private handleWorkerMessage = (event: MessageEvent<WorkerResponse>) => {
         if (event.data.type === 'measureGenerated') {
-            this.noteCache.push(...event.data.notes);
-            this.noteCache.sort((a, b) => {
-                if (a.measure !== b.measure) return a.measure - b.measure;
-                return a.subdivision - b.subdivision;
-            });
+            const newNotes = event.data.notes;
+            newNotes.forEach(note => this.audioEngine.scheduleAutopilotNote(note));
             this.isGenerating = false;
         }
     }
     
-    private scheduleNotes = () => {
-        const now = Tone.now();
-        const scheduleUntil = now + LOOKAHEAD_TIME;
-
-        while(this.noteCache.length > 0) {
-            const absoluteNoteTime = this.audioEngine.getAbsoluteTimeForNote(this.noteCache[0]);
-            
-            if (absoluteNoteTime < scheduleUntil) {
-                 const noteToSchedule = this.noteCache.shift();
-                 if (noteToSchedule) {
-                    this.audioEngine.scheduleAutopilotNote(noteToSchedule, absoluteNoteTime);
-                 }
-            } else {
-                break;
-            }
-        }
-    }
-
     private requestNextMeasureIfNeeded() {
         if (this.isGenerating || !this.isPlaying || !this.isAutopilotOn) return;
 
         const currentMeasure = Math.floor(Tone.Transport.position.toString().split(':')[0]);
-        const bufferMeasures = 2;
+        const bufferMeasures = 2; // Keep 2 measures ahead
         
-        // If the cache is running low (e.g., less than 2 measures ahead), generate more.
+        // If we need to generate more measures to stay ahead
         if(this.nextMeasureToGenerate <= currentMeasure + bufferMeasures) {
             this.isGenerating = true;
             this.postMessageToActiveWorker({
@@ -85,7 +64,6 @@ export class AutopilotEngine {
     private mainLoop = () => {
         if (!this.isAutopilotOn || !this.isPlaying) return;
         this.requestNextMeasureIfNeeded();
-        this.scheduleNotes();
     }
 
     private setWorker(): void {
@@ -132,13 +110,20 @@ export class AutopilotEngine {
     }
 
     public setAutopilot(isOn: boolean, style: AutopilotStyle, isPlaying: boolean) {
-        this.isPlaying = isPlaying;
+        const wasOn = this.isAutopilotOn;
         this.isAutopilotOn = isOn;
-        this.setStyle(style);
+        this.isPlaying = isPlaying;
         
-        if (isOn && isPlaying) {
+        if (this.currentStyle !== style) {
+            this.setStyle(style);
+        }
+
+        const shouldBeRunning = isOn && isPlaying;
+        const isRunning = this.schedulerEventId !== null;
+
+        if (shouldBeRunning && !isRunning) {
             this.start();
-        } else {
+        } else if (!shouldBeRunning && isRunning) {
             this.stop();
         }
     }
@@ -147,6 +132,9 @@ export class AutopilotEngine {
         if (this.schedulerEventId !== null) return;
         this.resetAutopilot();
         this.schedulerEventId = Tone.Transport.scheduleRepeat(this.mainLoop, SCHEDULE_INTERVAL);
+        // Immediately request the first measures
+        this.requestNextMeasureIfNeeded();
+        this.requestNextMeasureIfNeeded();
     }
 
     public stop() {
@@ -155,20 +143,19 @@ export class AutopilotEngine {
             this.schedulerEventId = null;
         }
         this.audioEngine.stopAllAutopilotSounds();
-        this.noteCache = [];
         this.nextMeasureToGenerate = 0;
         this.isGenerating = false;
+        this.postMessageToActiveWorker({ type: 'reset' });
     }
 
     private resetAutopilot() {
-        this.noteCache = [];
+        this.audioEngine.stopAllAutopilotSounds();
         this.nextMeasureToGenerate = 0;
         this.isGenerating = false;
         this.postMessageToActiveWorker({ type: 'reset' });
         
-        // If it's currently running, restart to apply changes immediately
         if (this.isAutopilotOn && this.isPlaying) {
-            if (this.schedulerEventId !== null) {
+             if (this.schedulerEventId !== null) {
                 Tone.Transport.clear(this.schedulerEventId);
                 this.schedulerEventId = null;
             }

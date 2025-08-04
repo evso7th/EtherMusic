@@ -6,6 +6,7 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Music, Waves, Drum, Bot, Anchor, Sparkles } from 'lucide-react';
 import { Separator } from './ui/separator';
+import { useState, useCallback } from 'react';
 
 type Volumes = { 
     melody: number; 
@@ -28,9 +29,9 @@ type Effects = {
 };
 
 interface MixerControlsProps {
-    volumes: Volumes;
+    initialVolumes: Volumes;
     onVolumeChange: (volumes: Volumes) => void;
-    effects: Effects;
+    initialEffects: Effects;
     onEffectChange: (effects: Effects) => void;
     isMobile: boolean;
 }
@@ -49,7 +50,7 @@ const EffectSlider = ({ label, value, onChange, min = -60, max = 0, step = 1 }: 
             min={min}
             max={max}
             step={step}
-            value={[value]}
+            defaultValue={[value]}
             onValueChange={(v) => onChange(v[0])}
         />
     </div>
@@ -84,7 +85,7 @@ const InstrumentControls = ({
                 min={-48}
                 max={6}
                 step={1}
-                value={[volume]}
+                defaultValue={[volume]}
                 onValueChange={onVolumeChange}
             />
         </div>
@@ -96,25 +97,29 @@ const InstrumentControls = ({
 );
 
 
-export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange }: MixerControlsProps) {
+export function MixerControls({ initialVolumes, onVolumeChange, initialEffects, onEffectChange }: MixerControlsProps) {
     
-    const handleVolumeChange = (instrument: keyof Volumes, value: number) => {
-        onVolumeChange({
-            ...volumes,
-            [instrument]: value
-        });
-    };
+    const [volumes, setVolumes] = useState(initialVolumes);
+    const [effects, setEffects] = useState(initialEffects);
 
-    const handleEffectChange = (instrument: keyof Effects, effect: 'reverb' | 'delay', value: number) => {
-        onEffectChange({
+    const handleVolumeChange = useCallback((instrument: keyof Volumes, value: number) => {
+        const newVolumes = { ...volumes, [instrument]: value };
+        setVolumes(newVolumes);
+        onVolumeChange(newVolumes);
+    }, [volumes, onVolumeChange]);
+
+    const handleEffectChange = useCallback((instrument: keyof Effects, effect: 'reverb' | 'delay', value: number) => {
+        const newEffects = {
             ...effects,
             [instrument]: {
                 // @ts-ignore
                 ...effects[instrument],
                 [effect]: value
             }
-        });
-    };
+        };
+        setEffects(newEffects);
+        onEffectChange(newEffects);
+    }, [effects, onEffectChange]);
 
     return (
         <div className="p-1 space-y-4">
@@ -188,5 +193,3 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
         </div>
     );
 }
-
-    
