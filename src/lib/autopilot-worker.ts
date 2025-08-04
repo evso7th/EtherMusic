@@ -341,8 +341,15 @@ function generateSpace(time: number, beat: number, rootDegree: number, chordTone
     generateEffects(time, rootDegree, 0.25); // More frequent effects for space
 }
 
-function generateSequence(time: number, beat: number, rootDegree: number, chordToneDegrees: number[]) {
-    // Bass on the downbeat of the measure
+function generateSequence(time: number, beat: number, measure: number, rootDegree: number, chordToneDegrees: number[]) {
+    // --- Mike Oldfield - Tubular Bells inspired sequence ---
+
+    // The sequence evolves over 16 measures, then repeats.
+    const cycleMeasure = measure % 16;
+
+    // --- BASS ---
+    // The bass is steady, playing on the first beat of every measure.
+    // It only plays if the user has enabled it in the debug panel.
     if (enabledParts.bass && beat === 0) {
         const freq = getFrequencyFromDegree(rootDegree, 'bass');
         if (freq) {
@@ -350,17 +357,57 @@ function generateSequence(time: number, beat: number, rootDegree: number, chordT
         }
     }
 
-    // A classic 16th-note arpeggiator for melody/accompaniment
-    if (enabledParts.melody) {
-        const arpPattern = [0, 1, 2, 1, 0, 2, 1, 0, 1, 2, 1, 2, 0, 1, 2, 0];
-        const patternIndex = beat % arpPattern.length;
-        const degree = chordToneDegrees[patternIndex % chordToneDegrees.length];
-        const freq = getFrequencyFromDegree(degree, 'melody');
-        if (freq) {
-            self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '16n', vel: 0.7 }, time });
+    // --- ACCOMPANIMENT (The main sequence) ---
+    // The accompaniment builds up over time.
+    if (enabledParts.accompaniment && cycleMeasure >= 2) {
+        // A more complex, evolving arpeggio pattern
+        const basePattern = [0, 2, 1, 2, 0, 1, 2, 0];
+        let pattern = basePattern;
+
+        // After 8 measures, the pattern becomes more complex
+        if (cycleMeasure >= 8) {
+            pattern = [0, 2, 1, 3, 0, 1, 2, 1]; // Use the 4th of the chord (degree 3 relative to root)
+        }
+        
+        // The instrument plays on every 8th note
+        if (beat % 2 === 0) {
+            const patternIndex = (beat / 2) % pattern.length;
+            const degree = chordToneDegrees[patternIndex % chordToneDegrees.length] || rootDegree;
+            const freq = getFrequencyFromDegree(degree, 'accompaniment');
+            if (freq) {
+                self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '8n', vel: 0.6 }, time });
+            }
+        }
+    }
+
+    // --- MELODY ---
+    // A simple, high, sustained melody that enters later in the cycle.
+    if (enabledParts.melody && cycleMeasure >= 4) {
+        // It plays a long note once every 2 measures
+        if (beat === 0 && cycleMeasure % 2 === 0) {
+            // It tends to step up or down from the last note.
+            let nextDegree: number;
+            if (lastMelodyDegree !== null) {
+                const direction = Math.random() < 0.5 ? 1 : -1;
+                nextDegree = lastMelodyDegree + direction;
+            } else {
+                nextDegree = chordToneDegrees[0];
+            }
+            
+            // Play in a higher octave
+            const freq = getFrequencyFromDegree(nextDegree + scaleIntervals.length, 'melody');
+
+            if (freq) {
+                self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '2m', vel: 0.7 }, time });
+                lastMelodyDegree = nextDegree;
+            } else {
+                // Reset if out of range
+                lastMelodyDegree = chordToneDegrees[0];
+            }
         }
     }
 }
+
 
 function generateChimes(time: number, beat: number, rootDegree: number, chordToneDegrees: number[]) {
     // Bass holds a long, low root note
@@ -447,7 +494,7 @@ function tick(time: number) {
             generateTrance(time, beat, rootDegree, chordToneDegrees);
             break;
         case 'Sequence':
-            generateSequence(time, beat, rootDegree, chordToneDegrees);
+            generateSequence(time, beat, measure, rootDegree, chordToneDegrees);
             break;
         case 'Chimes':
             generateChimes(time, beat, rootDegree, chordToneDegrees);
