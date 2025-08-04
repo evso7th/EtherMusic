@@ -121,22 +121,11 @@ export default {
           '0%, 100%': { boxShadow: '0 0 0 0 hsl(var(--primary) / 0.7)' },
           '70%': { boxShadow: '0 0 0 20px hsl(var(--primary) / 0)' },
         },
-        'pulse-accent-glow': {
-           '0%, 100%': {
-            boxShadow:
-              '0 0 20px rgba(0, 191, 255, 0.5), 0 0 30px rgba(0, 191, 255, 0.3)',
-          },
-          '50%': {
-            boxShadow:
-              '0 0 30px rgba(0, 191, 255, 0.8), 0 0 45px rgba(0, 191, 255, 0.5)',
-          },
-        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         'pulse-primary': 'pulse-primary 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'pulse-accent-glow': 'pulse-accent-glow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       },
     },
   },
