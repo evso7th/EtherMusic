@@ -52,10 +52,8 @@ class Voice {
         const options = { ...preset.options };
 
         if (preset.type === 'FMSynth') {
-            options.polyphony = 1; // Force monophonic for manual play
             this.synth = new Tone.FMSynth(options).connect(channel);
         } else if (preset.type === 'AMSynth') {
-            options.polyphony = 1; // Force monophonic for manual play
             this.synth = new Tone.AMSynth(options).connect(channel);
         } else { // Default to standard Synth
             this.synth = new Tone.Synth(options).connect(channel);
@@ -82,7 +80,8 @@ class Voice {
                 clearTimeout(this.releaseTimeoutId);
             }
             
-            const releaseTimeMs = new Tone.Time(this.synth.envelope.release).toMilliseconds();
+            // Universal way to get release time for any synth type
+            const releaseTimeMs = new Tone.Time(this.synth.get().envelope.release).toMilliseconds();
             
             this.releaseTimeoutId = setTimeout(() => {
                 this.isBusy = false;
@@ -103,7 +102,9 @@ class Voice {
 
         this.synth.triggerAttackRelease(freq, dur, time, vel);
         
-        const totalDurationMs = (new Tone.Time(dur).toMilliseconds() + new Tone.Time(this.synth.envelope.release).toMilliseconds());
+        // Universal way to get release time
+        const releaseTimeMs = new Tone.Time(this.synth.get().envelope.release).toMilliseconds();
+        const totalDurationMs = new Tone.Time(dur).toMilliseconds() + releaseTimeMs;
         
         const scheduledReleaseTime = (time - Tone.now()) * 1000;
 
