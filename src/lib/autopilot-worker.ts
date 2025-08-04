@@ -1,4 +1,5 @@
 
+
 // This file is a template and can be used as a base for new styles.
 // However, it is not directly used by the AutopilotEngine anymore.
 // The engine now dynamically loads workers from the /autopilot-styles/ directory.
@@ -10,7 +11,7 @@ import type { Unit } from 'tone/build/esm/core/type/Units';
 // --- TYPE DEFINITIONS ---
 export type AutopilotPart = 'bass' | 'accompaniment' | 'melody' | 'effects';
 
-type NoteEvent = {
+export type NoteEvent = {
     type: InstrumentType;
     freq: number;
     dur: Unit.Time;
@@ -20,10 +21,12 @@ type NoteEvent = {
 export type WorkerEvent =
     | { type: 'start' }
     | { type: 'stop' }
-    | { type: 'setHarmony', key: MusicKey, scale: MusicScale }
+    | { type: 'setHarmony', key: MusicKey, scale: MusicScale, bassOctaves: number[], melodyOctaves: number[], accompanimentOctaves: number[] }
     | { type: 'setStyle', style: AutopilotStyle } // This is kept for potential future use but is managed by engine
     | { type: 'setTempo', bpm: number }
-    | { type: 'setParts', parts: Record<AutopilotPart, boolean> };
+    | { type: 'setParts', parts: Record<AutopilotPart, boolean> }
+    | { type: 'tick', time: number };
+
 
 export type WorkerResponse =
     | { type: 'playNote', note: NoteEvent, time: number };
@@ -93,13 +96,15 @@ function getScaleFrequenciesForOctaves(key: MusicKey, scale: MusicScale, octaves
     return allFrequencies.sort((a,b) => a - b);
 }
 
-function updateMusicContext() {
+function updateMusicContext(data: any) {
+    currentKey = data.key;
+    currentScale = data.scale;
     scaleIntervals = scaleIntervalMap[currentScale] || [];
     
     scaleFrequencies = {
-        bass: getScaleFrequenciesForOctaves(currentKey, currentScale, [1, 2]),
-        accompaniment: getScaleFrequenciesForOctaves(currentKey, currentScale, [3, 4]),
-        melody: getScaleFrequenciesForOctaves(currentKey, currentScale, [4, 5]),
+        bass: getScaleFrequenciesForOctaves(currentKey, currentScale, data.bassOctaves),
+        accompaniment: getScaleFrequenciesForOctaves(currentKey, currentScale, data.accompanimentOctaves),
+        melody: getScaleFrequenciesForOctaves(currentKey, currentScale, data.melodyOctaves),
     };
 
     if (currentScale.includes('Major')) {
@@ -163,7 +168,7 @@ function tick(time: number) {
          const syncopation = (tickCount % 8 === 0) ? 1 : 0;
         const arpPattern = [0, 1, 2, 1];
         const patternIndex = (Math.floor(beat/2) + syncopation) % arpPattern.length;
-        const degree = chordToneDegrees[arpPattern[patternIndex]];
+        const degree = chordToneDegrees[patternIndex];
 
         if (degree !== null) {
             const freq = getFrequencyFromDegree(degree, 'accompaniment');
@@ -222,7 +227,6 @@ function tick(time: number) {
 
 function start() {
     stop(); 
-    updateMusicContext();
     tickCount = 0;
     const intervalSeconds = (60 / currentBpm) / (subdivisions / 4); // Interval for a 16th note
 
@@ -256,7 +260,7 @@ function stop() {
 
 // --- WORKER EVENT HANDLER ---
 self.onmessage = function (event: MessageEvent<WorkerEvent>) {
-    const { type } = event.data;
+    const { type, ...data } = event.data;
     switch (type) {
         case 'start':
             start();
@@ -265,18 +269,25 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             stop();
             break;
         case 'setHarmony':
-            currentKey = event.data.key;
-            currentScale = event.data.scale;
-            updateMusicContext();
+             // @ts-ignore
+            updateMusicContext(data);
             break;
         case 'setTempo':
-            currentBpm = event.data.bpm;
+             // @ts-ignore
+            currentBpm = data.bpm;
             if (timerId !== null) { 
                 start(); // Restart the loop with the new tempo
             }
             break;
         case 'setParts':
-            enabledParts = event.data.parts;
+             // @ts-ignore
+            enabledParts = data.parts;
+            break;
+        case 'tick':
+             // @ts-ignore
+            tick(data.time);
             break;
     }
 };
+
+    
