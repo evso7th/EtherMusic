@@ -213,6 +213,7 @@ export default function Home() {
     const handleAutopilotStyleChange = useCallback((newStyle: AutopilotStyle) => {
         const oldStyle = autopilotStyle;
         setAutopilotStyle(newStyle);
+        autopilotEngine.current?.setStyle(newStyle); // Inform the engine about the style change
 
         // If switching TO Toccata from something else
         if (newStyle === 'Toccata' && oldStyle !== 'Toccata') {

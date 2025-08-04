@@ -59,39 +59,26 @@ export class AutopilotEngine {
     }
 
     private getWorker(style: AutopilotStyle): Worker {
+        // Unified worker logic: always use the same worker file.
+        // The style variation is handled inside the worker itself.
+        const workerFileName = 'ambient.worker.js';
+
         if (workerCache[style]) {
             const worker = workerCache[style]!;
-            // Re-attach the message handler as it might have been cleared
             worker.onmessage = this.handleWorkerMessage;
             return worker;
-        }
-
-        let workerFileName: string;
-        switch(style) {
-            case 'Toccata':     workerFileName = 'toccata.worker.js'; break;
-            case 'Promenade':   workerFileName = 'promenade.worker.js'; break;
-            case 'Trance':      workerFileName = 'trance.worker.js'; break;
-            case 'Sequence':    workerFileName = 'sequence.worker.js'; break;
-            case 'Chimes':      workerFileName = 'chimes.worker.js'; break;
-            case 'Drone':       workerFileName = 'drone.worker.js'; break;
-            case 'Space':       workerFileName = 'space.worker.js'; break;
-            case 'Ambient':
-            default:            workerFileName = 'ambient.worker.js'; break;
         }
 
         const workerPath = `/assets/workers/${workerFileName}`;
         try {
             const worker = new Worker(workerPath, { type: 'module' });
             worker.onmessage = this.handleWorkerMessage;
+            // We cache it under the specific style name to handle potential re-activations,
+            // even though the source file is the same.
             workerCache[style] = worker;
             return worker;
         } catch (e) {
             console.error(`Failed to load worker for style ${style}:`, e);
-            // Fallback to ambient if the specific worker fails
-            if (style !== 'Ambient') {
-                console.log('Falling back to Ambient worker.');
-                return this.getWorker('Ambient');
-            }
             throw e;
         }
     }
@@ -127,6 +114,11 @@ export class AutopilotEngine {
         this.postMessageToActiveWorker({ type: 'setParts', parts: parts });
     }
     
+    public setStyle(style: AutopilotStyle) {
+        this.currentStyle = style;
+        this.postMessageToActiveWorker({ type: 'setStyle', style });
+    }
+
     public setAutopilot(isOn: boolean, style: AutopilotStyle) {
         const styleChanged = this.currentStyle !== style;
 
@@ -170,6 +162,9 @@ export class AutopilotEngine {
         this.setTempo(this.lastKnownState.bpm);
         this.setHarmony(this.lastKnownState.key, this.lastKnownState.scale);
         this.setAutopilotParts(this.lastKnownState.parts);
+        if (this.currentStyle) {
+            this.setStyle(this.currentStyle);
+        }
     }
 
     public dispose() {

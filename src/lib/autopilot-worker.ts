@@ -1,9 +1,5 @@
 
 
-// This file is a template and can be used as a base for new styles.
-// However, it is not directly used by the AutopilotEngine anymore.
-// The engine now dynamically loads workers from the /autopilot-styles/ directory.
-
 import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
 import type { InstrumentType } from './audio-engine';
 import type { Unit } from 'tone/build/esm/core/type/Units';
@@ -22,7 +18,7 @@ export type WorkerEvent =
     | { type: 'start' }
     | { type: 'stop' }
     | { type: 'setHarmony', key: MusicKey, scale: MusicScale, bassOctaves: number[], melodyOctaves: number[], accompanimentOctaves: number[] }
-    | { type: 'setStyle', style: AutopilotStyle } // This is kept for potential future use but is managed by engine
+    | { type: 'setStyle', style: AutopilotStyle }
     | { type: 'setTempo', bpm: number }
     | { type: 'setParts', parts: Record<AutopilotPart, boolean> }
     | { type: 'tick', time: number };
@@ -39,6 +35,7 @@ const subdivisions = 16;
 
 let currentKey: MusicKey = 'C';
 let currentScale: MusicScale = 'Major Pentatonic';
+let currentStyle: AutopilotStyle = 'Ambient';
 let currentBpm = 120;
 let scaleIntervals: number[] = [];
 let chordProgression: number[] = [0, 4, 5, 3]; 
@@ -104,7 +101,7 @@ function updateMusicContext(data: any) {
     scaleFrequencies = {
         bass: getScaleFrequenciesForOctaves(currentKey, currentScale, data.bassOctaves),
         accompaniment: getScaleFrequenciesForOctaves(currentKey, currentScale, data.accompanimentOctaves),
-        melody: getScaleFrequenciesForOctaves(currentKey, currentScale, [3, 4]),
+        melody: getScaleFrequenciesForOctaves(currentKey, currentScale, data.melodyOctaves),
     };
 
     if (currentScale.includes('Major')) {
@@ -282,6 +279,10 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
         case 'setParts':
              // @ts-ignore
             enabledParts = data.parts;
+            break;
+        case 'setStyle':
+             // @ts-ignore
+            currentStyle = data.style;
             break;
         case 'tick':
              // @ts-ignore
