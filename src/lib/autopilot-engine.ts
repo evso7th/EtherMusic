@@ -12,8 +12,7 @@ export class AutopilotEngine {
     private activeWorker: Worker | null = null;
     private currentStyle: AutopilotStyle = 'Ambient';
     private isAutopilotOn = false;
-    private tickLoop: Tone.Loop | null = null;
-
+    
     private lastKnownState: {
         bpm: number;
         key: MusicKey;
@@ -28,24 +27,15 @@ export class AutopilotEngine {
 
     constructor(audioEngine: AudioEngine) {
         this.audioEngine = audioEngine;
-        this.initialize();
-    }
-
-    private initialize() {
-        this.tickLoop = new Tone.Loop(time => {
-            if (this.isAutopilotOn && this.activeWorker) {
-                 this.postMessageToActiveWorker({ type: 'tick', time });
-            }
-        }, '16n').start(0);
-
         this.setWorker(this.currentStyle); // Pre-load the default worker
     }
-    
+
     private handleWorkerMessage = (event: MessageEvent<WorkerResponse>) => {
         if (!this.isAutopilotOn) return;
-        const { type, note, time } = event.data;
+        const { type, note } = event.data;
         if (type === 'playNote' && note) {
-            this.audioEngine.playAutopilotEvent(note, time);
+            // Schedule the note to be played 'now' as decided by the worker's internal clock
+            this.audioEngine.playAutopilotEvent(note, Tone.now());
         }
     }
 
@@ -53,6 +43,7 @@ export class AutopilotEngine {
         // Since we have a single worker file, we just create one instance
         if (this.activeWorker) {
             this.activeWorker.onmessage = null; // Clean up old listener
+            this.activeWorker.terminate(); // Terminate the old worker
         }
         const workerPath = `/assets/workers/ambient.worker.js`;
         try {
@@ -126,7 +117,6 @@ export class AutopilotEngine {
     }
 
     public dispose() {
-        this.tickLoop?.dispose();
         this.activeWorker?.terminate();
         this.activeWorker = null;
     }

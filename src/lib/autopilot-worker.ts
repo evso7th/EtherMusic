@@ -20,12 +20,11 @@ export type WorkerEvent =
     | { type: 'setHarmony', key: MusicKey, scale: MusicScale, bassOctaves: number[], melodyOctaves: number[], accompanimentOctaves: number[] }
     | { type: 'setStyle', style: AutopilotStyle }
     | { type: 'setTempo', bpm: number }
-    | { type: 'setParts', parts: Record<AutopilotPart, boolean> }
-    | { type: 'tick', time: number };
+    | { type: 'setParts', parts: Record<AutopilotPart, boolean> };
 
 
 export type WorkerResponse =
-    | { type: 'playNote', note: NoteEvent, time: number };
+    | { type: 'playNote', note: NoteEvent };
 
 
 // --- MUSICAL PATTERN DEFINITIONS ---
@@ -59,6 +58,8 @@ interface StylePatterns {
 // --- WORKER STATE ---
 let tickCount = 0;
 const SUBDIVISIONS = 16; 
+let timerId: number | null = null;
+let intervalTime = 125; // Default for 120 bpm at 16th notes
 
 let currentKey: MusicKey = 'C';
 let currentScale: MusicScale = 'Major Pentatonic';
@@ -305,14 +306,13 @@ function chooseNewPatternsForMeasure(measure: number) {
              self.postMessage({
                  type: 'playNote',
                  note: { type: 'autopilot_effects', freq, dur: '1n', vel: Math.random() * 0.3 + 0.2 },
-                 time: 0 // Placeholder, Tone.js will schedule it
              });
         }
     }
 }
 
 
-function tick(time: number) {
+function tick() {
     const measure = Math.floor(tickCount / SUBDIVISIONS);
     const beatInMeasure = tickCount % SUBDIVISIONS;
 
@@ -337,12 +337,25 @@ function tick(time: number) {
                     dur: noteData.dur,
                     vel: noteData.vel,
                 };
-                 self.postMessage({ type: 'playNote', note: noteEvent, time: time });
+                 self.postMessage({ type: 'playNote', note: noteEvent });
             }
         }
     }
 
     tickCount++;
+}
+
+function start() {
+    if (timerId !== null) return;
+    tickCount = 0;
+    timerId = setInterval(tick, intervalTime) as any;
+}
+
+function stop() {
+    if (timerId !== null) {
+        clearInterval(timerId);
+        timerId = null;
+    }
 }
 
 
@@ -351,8 +364,17 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
     const { type, ...data } = event.data;
     switch (type) {
         case 'start':
+            start();
+            break;
         case 'stop':
-            tickCount = 0;
+            stop();
+            break;
+        case 'setTempo':
+            intervalTime = (60 / data.bpm!) / (SUBDIVISIONS / 4); // Calculate 16th note interval
+            if (timerId !== null) { // If timer is running, restart it with the new interval
+                stop();
+                start();
+            }
             break;
         case 'setHarmony':
             currentKey = data.key;
@@ -373,8 +395,6 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             currentStyle = data.style;
             tickCount = 0;
             break;
-        case 'tick':
-            tick(data.time);
-            break;
     }
 };
+
