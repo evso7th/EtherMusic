@@ -72,6 +72,12 @@ Don't want to play yourself? Turn on the **Autopilot**!
 *   **Stop:** Stops all sounds immediately.
 *   **Record (\`Circle\` Icon):** Press to start recording your session. Press again to stop. Your recording will be downloaded automatically as a \`.webm\` file.
 
+## A Note on Performance
+
+**Important:** On older or less powerful mobile devices, using the **Latch** mode simultaneously with the **Autopilot** and the **Drum Machine** can sometimes lead to sound artifacts like clicks, freezes, or stuttering. The audio engine is powerful, but it requires significant resources.
+
+If you experience this, we recommend using these features separately for the smoothest experience (e.g., play manually with the drum machine, or use the Autopilot without the Latch mode).
+
 Enjoy the process and let the music you create reflect your inner state.
 `;
 
