@@ -444,6 +444,7 @@ export class AudioEngine {
             'E-Bells_melody': {
                 type: 'FMSynth',
                 options: {
+                    polyphony: 1,
                     harmonicity: 1.4,
                     modulationIndex: 20,
                     oscillator: { type: 'sine' },
@@ -455,6 +456,7 @@ export class AudioEngine {
             'E-Bells_bass': {
                 type: 'FMSynth',
                 options: {
+                    polyphony: 1,
                     harmonicity: 1.4,
                     modulationIndex: 15,
                     oscillator: { type: 'sine' },
