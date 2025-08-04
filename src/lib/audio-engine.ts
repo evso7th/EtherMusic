@@ -296,12 +296,12 @@ export class AudioEngine {
 
     public scheduleAutopilotNote(note: NoteEvent, time: number) {
         if (!this.isInitialized || note.freq === null || note.freq === undefined) return;
-        if (note.type === 'autopilot_effects') {
+        if (note.part === 'autopilot_effects') {
              const effectName = note.freq > 500 ? 'autopilot_effect_star' : 'autopilot_effect_meteor';
              this.reconfigurePool('autopilot_effects', effectName);
         }
         
-        const voice = this.getVoiceFromPool(note.type);
+        const voice = this.getVoiceFromPool(note.part);
         if (voice) {
             voice.attackRelease(note.freq, note.dur, time, note.vel);
         }
