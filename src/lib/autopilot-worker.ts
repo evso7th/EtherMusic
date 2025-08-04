@@ -187,7 +187,7 @@ function generateAmbient(time: number, beat: number, rootDegree: number, chordTo
     }
     
     // Melody
-    if (enabledParts.melody && (beat % 4 === 1 || beat % 8 === 5) && Math.random() > 0.5) {
+    if (enabledParts.melody && beat % 4 !== 3) { // Play more often
         let nextDegree: number | null = null;
         if (lastMelodyDegree !== null) {
             const direction = Math.random() < 0.7 ? (Math.random() < 0.5 ? 1 : -1) : 0;
@@ -229,8 +229,8 @@ function generateToccata(time: number, beat: number, rootDegree: number, chordTo
         }
     }
     
-    // Melody (fast runs)
-    if (enabledParts.melody && (beat % 4 !== 3) && Math.random() > 0.4) {
+    // Melody (fast runs, no random skips)
+    if (enabledParts.melody) {
         let nextDegree: number | null = null;
         if (lastMelodyDegree !== null) {
             const direction = Math.random() < 0.6 ? 1 : -1;
@@ -267,7 +267,7 @@ function generatePromenade(time: number, beat: number, rootDegree: number, chord
         });
     }
 
-    // Melody (simple, walking)
+    // Melody (simple, walking, consistent)
     if (enabledParts.melody && beat % 2 === 0) {
         const melodyPattern = [0, 0, 1, 1, 2, 2, 1, 0];
         const patternIndex = Math.floor(beat / 2) % melodyPattern.length;
@@ -300,9 +300,9 @@ function generateSpace(time: number, beat: number, rootDegree: number, chordTone
         }
     }
 
-    // Melody (sparse, high notes)
-    if (enabledParts.melody && beat % 16 === 0 && Math.random() > 0.3) {
-        const degree = chordToneDegrees[Math.floor(Math.random() * chordToneDegrees.length)] + scaleIntervals.length; // One octave up
+    // Melody (long, evolving notes)
+    if (enabledParts.melody && beat % 16 === 0) {
+        const degree = chordToneDegrees[Math.floor(Math.random() * chordToneDegrees.length)];
         const freq = getFrequencyFromDegree(degree, 'melody');
         if (freq) {
             self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '1m', vel: 0.7 }, time });
@@ -414,5 +414,3 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             break;
     }
 };
-
-    
