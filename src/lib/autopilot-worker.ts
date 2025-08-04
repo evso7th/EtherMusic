@@ -104,7 +104,7 @@ function updateMusicContext(data: any) {
     scaleFrequencies = {
         bass: getScaleFrequenciesForOctaves(currentKey, currentScale, data.bassOctaves),
         accompaniment: getScaleFrequenciesForOctaves(currentKey, currentScale, data.accompanimentOctaves),
-        melody: getScaleFrequenciesForOctaves(currentKey, currentScale, data.melodyOctaves),
+        melody: getScaleFrequenciesForOctaves(currentKey, currentScale, [3, 4]),
     };
 
     if (currentScale.includes('Major')) {
@@ -179,7 +179,7 @@ function tick(time: number) {
     }
 
     // Melody
-    if (enabledParts.melody && beat % 8 === 1 && Math.random() > 0.4) {
+    if (enabledParts.melody && (beat % 4 === 1 || beat % 8 === 5) && Math.random() > 0.5) {
         let nextDegree: number | null = null;
         
         if (lastMelodyDegree !== null) {
