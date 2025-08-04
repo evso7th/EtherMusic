@@ -59,8 +59,6 @@ export class AutopilotEngine {
     }
 
     private getWorker(style: AutopilotStyle): Worker {
-        // Unified worker logic: always use the same worker file.
-        // The style variation is handled inside the worker itself.
         const workerFileName = 'ambient.worker.js';
 
         if (workerCache[style]) {
@@ -73,8 +71,6 @@ export class AutopilotEngine {
         try {
             const worker = new Worker(workerPath, { type: 'module' });
             worker.onmessage = this.handleWorkerMessage;
-            // We cache it under the specific style name to handle potential re-activations,
-            // even though the source file is the same.
             workerCache[style] = worker;
             return worker;
         } catch (e) {
@@ -115,6 +111,11 @@ export class AutopilotEngine {
     }
     
     public setStyle(style: AutopilotStyle) {
+        if (this.currentStyle === style) return;
+
+        // Immediately stop notes from the old style
+        this.audioEngine.stopAutopilotNotes();
+
         this.currentStyle = style;
         this.postMessageToActiveWorker({ type: 'setStyle', style });
     }
@@ -176,5 +177,3 @@ export class AutopilotEngine {
         this.activeWorker = null;
     }
 }
-
-    

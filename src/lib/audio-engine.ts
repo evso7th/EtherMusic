@@ -331,6 +331,14 @@ export class AudioEngine {
         this.latchEngine.stopAll();
         this.drumMachine.stop();
     }
+
+    public stopAutopilotNotes() {
+        this.voicePool.forEach(voice => {
+            if (voice.instrumentType?.startsWith('autopilot_')) {
+                voice.release(0.01); // Very fast release
+            }
+        });
+    }
     
     // --- Setters ---
     

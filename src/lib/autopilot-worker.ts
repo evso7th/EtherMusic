@@ -188,8 +188,8 @@ function generateAmbient(time: number, beat: number, rootDegree: number, chordTo
         }
     }
     
-    // Melody - more frequent and less random
-    if (enabledParts.melody && beat % 2 === 0) { // Play every 8th note
+    // Melody
+    if (enabledParts.melody && beat % 2 === 0) { 
         let nextDegree: number | null = null;
         if (lastMelodyDegree !== null) {
             const direction = Math.random() < 0.5 ? 1 : -1;
@@ -211,8 +211,38 @@ function generateAmbient(time: number, beat: number, rootDegree: number, chordTo
     generateEffects(time, rootDegree);
 }
 
+function generateTrance(time: number, beat: number, rootDegree: number, chordToneDegrees: number[]) {
+    // Bass on the downbeat
+    if (enabledParts.bass && beat % 4 === 0) {
+        const freq = getFrequencyFromDegree(rootDegree, 'bass');
+        if (freq) {
+            self.postMessage({ type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '4n', vel: 1.0 }, time });
+        }
+    }
+
+    // Standard 16th note arpeggio for accompaniment
+    if (enabledParts.accompaniment) {
+        const arpPattern = [0, 1, 2, 1]; // Simple up-down arp
+        const patternIndex = beat % arpPattern.length;
+        const degree = chordToneDegrees[patternIndex];
+        const freq = getFrequencyFromDegree(degree, 'accompaniment');
+        if (freq) {
+            self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '16n', vel: 0.6 }, time });
+        }
+    }
+    
+    // Melody plays a longer note on the first beat of the measure
+    if (enabledParts.melody && beat === 0) {
+        const degree = chordToneDegrees[Math.floor(Math.random() * chordToneDegrees.length)];
+        const freq = getFrequencyFromDegree(degree, 'melody');
+        if (freq) {
+            self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '1m', vel: 0.7 }, time });
+        }
+    }
+}
+
+
 function generateToccata(time: number, beat: number, rootDegree: number, chordToneDegrees: number[]) {
-     // Bass (more active)
     if (enabledParts.bass && beat % 8 === 0) {
         const freq = getFrequencyFromDegree(rootDegree, 'bass');
         if (freq) {
@@ -220,7 +250,6 @@ function generateToccata(time: number, beat: number, rootDegree: number, chordTo
         }
     }
 
-    // Accompaniment (fast arpeggio)
     if (enabledParts.accompaniment && (beat % 2 === 0)) {
         const arpPattern = [0, 1, 2, 0, 2, 1, 0, 2];
         const patternIndex = beat % arpPattern.length;
@@ -231,7 +260,6 @@ function generateToccata(time: number, beat: number, rootDegree: number, chordTo
         }
     }
     
-    // Melody (continuous runs)
     if (enabledParts.melody) {
         let nextDegree: number | null = null;
         if (lastMelodyDegree !== null) {
@@ -246,14 +274,12 @@ function generateToccata(time: number, beat: number, rootDegree: number, chordTo
             self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '16n', vel: 0.7 }, time });
             lastMelodyDegree = nextDegree;
         } else {
-            // If out of range, jump back to a chord tone
             lastMelodyDegree = chordToneDegrees[0];
         }
     }
 }
 
 function generatePromenade(time: number, beat: number, rootDegree: number, chordToneDegrees: number[]) {
-    // Bass (stately, on the beat)
     if (enabledParts.bass && (beat % 8 === 0 || beat % 8 === 4)) {
         const degree = (beat % 8 === 0) ? rootDegree : chordToneDegrees[1];
         const freq = getFrequencyFromDegree(degree, 'bass');
@@ -262,7 +288,6 @@ function generatePromenade(time: number, beat: number, rootDegree: number, chord
         }
     }
 
-    // Accompaniment (block chords)
     if (enabledParts.accompaniment && beat % 4 === 0) {
         chordToneDegrees.forEach((degree, index) => {
             const freq = getFrequencyFromDegree(degree, 'accompaniment');
@@ -272,9 +297,8 @@ function generatePromenade(time: number, beat: number, rootDegree: number, chord
         });
     }
 
-    // Melody (more consistent walking bass)
     if (enabledParts.melody && beat % 2 === 0) {
-        const melodyPattern = [0, 1, 2, 1, 0, 1, 2, 1]; // More consistent pattern
+        const melodyPattern = [0, 1, 2, 1, 0, 1, 2, 1];
         const patternIndex = Math.floor(beat / 2) % melodyPattern.length;
         const degree = chordToneDegrees[melodyPattern[patternIndex % chordToneDegrees.length]];
         const freq = getFrequencyFromDegree(degree, 'melody');
@@ -285,7 +309,6 @@ function generatePromenade(time: number, beat: number, rootDegree: number, chord
 }
 
 function generateSpace(time: number, beat: number, rootDegree: number, chordToneDegrees: number[]) {
-     // Bass (slow drone)
     if (enabledParts.bass && beat === 0) {
         const freq = getFrequencyFromDegree(rootDegree, 'bass');
         if (freq) {
@@ -293,7 +316,6 @@ function generateSpace(time: number, beat: number, rootDegree: number, chordTone
         }
     }
 
-    // Accompaniment (slow, overlapping arpeggio)
     if (enabledParts.accompaniment && (beat % 8 === 0)) {
         let nextDegree: number | null = null;
         if (lastAccompanimentDegree !== null) {
@@ -311,12 +333,10 @@ function generateSpace(time: number, beat: number, rootDegree: number, chordTone
         }
     }
 
-    // Melody (long, evolving, overlapping notes)
     if (enabledParts.melody && beat % 16 === 0) {
         const degree = chordToneDegrees[Math.floor(Math.random() * chordToneDegrees.length)];
         const freq = getFrequencyFromDegree(degree, 'melody');
         if (freq) {
-            // Long note with a slow attack
             self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '1m', vel: 0.7 }, time });
         }
     }
@@ -343,8 +363,10 @@ function tick(time: number) {
         case 'Space':
             generateSpace(time, beat, rootDegree, chordToneDegrees);
             break;
-        case 'Ambient':
         case 'Trance':
+            generateTrance(time, beat, rootDegree, chordToneDegrees);
+            break;
+        case 'Ambient':
         case 'Sequence':
         case 'Chimes':
         case 'Drone':
@@ -420,11 +442,13 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
         case 'setStyle':
              // @ts-ignore
             currentStyle = data.style;
+            // When style changes, reset the music state to avoid weird transitions
+            lastMelodyDegree = null;
+            lastAccompanimentDegree = null;
+            tickCount = 0;
             break;
         case 'tick':
              // This case is no longer used as the worker runs its own loop
             break;
     }
 };
-
-    
