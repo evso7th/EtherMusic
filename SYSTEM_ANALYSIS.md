@@ -27,8 +27,8 @@ The application's logic is cleanly divided into three specialized engines:
 
 This is a critical performance and architectural feature.
 
-- **Isolation:** All complex music generation algorithms for each style (`Ambient`, `Toccata`, `Space`, etc.) are located in separate Web Worker files inside the `/public/assets/workers/` directory. This prevents the main UI thread from freezing during heavy computations.
-- **Dynamic Loading:** The `AutopilotEngine` dynamically instantiates the correct worker file based on the user's style selection. This makes the system modular and easy to extend with new styles without touching the core engine logic.
+- **Isolation:** All complex music generation algorithms for each style (`Ambient`, `Toccata`, `Space`, etc.) are located in a single, dedicated Web Worker file (`/public/assets/workers/ambient.worker.js`). This prevents the main UI thread from freezing during heavy computations.
+- **Dynamic Loading:** The `AutopilotEngine` dynamically instantiates the worker file. This makes the system modular and easy to extend with new styles without touching the core engine logic, as all style logic is contained within the single worker file.
 
 ## 3. Unidirectional Data Flow and UI as the Source of Truth
 
@@ -48,7 +48,7 @@ This is a critical performance and architectural feature.
     2. The `isAutopilotOn` state changes to `true`.
     3. A `useEffect` hook, which depends on `[isAutopilotOn, autopilotStyle]`, is triggered.
     4. It calls `autopilotEngine.current.setAutopilot(true, newStyle)`.
-    5. The `AutopilotEngine` loads the corresponding worker, syncs its state (tempo, key, etc.), and sends it a `'start'` message.
+    5. The `AutopilotEngine` loads the worker, syncs its state (tempo, key, etc.), and sends it a `'start'` message.
 
 - **Note Generation and Playback:**
     1. The active Web Worker generates a musical event (a note or a series of notes).

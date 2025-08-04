@@ -131,6 +131,7 @@ export default function Home() {
             audioEngine.current = mainEngine;
             
             const apEngine = new AutopilotEngine(mainEngine);
+            await apEngine.initialize();
             autopilotEngine.current = apEngine;
             
             // Sync initial state with the engines
@@ -342,7 +343,7 @@ export default function Home() {
                  <footer className="z-10 text-xs text-white/50 pb-4 text-center">
                     <p>Powered by theremin technology</p>
                     <p>&copy; 2025, EVS</p>
-                    <p className="mt-2">v.1.031</p>
+                    <p className="mt-2">v.1.035</p>
                 </footer>
             </div>
         )
