@@ -102,7 +102,7 @@ function updateMusicContext(data: any) {
     scaleFrequencies = {
         bass: getScaleFrequenciesForOctaves(currentKey, currentScale, data.bassOctaves),
         accompaniment: getScaleFrequenciesForOctaves(currentKey, currentScale, data.accompanimentOctaves),
-        melody: getScaleFrequenciesForOctaves(currentKey, currentScale, data.melodyOctaves),
+        melody: getScaleFrequenciesForOctaves(currentKey, currentScale, [3, 4]),
     };
 
     if (currentScale.includes('Major')) {
@@ -193,7 +193,7 @@ function generateAmbient(time: number, beat: number, rootDegree: number, chordTo
         let nextDegree: number | null = null;
         if (lastMelodyDegree !== null) {
             const direction = Math.random() < 0.5 ? 1 : -1;
-            const jump = Math.random() < 0.1 ? 2 : 1; 
+            const jump = Math.random() < 0.2 ? 2 : 1; 
             nextDegree = lastMelodyDegree + direction * jump;
         } else {
             nextDegree = chordToneDegrees[0];
@@ -344,6 +344,89 @@ function generateSpace(time: number, beat: number, rootDegree: number, chordTone
     generateEffects(time, rootDegree, 0.4);
 }
 
+function generateSequence(time: number, beat: number, rootDegree: number, chordToneDegrees: number[]) {
+    // Bass on the downbeat of the measure
+    if (enabledParts.bass && beat === 0) {
+        const freq = getFrequencyFromDegree(rootDegree, 'bass');
+        if (freq) {
+            self.postMessage({ type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '1m', vel: 0.9 }, time });
+        }
+    }
+
+    // A classic 16th-note arpeggiator for melody/accompaniment
+    if (enabledParts.melody) {
+        const arpPattern = [0, 1, 2, 1, 0, 2, 1, 0, 1, 2, 1, 2, 0, 1, 2, 0];
+        const patternIndex = beat % arpPattern.length;
+        const degree = chordToneDegrees[patternIndex % chordToneDegrees.length];
+        const freq = getFrequencyFromDegree(degree, 'melody');
+        if (freq) {
+            self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '16n', vel: 0.7 }, time });
+        }
+    }
+}
+
+function generateChimes(time: number, beat: number, rootDegree: number, chordToneDegrees: number[]) {
+    // Bass holds a long, low root note
+    if (enabledParts.bass && beat === 0) {
+        const freq = getFrequencyFromDegree(rootDegree, 'bass');
+        if (freq) {
+            self.postMessage({ type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '1m', vel: 0.7 }, time });
+        }
+    }
+    
+    // Melody and Accompaniment create a "rain" of notes
+    if (enabledParts.melody && Math.random() < 0.6) { // High probability of a note
+        const degree = chordToneDegrees[Math.floor(Math.random() * chordToneDegrees.length)];
+        const freq = getFrequencyFromDegree(degree + scaleIntervals.length, 'melody'); // Play one octave higher
+        if (freq) {
+            self.postMessage({
+                type: 'playNote',
+                note: {
+                    type: 'autopilot_melody',
+                    freq,
+                    dur: '2n', // Long duration for overlapping sounds
+                    vel: Math.random() * 0.4 + 0.3 // Random velocity
+                },
+                time
+            });
+        }
+    }
+}
+
+function generateDrone(time: number, beat: number, rootDegree: number, chordToneDegrees: number[]) {
+    // Bass and accompaniment play the full chord with a long attack and release
+    if (enabledParts.bass && beat === 0) {
+        chordToneDegrees.forEach((degree, index) => {
+            const freq = getFrequencyFromDegree(degree, 'bass');
+            if (freq) {
+                self.postMessage({
+                    type: 'playNote',
+                    note: {
+                        type: index === 0 ? 'autopilot_bass' : 'autopilot_accompaniment',
+                        freq,
+                        dur: '1m', // Very long duration
+                        vel: 0.6
+                    },
+                    time: time + index * 0.05 // Slightly stagger notes
+                });
+            }
+        });
+    }
+
+    // Melody plays a very sparse, high, and long note
+    if (enabledParts.melody && beat === 0 && Math.random() < 0.4) {
+        const degree = chordToneDegrees[Math.floor(Math.random() * chordToneDegrees.length)];
+        const freq = getFrequencyFromDegree(degree + scaleIntervals.length * 2, 'melody'); // Play two octaves higher
+        if (freq) {
+             self.postMessage({
+                type: 'playNote',
+                note: { type: 'autopilot_melody', freq, dur: '1m', vel: 0.7 },
+                time
+            });
+        }
+    }
+}
+
 
 function tick(time: number) {
     const measure = Math.floor(tickCount / subdivisions);
@@ -366,10 +449,16 @@ function tick(time: number) {
         case 'Trance':
             generateTrance(time, beat, rootDegree, chordToneDegrees);
             break;
-        case 'Ambient':
         case 'Sequence':
+            generateSequence(time, beat, rootDegree, chordToneDegrees);
+            break;
         case 'Chimes':
+            generateChimes(time, beat, rootDegree, chordToneDegrees);
+            break;
         case 'Drone':
+            generateDrone(time, beat, rootDegree, chordToneDegrees);
+            break;
+        case 'Ambient':
         default:
             generateAmbient(time, beat, rootDegree, chordToneDegrees);
             break;
@@ -452,3 +541,4 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             break;
     }
 };
+
