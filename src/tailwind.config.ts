@@ -121,8 +121,14 @@ export default {
           '70%': { boxShadow: '0 0 0 20px hsl(var(--primary) / 0)' },
         },
         'pulse-accent-glow': {
-          '0%, 100%': { boxShadow: '0 0 10px hsl(var(--accent) / 0.5), 0 0 20px hsl(var(--accent) / 0.3)' },
-          '50%': { boxShadow: '0 0 20px hsl(var(--accent) / 0.8), 0 0 35px hsl(var(--accent) / 0.5)' },
+           '0%, 100%': {
+            boxShadow:
+              '0 0 20px rgba(0, 191, 255, 0.5), 0 0 30px rgba(0, 191, 255, 0.3)',
+          },
+          '50%': {
+            boxShadow:
+              '0 0 30px rgba(0, 191, 255, 0.8), 0 0 45px rgba(0, 191, 255, 0.5)',
+          },
         },
       },
       animation: {
