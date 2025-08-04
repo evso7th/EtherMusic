@@ -205,7 +205,10 @@ export function ThereminPad({
             )}
             style={{ willChange: 'border-color, box-shadow' }}
         >
-            <CardHeader className="flex-shrink-0 flex flex-row items-center justify-end p-2">
+            <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between p-2">
+                <div className="text-xs text-muted-foreground capitalize pl-2">
+                    {activeInstrument?.replace('_', ' ')}
+                </div>
                 <div className="flex items-center gap-2">
                     {renderSettingsControls()}
                     {type === 'bass' && onLatchToggle && (
