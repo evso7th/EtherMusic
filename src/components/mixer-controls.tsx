@@ -6,7 +6,6 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Music, Waves, Drum, Bot, Anchor, Sparkles } from 'lucide-react';
 import { Separator } from './ui/separator';
-import { cn } from '@/lib/utils';
 
 type Volumes = { 
     melody: number; 
@@ -15,6 +14,7 @@ type Volumes = {
     drums: number; 
     autopilot: number;
     effects: number;
+    ebass: number;
 };
 
 type Effects = {
@@ -96,7 +96,7 @@ const InstrumentControls = ({
 );
 
 
-export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange, isMobile }: MixerControlsProps) {
+export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange }: MixerControlsProps) {
     
     const handleVolumeChange = (instrument: keyof Volumes, value: number) => {
         onVolumeChange({
@@ -188,3 +188,5 @@ export function MixerControls({ volumes, onVolumeChange, effects, onEffectChange
         </div>
     );
 }
+
+    

@@ -37,8 +37,8 @@ export const tempos: Tempo[] = [
     { name: 'Allegretto', bpm: 130 },
 ];
 
-export type Instrument = 'synth' | 'organ' | 'theremin' | 'E-Bells' | 'mellotron' | 'G-Drops';
-export const instruments: Instrument[] = ['synth', 'organ', 'theremin', 'E-Bells', 'mellotron', 'G-Drops'];
+export type Instrument = 'synth' | 'organ' | 'theremin' | 'E-Bells' | 'mellotron' | 'G-Drops' | 'ebass';
+export const instruments: Instrument[] = ['synth', 'organ', 'theremin', 'E-Bells', 'mellotron', 'G-Drops', 'ebass'];
 
 export type MusicKey = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B';
 export const musicKeys: MusicKey[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -74,7 +74,7 @@ export default function Home() {
     const [isPlaying, setIsPlaying] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
-    const [volumes, setVolumes] = useState({ melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, effects: -6 });
+    const [volumes, setVolumes] = useState({ melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, effects: -6, ebass: -6 });
     const [effects, setEffects] = useState({
         melody: { reverb: -Infinity, delay: -60 },
         manualBass: { reverb: -Infinity, delay: -60 },
@@ -206,7 +206,11 @@ export default function Home() {
     }, [autopilotParts]);
     
     useEffect(() => {
-        if (isReady && isAppStarted) {
+        if (isAppStarted && !isReady) {
+            // This will be triggered once after the app starts and engines are initializing.
+            // We set a flag or directly call initializeAudio.
+        } else if (isAppStarted && isReady) {
+            // This means engines are ready, now we can play.
             handlePlayPause();
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -423,7 +427,7 @@ export default function Home() {
                             color="hsl(var(--accent))"
                             isLatchOn={isBassLatchOn}
                             onLatchToggle={setIsBassLatchOn}
-                            instruments={instruments}
+                            instruments={instruments.filter(i => i !== 'theremin' && i !== 'G-Drops')} // Filter out instruments not suitable for bass
                             activeInstrument={bassInstrument}
                             onInstrumentChange={setBassInstrument}
                             isPolyphonic
@@ -433,7 +437,7 @@ export default function Home() {
                             type="melody"
                             frequencyRange={[220, 1760]}
                             color="hsl(var(--primary))"
-                            instruments={instruments}
+                            instruments={instruments.filter(i => i !== 'ebass')} // Filter out e-bass from melody
                             activeInstrument={melodyInstrument}
                             onInstrumentChange={setMelodyInstrument}
                             musicKeys={musicKeys}
@@ -467,7 +471,7 @@ export default function Home() {
                             autopilotParts={autopilotParts}
                             onAutopilotPartsChange={setAutopilotParts}
                             isMobile={isMobile}
-                            instruments={instruments}
+                            instruments={instruments.filter(i => i !== 'ebass')}
                         />
                     </div>
                 </main>
@@ -496,10 +500,12 @@ export default function Home() {
                         onAutopilotPartsChange={setAutopilotParts}
                         isMobile={isMobile}
                         isLandscape={true} // Pass landscape prop
-                        instruments={instruments}
+                        instruments={instruments.filter(i => i !== 'ebass')}
                     />
                 </div>
             </div>
         </div>
     );
 }
+
+    

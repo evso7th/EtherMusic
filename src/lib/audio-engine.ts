@@ -324,7 +324,7 @@ export class AudioEngine {
         this.channels.drums.volume.value = volumes.drums;
         this.channels.autopilot.volume.value = volumes.autopilot;
         this.channels.effects.volume.value = volumes.effects;
-        this.channels.ebass.volume.value = volumes.manualBass;
+        this.channels.ebass.volume.value = volumes.ebass;
     }
 
     public setEffects(effects: Record<string, any>) {
@@ -432,3 +432,5 @@ export class AudioEngine {
         return freqs.reduce((prev, curr) => (Math.abs(curr - targetFreq) < Math.abs(prev - targetFreq) ? curr : prev));
     }
 }
+
+    
