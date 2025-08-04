@@ -187,7 +187,8 @@ function tick(time: number) {
                 nextDegree = chordToneDegrees[Math.floor(Math.random() * chordToneDegrees.length)];
             }
         } else {
-            nextDegree = chordToneDegrees[Math.floor(Math.random() * chordToneDegrees.length)];
+            // Fix for the "loud start" bug: start with the root note gracefully.
+            nextDegree = chordToneDegrees[0];
         }
 
         if (nextDegree !== null) {
@@ -225,6 +226,7 @@ function tick(time: number) {
 function start() {
     stop(); 
     tickCount = 0;
+    lastMelodyDegree = null; // Reset last note on start
     const intervalSeconds = (60 / currentBpm) / (subdivisions / 4); // Interval for a 16th note
 
     let expected = self.performance.now();

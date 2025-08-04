@@ -38,7 +38,7 @@ export const tempos: Tempo[] = [
 ];
 
 export type Instrument = 'synth' | 'organ' | 'theremin' | 'E-Bells' | 'mellotron' | 'G-Drops';
-const instruments: Instrument[] = ['synth', 'organ', 'theremin', 'E-Bells', 'mellotron', 'G-Drops'];
+export const instruments: Instrument[] = ['synth', 'organ', 'theremin', 'E-Bells', 'mellotron', 'G-Drops'];
 
 export type MusicKey = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B';
 export const musicKeys: MusicKey[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -92,6 +92,7 @@ export default function Home() {
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
     const [isAutopilotOn, setIsAutopilotOn] = useState(false);
     const [autopilotStyle, setAutopilotStyle] = useState<AutopilotStyle>('Ambient');
+    const [autopilotInstrument, setAutopilotInstrument] = useState<Instrument>('synth');
     const [autopilotParts, setAutopilotParts] = useState<Record<AutopilotPart, boolean>>({
         bass: true,
         accompaniment: true,
@@ -138,6 +139,7 @@ export default function Home() {
             mainEngine.setEffects(effects);
             mainEngine.setMelodyInstrument(melodyInstrument);
             mainEngine.setBassInstrument(bassInstrument);
+            mainEngine.setAutopilotInstrument(autopilotInstrument);
             mainEngine.setHarmony(musicKey, musicScale);
             mainEngine.setBeatPattern(activePattern.name);
             
@@ -154,7 +156,7 @@ export default function Home() {
                 variant: "destructive"
             });
         }
-    }, [isReady, activeTempo.bpm, volumes, effects, melodyInstrument, bassInstrument, musicKey, musicScale, activePattern.name, toast]);
+    }, [isReady, activeTempo.bpm, volumes, effects, melodyInstrument, bassInstrument, autopilotInstrument, musicKey, musicScale, activePattern.name, toast]);
     
 
     // --- State Sync with Audio Engine ---
@@ -193,6 +195,12 @@ export default function Home() {
             audioEngine.current?.setBassInstrument(bassInstrument);
         }
     }, [bassInstrument, isReady]);
+
+    useEffect(() => {
+        if (isReady) {
+            audioEngine.current?.setAutopilotInstrument(autopilotInstrument);
+        }
+    }, [autopilotInstrument, isReady]);
     
     useEffect(() => {
         audioEngine.current?.setBassLatch(isBassLatchOn);
@@ -211,28 +219,9 @@ export default function Home() {
 
     // Autopilot Style Change Handler
     const handleAutopilotStyleChange = useCallback((newStyle: AutopilotStyle) => {
-        const oldStyle = autopilotStyle;
         setAutopilotStyle(newStyle);
         autopilotEngine.current?.setStyle(newStyle); // Inform the engine about the style change
-
-        // If switching TO Toccata from something else
-        if (newStyle === 'Toccata' && oldStyle !== 'Toccata') {
-            previousMelodySettings.current = {
-                instrument: melodyInstrument,
-                key: musicKey,
-                scale: musicScale,
-            };
-            setMelodyInstrument('organ');
-            setMusicKey('D');
-            setMusicScale('Minor');
-        } 
-        // If switching FROM Toccata to something else
-        else if (oldStyle === 'Toccata' && newStyle !== 'Toccata') {
-            setMelodyInstrument(previousMelodySettings.current.instrument);
-            setMusicKey(previousMelodySettings.current.key);
-            setMusicScale(previousMelodySettings.current.scale);
-        }
-    }, [autopilotStyle, melodyInstrument, musicKey, musicScale]);
+    }, []);
 
     // --- UI Event Handlers ---
     const handleStartApp = useCallback(async () => {
@@ -480,9 +469,12 @@ export default function Home() {
                             autopilotStyles={autopilotStyles}
                             activeAutopilotStyle={autopilotStyle}
                             onAutopilotStyleChange={handleAutopilotStyleChange}
+                            autopilotInstrument={autopilotInstrument}
+                            onAutopilotInstrumentChange={setAutopilotInstrument}
                             autopilotParts={autopilotParts}
                             onAutopilotPartsChange={setAutopilotParts}
                             isMobile={isMobile}
+                            instruments={instruments}
                         />
                     </div>
                 </main>
@@ -505,10 +497,13 @@ export default function Home() {
                         autopilotStyles={autopilotStyles}
                         activeAutopilotStyle={autopilotStyle}
                         onAutopilotStyleChange={handleAutopilotStyleChange}
+                        autopilotInstrument={autopilotInstrument}
+                        onAutopilotInstrumentChange={setAutopilotInstrument}
                         autopilotParts={autopilotParts}
                         onAutopilotPartsChange={setAutopilotParts}
                         isMobile={isMobile}
                         isLandscape={true} // Pass landscape prop
+                        instruments={instruments}
                     />
                 </div>
             </div>

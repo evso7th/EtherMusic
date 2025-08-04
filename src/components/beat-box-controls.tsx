@@ -19,16 +19,17 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { MixerControls } from '@/components/mixer-controls';
-import { SlidersHorizontal, Drum, Zap, Bot, Wand2, Power, TestTube2 } from 'lucide-react';
+import { SlidersHorizontal, Drum, Zap, Bot, Wand2, Power, TestTube2, Music } from 'lucide-react';
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
-import type { AutopilotStyle } from '@/app/page';
+import type { AutopilotStyle, Instrument } from '@/app/page';
 import { Separator } from "./ui/separator";
 import { Switch } from "./ui/switch";
 import { ScrollArea } from "./ui/scroll-area";
 import type { AutopilotPart } from "@/lib/autopilot-worker";
 import { Checkbox } from "./ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 
 type BeatPattern = {
@@ -76,10 +77,13 @@ interface BeatBoxControlsProps {
     autopilotStyles: AutopilotStyle[];
     activeAutopilotStyle: AutopilotStyle;
     onAutopilotStyleChange: (style: AutopilotStyle) => void;
+    autopilotInstrument: Instrument;
+    onAutopilotInstrumentChange: (instrument: Instrument) => void;
     autopilotParts: Record<AutopilotPart, boolean>;
     onAutopilotPartsChange: (parts: Record<AutopilotPart, boolean>) => void;
     isMobile: boolean;
     isLandscape?: boolean;
+    instruments: Instrument[];
 }
 
 const AutopilotDebugDialog = ({
@@ -151,10 +155,13 @@ export function BeatBoxControls({
     autopilotStyles,
     activeAutopilotStyle,
     onAutopilotStyleChange,
+    autopilotInstrument,
+    onAutopilotInstrumentChange,
     autopilotParts,
     onAutopilotPartsChange,
     isMobile,
     isLandscape = false,
+    instruments,
 }: BeatBoxControlsProps) {
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isTempoOpen, setIsTempoOpen] = useState(false);
@@ -285,32 +292,46 @@ export function BeatBoxControls({
                         </Button>
                     </DialogTrigger>
                      {/* Autopilot Dialog Content */}
-                     <DialogContent>
+                    <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>Autopilot Style</DialogTitle>
+                            <DialogTitle>Autopilot Controls</DialogTitle>
                         </DialogHeader>
                         <ScrollArea className="h-auto max-h-[70vh]">
-                            <div className='py-4 space-y-4 pr-4'>
+                            <div className='py-4 space-y-6 pr-4'>
                                 <div className="flex items-center space-x-2">
                                     <Switch id="autopilot-switch" checked={isAutopilotOn} onCheckedChange={onAutopilotToggle} />
                                     <Label htmlFor="autopilot-switch">Autopilot On/Off</Label>
                                 </div>
-                                <div className={cn(
-                                    "grid grid-cols-3 gap-2 transition-opacity",
-                                    !isAutopilotOn && "opacity-50 pointer-events-none"
-                                )}>
-                                    {autopilotStyles.map((style) => (
-                                        <Button
-                                            key={style}
-                                            variant={activeAutopilotStyle === style ? 'default' : 'outline'}
-                                            onClick={() => {
-                                                onAutopilotStyleChange(style);
-                                            }}
-                                            disabled={!isAutopilotOn}
-                                        >
-                                            {style}
-                                        </Button>
-                                    ))}
+                                <div className={cn("space-y-4 transition-opacity", !isAutopilotOn && "opacity-50 pointer-events-none")}>
+                                    <div>
+                                        <Label>Generation Style</Label>
+                                        <div className="grid grid-cols-3 gap-2 pt-2">
+                                            {autopilotStyles.map((style) => (
+                                                <Button
+                                                    key={style}
+                                                    variant={activeAutopilotStyle === style ? 'default' : 'outline'}
+                                                    onClick={() => onAutopilotStyleChange(style)}
+                                                    disabled={!isAutopilotOn}
+                                                    size="sm"
+                                                >
+                                                    {style}
+                                                </Button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <Label>Autopilot Instrument</Label>
+                                         <Select value={autopilotInstrument} onValueChange={onAutopilotInstrumentChange} disabled={!isAutopilotOn}>
+                                            <SelectTrigger className="capitalize mt-2">
+                                                <SelectValue placeholder="Instrument" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {instruments.map(inst => (
+                                                    <SelectItem key={inst} value={inst} className="capitalize">{inst}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                 </div>
                             </div>
                         </ScrollArea>
@@ -458,30 +479,44 @@ export function BeatBoxControls({
                     </DialogTrigger>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>Autopilot Style</DialogTitle>
+                            <DialogTitle>Autopilot Controls</DialogTitle>
                         </DialogHeader>
                         <ScrollArea className="h-auto max-h-[70vh]">
-                            <div className='py-4 space-y-4 pr-4'>
+                            <div className='py-4 space-y-6 pr-4'>
                                 <div className="flex items-center space-x-2">
                                     <Switch id="autopilot-switch-portrait" checked={isAutopilotOn} onCheckedChange={onAutopilotToggle} />
                                     <Label htmlFor="autopilot-switch-portrait">Autopilot On/Off</Label>
                                 </div>
-                                <div className={cn(
-                                    "grid grid-cols-3 gap-2 transition-opacity",
-                                    !isAutopilotOn && "opacity-50 pointer-events-none"
-                                )}>
-                                    {autopilotStyles.map((style) => (
-                                        <Button
-                                            key={style}
-                                            variant={activeAutopilotStyle === style ? 'default' : 'outline'}
-                                            onClick={() => {
-                                                onAutopilotStyleChange(style);
-                                            }}
-                                            disabled={!isAutopilotOn}
-                                        >
-                                            {style}
-                                        </Button>
-                                    ))}
+                                <div className={cn("space-y-4 transition-opacity", !isAutopilotOn && "opacity-50 pointer-events-none")}>
+                                    <div>
+                                        <Label>Generation Style</Label>
+                                        <div className="grid grid-cols-3 gap-2 pt-2">
+                                            {autopilotStyles.map((style) => (
+                                                <Button
+                                                    key={style}
+                                                    variant={activeAutopilotStyle === style ? 'default' : 'outline'}
+                                                    onClick={() => onAutopilotStyleChange(style)}
+                                                    disabled={!isAutopilotOn}
+                                                    size="sm"
+                                                >
+                                                    {style}
+                                                </Button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <Label>Autopilot Instrument</Label>
+                                         <Select value={autopilotInstrument} onValueChange={onAutopilotInstrumentChange} disabled={!isAutopilotOn}>
+                                            <SelectTrigger className="capitalize mt-2">
+                                                <SelectValue placeholder="Instrument" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {instruments.map(inst => (
+                                                    <SelectItem key={inst} value={inst} className="capitalize">{inst}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                 </div>
                             </div>
                         </ScrollArea>

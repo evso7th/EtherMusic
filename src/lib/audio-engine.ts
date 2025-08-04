@@ -146,6 +146,7 @@ export class AudioEngine {
     private isBassLatchOn = false;
     private currentMelodyInstrument: Instrument = 'theremin';
     private currentBassInstrument: Instrument = 'synth';
+    private currentAutopilotInstrument: Instrument = 'synth';
     
     constructor(orbManager: OrbManager) {
         this.orbManager = orbManager;
@@ -303,10 +304,10 @@ export class AudioEngine {
         // Determine the preset based on the autopilot part
         let preset;
         if (note.type === 'autopilot_melody' || note.type === 'autopilot_accompaniment') {
-             if (this.currentMelodyInstrument === 'E-Bells') {
+             if (this.currentAutopilotInstrument === 'E-Bells') {
                 preset = this.presets['E-Bells_melody'];
             } else {
-                preset = this.presets[this.currentMelodyInstrument];
+                preset = this.presets[this.currentAutopilotInstrument];
             }
         } else {
              preset = this.presets[note.type];
@@ -366,6 +367,10 @@ export class AudioEngine {
 
     public setBassInstrument(instrument: Instrument) {
         this.currentBassInstrument = instrument;
+    }
+
+    public setAutopilotInstrument(instrument: Instrument) {
+        this.currentAutopilotInstrument = instrument;
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
