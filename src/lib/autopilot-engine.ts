@@ -117,7 +117,7 @@ export class AutopilotEngine {
             key, 
             scale,
             bassOctaves: [2, 3], 
-            melodyOctaves: [3, 4, 5],
+            melodyOctaves: [3, 4],
             accompanimentOctaves: [3, 4]
         });
     }
