@@ -61,9 +61,6 @@ const effectTypes: InstrumentType[] = [
     'autopilot_effect_pulsar', 'autopilot_effect_nebula', 'autopilot_effect_comet', 'autopilot_effect_wind', 'autopilot_effect_echoes'
 ];
 
-let nextEffectTime = 0;
-
-
 // --- MUSIC THEORY HELPERS ---
 
 const scaleIntervalMap: { [key in MusicScale]: number[] } = {
@@ -172,8 +169,8 @@ function generateAmbient(time: number, beat: number, rootDegree: number, chordTo
     }
 
     // Accompaniment plays a chord tone on every half note
-    if (enabledParts.accompaniment && (beat % 8 === 0)) {
-        const degree = chordToneDegrees[Math.floor(beat / 8) % chordToneDegrees.length];
+    if (enabledParts.accompaniment && (beat % 4 === 0)) {
+        const degree = chordToneDegrees[Math.floor(beat / 4) % chordToneDegrees.length];
         const freq = getFrequencyFromDegree(degree, 'accompaniment');
         if (freq) {
             self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '2n', vel: 0.5 }, time });
@@ -357,13 +354,18 @@ function generateSequence(time: number, beat: number, measure: number, rootDegre
     // Main syncopated arpeggio for accompaniment
     if (enabledParts.accompaniment && cycleMeasure >= 2) {
         const basePattern = [0, 2, 1, 3, 0, 1, 2, 1]; // Using a slightly more complex pattern
-        const rhythmPattern = [0, 3, 4, 7, 10, 12, 14, 15]; // Syncopated rhythm
+        let rhythmPattern = [0, 3, 4, 7, 10, 12, 14, 15]; // Syncopated rhythm
 
         if (rhythmPattern.includes(beat)) {
             const noteIndex = rhythmPattern.indexOf(beat) % basePattern.length;
-            const degree = chordToneDegrees[basePattern[noteIndex] % chordToneDegrees.length] || rootDegree;
-            const freq = getFrequencyFromDegree(degree, 'accompaniment');
+            let degree = chordToneDegrees[basePattern[noteIndex] % chordToneDegrees.length] || rootDegree;
+            
+            // Evolution after 8 measures
+            if (cycleMeasure >= 8) {
+                degree += scaleIntervals.length; // Play one octave higher
+            }
 
+            const freq = getFrequencyFromDegree(degree, 'accompaniment');
             if (freq) {
                 self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '16n', vel: 0.65 }, time });
             }
@@ -395,77 +397,97 @@ function generateSequence(time: number, beat: number, measure: number, rootDegre
 
 
 function generateChimes(time: number, beat: number, rootDegree: number, chordToneDegrees: number[]) {
-    // Yes / "Fragile" inspired chimes
-    // Bass plays a more melodic and rhythmic role, not just a drone
-    if (enabledParts.bass && (beat % 4 === 0)) {
-        const bassPattern = [rootDegree, chordToneDegrees[1], chordToneDegrees[2], chordToneDegrees[1]];
-        const degree = bassPattern[Math.floor(beat / 4) % bassPattern.length];
-        const freq = getFrequencyFromDegree(degree, 'bass');
+    // Accompaniment creates a constant, fast, intricate arpeggio
+    if (enabledParts.accompaniment) {
+        const arpPattern = [0, 2, 1, 2, 0, 1, 2, 0]; // A more complex, non-linear pattern
+        const patternIndex = beat % arpPattern.length;
+        const degree = chordToneDegrees[patternIndex % chordToneDegrees.length];
+        const freq = getFrequencyFromDegree(degree, 'accompaniment');
         if (freq) {
-            self.postMessage({ type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '4n', vel: 0.9 }, time });
+            self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '16n', vel: 0.6 }, time });
         }
     }
     
-    // Accompaniment plays a fast, continuous, and intricate arpeggio
-    if (enabledParts.accompaniment) {
-        const arpPattern = [0, 1, 2, 1, 2, 0, 1, 2]; // A more complex pattern
-        const degree = chordToneDegrees[beat % arpPattern.length];
-        const freq = getFrequencyFromDegree(degree, 'accompaniment');
-        if (freq) {
-            self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '16n', vel: 0.5 }, time });
-        }
-    }
-
-    // Melody is more deliberate, playing on eighth notes and holding
+    // Melody plays a slower, more deliberate line over the top
     if (enabledParts.melody && (beat % 4 === 0)) {
         let nextDegree: number;
         if (lastMelodyDegree !== null) {
-             const direction = Math.random() < 0.6 ? 1 : -1;
-             nextDegree = lastMelodyDegree + direction;
+             // Stepwise motion, but with occasional larger leaps
+             const direction = Math.random() < 0.5 ? 1 : -1;
+             const leap = Math.random() < 0.2 ? 2 : 1; // 20% chance of a bigger jump
+             nextDegree = lastMelodyDegree + (direction * leap);
         } else {
             nextDegree = chordToneDegrees[0];
         }
 
         const freq = getFrequencyFromDegree(nextDegree, 'melody');
         if (freq) {
-            self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '4n', vel: 0.75 }, time });
+            self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '4n', vel: 0.8 }, time });
             lastMelodyDegree = nextDegree;
         } else {
-             lastMelodyDegree = chordToneDegrees[0];
+             lastMelodyDegree = chordToneDegrees[0]; // Reset if out of bounds
+        }
+    }
+     // Bass plays a more supportive role, on the first and third beat
+    if (enabledParts.bass && (beat === 0 || beat === 8)) {
+        const freq = getFrequencyFromDegree(rootDegree, 'bass');
+        if (freq) {
+            self.postMessage({ type: 'playNote', note: { type: 'autopilot_bass', freq, dur: '2n', vel: 0.9 }, time });
         }
     }
 }
 
 
-function generateDrone(time: number, beat: number, rootDegree: number, chordToneDegrees: number[]) {
-    // Bass and accompaniment play the full chord with a long attack and release
-    if ((enabledParts.bass || enabledParts.accompaniment) && beat === 0) {
+function generateDrone(time: number, beat: number, measure: number, rootDegree: number, chordToneDegrees: number[]) {
+    // Bass holds the root note for the entire measure for a solid foundation.
+    if (enabledParts.bass && beat === 0) {
+        const freq = getFrequencyFromDegree(rootDegree, 'bass');
+        if (freq) {
+            self.postMessage({
+                type: 'playNote',
+                note: { type: 'autopilot_bass', freq, dur: '1m', vel: 0.7 },
+                time
+            });
+        }
+    }
+
+    // Accompaniment plays the full chord with a long attack/release, creating the "drone" pad.
+    if (enabledParts.accompaniment && beat === 0) {
         chordToneDegrees.forEach((degree, index) => {
-            const freq = getFrequencyFromDegree(degree, 'bass'); // Use bass range for all drone notes
+            const freq = getFrequencyFromDegree(degree, 'accompaniment');
             if (freq) {
-                // Play bass on the root, accompaniment on the others
-                const partType = (index === 0 && enabledParts.bass) ? 'autopilot_bass' : 'autopilot_accompaniment';
-                
-                if ((partType === 'autopilot_bass' && enabledParts.bass) || (partType === 'autopilot_accompaniment' && enabledParts.accompaniment)) {
-                    self.postMessage({
-                        type: 'playNote',
-                        note: {
-                            type: partType,
-                            freq,
-                            dur: '1m', // Very long duration
-                            vel: 0.6
-                        },
-                        time: time + index * 0.05 // Slightly stagger notes
-                    });
-                }
+                self.postMessage({
+                    type: 'playNote',
+                    note: {
+                        type: 'autopilot_accompaniment',
+                        freq,
+                        dur: '1m', // Very long duration to blend notes
+                        vel: 0.5
+                    },
+                    time: time + index * 0.02 // Slightly stagger for a richer texture
+                });
             }
         });
     }
+    
+    // Effects are more frequent and specific, like the "ping" from Echoes.
+    if (enabledParts.effects && (beat === 4 || beat === 12)) {
+         // High, slightly dissonant note for the effect
+         const effectDegree = rootDegree + scaleIntervals.length + 4; 
+         const freq = getFrequencyFromDegree(effectDegree, 'melody');
+         if(freq) {
+            self.postMessage({
+                type: 'playNote',
+                note: { type: 'autopilot_effect_echoes', freq: freq, dur: '8n', vel: 0.8 },
+                time
+            });
+         }
+    }
 
-    // Melody plays a very sparse, high, and long note
-    if (enabledParts.melody && beat === 0 && Math.random() < 0.4) {
-        const degree = chordToneDegrees[Math.floor(Math.random() * chordToneDegrees.length)];
-        const freq = getFrequencyFromDegree(degree + scaleIntervals.length * 2, 'melody'); // Play two octaves higher
+    // Melody is very sparse, a single high note every few measures.
+    if (enabledParts.melody && beat === 0 && measure % 4 === 0) {
+        const melodyDegree = chordToneDegrees[Math.floor(Math.random() * chordToneDegrees.length)] + scaleIntervals.length;
+        const freq = getFrequencyFromDegree(melodyDegree, 'melody');
         if (freq) {
              self.postMessage({
                 type: 'playNote',
@@ -505,7 +527,7 @@ function tick(time: number) {
             generateChimes(time, beat, rootDegree, chordToneDegrees);
             break;
         case 'Drone':
-            generateDrone(time, beat, rootDegree, chordToneDegrees);
+            generateDrone(time, beat, measure, rootDegree, chordToneDegrees);
             break;
         case 'Ambient':
         default:
@@ -524,18 +546,18 @@ function start() {
     lastAccompanimentDegree = null;
     const intervalSeconds = (60 / currentBpm) / (subdivisions / 4); // Interval for a 16th note
 
-    let expected = self.performance.now();
+    // Using a self-adjusting timer to prevent drift over time.
+    let expected = self.performance.now() + intervalSeconds * 1000;
 
     const loop = () => {
-        const now = self.performance.now();
-        const drift = now - expected;
+        const drift = self.performance.now() - expected;
         if (drift > intervalSeconds * 1000) {
-            console.warn("Autopilot worker drift is high. Resetting expected time.");
-            expected = now;
+            // If we're lagging, reset the expected time to prevent snowballing delay.
+            expected = self.performance.now();
         }
         
-        // Pass the absolute time for scheduling in Tone.js
-        tick(now / 1000); 
+        // Pass the absolute time for precise scheduling in Tone.js
+        tick(expected / 1000); 
 
         expected += intervalSeconds * 1000;
         timerId = setTimeout(loop, Math.max(0, intervalSeconds * 1000 - drift));
@@ -592,4 +614,3 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
 };
 
     
-
