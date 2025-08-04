@@ -87,20 +87,6 @@ export class LatchEngine {
         return this.allowedFrequencies.reduce((prev, curr) => (Math.abs(curr - targetFreq) < Math.abs(prev - targetFreq) ? curr : prev));
     }
 
-    public startAll() {
-        this.latchedNotes.forEach(note => {
-            if (note.voice && note.voice.isAvailable()) {
-                note.voice.attack(note.initialFreq, note.volume, null, 'latch');
-            }
-        });
-    }
-    
-    public pauseAll() {
-        this.latchedNotes.forEach((note) => {
-            this.audioEngine.releaseLatchVoice(note.voice);
-        });
-    }
-
     public stopAll() {
         this.latchedNotes.forEach((note, id) => {
             this.releaseAndRemoveNote(id);
@@ -116,5 +102,3 @@ export class LatchEngine {
         }
     }
 }
-
-    

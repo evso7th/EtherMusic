@@ -6,119 +6,84 @@ import { LatchEngine } from './latch-engine';
 import { DrumMachine } from './drum-machine';
 import { OrbManager } from './orb-manager';
 
-export type InstrumentType = 
-    'melody' | 
-    'bass' | 
-    'latch' | 
-    'autopilot_melody' | 
-    'autopilot_accompaniment' | 
-    'autopilot_bass' |
-    'autopilot_effect_star' |
-    'autopilot_effect_meteor' |
-    'autopilot_effect_warp' |
-    'autopilot_effect_hole' |
-    'autopilot_effect_pulsar' |
-    'autopilot_effect_nebula' |
-    'autopilot_effect_comet' |
-    'autopilot_effect_wind' |
-    'autopilot_effect_echoes';
+export type InstrumentPart = 
+    | 'melody'
+    | 'bass'
+    | 'latch'
+    | 'autopilot_melody'
+    | 'autopilot_accompaniment'
+    | 'autopilot_bass'
+    | 'autopilot_effects';
 
-
-// A "Voice" represents a single synthesizer and its current state.
+// A "Voice" represents a single synthesizer instance. It is configured once and then reused.
 class Voice {
-    public synth: any; // Can be Tone.Synth or Tone.FMSynth etc.
+    public synth: any; // Can be Tone.Synth, Tone.FMSynth, etc.
     public isBusy = false;
     public activePointerId: number | null = null;
-    public instrumentType: InstrumentType | null = null;
+    public part: InstrumentPart;
     private releaseTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
-    constructor() {
-        // We start with a generic synth. It will be replaced by configure().
-        this.synth = new Tone.Synth();
-    }
-
-    isAvailable(): boolean {
-        // A voice is available if it's not busy.
-        return !this.isBusy;
-    }
-    
-    // Applies a preset and connects to the correct channel
-    configure(preset: any, channel: Tone.Channel) {
-        // Dispose of the old synth to prevent memory leaks
-        if (this.synth) {
-            this.synth.dispose();
-        }
-
+    constructor(preset: any, channel: Tone.Channel, part: InstrumentPart) {
+        this.part = part;
         const options = { ...preset.options };
-
+        
+        // Create the synth based on the preset type
         if (preset.type === 'FMSynth') {
             this.synth = new Tone.FMSynth(options).connect(channel);
         } else if (preset.type === 'AMSynth') {
             this.synth = new Tone.AMSynth(options).connect(channel);
+        } else if (preset.type === 'NoiseSynth') {
+            this.synth = new Tone.NoiseSynth(options).connect(channel);
         } else { // Default to standard Synth
             this.synth = new Tone.Synth(options).connect(channel);
         }
     }
     
-    attack(freq: number, vel: number, time: number | undefined, pointerId: number | null, type: InstrumentType) {
-        if (this.releaseTimeoutId) {
-            clearTimeout(this.releaseTimeoutId);
-            this.releaseTimeoutId = null;
-        }
+    isAvailable(): boolean {
+        return !this.isBusy;
+    }
+
+    attack(freq: number, vel: number, time: number | undefined, pointerId: number | null) {
+        if (this.releaseTimeoutId) clearTimeout(this.releaseTimeoutId);
         this.isBusy = true;
         this.activePointerId = pointerId;
-        this.instrumentType = type;
         this.synth.triggerAttack(freq, time, vel);
     }
     
-    release(duration: Tone.Unit.Time = 0) {
+    release(duration: Tone.Unit.Time = 0.1) {
         if (this.isBusy) {
             const releaseStartTime = Tone.now() + new Tone.Time(duration).toSeconds();
             this.synth.triggerRelease(releaseStartTime);
 
-            if (this.releaseTimeoutId) {
-                clearTimeout(this.releaseTimeoutId);
-            }
+            if (this.releaseTimeoutId) clearTimeout(this.releaseTimeoutId);
             
-            // Universal way to get release time for any synth type
             const releaseTimeMs = new Tone.Time(this.synth.get().envelope.release).toMilliseconds();
             
             this.releaseTimeoutId = setTimeout(() => {
                 this.isBusy = false;
                 this.activePointerId = null;
-                this.instrumentType = null;
-                this.releaseTimeoutId = null;
-            }, releaseTimeMs + 50); // Add 50ms buffer
+            }, releaseTimeMs + 100); // Add buffer
         }
     }
 
-    attackRelease(freq: number, dur: Tone.Unit.Time, time: number, vel: number, type: InstrumentType) {
-        if (this.releaseTimeoutId) {
-            clearTimeout(this.releaseTimeoutId);
-        }
+    attackRelease(freq: number, dur: Tone.Unit.Time, time: number, vel: number) {
+        if (this.releaseTimeoutId) clearTimeout(this.releaseTimeoutId);
         this.isBusy = true;
         this.activePointerId = null; 
-        this.instrumentType = type;
 
         this.synth.triggerAttackRelease(freq, dur, time, vel);
         
-        // Universal way to get release time
         const releaseTimeMs = new Tone.Time(this.synth.get().envelope.release).toMilliseconds();
         const totalDurationMs = new Tone.Time(dur).toMilliseconds() + releaseTimeMs;
-        
         const scheduledReleaseTime = (time - Tone.now()) * 1000;
 
         this.releaseTimeoutId = setTimeout(() => {
             this.isBusy = false;
-            this.instrumentType = null;
-            this.releaseTimeoutId = null;
-        }, scheduledReleaseTime + totalDurationMs + 50);
+        }, Math.max(0, scheduledReleaseTime) + totalDurationMs + 100);
     }
     
     dispose() {
-        if (this.releaseTimeoutId) {
-            clearTimeout(this.releaseTimeoutId);
-        }
+        if (this.releaseTimeoutId) clearTimeout(this.releaseTimeoutId);
         this.synth.dispose();
     }
 }
@@ -130,24 +95,21 @@ export class AudioEngine {
     public drumMachine!: DrumMachine;
     private latchEngine!: LatchEngine;
 
-    public channels!: {
-        [key: string]: Tone.Channel
-    };
+    public channels!: { [key: string]: Tone.Channel };
     public fx!: { reverb: Tone.Reverb, delay: Tone.FeedbackDelay };
     
-    // --- The Unified Voice Pool ---
-    private voicePool: Voice[] = [];
-    private readonly MAX_VOICES = 18; // Total voices for the entire app
-    private readonly MAX_MELODY_VOICES = 3;
-    private readonly MAX_BASS_VOICES = 3;
+    private voicePools: Map<InstrumentPart, Voice[]> = new Map();
     private presets: { [key: string]: any } = {};
 
     private allowedFrequencies = { bass: [] as number[], melody: [] as number[] };
     private isBassLatchOn = false;
-    private currentMelodyInstrument: Instrument = 'theremin';
-    private currentBassInstrument: Instrument = 'synth';
-    private currentAutopilotInstrument: Instrument = 'synth';
     
+    private currentInstruments: Record<'melody' | 'bass' | 'autopilot', Instrument> = {
+        melody: 'theremin',
+        bass: 'synth',
+        autopilot: 'synth'
+    };
+
     constructor(orbManager: OrbManager) {
         this.orbManager = orbManager;
     }
@@ -156,13 +118,11 @@ export class AudioEngine {
         if (this.isInitialized) return;
         await Tone.start();
 
-        // Master FX
+        // Master FX & Channels
         this.fx = {
             reverb: new Tone.Reverb({ decay: 8, wet: 1 }).toDestination(),
             delay: new Tone.FeedbackDelay("8n", 0.5).toDestination(),
         };
-
-        // Master Channels
         this.channels = {
             melody: new Tone.Channel(-6),
             manualBass: new Tone.Channel(-6),
@@ -172,65 +132,131 @@ export class AudioEngine {
             effects: new Tone.Channel(-6),
             ebass: new Tone.Channel(-6),
         };
-        
-        for (const [key, channel] of Object.entries(this.channels)) {
-            channel.connect(this.fx.reverb);
-            channel.connect(this.fx.delay);
-            channel.toDestination();
+        for (const channel of Object.values(this.channels)) {
+            channel.connect(this.fx.reverb).connect(this.fx.delay).toDestination();
         }
 
         this.createPresets();
-        
-        // --- Create the Unified Voice Pool ---
-        for (let i = 0; i < this.MAX_VOICES; i++) {
-            this.voicePool.push(new Voice());
-        }
+        this.initializeVoicePools();
         
         this.latchEngine = new LatchEngine(this, this.orbManager);
         
         this.drumMachine = new DrumMachine(this.channels.drums);
         await this.drumMachine.initialize();
         
-        const recorder = new Tone.Recorder();
-        Tone.getDestination().connect(recorder);
-        
         this.isInitialized = true;
-        console.log(`AudioEngine initialized with a unified pool of ${this.MAX_VOICES} voices.`);
+        console.log(`AudioEngine initialized with dedicated voice pools.`);
     }
 
-    // --- Core Voice Management ---
-    private getVoice(pointerId: number | null = null): Voice | null {
-        // First, check for a voice with the same pointerId (for note updates)
+    private initializeVoicePools() {
+        const poolSizes: Record<InstrumentPart, number> = {
+            melody: 3,
+            bass: 3,
+            latch: 3,
+            autopilot_melody: 4,
+            autopilot_accompaniment: 4,
+            autopilot_bass: 2,
+            autopilot_effects: 4
+        };
+
+        const partToChannel: Record<InstrumentPart, Tone.Channel> = {
+            melody: this.channels.melody,
+            bass: this.channels.manualBass,
+            latch: this.channels.latch,
+            autopilot_melody: this.channels.autopilot,
+            autopilot_accompaniment: this.channels.autopilot,
+            autopilot_bass: this.channels.autopilot,
+            autopilot_effects: this.channels.effects
+        };
+        
+        // Create dedicated pools
+        for (const part of Object.keys(poolSizes) as InstrumentPart[]) {
+            const size = poolSizes[part];
+            const channel = partToChannel[part];
+            const pool: Voice[] = [];
+            // We create a dummy preset just to instantiate the voices. They will be reconfigured later.
+            const initialPreset = this.presets['synth'];
+            for (let i = 0; i < size; i++) {
+                pool.push(new Voice(initialPreset, channel, part));
+            }
+            this.voicePools.set(part, pool);
+        }
+        
+        // Initial configuration
+        this.reconfigurePool('melody', this.currentInstruments.melody);
+        this.reconfigurePool('bass', this.currentInstruments.bass);
+        this.reconfigurePool('latch', this.currentInstruments.bass);
+        this.reconfigurePool('autopilot_melody', this.currentInstruments.autopilot);
+        this.reconfigurePool('autopilot_accompaniment', this.currentInstruments.autopilot);
+        this.reconfigurePool('autopilot_bass', 'autopilot_bass');
+        this.reconfigurePool('autopilot_effects', 'autopilot_effect_star'); // a default
+    }
+
+    private reconfigurePool(part: InstrumentPart, instrumentName: Instrument | string) {
+        const pool = this.voicePools.get(part);
+        const channel = this.getChannelForPart(part, instrumentName);
+        let presetKey = this.getPresetKey(part, instrumentName);
+        const preset = this.presets[presetKey];
+        
+        if (pool && preset && channel) {
+            pool.forEach(voice => {
+                // This is where we would re-create the synth if needed. For now, we assume synths don't change type mid-flight
+                 if (voice.synth.name !== preset.type) {
+                     voice.synth.dispose();
+                     if (preset.type === 'FMSynth') voice.synth = new Tone.FMSynth(preset.options).connect(channel);
+                     else if (preset.type === 'AMSynth') voice.synth = new Tone.AMSynth(preset.options).connect(channel);
+                     else if (preset.type === 'NoiseSynth') voice.synth = new Tone.NoiseSynth(preset.options).connect(channel);
+                     else voice.synth = new Tone.Synth(preset.options).connect(channel);
+                 } else {
+                    voice.synth.set(preset.options);
+                 }
+            });
+        }
+    }
+    
+    private getChannelForPart(part: InstrumentPart, instrumentName: string | Instrument): Tone.Channel {
+        if ((part === 'bass' || part === 'latch') && instrumentName === 'ebass') {
+            return this.channels.ebass;
+        }
+        const partToChannelMap: Record<InstrumentPart, Tone.Channel> = {
+            melody: this.channels.melody, bass: this.channels.manualBass, latch: this.channels.latch,
+            autopilot_melody: this.channels.autopilot, autopilot_accompaniment: this.channels.autopilot,
+            autopilot_bass: this.channels.autopilot, autopilot_effects: this.channels.effects
+        };
+        return partToChannelMap[part];
+    }
+    
+    private getPresetKey(part: InstrumentPart, instrumentName: string | Instrument): string {
+         if (instrumentName === 'E-Bells') {
+            return (part === 'melody' || part === 'autopilot_melody' || part === 'autopilot_accompaniment') ? 'E-Bells_melody' : 'E-Bells_bass';
+        }
+        if (part === 'autopilot_effects' || part === 'autopilot_bass') {
+            return instrumentName;
+        }
+        return instrumentName;
+    }
+
+    private getVoiceFromPool(part: InstrumentPart, pointerId: number | null = null): Voice | null {
+        const pool = this.voicePools.get(part);
+        if (!pool) return null;
+
         if (pointerId !== null) {
-            const existing = this.voicePool.find(v => v.activePointerId === pointerId);
+            const existing = pool.find(v => v.activePointerId === pointerId);
             if (existing) return existing;
         }
 
-        // Find the first available voice
-        let voice = this.voicePool.find(v => v.isAvailable());
-        if (voice) {
-            return voice;
+        const availableVoice = pool.find(v => v.isAvailable());
+        if (!availableVoice) {
+            // console.warn(`No available voices in pool: ${part}`);
+            return null;
         }
-        
-        // Voice stealing could be implemented here if needed, but for now, we just return null.
-        console.warn("No available voices in the pool.");
-        return null;
+        return availableVoice;
     }
     
-    // --- Theremin Interaction ---
+    // --- Public Methods ---
 
     public startNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}) {
         if (!this.isInitialized) return;
-        
-        const activeVoicesOfType = this.voicePool.filter(v => v.instrumentType === type && !v.isAvailable()).length;
-
-        if (type === 'melody' && activeVoicesOfType >= this.MAX_MELODY_VOICES) {
-            return;
-        }
-        if (type === 'bass' && activeVoicesOfType >= this.MAX_BASS_VOICES) {
-            return;
-        }
-
         const quantizedFreq = this.getClosestFrequency(freq, type);
         
         if (type === 'bass' && this.isBassLatchOn) {
@@ -238,113 +264,58 @@ export class AudioEngine {
             return;
         }
         
-        const voice = this.getVoice();
+        const voice = this.getVoiceFromPool(type, pointerId);
         if (voice) {
             const time = Tone.now();
-            const instrumentName = type === 'melody' ? this.currentMelodyInstrument : this.currentBassInstrument;
-            
-            // Special channel handling for e-bass
-            const channel = (instrumentName === 'ebass') 
-                ? this.channels.ebass 
-                : (type === 'melody' ? this.channels.melody : this.channels.manualBass);
-
-            let presetKey: string;
-            if (instrumentName === 'E-Bells') {
-                presetKey = `E-Bells_${type}`;
-            } else {
-                 presetKey = instrumentName;
-            }
-            
-            const preset = this.presets[presetKey];
-            
-            if (preset) {
-                voice.configure(preset, channel);
-                voice.attack(quantizedFreq, vol*vol, time, pointerId, type);
-                this.orbManager.addOrb(pointerId, type, pos.x, pos.y);
-            }
+            voice.attack(quantizedFreq, vol*vol, time, pointerId);
+            this.orbManager.addOrb(pointerId, type, pos.x, pos.y);
         }
     }
 
     public updateNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}) {
         if (!this.isInitialized) return;
-        const voice = this.getVoice(pointerId);
+        const voice = this.getVoiceFromPool(type, pointerId);
         if (voice) {
             const quantizedFreq = this.getClosestFrequency(freq, type);
-            if (voice.synth.frequency) {
-                voice.synth.frequency.value = quantizedFreq;
-            }
-            if (voice.synth.volume) {
-                 voice.synth.volume.value = Tone.gainToDb(vol * vol);
-            }
+            if (voice.synth.frequency) voice.synth.frequency.value = quantizedFreq;
+            if (voice.synth.volume) voice.synth.volume.value = Tone.gainToDb(vol * vol);
             this.orbManager.updateOrb(pointerId, pos.x, pos.y);
         }
     }
 
     public stopNote(type: 'melody' | 'bass', pointerId: number) {
-        if (!this.isInitialized) return;
-        if (this.isBassLatchOn && type === 'bass') return;
-
-        const voice = this.getVoice(pointerId);
+        if (!this.isInitialized || (this.isBassLatchOn && type === 'bass')) return;
+        const voice = this.getVoiceFromPool(type, pointerId);
         if (voice) {
-            voice.release(0.1); // Give a short release for manual notes
+            voice.release();
             this.orbManager.removeOrb(pointerId);
         }
     }
-    
-    public playAutopilotEvent(note: {type: InstrumentType, freq: number, dur: Tone.Unit.Time, vel: number}, time: number) {
-         if (!this.isInitialized || note.freq === null || note.freq === undefined) {
-             return;
-        }
 
-        const voice = this.getVoice();
-        if (!voice) {
-            return; 
-        }
+    public playAutopilotEvent(note: {type: InstrumentPart, freq: number, dur: Tone.Unit.Time, vel: number}, time: number) {
+        if (!this.isInitialized || note.freq === null || note.freq === undefined) return;
 
-        // Determine the preset based on the autopilot part
-        let preset;
-        if (note.type === 'autopilot_melody' || note.type === 'autopilot_accompaniment') {
-             if (this.currentAutopilotInstrument === 'E-Bells') {
-                preset = this.presets['E-Bells_melody'];
-            } else {
-                preset = this.presets[this.currentAutopilotInstrument];
-            }
-        } else {
-             preset = this.presets[note.type];
-        }
-
-        if (!preset) {
-            console.warn(`AudioEngine: No preset for instrument type "${note.type}"`);
-            return;
+        // Reconfigure effects pool on the fly for variety
+        if (note.type === 'autopilot_effects') {
+             const effectName = note.freq > 500 ? 'autopilot_effect_star' : 'autopilot_effect_meteor'; // Example logic
+             this.reconfigurePool('autopilot_effects', effectName);
         }
         
-        const channel = note.type.startsWith('autopilot_effect') ? this.channels.effects : this.channels.autopilot;
-        
-        voice.configure(preset, channel);
-        voice.attackRelease(note.freq, note.dur, time, note.vel, note.type);
+        const voice = this.getVoiceFromPool(note.type);
+        if (voice) {
+            voice.attackRelease(note.freq, note.dur, time, note.vel);
+        }
     }
-
+    
     public stopAllSounds() {
-        this.voicePool.forEach(voice => voice.release(0.1));
+        this.voicePools.forEach(pool => pool.forEach(voice => voice.release(0.1)));
         this.orbManager.removeAllOrbs('melody');
         this.orbManager.removeAllOrbs('bass');
         this.latchEngine.stopAll();
-        this.drumMachine.stop();
-    }
-
-    public stopAutopilotNotes() {
-        this.voicePool.forEach(voice => {
-            if (voice.instrumentType?.startsWith('autopilot_')) {
-                voice.release(0.01); // Very fast release
-            }
-        });
+        if (this.isInitialized) this.drumMachine.stop();
     }
     
-    // --- Setters ---
-    
-    public setTempo(bpm: number) {
-        Tone.Transport.bpm.value = bpm;
-    }
+    public setTempo(bpm: number) { Tone.Transport.bpm.value = bpm; }
 
     public setVolumes(volumes: Record<string, number>) {
         this.channels.melody.volume.value = volumes.melody;
@@ -353,7 +324,7 @@ export class AudioEngine {
         this.channels.drums.volume.value = volumes.drums;
         this.channels.autopilot.volume.value = volumes.autopilot;
         this.channels.effects.volume.value = volumes.effects;
-        this.channels.ebass.volume.value = volumes.manualBass; // E-Bass uses manualBass volume
+        this.channels.ebass.volume.value = volumes.manualBass;
     }
 
     public setEffects(effects: Record<string, any>) {
@@ -365,20 +336,23 @@ export class AudioEngine {
         }
     }
     
-    public setBeatPattern(patternName: string) {
-        this.drumMachine.setBeatPattern(patternName);
-    }
+    public setBeatPattern(patternName: string) { if(this.isInitialized) this.drumMachine.setBeatPattern(patternName); }
     
     public setMelodyInstrument(instrument: Instrument) {
-        this.currentMelodyInstrument = instrument;
+        this.currentInstruments.melody = instrument;
+        this.reconfigurePool('melody', instrument);
     }
 
     public setBassInstrument(instrument: Instrument) {
-        this.currentBassInstrument = instrument;
+        this.currentInstruments.bass = instrument;
+        this.reconfigurePool('bass', instrument);
+        this.reconfigurePool('latch', instrument); // Latch follows bass instrument
     }
 
     public setAutopilotInstrument(instrument: Instrument) {
-        this.currentAutopilotInstrument = instrument;
+        this.currentInstruments.autopilot = instrument;
+        this.reconfigurePool('autopilot_melody', instrument);
+        this.reconfigurePool('autopilot_accompaniment', instrument);
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
@@ -394,124 +368,46 @@ export class AudioEngine {
         this.latchEngine.setLatch(isLatchOn);
     }
     
-    // --- Latch specific methods ---
     public getLatchVoice(freq: number, vol: number): Voice | null {
-        const voice = this.getVoice();
+        const voice = this.getVoiceFromPool('latch');
         if (voice) {
-            const time = Tone.now();
-            const instrumentName = this.currentBassInstrument;
-            
-            let presetKey: string;
-            if (instrumentName === 'E-Bells') {
-                presetKey = 'E-Bells_bass';
-            } else {
-                 presetKey = instrumentName;
-            }
-            const preset = this.presets[presetKey];
-            
-            // Special channel handling for e-bass
-            const channel = (instrumentName === 'ebass') ? this.channels.ebass : this.channels.latch;
-
-            if (preset) {
-                voice.configure(preset, channel);
-                voice.attack(freq, vol, time, null, 'latch');
-            }
+            voice.attack(freq, vol, Tone.now(), null);
         }
         return voice;
     }
     
-    public releaseLatchVoice(voice: Voice) {
-        voice.release(0.5); // Give a gentle release for latched notes
+    public releaseLatchVoice(voice: Voice) { voice.release(0.5); }
+
+    public async setPlaying(isPlaying: boolean) {
+        if (!this.isInitialized) return;
+        if (isPlaying && Tone.context.state !== 'running') await Tone.start();
+        if (isPlaying) {
+             if (Tone.Transport.state !== 'started') Tone.Transport.start();
+        } else {
+             if (Tone.Transport.state === 'started') Tone.Transport.pause();
+        }
     }
 
-
-    // --- Private Helpers ---
+    public stop() {
+        if (this.isInitialized) {
+            this.stopAllSounds();
+            if (Tone.Transport.state !== 'stopped') Tone.Transport.stop();
+        }
+    }
+    
     private createPresets() {
         this.presets = {
             synth: { type: 'Synth', options: { oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } } },
-            organ: {
-                type: 'Synth',
-                options: {
-                    oscillator: { type: 'fatsawtooth', count: 3, spread: 20 },
-                    envelope: { attack: 0.05, decay: 0.2, sustain: 0.7, release: 1.2 }
-                }
-            },
+            organ: { type: 'Synth', options: { oscillator: { type: 'fatsawtooth', count: 3, spread: 20 }, envelope: { attack: 0.05, decay: 0.2, sustain: 0.7, release: 1.2 } } },
             theremin: { type: 'Synth', options: { oscillator: { type: 'sine' }, envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 } } },
-            mellotron: {
-                type: 'FMSynth',
-                options: {
-                    harmonicity: 3,
-                    modulationIndex: 0.5,
-                    oscillator: { type: "sine" },
-                    envelope: { attack: 0.1, decay: 0.2, sustain: 0.4, release: 0.8 },
-                    modulation: { type: "sine" },
-                    modulationEnvelope: { attack: 0.2, decay: 0.5, sustain: 0.1, release: 0.8 }
-                }
-            },
-            ebass: {
-                type: 'FMSynth',
-                options: {
-                    harmonicity: 1,
-                    modulationIndex: 3.5,
-                    oscillator: { type: 'sine' },
-                    envelope: { attack: 0.01, decay: 0.3, sustain: 0.1, release: 0.5 },
-                    modulation: { type: 'square' },
-                    modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.2 }
-                }
-            },
-            'E-Bells_melody': {
-                type: 'FMSynth',
-                options: {
-                    harmonicity: 1.4,
-                    modulationIndex: 20,
-                    oscillator: { type: 'sine' },
-                    envelope: { attack: 0.001, decay: 1.6, sustain: 0, release: 1.6 },
-                    modulation: { type: 'square' },
-                    modulationEnvelope: { attack: 0.002, decay: 0.4, sustain: 0, release: 0.4 }
-                }
-            },
-            'E-Bells_bass': {
-                type: 'FMSynth',
-                options: {
-                    harmonicity: 1.4,
-                    modulationIndex: 15,
-                    oscillator: { type: 'sine' },
-                    envelope: { attack: 0.01, decay: 1.5, sustain: 0, release: 2.5 },
-                    modulation: { type: 'square' },
-                    modulationEnvelope: { attack: 0.01, decay: 1.0, sustain: 0, release: 1.0 }
-                }
-            },
-            'G-Drops': {
-                type: 'FMSynth',
-                options: {
-                    harmonicity: 0.5,
-                    modulationIndex: 3.5,
-                    oscillator: { type: 'sine' },
-                    envelope: { attack: 0.01, decay: 0.7, sustain: 0.1, release: 0.4 },
-                    modulation: { type: 'triangle' },
-                    modulationEnvelope: { attack: 0.01, decay: 0.5, sustain: 0, release: 0.2 }
-                }
-            },
-            // Autopilot presets
-            autopilot_bass: {
-                type: 'Synth',
-                options: {
-                    oscillator: { type: "fmsine", harmonicity: 0.5 },
-                    filter: { Q: 1, type: 'lowpass', rolloff: -12 },
-                    envelope: { attack: 0.1, decay: 0.3, sustain: 0.4, release: 1.2 },
-                    filterEnvelope: { attack: 0.05, decay: 0.2, sustain: 0.1, release: 1, baseFrequency: 200, octaves: 1.5 }
-                }
-            },
-            // Effect presets
-            autopilot_effect_star: { type: 'FMSynth', options: { oscillator: { type: 'fmsine', modulationType: 'sine', harmonicity: 0.8 }, envelope: { attack: 0.01, decay: 0.8, sustain: 0, release: 0.5 } } },
-            autopilot_effect_meteor: { type: 'NoiseSynth', options: { noise: { type: 'white' }, filter: { type: 'bandpass', Q: 15 }, envelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.2, attackCurve: 'exponential' } } },
-            autopilot_effect_warp: { type: 'NoiseSynth', options: { noise: { type: 'pink', playbackRate: 0.2 }, filter: { type: 'lowpass', Q: 2 }, envelope: { attack: 0.5, decay: 0.8, sustain: 0.1, release: 1 } } },
-            autopilot_effect_hole: { type: 'AMSynth', options: { oscillator: { type: 'amsine', harmonicity: 0.2 }, envelope: { attack: 2, decay: 2, sustain: 0, release: 1 } } },
-            autopilot_effect_pulsar: { type: 'Synth', options: { oscillator: { type: 'pwm', modulationFrequency: 0.2 }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.2 } } },
-            autopilot_effect_nebula: { type: 'Synth', options: { oscillator: { type: 'fatsawtooth', count: 5, spread: 80 }, envelope: { attack: 1.5, decay: 2, sustain: 0.5, release: 2 } } },
-            autopilot_effect_comet: { type: 'Synth', options: { oscillator: { type: 'pulse', width: 0.1 }, envelope: { attack: 0.01, decay: 0.5, sustain: 0, release: 0.8 } } },
-            autopilot_effect_wind: { type: 'NoiseSynth', options: { noise: { type: 'brown' }, filter: { type: 'bandpass', Q: 8 }, envelope: { attack: 2, decay: 5, sustain: 0.1, release: 3 } } },
-            autopilot_effect_echoes: { type: 'Synth', options: { oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.5 } } },
+            mellotron: { type: 'FMSynth', options: { harmonicity: 3, modulationIndex: 0.5, oscillator: { type: "sine" }, envelope: { attack: 0.1, decay: 0.2, sustain: 0.4, release: 0.8 }, modulation: { type: "sine" }, modulationEnvelope: { attack: 0.2, decay: 0.5, sustain: 0.1, release: 0.8 } } },
+            ebass: { type: 'FMSynth', options: { harmonicity: 1, modulationIndex: 3.5, oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.3, sustain: 0.1, release: 0.5 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.2 } } },
+            'E-Bells_melody': { type: 'FMSynth', options: { harmonicity: 1.4, modulationIndex: 20, oscillator: { type: 'sine' }, envelope: { attack: 0.001, decay: 1.6, sustain: 0, release: 1.6 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.002, decay: 0.4, sustain: 0, release: 0.4 } } },
+            'E-Bells_bass': { type: 'FMSynth', options: { harmonicity: 1.4, modulationIndex: 15, oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 1.5, sustain: 0, release: 2.5 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.01, decay: 1.0, sustain: 0, release: 1.0 } } },
+            'G-Drops': { type: 'FMSynth', options: { harmonicity: 0.5, modulationIndex: 3.5, oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.7, sustain: 0.1, release: 0.4 }, modulation: { type: 'triangle' }, modulationEnvelope: { attack: 0.01, decay: 0.5, sustain: 0, release: 0.2 } } },
+            autopilot_bass: { type: 'Synth', options: { oscillator: { type: "fmsine", harmonicity: 0.5 }, filter: { Q: 1, type: 'lowpass', rolloff: -12 }, envelope: { attack: 0.1, decay: 0.3, sustain: 0.4, release: 1.2 }, filterEnvelope: { attack: 0.05, decay: 0.2, sustain: 0.1, release: 1, baseFrequency: 200, octaves: 1.5 } } },
+            autopilot_effect_star: { type: 'FMSynth', options: { harmonicity: 1.4, modulationIndex: 20, envelope: { attack: 0.01, decay: 1.2, release: 1.2 } } },
+            autopilot_effect_meteor: { type: 'NoiseSynth', options: { noise: { type: 'white' }, filter: { Q: 10 }, envelope: { attack: 0.01, decay: 0.3, release: 0.5 } } },
         };
     }
 
@@ -524,42 +420,15 @@ export class AudioEngine {
         const intervals = scaleIntervals[scale];
         octaves.forEach(octave => {
             intervals.forEach(interval => {
-                const note = Tone.Frequency(key + octave).transpose(interval);
-                allFrequencies.push(note.toFrequency());
+                allFrequencies.push(Tone.Frequency(key + octave).transpose(interval).toFrequency());
             });
         });
         return allFrequencies.sort((a,b) => a - b);
     };
 
     private getClosestFrequency(targetFreq: number, type: 'bass' | 'melody'): number {
-        const freqs = type === 'bass' ? this.allowedFrequencies.bass : this.allowedFrequencies.melody;
+        const freqs = this.allowedFrequencies[type];
         if (freqs.length === 0) return targetFreq;
         return freqs.reduce((prev, curr) => (Math.abs(curr - targetFreq) < Math.abs(prev - targetFreq) ? curr : prev));
-    }
-    
-    public async setPlaying(isPlaying: boolean) {
-        if (!this.isInitialized) return;
-        
-        if (isPlaying) {
-            if (Tone.Transport.state !== 'started') {
-                await Tone.start(); // Ensure context is running
-                Tone.Transport.start();
-                this.latchEngine.startAll();
-            }
-        } else {
-            if (Tone.Transport.state === 'started') {
-                Tone.Transport.pause();
-                this.latchEngine.pauseAll();
-            }
-        }
-    }
-
-    public stop() {
-        if (this.isInitialized) {
-            this.stopAllSounds();
-            if (Tone.Transport.state !== 'stopped') {
-                Tone.Transport.stop();
-            }
-        }
     }
 }

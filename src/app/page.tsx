@@ -99,11 +99,6 @@ export default function Home() {
         melody: true,
         effects: true
     });
-    const previousMelodySettings = useRef({
-        instrument: melodyInstrument,
-        key: musicKey,
-        scale: musicScale,
-    });
 
 
     // --- Engine Ref ---
@@ -131,8 +126,7 @@ export default function Home() {
             audioEngine.current = mainEngine;
             
             const apEngine = new AutopilotEngine(mainEngine);
-            await apEngine.initialize();
-            autopilotEngine.current = apEngine;
+            autopilotEngine.current = apEngine; // Assign ref here
             
             // Sync initial state with the engines
             mainEngine.setTempo(activeTempo.bpm);
@@ -260,13 +254,11 @@ export default function Home() {
     }, [isMobile, initializeAudio]);
     
     const handlePlayPause = useCallback(async () => {
-        if (!isReady) return;
+        if (!audioEngine.current) return;
         const willBePlaying = !isPlaying;
-        
-        await audioEngine.current?.setPlaying(willBePlaying);
+        await audioEngine.current.setPlaying(willBePlaying);
         setIsPlaying(willBePlaying);
-
-    }, [isReady, isPlaying]);
+    }, [isPlaying]);
 
     useEffect(() => {
         if (!isReady || !autopilotEngine.current) return;
@@ -277,13 +269,13 @@ export default function Home() {
 
 
     const handleStop = useCallback(async () => {
-        if (!isReady) return;
-        audioEngine.current?.stop();
+        if (!audioEngine.current) return;
+        audioEngine.current.stop();
         if (isAutopilotOn) {
             setIsAutopilotOn(false);
         }
         setIsPlaying(false);
-    }, [isReady, isAutopilotOn]);
+    }, [isAutopilotOn]);
 
     const handleRecord = useCallback(() => {
         toast({ title: "Recording Unavailable", description: "This feature is temporarily disabled." });
@@ -511,5 +503,3 @@ export default function Home() {
         </div>
     );
 }
-
-    

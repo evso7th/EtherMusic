@@ -1,14 +1,14 @@
 
 
 import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
-import type { InstrumentType } from './audio-engine';
+import type { InstrumentPart } from './audio-engine';
 import type { Unit } from 'tone/build/esm/core/type/Units';
 
 // --- TYPE DEFINITIONS ---
-export type AutopilotPart = 'bass' | 'accompaniment' | 'melody' | 'effects';
+export type { AutopilotPart };
 
 export type NoteEvent = {
-    type: InstrumentType;
+    type: InstrumentPart;
     freq: number;
     dur: Unit.Time;
     vel: number;
@@ -71,10 +71,14 @@ let scaleFrequencies: Record<'bass' | 'accompaniment' | 'melody', number[]> = {
 let scaleIntervals: number[] = [];
 
 // This state holds the currently selected patterns for the measure
-let activePatterns = {
-    bass: null as Pattern | null,
-    accompaniment: null as Pattern | null,
-    melody: null as Pattern | null,
+let activePatterns: {
+    bass: Pattern | null,
+    accompaniment: Pattern | null,
+    melody: Pattern | null,
+} = {
+    bass: null,
+    accompaniment: null,
+    melody: null,
 }
 
 // --- MUSIC THEORY & UTILITIES ---
@@ -120,8 +124,6 @@ function getFrequencyFromDegree(degree: number, part: keyof typeof scaleFrequenc
     }
     return null;
 }
-
-const effectTypes: InstrumentType[] = ['autopilot_effect_star', 'autopilot_effect_meteor', 'autopilot_effect_comet', 'autopilot_effect_echoes'];
 
 // --- PATTERN LIBRARY ---
 
@@ -283,11 +285,10 @@ function chooseNewPatternsForMeasure(measure: number) {
     const style = patternLibrary[currentStyle];
     if (!style) return;
 
-    const chooseRandom = (arr: any[]) => arr[Math.floor(Math.random() * arr.length)];
+    const chooseRandom = (arr: any[]) => arr.length > 0 ? arr[Math.floor(Math.random() * arr.length)] : null;
     
     activePatterns.bass = chooseRandom(style.bass.grooves);
     
-    // Every 4th measure, play a fill, otherwise a groove.
     const isFillMeasure = measure % 4 === 3;
     
     activePatterns.accompaniment = isFillMeasure && style.accompaniment.fills.length > 0 
@@ -298,12 +299,14 @@ function chooseNewPatternsForMeasure(measure: number) {
         ? chooseRandom(style.melody.fills)
         : chooseRandom(style.melody.grooves);
     
-    // Handle effects separately
     if (enabledParts.effects && Math.random() < style.effects.probability) {
-        const effectType = effectTypes[Math.floor(Math.random() * effectTypes.length)];
-        const freq = getFrequencyFromDegree(Math.floor(Math.random() * 12), 'melody');
+        const freq = getFrequencyFromDegree(Math.floor(Math.random() * 12) + 5, 'melody');
         if (freq) {
-             self.postMessage({ type: 'playNote', note: { type: effectType, freq, dur: '1n', vel: Math.random() * 0.3 + 0.2 }, time: 0 }); // time is ignored here, will be scheduled by main thread
+             self.postMessage({
+                 type: 'playNote',
+                 note: { type: 'autopilot_effects', freq, dur: '1n', vel: Math.random() * 0.3 + 0.2 },
+                 time: 0 // Placeholder, Tone.js will schedule it
+             });
         }
     }
 }
@@ -313,30 +316,26 @@ function tick(time: number) {
     const measure = Math.floor(tickCount / SUBDIVISIONS);
     const beatInMeasure = tickCount % SUBDIVISIONS;
 
-    // At the start of a new measure, pick patterns
     if (beatInMeasure === 0) {
         chooseNewPatternsForMeasure(measure);
     }
     
-    const parts: AutopilotPart[] = ['bass', 'accompaniment', 'melody'];
+    const parts: ('bass' | 'accompaniment' | 'melody')[] = ['bass', 'accompaniment', 'melody'];
     for (const partName of parts) {
         if (!enabledParts[partName]) continue;
 
-        // @ts-ignore
         const pattern: Pattern | null = activePatterns[partName];
         if (!pattern) continue;
 
-        const note = pattern[beatInMeasure];
-        if (note) {
-            // Translate scale degree to frequency
-            const freq = getFrequencyFromDegree(note.degree, partName as keyof typeof scaleFrequencies);
+        const noteData = pattern[beatInMeasure];
+        if (noteData) {
+            const freq = getFrequencyFromDegree(noteData.degree, partName);
             if (freq) {
                 const noteEvent: NoteEvent = {
-                    // @ts-ignore
-                    type: `autopilot_${partName}`,
+                    type: `autopilot_${partName}` as InstrumentPart,
                     freq: freq,
-                    dur: note.dur,
-                    vel: note.vel,
+                    dur: noteData.dur,
+                    vel: noteData.vel,
                 };
                  self.postMessage({ type: 'playNote', note: noteEvent, time: time });
             }
@@ -367,7 +366,8 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             tickCount = 0;
             break;
         case 'setParts':
-            enabledParts = data.parts;
+            // This is a safe cast because the keys are identical
+            enabledParts = data.parts as Record<AutopilotPart, boolean>;
             break;
         case 'setStyle':
             currentStyle = data.style;
@@ -378,5 +378,3 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             break;
     }
 };
-
-    
