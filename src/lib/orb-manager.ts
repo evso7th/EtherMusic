@@ -50,13 +50,13 @@ export class OrbManager {
 
         orbEl.className = cn(
             'absolute rounded-full w-8 h-8 md:w-12 md:h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity duration-300 opacity-0',
-            type === 'latch' && 'animate-pulse-accent-glow'
+             type === 'latch' && 'animate-pulse-accent-glow'
         );
         orbEl.style.backgroundColor = color;
         orbEl.style.boxShadow = `0 0 20px ${color}, 0 0 30px ${color}`;
         orbEl.style.transform = `translate(${x}px, ${y}px)`;
         // This tells the browser to optimize for transform changes (hardware acceleration)
-        orbEl.style.willChange = 'transform, box-shadow';
+        orbEl.style.willChange = 'transform, box-shadow, opacity';
         
         pad.appendChild(orbEl);
         this.orbs.set(id, { element: orbEl, type });
