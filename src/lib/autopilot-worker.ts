@@ -292,3 +292,5 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
 };
 
     
+
+    
