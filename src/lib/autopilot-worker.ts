@@ -343,13 +343,9 @@ function generateSpace(time: number, beat: number, rootDegree: number, chordTone
 
 function generateSequence(time: number, beat: number, measure: number, rootDegree: number, chordToneDegrees: number[]) {
     // --- Mike Oldfield - Tubular Bells inspired sequence ---
-
-    // The sequence evolves over 16 measures, then repeats.
     const cycleMeasure = measure % 16;
 
     // --- BASS ---
-    // The bass is steady, playing on the first beat of every measure.
-    // It only plays if the user has enabled it in the debug panel.
     if (enabledParts.bass && beat === 0) {
         const freq = getFrequencyFromDegree(rootDegree, 'bass');
         if (freq) {
@@ -357,35 +353,30 @@ function generateSequence(time: number, beat: number, measure: number, rootDegre
         }
     }
 
-    // --- ACCOMPANIMENT (The main sequence) ---
-    // The accompaniment builds up over time.
+    // --- ACCOMPANIMENT (The main sequence with syncopation) ---
     if (enabledParts.accompaniment && cycleMeasure >= 2) {
-        // A more complex, evolving arpeggio pattern
-        const basePattern = [0, 2, 1, 2, 0, 1, 2, 0];
-        let pattern = basePattern;
-
-        // After 8 measures, the pattern becomes more complex
-        if (cycleMeasure >= 8) {
-            pattern = [0, 2, 1, 3, 0, 1, 2, 1]; // Use the 4th of the chord (degree 3 relative to root)
-        }
+        const melodyPattern = [0, 2, 1, 2, 0, 1, 2, 0];
+        let complexMelodyPattern = [0, 2, 1, 3, 0, 1, 2, 1];
         
-        // The instrument plays on every 8th note
-        if (beat % 2 === 0) {
-            const patternIndex = (beat / 2) % pattern.length;
-            const degree = chordToneDegrees[patternIndex % chordToneDegrees.length] || rootDegree;
+        // A classic syncopated rhythm pattern (on 16th note basis)
+        const rhythmPattern = [0, 3, 4, 7, 10, 12, 14];
+        
+        if (rhythmPattern.includes(beat)) {
+            const pattern = cycleMeasure >= 8 ? complexMelodyPattern : melodyPattern;
+            // Get the note degree from the melody pattern based on which rhythmic beat we are on
+            const noteIndex = rhythmPattern.indexOf(beat) % pattern.length;
+            const degree = chordToneDegrees[pattern[noteIndex] % chordToneDegrees.length] || rootDegree;
             const freq = getFrequencyFromDegree(degree, 'accompaniment');
             if (freq) {
-                self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '8n', vel: 0.6 }, time });
+                // Use a shorter note duration to emphasize the syncopation
+                self.postMessage({ type: 'playNote', note: { type: 'autopilot_accompaniment', freq, dur: '16n', vel: 0.65 }, time });
             }
         }
     }
 
     // --- MELODY ---
-    // A simple, high, sustained melody that enters later in the cycle.
     if (enabledParts.melody && cycleMeasure >= 4) {
-        // It plays a long note once every 2 measures
         if (beat === 0 && cycleMeasure % 2 === 0) {
-            // It tends to step up or down from the last note.
             let nextDegree: number;
             if (lastMelodyDegree !== null) {
                 const direction = Math.random() < 0.5 ? 1 : -1;
@@ -394,14 +385,12 @@ function generateSequence(time: number, beat: number, measure: number, rootDegre
                 nextDegree = chordToneDegrees[0];
             }
             
-            // Play in a higher octave
             const freq = getFrequencyFromDegree(nextDegree + scaleIntervals.length, 'melody');
 
             if (freq) {
                 self.postMessage({ type: 'playNote', note: { type: 'autopilot_melody', freq, dur: '2m', vel: 0.7 }, time });
                 lastMelodyDegree = nextDegree;
             } else {
-                // Reset if out of range
                 lastMelodyDegree = chordToneDegrees[0];
             }
         }
