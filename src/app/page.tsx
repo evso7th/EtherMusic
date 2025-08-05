@@ -131,7 +131,6 @@ export default function Home() {
             setIsReady(true);
             const initialPattern = beatPatterns.find(p => p.name === 'Promenade')!;
             setActivePattern(initialPattern);
-            mainEngine.setBeatPattern(initialPattern.name);
             console.log('Audio engines and worker initialized and ready.');
         } catch(e) {
             console.error("Failed to initialize audio engines:", e);
@@ -436,3 +435,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
