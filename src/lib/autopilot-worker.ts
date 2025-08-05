@@ -52,16 +52,50 @@ const chizhikAccompaniment: (string | null)[] = [
 ];
 
 const noteDuration = '8n'; // Each note is an eighth note
+const measureLengthInEighths = 8;
 
 // --- CORE LOGIC ---
 function tick(time: number) {
     if (!isRunning) return;
 
     // Determine the current position in the melody loop
-    const melody_idx = noteIndex % chizhikMelody.length;
+    const loopPosition = noteIndex % chizhikMelody.length;
+    const positionInMeasure = loopPosition % measureLengthInEighths;
+
+
+    // --- Play Bass ---
+    // The bass part plays on strong beats
+    const bassNoteName = 'C2'; // Low C note as the root
+    if (positionInMeasure % 2 === 0) { // Play on every quarter note beat
+        let bassDuration: Unit.Time = '4n';
+        let secondBassNote = false;
+
+        if (positionInMeasure === 6) { // On the 4th beat, play two 8th notes
+            bassDuration = '8n';
+            secondBassNote = true;
+        }
+        
+        const bassEvent: NoteEvent = {
+            part: 'bass',
+            freq: Tone.Frequency(bassNoteName).toFrequency(),
+            dur: bassDuration,
+            vel: 0.8, // Bass is punchy
+            time: time,
+        };
+        self.postMessage({ type: 'playNote', note: bassEvent });
+
+        if (secondBassNote) {
+            const secondBassEvent: NoteEvent = {
+                ...bassEvent,
+                time: time + Tone.Time('8n').toSeconds(), // Schedule the second note
+            };
+            self.postMessage({ type: 'playNote', note: secondBassEvent });
+        }
+    }
+
 
     // --- Play Melody ---
-    const melodyNoteName = chizhikMelody[melody_idx];
+    const melodyNoteName = chizhikMelody[loopPosition];
     if (melodyNoteName) {
         const melodyEvent: NoteEvent = {
             part: 'melody',
@@ -74,7 +108,7 @@ function tick(time: number) {
     }
 
     // --- Play Accompaniment ---
-    const accompanimentNoteName = chizhikAccompaniment[melody_idx];
+    const accompanimentNoteName = chizhikAccompaniment[loopPosition];
     if (accompanimentNoteName) {
         const accompanimentEvent: NoteEvent = {
             part: 'accompaniment',

@@ -3,7 +3,7 @@
 
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
-import { Music, Waves, Drum, Bot, Anchor, Sparkles, GitCompareArrows } from 'lucide-react';
+import { Music, Waves, Drum, Bot, Anchor, Sparkles, GitCompareArrows, Guitar } from 'lucide-react';
 import { Separator } from './ui/separator';
 import { useState, useCallback } from 'react';
 import { Button } from "./ui/button";
@@ -19,6 +19,7 @@ type Volumes = {
     drums: number; 
     autopilot: number;
     accompaniment: number;
+    autopilotBass: number;
     effects: number;
     ebass: number;
 };
@@ -30,6 +31,7 @@ type Effects = {
     drums: { reverb: number, delay: number };
     autopilot: { reverb: number, delay: number };
     accompaniment: { reverb: number, delay: number };
+    autopilotBass: { reverb: number, delay: number };
     effects: { reverb: number, delay: number };
     ebass: { reverb: number, delay: number };
 };
@@ -219,6 +221,16 @@ export function AutopilotMixerControls({ initialVolumes, onVolumeChange, initial
                 onVolumeChange={(v) => handleVolumeChange('accompaniment', v)}
                 onReverbChange={(v) => handleEffectChange('accompaniment', 'reverb', v)}
                 onDelayChange={(v) => handleEffectChange('accompaniment', 'delay', v)}
+            />
+            <InstrumentControls 
+                label="Autopilot Bass"
+                icon={Guitar}
+                volume={volumes.autopilotBass}
+                reverb={effects.autopilotBass.reverb}
+                delay={effects.autopilotBass.delay}
+                onVolumeChange={(v) => handleVolumeChange('autopilotBass', v)}
+                onReverbChange={(v) => handleEffectChange('autopilotBass', 'reverb', v)}
+                onDelayChange={(v) => handleEffectChange('autopilotBass', 'delay', v)}
             />
             <InstrumentControls 
                 label="Effects"
