@@ -4,6 +4,7 @@ import type { MusicKey, MusicScale } from '@/app/page';
 import type { Unit } from 'tone/build/esm/core/type/Units';
 
 // --- TYPE DEFINITIONS ---
+export type AutopilotStyle = 'Ambient' | 'Sequence';
 export type AutopilotPart = 'melody' | 'accompaniment' | 'bass' | 'effects';
 
 export type NoteEvent = {
@@ -19,154 +20,181 @@ export type WorkerEvent =
     | { type: 'stop' }
     | { type: 'tick', time: number }
     | { type: 'setHarmony', key: MusicKey, scale: MusicScale }
-    | { type: 'setTempo', bpm: number };
+    | { type: 'setTempo', bpm: number }
+    | { type: 'setStyle', style: AutopilotStyle };
 
 export type WorkerResponse =
     | { type: 'playNote', note: NoteEvent };
 
-// --- WORKER STATE ---
-let isRunning = false;
-let noteIndex = 0; // Simple counter for melody, driven by external 8n ticks
-let tick16n = 0; // Separate counter for accompaniment, driven by external 16n ticks
 
-// --- MUSIC DATA: "Чижик-Пыжик" ---
+// --- MUSIC THEORY HELPERS ---
+const getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]): number[] => {
+    const scaleIntervals: { [key in MusicScale]: string[] } = {
+        'Major': ['0', '2', '4', '5', '7', '9', '11'], 'Minor': ['0', '2', '3', '5', '7', '8', '10'],
+        'Major Pentatonic': ['0', '2', '4', '7', '9'], 'Minor Pentatonic': ['0', '3', '5', '7', '10'],
+    };
+    let allFrequencies: number[] = [];
+    const intervals = scaleIntervals[scale];
+    octaves.forEach(octave => {
+        intervals.forEach(interval => {
+            allFrequencies.push(Tone.Frequency(key + octave).transpose(interval).toFrequency());
+        });
+    });
+    return allFrequencies.sort((a,b) => a - b);
+};
+
+// --- WORKER STATE ---
+let state = {
+    isRunning: false,
+    tick16n: 0,
+    currentStyle: 'Ambient' as AutopilotStyle,
+    currentKey: 'G' as MusicKey,
+    currentScale: 'Major' as MusicScale,
+    currentBpm: 90,
+    scaleFrequencies: {
+        bass: [] as number[],
+        accompaniment: [] as number[],
+        melody: [] as number[],
+    },
+    // Style-specific state
+    sequence: {
+        bassNoteIndex: 0,
+        accompanimentIndex: 0,
+        melodyPhrase: [] as number[],
+        melodyIndex: 0,
+        nextMelodyTick: 0,
+    }
+};
+
+function updateHarmony(key: MusicKey, scale: MusicScale) {
+    state.currentKey = key;
+    state.currentScale = scale;
+    state.scaleFrequencies = {
+        bass: getScaleFrequencies(key, scale, [1, 2]),
+        accompaniment: getScaleFrequencies(key, scale, [3, 4]),
+        melody: getScaleFrequencies(key, scale, [4, 5]),
+    };
+}
+
+
+// --- "AMBIENT" STYLE (previously Chizhik) ---
 const chizhikMelody: (string | null)[] = [
     'G4', 'G4', 'A4', 'B4', 'B4', 'A4', 'G4', 'F#4',
     'E4', 'E4', 'F#4', 'G4', 'G4', 'F#4', 'E4', 'D4',
 ];
-const melodyNoteDuration = '8n';
-const totalMelodyNotesInLoop = chizhikMelody.length;
-
-// --- Accompaniment Data ---
 const chordProgression: { [key: number]: string } = {
-    0: 'G',  // Measure 1
-    1: 'G',
-    2: 'D7', // Measure 2
-    3: 'D7',
-    4: 'G',  // Measure 3
-    5: 'G',
-    6: 'C',  // Measure 4
-    7: 'C',
-    8: 'G',  // Measure 5
-    9: 'G',
-    10: 'D7', // Measure 6
-    11: 'D7',
-    12: 'G', // Measure 7
-    13: 'G',
-    14: 'D7', // Measure 8
-    15: 'D7'
+    0: 'G', 2: 'D7', 4: 'G', 6: 'C', 8: 'G', 10: 'D7', 12: 'G', 14: 'D7'
+};
+const chordDefs: { [key: string]: string[] } = {
+    'G': ['G3', 'B3', 'D4'], 'D7': ['D3', 'F#3', 'A3', 'C4'], 'C': ['C3', 'E3', 'G3']
 };
 
-const chordDefs: { [key: string]: { notes: string[], passing: string[] } } = {
-    'G': { notes: ['G3', 'B3', 'D4'], passing: ['A3', 'C4'] },
-    'D7': { notes: ['D3', 'F#3', 'A3', 'C4'], passing: ['E3', 'G3'] },
-    'C': { notes: ['C3', 'E3', 'G3'], passing: ['D3', 'F3'] }
-};
+function tickAmbient(time: number) {
+    const totalMelodyNotesInLoop = chizhikMelody.length;
+    const ticksPerMeasure = 16;
+    const melodyLoopPosition = Math.floor(state.tick16n / 2) % totalMelodyNotesInLoop;
+    const measure = Math.floor((state.tick16n % (ticksPerMeasure * 8)) / ticksPerMeasure);
+    const tickInMeasure = state.tick16n % ticksPerMeasure;
 
-const accompanimentNoteDuration = '16n';
-const ticksPerMeasure = 16; // 16n ticks
+    // Accompaniment
+    if (tickInMeasure % 4 === 0) { // Play on quarter notes
+        const chordName = chordProgression[measure];
+        const chord = chordDefs[chordName];
+        if (chord) {
+            const noteName = chord[Math.floor(Math.random() * chord.length)];
+            const event: NoteEvent = {
+                part: 'accompaniment', freq: Tone.Frequency(noteName).toFrequency(),
+                dur: '2n', vel: 0.25, time,
+            };
+            self.postMessage({ type: 'playNote', note: event });
+        }
+    }
 
-// --- CORE LOGIC ---
-function tick(time: number) {
-    if (!isRunning) return;
-
-    const melodyLoopPosition = Math.floor(tick16n / 2) % totalMelodyNotesInLoop;
-    const currentMeasure = Math.floor(tick16n / ticksPerMeasure) % 16; // Loop progression every 16 measures
-    const tickInMeasure = tick16n % ticksPerMeasure;
-
-    // --- Play Melody Part (Every other 16n tick to make an 8n) ---
-    if (tick16n % 2 === 0) {
+    // Melody
+    if (state.tick16n % 2 === 0) {
         const melodyNoteName = chizhikMelody[melodyLoopPosition];
         if (melodyNoteName) {
-            const melodyEvent: NoteEvent = {
-                part: 'melody',
-                freq: Tone.Frequency(melodyNoteName).toFrequency(),
-                dur: melodyNoteDuration,
-                vel: 0.6,
-                time: time,
+            const event: NoteEvent = {
+                part: 'melody', freq: Tone.Frequency(melodyNoteName).toFrequency(),
+                dur: '8n', vel: 0.6, time,
             };
-            self.postMessage({ type: 'playNote', note: melodyEvent });
+            self.postMessage({ type: 'playNote', note: event });
         }
+    }
+}
+
+
+// --- "SEQUENCE" STYLE (Mike Oldfield inspired) ---
+function tickSequence(time: number) {
+    // Bass part (plays every 4 ticks = quarter note)
+    if (state.tick16n % 4 === 0) {
+        const bassFreq = state.scaleFrequencies.bass[state.sequence.bassNoteIndex % state.scaleFrequencies.bass.length];
+        const event: NoteEvent = {
+            part: 'bass', freq: bassFreq,
+            dur: '4n', vel: 0.8, time
+        };
+        self.postMessage({ type: 'playNote', note: event });
+        state.sequence.bassNoteIndex++;
+    }
+
+    // Accompaniment (plays every tick = 16th note arpeggio)
+    const accompFreq = state.scaleFrequencies.accompaniment[state.sequence.accompanimentIndex % state.scaleFrequencies.accompaniment.length];
+    const event: NoteEvent = {
+        part: 'accompaniment', freq: accompFreq,
+        dur: '16n', vel: 0.4, time
+    };
+    self.postMessage({ type: 'playNote', note: event });
+    state.sequence.accompanimentIndex++;
+    if (Math.random() < 0.05) { // Occasionally jump in the arpeggio
+        state.sequence.accompanimentIndex += Math.floor(Math.random() * 4) - 2;
+    }
+
+
+    // Melody part (plays phrases)
+    if (state.tick16n >= state.sequence.nextMelodyTick) {
+         // Is the current phrase finished?
+        if (state.sequence.melodyIndex >= state.sequence.melodyPhrase.length) {
+            // End of phrase, wait for a bit
+            state.sequence.melodyIndex = 0;
+            state.sequence.melodyPhrase = [];
+            state.sequence.nextMelodyTick = state.tick16n + 32 + Math.floor(Math.random() * 32); // Wait 2-4 beats
+        } else {
+             // Play the next note in the phrase
+            const melodyFreq = state.sequence.melodyPhrase[state.sequence.melodyIndex];
+            const event: NoteEvent = {
+                part: 'melody', freq: melodyFreq,
+                dur: '8n', vel: 0.7, time
+            };
+            self.postMessage({ type: 'playNote', note: event });
+            state.sequence.melodyIndex++;
+            state.sequence.nextMelodyTick = state.tick16n + 2; // Next note in 2 ticks (8th note)
+        }
+    } else if (state.sequence.melodyPhrase.length === 0 && state.tick16n === state.sequence.nextMelodyTick) {
+        // Time to create a new phrase
+        const phraseLength = 4 + Math.floor(Math.random() * 5); // 4-8 notes
+        state.sequence.melodyPhrase = Array.from({ length: phraseLength }, () =>
+            state.scaleFrequencies.melody[Math.floor(Math.random() * state.scaleFrequencies.melody.length)]
+        );
+        state.sequence.melodyIndex = 0;
+    }
+}
+
+
+// --- MAIN TICK ROUTER ---
+function tick(time: number) {
+    if (!state.isRunning) return;
+
+    switch(state.currentStyle) {
+        case 'Ambient':
+            tickAmbient(time);
+            break;
+        case 'Sequence':
+            tickSequence(time);
+            break;
     }
     
-    // --- Play Accompaniment Part ---
-    const currentChordName = chordProgression[currentMeasure];
-    const chord = chordDefs[currentChordName];
-    if(chord) {
-        // Simple ascending arpeggio
-        const noteToPlayIndex = tickInMeasure % chord.notes.length;
-        let noteName = chord.notes[noteToPlayIndex];
-
-        // Occasionally insert a passing tone on an off-beat
-        if (tickInMeasure % 4 !== 0 && Math.random() < 0.25) {
-             const passingNoteIndex = Math.floor(Math.random() * chord.passing.length);
-             noteName = chord.passing[passingNoteIndex];
-        }
-
-        const accompanimentEvent: NoteEvent = {
-            part: 'accompaniment',
-            freq: Tone.Frequency(noteName).toFrequency(),
-            dur: accompanimentNoteDuration,
-            vel: 0.35,
-            time: time,
-        };
-        self.postMessage({ type: 'playNote', note: accompanimentEvent });
-    }
-
-    // --- Play Bass Part ---
-    // Measure is `noteIndex / 8` because bass runs on 8n ticks
-    const bassMeasure = Math.floor(noteIndex / 8); 
-    const tickInBassMeasure = noteIndex % 8; // 8 ticks of 8n per measure
-
-    // Play on the 2nd beat (tick 2) and 3rd beat (ticks 4 & 5) of specific measures
-    if (bassMeasure % 4 === 1 && tickInBassMeasure === 0) { // On the first tick of the second measure
-        const bassNote: NoteEvent = {
-            part: 'bass',
-            freq: Tone.Frequency('G1').toFrequency(),
-            dur: '4n',
-            vel: 0.9,
-            time: time,
-        };
-        self.postMessage({ type: 'playNote', note: bassNote });
-    } else if (bassMeasure % 4 === 2) { // In the third measure
-        if (tickInBassMeasure === 0) { // First beat
-             const bassNote1: NoteEvent = {
-                part: 'bass',
-                freq: Tone.Frequency('G1').toFrequency(),
-                dur: '8n',
-                vel: 0.9,
-                time: time,
-            };
-            self.postMessage({ type: 'playNote', note: bassNote1 });
-        } else if (tickInBassMeasure === 2) { // Second beat
-             const bassNote2: NoteEvent = {
-                part: 'bass',
-                freq: Tone.Frequency('G1').toFrequency(),
-                dur: '8n',
-                vel: 0.8,
-                time: time,
-            };
-            self.postMessage({ type: 'playNote', note: bassNote2 });
-        }
-    }
-
-    // --- Play random effect sound ---
-    if (Math.random() < 0.01) { 
-        const effectEvent: NoteEvent = {
-            part: 'effects',
-            freq: 1000 + Math.random() * 2000,
-            dur: '4n',
-            vel: 0.1 + Math.random() * 0.2,
-            time: time
-        };
-        self.postMessage({ type: 'playNote', note: effectEvent });
-    }
-    
-    // Increment counters
-    if (tick16n % 2 === 0) {
-        noteIndex++;
-    }
-    tick16n++;
+    // Increment master tick
+    state.tick16n++;
 }
 
 // --- MESSAGE HANDLER ---
@@ -174,23 +202,37 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
     const { type, ...data } = event.data;
     switch (type) {
         case 'start':
-            isRunning = true;
-            noteIndex = 0;
-            tick16n = 0;
+            state.isRunning = true;
+            state.tick16n = 0;
+            state.sequence.bassNoteIndex = 0;
+            state.sequence.accompanimentIndex = 0;
+            state.sequence.melodyIndex = 0;
+            state.sequence.melodyPhrase = [];
+            state.sequence.nextMelodyTick = 0;
             break;
         case 'stop':
-            isRunning = false;
+            state.isRunning = false;
             break;
         case 'tick':
             tick(data.time);
             break;
         case 'setTempo':
-            // Tempo changes are handled by the main thread's Transport scheduling rate
+            // @ts-ignore
+            state.currentBpm = data.bpm;
             break;
         case 'setHarmony':
-            // For now, harmony is fixed to G Major for Chizhik
+            // @ts-ignore
+            updateHarmony(data.key, data.scale);
+            break;
+        case 'setStyle':
+            // @ts-ignore
+            state.currentStyle = data.style;
+            state.tick16n = 0; // Reset tick count on style change
             break;
     }
 };
+
+// Initial setup
+updateHarmony(state.currentKey, state.currentScale);
 
     

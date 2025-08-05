@@ -18,13 +18,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { MixerControls, AutopilotMixerControls } from '@/components/mixer-controls';
-import { SlidersHorizontal, Drum, Zap, Bot, Power } from 'lucide-react';
+import { SlidersHorizontal, Drum, Zap, Bot, Power, Wand2 } from 'lucide-react';
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
 import { Separator } from "./ui/separator";
 import { Switch } from "./ui/switch";
 import { ScrollArea } from "./ui/scroll-area";
+import type { AutopilotStyle } from "@/lib/autopilot-worker";
 
 type BeatPattern = {
     name: string;
@@ -69,6 +70,9 @@ interface BeatBoxControlsProps {
     onEffectChange: (effects: Effects) => void;
     isAutopilotOn: boolean;
     onAutopilotToggle: (isOn: boolean) => void;
+    autopilotStyles: AutopilotStyle[];
+    activeAutopilotStyle: AutopilotStyle;
+    onAutopilotStyleChange: (style: AutopilotStyle) => void;
     isMobile: boolean;
     isLandscape?: boolean;
 }
@@ -86,6 +90,9 @@ export function BeatBoxControls({
     onEffectChange,
     isAutopilotOn,
     onAutopilotToggle,
+    autopilotStyles,
+    activeAutopilotStyle,
+    onAutopilotStyleChange,
     isMobile,
     isLandscape = false,
 }: BeatBoxControlsProps) {
@@ -93,6 +100,7 @@ export function BeatBoxControls({
     const [isTempoOpen, setIsTempoOpen] = useState(false);
     const [isAutopilotOpen, setIsAutopilotOpen] = useState(false);
     const [isAutopilotMixerOpen, setIsAutopilotMixerOpen] = useState(false);
+    const [isStyleOpen, setIsStyleOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<'Meditative' | 'Classic'>('Meditative');
     
     const { classicPatterns, meditativePatterns, offPattern } = useMemo(() => {
@@ -121,11 +129,41 @@ export function BeatBoxControls({
                 <DialogHeader>
                     <DialogTitle>Autopilot Controls</DialogTitle>
                 </DialogHeader>
-                <div className='py-4 space-y-6'>
+                <div className='py-4 space-y-4'>
                     <div className="flex items-center space-x-2">
                         <Switch id="autopilot-switch" checked={isAutopilotOn} onCheckedChange={onAutopilotToggle} />
                         <Label htmlFor="autopilot-switch">Autopilot On/Off</Label>
                     </div>
+
+                    <Dialog open={isStyleOpen} onOpenChange={setIsStyleOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" className="w-full" disabled={!isAutopilotOn}>
+                                <Wand2 className="w-4 h-4 mr-2" />
+                                Style: {activeAutopilotStyle}
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Autopilot Style</DialogTitle>
+                            </DialogHeader>
+                             <div className="grid grid-cols-2 gap-2 py-4">
+                                {autopilotStyles.map((style) => (
+                                    <Button
+                                        key={style}
+                                        variant={activeAutopilotStyle === style ? 'default' : 'outline'}
+                                        onClick={() => {
+                                            onAutopilotStyleChange(style);
+                                            setIsStyleOpen(false);
+                                        }}
+                                    >
+                                        {style}
+                                    </Button>
+                                ))}
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+
+
                     <Dialog open={isAutopilotMixerOpen} onOpenChange={setIsAutopilotMixerOpen}>
                         <DialogTrigger asChild>
                             <Button variant="outline" className="w-full">
@@ -410,3 +448,5 @@ export function BeatBoxControls({
         </Card>
     );
 }
+
+    

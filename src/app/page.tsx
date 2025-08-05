@@ -25,7 +25,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
-import type { NoteEvent, WorkerResponse } from '@/lib/autopilot-worker';
+import type { NoteEvent, WorkerResponse, AutopilotStyle } from '@/lib/autopilot-worker';
 
 
 export const tempos: Tempo[] = [
@@ -45,9 +45,7 @@ export const musicKeys: MusicKey[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G',
 export type MusicScale = 'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentatonic';
 export const musicScales: MusicScale[] = ['Major', 'Minor', 'Major Pentatonic', 'Minor Pentatonic'];
 
-// Simplified for debugging
-export type AutopilotStyle = 'Ambient';
-export const autopilotStyles: AutopilotStyle[] = ['Ambient'];
+export const autopilotStyles: AutopilotStyle[] = ['Ambient', 'Sequence'];
 
 
 const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
@@ -81,6 +79,7 @@ export default function Home() {
     const [musicScale, setMusicScale] = useState<MusicScale>('Major');
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
     const [isAutopilotOn, setIsAutopilotOn] = useState(false);
+    const [autopilotStyle, setAutopilotStyle] = useState<AutopilotStyle>('Ambient');
     
     // --- Engine Ref ---
     const audioEngine = useRef<AudioEngine>();
@@ -123,6 +122,7 @@ export default function Home() {
             
             worker.postMessage({ type: 'setHarmony', key: 'G', scale: 'Major' });
             worker.postMessage({ type: 'setTempo', bpm: tempos[2].bpm });
+            worker.postMessage({ type: 'setStyle', style: 'Ambient' });
             
             Tone.Transport.scheduleRepeat((time) => {
                 autopilotWorker.current?.postMessage({ type: 'tick', time });
@@ -194,6 +194,11 @@ export default function Home() {
     const handleAutopilotToggle = useCallback((isOn: boolean) => {
         setIsAutopilotOn(isOn);
         autopilotWorker.current?.postMessage({ type: isOn ? 'start' : 'stop' });
+    }, []);
+
+    const handleAutopilotStyleChange = useCallback((style: AutopilotStyle) => {
+        setAutopilotStyle(style);
+        autopilotWorker.current?.postMessage({ type: 'setStyle', style });
     }, []);
 
     const handlePlayPause = useCallback(async () => {
@@ -408,6 +413,9 @@ export default function Home() {
                             onEffectChange={handleEffectChange}
                             isAutopilotOn={isAutopilotOn}
                             onAutopilotToggle={handleAutopilotToggle}
+                            autopilotStyles={autopilotStyles}
+                            activeAutopilotStyle={autopilotStyle}
+                            onAutopilotStyleChange={handleAutopilotStyleChange}
                             isMobile={isMobile}
                         />
                     </div>
@@ -427,6 +435,9 @@ export default function Home() {
                         onEffectChange={handleEffectChange}
                         isAutopilotOn={isAutopilotOn}
                         onAutopilotToggle={handleAutopilotToggle}
+                        autopilotStyles={autopilotStyles}
+                        activeAutopilotStyle={autopilotStyle}
+                        onAutopilotStyleChange={handleAutopilotStyleChange}
                         isMobile={isMobile}
                         isLandscape={true}
                     />
