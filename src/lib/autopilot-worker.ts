@@ -81,7 +81,7 @@ function updateHarmony(key: MusicKey, scale: MusicScale) {
     state.scaleFrequencies = {
         bass: getScaleFrequencies(key, scale, [1, 2]),
         accompaniment: getScaleFrequencies(key, scale, [3, 4]),
-        melody: getScaleFrequencies(key, scale, [4, 5]),
+        melody: getScaleFrequencies(key, scale, [3, 4]),
     };
     // Reset melody memory on harmony change
     state.sequence.lastMelodyNoteIndex = null;

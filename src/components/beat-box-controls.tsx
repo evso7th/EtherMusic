@@ -218,7 +218,7 @@ export function BeatBoxControls({
                             label="Bass"
                             value={activeAutopilotInstruments.bass}
                             onChange={(inst) => onAutopilotInstrumentChange('bass', inst as Instrument)}
-                             instruments={autopilotInstruments.filter(i => i.includes('ebass') || i.includes('bass') || i === 'synth')}
+                             instruments={autopilotInstruments.filter(i => i !== 'theremin' && i !== 'G-Drops' && !i.includes('effect'))}
                         />
                          <AutopilotInstrumentSelector 
                             label="Effects"
