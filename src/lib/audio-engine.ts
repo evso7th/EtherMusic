@@ -123,6 +123,7 @@ export class AudioEngine {
         if (this.isInitialized) return;
         await Tone.start();
         Tone.Transport.set({ bpm: 90, swing: 0, timeSignature: 4 });
+        Tone.Transport.start(); // START THE METRONOME AND NEVER STOP IT
 
         // Master FX & Channels
         this.fx = {
@@ -391,23 +392,12 @@ export class AudioEngine {
     
     public releaseLatchVoice(voice: Voice) { voice.release(0.5); }
 
-    public async setPlaying(isPlaying: boolean) {
-        if (!this.isInitialized) return;
-        if (isPlaying && Tone.context.state !== 'running') await Tone.start();
-        if (isPlaying) {
-             if (Tone.Transport.state !== 'started') Tone.Transport.start();
-        } else {
-             if (Tone.Transport.state === 'started') Tone.Transport.pause();
-        }
-    }
-
     public stop() {
         if (this.isInitialized) {
             this.stopAllSounds();
-            if (Tone.Transport.state !== 'stopped') {
-                Tone.Transport.stop();
-                Tone.Transport.cancel(0);
-            };
+            // DO NOT STOP THE TRANSPORT
+            // We only stop the parts that are playing.
+            this.drumMachine.stop();
         }
     }
     

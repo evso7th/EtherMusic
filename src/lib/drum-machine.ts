@@ -30,7 +30,7 @@ export class DrumMachine {
         if (this.isInitialized) return;
         await this.loadDrumSamples();
         
-        // Initialize the part once and keep it running.
+        // Initialize the part but don't start it immediately.
         this.drumPart = new Tone.Part((time, value) => {
              const playNote = (note: string, offset: number) => {
                if (this.drumSamplers?.has(note)) {
@@ -42,7 +42,7 @@ export class DrumMachine {
            } else if (value.note) {
                playNote(value.note, 0);
            }
-        }, []).start(0);
+        }, []);
 
         this.drumPart.loop = true;
         this.drumPart.loopEnd = '4m';
@@ -60,6 +60,11 @@ export class DrumMachine {
         this.channel.send('reverb', effects.reverb);
         this.channel.send('delay', effects.delay);
     }
+    
+    public start() {
+        if (!this.isInitialized || !this.drumPart) return;
+        this.drumPart.start(0);
+    }
 
     public setBeatPattern(patternName: string) {
         if (!this.isInitialized || !this.drumPart) return;
@@ -68,7 +73,7 @@ export class DrumMachine {
         this.drumPart.clear();
 
         if (patternName === 'Off') {
-            this.drumSamplers?.stopAll();
+            this.stop();
             return;
         }
         
@@ -94,8 +99,9 @@ export class DrumMachine {
     }
     
     public stop() {
-        if (!this.isInitialized) return;
-        this.drumPart?.clear();
+        if (!this.isInitialized || !this.drumPart) return;
+        this.drumPart.stop();
+        this.drumPart.clear();
         this.drumSamplers?.stopAll();
     }
     

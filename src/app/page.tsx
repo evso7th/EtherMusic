@@ -210,7 +210,11 @@ export default function Home() {
         if (!audioEngine.current) return;
         const willBePlaying = !isPlaying;
         setIsPlaying(willBePlaying);
-        await audioEngine.current.setPlaying(willBePlaying);
+        if (willBePlaying) {
+            audioEngine.current.drumMachine.start();
+        } else {
+            audioEngine.current.drumMachine.stop();
+        }
     }, [isPlaying]);
     
     const handleStop = useCallback(async () => {
