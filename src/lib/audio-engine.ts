@@ -310,6 +310,7 @@ export class AudioEngine {
         if (synthToUse) {
             // Assign an ID to the synth if it's a new one for a note that needs updating
             if (note.id) {
+                // @ts-ignore
                 synthToUse.id = note.id;
             }
             synthToUse.triggerAttackRelease(note.freq, note.dur, note.time, note.vel);
@@ -319,7 +320,7 @@ export class AudioEngine {
     public updateWorkerNote(note: NoteUpdateEvent) {
         if (!this.isInitialized) return;
         const synthToUpdate = this.autopilotSynths[note.part];
-    
+        // @ts-ignore
         if (synthToUpdate && synthToUpdate.id === note.id) {
             if (synthToUpdate.frequency) {
                 synthToUpdate.frequency.rampTo(note.freq, note.rampTime);
@@ -336,7 +337,7 @@ export class AudioEngine {
             if (synth) {
                 // Cancel any scheduled ramps or events
                 if (synth.frequency) synth.frequency.cancelScheduledValues(Tone.now());
-                synth.releaseAll();
+                synth.triggerRelease();
             }
         }
 
