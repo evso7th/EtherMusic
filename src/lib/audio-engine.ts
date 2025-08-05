@@ -317,7 +317,11 @@ export class AudioEngine {
         const scale = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5'];
         
         this.testSequence = new Tone.Sequence((time, note) => {
-             this.testSynth?.triggerAttackRelease(note, "8n", time);
+             if (this.testSynth) {
+                // Play note for 1/8, then rest for 1/16, which is clean
+                this.testSynth.triggerAttack(note, time, 0.8);
+                this.testSynth.triggerRelease(time + new Tone.Time('8n').toSeconds());
+            }
         }, scale, "8n.").start(0);
 
         this.testSequence.loop = true;
