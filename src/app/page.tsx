@@ -115,18 +115,8 @@ export default function Home() {
             autopilotWorker.current = worker;
             
             mainEngine.setTempo(tempos[2].bpm);
-            mainEngine.setVolumes({ melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, accompaniment: -14, autopilotBass: -9, effects: -6, ebass: -6 });
-            mainEngine.setEffects({
-                melody: { reverb: -Infinity, delay: -60 },
-                manualBass: { reverb: -Infinity, delay: -60 },
-                latch: { reverb: -Infinity, delay: -60 },
-                drums: { reverb: -Infinity, delay: -60 },
-                autopilot: { reverb: -Infinity, delay: -60 },
-                accompaniment: { reverb: -6, delay: -20 },
-                autopilotBass: { reverb: -Infinity, delay: -60 },
-                effects: { reverb: -6, delay: -6 },
-                ebass: { reverb: -Infinity, delay: -60 }
-            });
+            mainEngine.setVolumes(initialVolumes.current);
+            mainEngine.setEffects(initialEffects.current);
             mainEngine.setMelodyInstrument('theremin');
             mainEngine.setBassInstrument('synth');
             mainEngine.setAutopilotInstrument('synth');
@@ -396,7 +386,7 @@ export default function Home() {
                             activeInstrument={melodyInstrument}
                             onInstrumentChange={handleMelodyInstrumentChange}
                             musicKeys={musicKeys}
-                            activeKey={musicKey}
+                            activeKey={activeKey}
                             onKeyChange={(k) => handleHarmonyChange(k, musicScale)}
                             musicScales={musicScales}
                             activeScale={musicScale}
@@ -445,5 +435,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
