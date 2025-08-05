@@ -71,12 +71,12 @@ export default function Home() {
     const [isReady, setIsReady] = useState(false);
     
     // --- UI State ---
-    const [isPlaying, setIsPlaying] = useState(false);
+    const [isPlaying, setIsPlaying] = useState(true);
     const [isRecording, setIsRecording] = useState(false);
     const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
     const [activePattern, setActivePattern] = useState<(typeof beatPatterns)[number]>(beatPatterns.find(p => p.name === 'Off')!);
     const [melodyInstrument, setMelodyInstrument] = useState<Instrument>('theremin');
-    const [bassInstrument, setBassInstrument] = useState<Instrument>('synth');
+    const [bassInstrument, setBassInstrument] = useState<Instrument>('ebass');
     const [musicKey, setMusicKey] = useState<MusicKey>('G');
     const [musicScale, setMusicScale] = useState<MusicScale>('Major');
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
@@ -117,7 +117,7 @@ export default function Home() {
             mainEngine.setVolumes(initialVolumes.current);
             mainEngine.setEffects(initialEffects.current);
             mainEngine.setMelodyInstrument('theremin');
-            mainEngine.setBassInstrument('synth');
+            mainEngine.setBassInstrument('ebass');
             mainEngine.setAutopilotInstrument('synth');
             mainEngine.setHarmony('G', 'Major');
             
@@ -129,6 +129,9 @@ export default function Home() {
             }, '16n');
 
             setIsReady(true);
+            const initialPattern = beatPatterns.find(p => p.name === 'Promenade')!;
+            setActivePattern(initialPattern);
+            mainEngine.setBeatPattern(initialPattern.name);
             console.log('Audio engines and worker initialized and ready.');
         } catch(e) {
             console.error("Failed to initialize audio engines:", e);

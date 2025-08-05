@@ -109,7 +109,7 @@ export class AudioEngine {
     
     private currentInstruments: Record<'melody' | 'bass' | 'autopilot', Instrument> = {
         melody: 'theremin',
-        bass: 'synth',
+        bass: 'ebass',
         autopilot: 'synth'
     };
     
@@ -466,5 +466,3 @@ export class AudioEngine {
         return freqs.reduce((prev, curr) => (Math.abs(curr - targetFreq) < Math.abs(prev - targetFreq) ? curr : prev));
     }
 }
-
-    
