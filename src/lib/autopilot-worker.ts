@@ -81,45 +81,42 @@ function tick(time: number) {
         self.postMessage({ type: 'playNote', note: accompanimentEvent });
     }
 
-    // --- Play Bass Part on specific measures ---
-    const ticksPerMeasure = 8; // 8 ticks of '8n' per 4/4 measure
-    const isFirstBeatOfMeasure = (noteIndex % ticksPerMeasure) === 0;
-
-    if (isFirstBeatOfMeasure) {
-        const measureNumber = Math.floor(noteIndex / ticksPerMeasure) + 1;
-
-        if (measureNumber % 5 === 0) {
-            // On the 5th measure, play "boom-boom"
-            const bassNote1: NoteEvent = {
-                part: 'bass',
-                freq: Tone.Frequency('C2').toFrequency(),
-                dur: '8n',
-                vel: 0.9,
-                time: time,
-            };
-            self.postMessage({ type: 'playNote', note: bassNote1 });
-
-            // Schedule the second note right after the first
-            const bassNote2: NoteEvent = {
-                part: 'bass',
-                freq: Tone.Frequency('C2').toFrequency(),
-                dur: '8n',
-                vel: 0.8,
-                time: time + new Tone.Time('8n').toSeconds(),
-            };
-            self.postMessage({ type: 'playNote', note: bassNote2 });
-
-        } else if (measureNumber % 3 === 0) {
-            // On the 3rd measure, play one "boom"
-            const bassNote: NoteEvent = {
-                part: 'bass',
-                freq: Tone.Frequency('C2').toFrequency(),
-                dur: '4n',
-                vel: 0.9,
-                time: time,
-            };
-            self.postMessage({ type: 'playNote', note: bassNote });
-        }
+    // --- Play Bass Part on specific beats ---
+    // Total ticks in a 4/4 measure, with our '8n' tick rate
+    const ticksPerMeasure = 8; 
+    const currentTickInMeasure = noteIndex % ticksPerMeasure;
+    
+    // Play on the second beat (tick 2) and third beat (ticks 4 and 5)
+    if (currentTickInMeasure === 2) { // Second beat
+        const bassNote: NoteEvent = {
+            part: 'bass',
+            freq: Tone.Frequency('C2').toFrequency(),
+            dur: '4n',
+            vel: 0.9,
+            time: time,
+        };
+        self.postMessage({ type: 'playNote', note: bassNote });
+    } else if (currentTickInMeasure === 4) { // Third beat
+        const bassNote1: NoteEvent = {
+            part: 'bass',
+            freq: Tone.Frequency('C2').toFrequency(),
+            dur: '8n',
+            vel: 0.9,
+            time: time,
+        };
+        self.postMessage({ type: 'playNote', note: bassNote1 });
+        
+        // The second "boom" is scheduled by the AudioEngine, so we just send another event for a later time.
+        // But since our tick() is called for every 8n, it's easier to just trigger it on the next tick.
+    } else if (currentTickInMeasure === 5) {
+         const bassNote2: NoteEvent = {
+            part: 'bass',
+            freq: Tone.Frequency('C2').toFrequency(),
+            dur: '8n',
+            vel: 0.8,
+            time: time,
+        };
+        self.postMessage({ type: 'playNote', note: bassNote2 });
     }
     
     // --- Play random effect sound ---
