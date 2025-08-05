@@ -316,12 +316,12 @@ function tickAir(time: number) {
     const chordProgression = [0, 3, 4, 0]; // I-IV-V-I
     const notesBatch: NoteEvent[] = [];
 
-    // --- BASS, ACCOMPANIMENT, MELODY ---
+    // --- BASS & ACCOMPANIMENT ---
     if (state.tick16n % ticksPerChordChange === 0) {
         state.air.currentChordIndex = (state.air.currentChordIndex + 1) % chordProgression.length;
         const rootDegree = chordProgression[state.air.currentChordIndex];
 
-        // 1. Bass - Rhythmic and simple
+        // Bass - Rhythmic and simple
         for (let i = 0; i < 4; i++) { // Every half measure
             const bassFreq = state.scaleFrequencies.bass[rootDegree % state.scaleFrequencies.bass.length];
             if (bassFreq) {
@@ -335,7 +335,7 @@ function tickAir(time: number) {
             }
         }
 
-        // 2. Accompaniment - Enveloping pads
+        // Accompaniment - Enveloping pads
         const chordDegrees = [rootDegree, rootDegree + 2, rootDegree + 4];
         chordDegrees.forEach((degree, index) => {
             const noteFreq = state.scaleFrequencies.accompaniment[degree % state.scaleFrequencies.accompaniment.length];
@@ -345,36 +345,37 @@ function tickAir(time: number) {
                     freq: noteFreq,
                     dur: '1m', // Hold for one measure
                     vel: 0.3,
-                    time: time + (index * ticksPerMeasure * (60 / state.currentBpm / 4)) // Staggered entry
+                    time: time + (index * ticksPerMeasure * (60 / state.currentBpm / 4))
                 });
             }
         });
+    }
 
-        // 3. Melody - Flowing and continuous
-        let lastDegree = state.air.lastMelodyDegree ?? rootDegree;
-        for (let i = 0; i < 8; i++) { // Create an 8-note phrase
-             const direction = Math.random() > 0.6 ? 1 : -1;
-             let nextDegree = lastDegree + direction;
-             if (nextDegree < 0 || nextDegree >= state.scaleFrequencies.melody.length) {
-                 nextDegree = lastDegree - direction;
-             }
-             const melodyFreq = state.scaleFrequencies.melody[nextDegree % state.scaleFrequencies.melody.length];
-             if (melodyFreq) {
-                notesBatch.push({
-                     part: 'melody',
-                     freq: melodyFreq,
-                     dur: '2n',
-                     vel: 0.7,
-                     time: time + (i * ticksPerMeasure / 2 * (60 / state.currentBpm / 4))
-                });
-             }
-             lastDegree = nextDegree;
-        }
-        state.air.lastMelodyDegree = lastDegree;
+    // --- MELODY (ARPEGGIATED TRIADS) ---
+    // Every beat (4 ticks)
+    if (state.tick16n % 4 === 0) {
+        const rootDegree = chordProgression[state.air.currentChordIndex];
+        const triad = [rootDegree, rootDegree + 2, rootDegree + 4];
         
-        if (notesBatch.length > 0) {
-            self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
+        // Pick one note from the triad to play
+        const degreeIndex = (state.tick16n / 4) % triad.length;
+        const noteDegree = triad[degreeIndex];
+        
+        const melodyFreq = state.scaleFrequencies.melody[noteDegree % state.scaleFrequencies.melody.length];
+        
+        if (melodyFreq) {
+            notesBatch.push({
+                part: 'melody',
+                freq: melodyFreq,
+                dur: '8n',
+                vel: 0.7,
+                time: time,
+            });
         }
+    }
+        
+    if (notesBatch.length > 0) {
+        self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
     }
 }
 
