@@ -119,7 +119,7 @@ export class AudioEngine {
     private effectsSynth: Tone.FMSynth | null = null;
 
     constructor() {
-        // Orb manager is now initialized after engine is ready in page.tsx
+        // All initialization is now in the async initialize() method
     }
 
     public async initialize() {
@@ -160,8 +160,9 @@ export class AudioEngine {
         this.autopilotBassSynth = new Tone.FMSynth(this.presets.ebass.options).connect(this.channels.autopilotBass);
         this.effectsSynth = new Tone.FMSynth(this.presets.autopilot_effect_star.options).connect(this.channels.effects);
         
+        Tone.Transport.start(); // START THE ETERNAL METRONOME
         this.isInitialized = true;
-        console.log(`AudioEngine initialized.`);
+        console.log(`AudioEngine initialized and Transport started.`);
     }
 
     public setOrbManager(orbManager: OrbManager) {
@@ -334,7 +335,6 @@ export class AudioEngine {
     public stopAllSounds() {
         this.voicePools.forEach(pool => pool.forEach(voice => voice.release(0.1)));
         this.latchEngine.stopAll();
-        if (this.isInitialized) this.drumMachine.setBeatPattern('Off');
         
         // Cancel all scheduled events and stop synths
         this.autopilotMelodySynth?.releaseAll();

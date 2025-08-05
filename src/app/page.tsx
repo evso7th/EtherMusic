@@ -87,7 +87,6 @@ export default function Home() {
     const autopilotWorker = useRef<Worker>();
     const orbManager = useRef<OrbManager>();
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
-    const transportEventId = useRef<number | null>(null);
 
     // --- Engine Initialization ---
     useEffect(() => {
@@ -121,12 +120,11 @@ export default function Home() {
             mainEngine.setBassInstrument('synth');
             mainEngine.setAutopilotInstrument('synth');
             mainEngine.setHarmony('G', 'Major');
-            mainEngine.setBeatPattern('Off');
             
             worker.postMessage({ type: 'setHarmony', key: 'G', scale: 'Major' });
             worker.postMessage({ type: 'setTempo', bpm: tempos[2].bpm });
             
-            transportEventId.current = Tone.Transport.scheduleRepeat((time) => {
+            Tone.Transport.scheduleRepeat((time) => {
                 autopilotWorker.current?.postMessage({ type: 'tick', time });
             }, '16n');
 
@@ -160,8 +158,10 @@ export default function Home() {
 
     const handlePatternChange = useCallback((pattern: (typeof beatPatterns)[number]) => {
         setActivePattern(pattern);
-        audioEngine.current?.setBeatPattern(pattern.name);
-    }, []);
+        if (isPlaying) {
+            audioEngine.current?.setBeatPattern(pattern.name);
+        }
+    }, [isPlaying]);
 
     const handleHarmonyChange = useCallback((key: MusicKey, scale: MusicScale) => {
         setMusicKey(key);
@@ -199,16 +199,16 @@ export default function Home() {
         const willBePlaying = !isPlaying;
         setIsPlaying(willBePlaying);
         if (willBePlaying) {
-            Tone.Transport.start();
+             audioEngine.current.setBeatPattern(activePattern.name);
         } else {
-            Tone.Transport.pause();
+            audioEngine.current.setBeatPattern('Off');
         }
-    }, [isPlaying]);
+    }, [isPlaying, activePattern]);
     
     const handleStop = useCallback(async () => {
         if (!audioEngine.current) return;
         setIsPlaying(false);
-        Tone.Transport.stop();
+        audioEngine.current.setBeatPattern('Off');
         audioEngine.current.stopAllSounds();
     }, []);
 
