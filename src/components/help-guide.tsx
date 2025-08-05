@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { HelpCircle } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import { cn } from "@/lib/utils";
+import React from "react";
 
 
 const guideContent = `
@@ -86,7 +87,9 @@ interface HelpGuideProps extends ButtonProps {
     showText?: boolean;
 }
 
-export function HelpGuide({ buttonVariant = "outline", buttonClassName, showText = true, size, ...props }: HelpGuideProps) {
+const HelpGuideComponent = ({ buttonVariant = "outline", buttonClassName, showText = true, size, ...props }: HelpGuideProps) => {
+    const content = React.useMemo(() => <ReactMarkdown>{guideContent}</ReactMarkdown>, []);
+    
     return (
         <Dialog>
             <DialogTrigger asChild>
@@ -106,10 +109,12 @@ export function HelpGuide({ buttonVariant = "outline", buttonClassName, showText
                 </DialogHeader>
                 <ScrollArea className="h-[70vh] w-full">
                     <div className="prose prose-invert p-4">
-                        <ReactMarkdown>{guideContent}</ReactMarkdown>
+                        {content}
                     </div>
                 </ScrollArea>
             </DialogContent>
         </Dialog>
     )
 }
+
+export const HelpGuide = React.memo(HelpGuideComponent);
