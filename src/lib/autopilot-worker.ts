@@ -67,8 +67,10 @@ let state = {
     sequence: {
         bassNoteIndex: 0,
         accompanimentIndex: 0,
-        melodyPhrase: [] as number[],
-        melodyIndex: 0,
+        // Melody state
+        lastMelodyNoteIndex: null as number | null,
+        notesInCurrentPhrase: 0,
+        maxNotesInPhrase: 5,
         nextMelodyTick: 0,
     }
 };
@@ -81,6 +83,8 @@ function updateHarmony(key: MusicKey, scale: MusicScale) {
         accompaniment: getScaleFrequencies(key, scale, [3, 4]),
         melody: getScaleFrequencies(key, scale, [4, 5]),
     };
+    // Reset melody memory on harmony change
+    state.sequence.lastMelodyNoteIndex = null;
 }
 
 
@@ -144,8 +148,8 @@ function tickSequence(time: number) {
         state.sequence.bassNoteIndex++;
     }
 
-    // Accompaniment (plays every 2 ticks = 8th note arpeggio)
-    if (state.tick16n % 2 === 0) {
+    // Accompaniment (plays every 4 ticks = quarter note arpeggio)
+    if (state.tick16n % 4 === 0) {
         const accompFreq = state.scaleFrequencies.accompaniment[state.sequence.accompanimentIndex % state.scaleFrequencies.accompaniment.length];
         const event: NoteEvent = {
             part: 'accompaniment', freq: accompFreq,
@@ -158,33 +162,41 @@ function tickSequence(time: number) {
         }
     }
 
-
-    // Melody part (plays phrases)
+    // New Melodic Logic
     if (state.tick16n >= state.sequence.nextMelodyTick) {
-         // Is the current phrase finished?
-        if (state.sequence.melodyIndex >= state.sequence.melodyPhrase.length) {
-            // End of phrase, wait for a bit
-            state.sequence.melodyIndex = 0;
-            state.sequence.melodyPhrase = [];
-            state.sequence.nextMelodyTick = state.tick16n + 32 + Math.floor(Math.random() * 32); // Wait 2-4 beats
-        } else {
-             // Play the next note in the phrase
-            const melodyFreq = state.sequence.melodyPhrase[state.sequence.melodyIndex];
-            const event: NoteEvent = {
-                part: 'melody', freq: melodyFreq,
-                dur: '4n', vel: 0.7, time
-            };
-            self.postMessage({ type: 'playNote', note: event });
-            state.sequence.melodyIndex++;
-            state.sequence.nextMelodyTick = state.tick16n + 4; // Next note in 4 ticks (quarter note)
+        // Phrase finished, create a pause
+        if (state.sequence.notesInCurrentPhrase >= state.sequence.maxNotesInPhrase) {
+            state.sequence.notesInCurrentPhrase = 0;
+            state.sequence.maxNotesInPhrase = 3 + Math.floor(Math.random() * 3); // 3-5 notes
+            state.sequence.nextMelodyTick = state.tick16n + 8 + Math.floor(Math.random() * 16); // Pause for 2-6 beats
+            return;
         }
-    } else if (state.sequence.melodyPhrase.length === 0 && state.tick16n === state.sequence.nextMelodyTick) {
-        // Time to create a new phrase
-        const phraseLength = 4 + Math.floor(Math.random() * 5); // 4-8 notes
-        state.sequence.melodyPhrase = Array.from({ length: phraseLength }, () =>
-            state.scaleFrequencies.melody[Math.floor(Math.random() * state.scaleFrequencies.melody.length)]
-        );
-        state.sequence.melodyIndex = 0;
+
+        let nextNoteIndex;
+        // If it's the first note, pick one from the middle of the scale
+        if (state.sequence.lastMelodyNoteIndex === null) {
+            nextNoteIndex = Math.floor(state.scaleFrequencies.melody.length / 2) + (Math.floor(Math.random()*4)-2);
+        } else {
+            // Stepwise motion: move 1 or 2 steps up or down the scale
+            const step = (Math.random() < 0.2) ? 2 : 1; // 20% chance of a 2-step jump
+            const direction = (Math.random() < 0.5) ? -1 : 1;
+            nextNoteIndex = state.sequence.lastMelodyNoteIndex + (step * direction);
+        }
+
+        // Keep the note within the scale boundaries
+        nextNoteIndex = Math.max(0, Math.min(state.scaleFrequencies.melody.length - 1, nextNoteIndex));
+        
+        const melodyFreq = state.scaleFrequencies.melody[nextNoteIndex];
+        const event: NoteEvent = {
+            part: 'melody', freq: melodyFreq,
+            dur: '4n', vel: 0.7, time
+        };
+        self.postMessage({ type: 'playNote', note: event });
+        
+        // Update state
+        state.sequence.lastMelodyNoteIndex = nextNoteIndex;
+        state.sequence.notesInCurrentPhrase++;
+        state.sequence.nextMelodyTick = state.tick16n + 4; // Next note is a quarter note away
     }
 }
 
@@ -215,8 +227,9 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             state.tick16n = 0;
             state.sequence.bassNoteIndex = 0;
             state.sequence.accompanimentIndex = 0;
-            state.sequence.melodyIndex = 0;
-            state.sequence.melodyPhrase = [];
+            state.sequence.lastMelodyNoteIndex = null;
+            state.sequence.notesInCurrentPhrase = 0;
+            state.sequence.maxNotesInPhrase = 5;
             state.sequence.nextMelodyTick = 0;
             break;
         case 'stop':
