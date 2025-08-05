@@ -316,6 +316,13 @@ export class AudioEngine {
             synthToUse.triggerAttackRelease(note.freq, note.dur, note.time, note.vel);
         }
     }
+
+    public playWorkerNotesBatch(notes: NoteEvent[]) {
+        if (!this.isInitialized) return;
+        notes.forEach(note => {
+            this.playWorkerNote(note);
+        });
+    }
     
     public updateWorkerNote(note: NoteUpdateEvent) {
         if (!this.isInitialized) return;
@@ -392,8 +399,12 @@ export class AudioEngine {
             existingSynth.dispose();
         }
     
-        const preset = this.presets[instrument];
-        if (!preset) return;
+        const presetKey = this.getPresetKey(part, instrument);
+        const preset = this.presets[presetKey];
+        if (!preset) {
+            console.warn(`No preset found for instrument: ${instrument}`);
+            return;
+        }
     
         let channel: Tone.Channel;
         switch(part) {
@@ -453,8 +464,10 @@ export class AudioEngine {
             'E-Bells_bass': { type: 'FMSynth', options: { harmonicity: 1.4, modulationIndex: 15, oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 1.5, sustain: 0, release: 2.5 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.01, decay: 1.0, sustain: 0, release: 1.0 } } },
             'G-Drops': { type: 'FMSynth', options: { harmonicity: 0.5, modulationIndex: 3.5, oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.7, sustain: 0.1, release: 0.4 }, modulation: { type: 'triangle' }, modulationEnvelope: { attack: 0.01, decay: 0.5, sustain: 0, release: 0.2 } } },
             autopilot_bass: { type: 'FMSynth', options: { harmonicity: 1, modulationIndex: 3.5, oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.2 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.1 } } },
-            autopilot_effect_star: { type: 'FMSynth', options: { harmonicity: 3.4, modulationIndex: 10, envelope: { attack: 0.01, decay: 1.2, release: 1.2 } } },
-            autopilot_effect_meteor: { type: 'NoiseSynth', options: { noise: { type: 'white' }, filter: { Q: 10 }, envelope: { attack: 0.01, decay: 0.3, release: 0.5 } } },
+            'Starfall': { type: 'FMSynth', options: { harmonicity: 3.4, modulationIndex: 10, envelope: { attack: 0.01, decay: 1.2, release: 1.2 } } },
+            'Meteor': { type: 'NoiseSynth', options: { noise: { type: 'white' }, filter: { Q: 10 }, envelope: { attack: 0.01, decay: 0.3, release: 0.5 } } },
+            'autopilot_effect_bell': { type: 'FMSynth', options: { harmonicity: 2.1, modulationIndex: 15, envelope: { attack: 0.01, decay: 1.8, release: 1.8 } } },
+            'autopilot_effect_chimes': { type: 'FMSynth', options: { harmonicity: 4.2, modulationIndex: 18, envelope: { attack: 0.01, decay: 1.0, release: 1.0 } } },
         };
     }
 

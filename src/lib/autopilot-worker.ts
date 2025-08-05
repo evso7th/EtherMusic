@@ -1,10 +1,11 @@
 
+
 import * as Tone from 'tone';
 import type { Instrument, MusicKey, MusicScale } from '@/app/page';
 import type { Unit } from 'tone/build/esm/core/type/Units';
 
 // --- TYPE DEFINITIONS ---
-export type AutopilotStyle = 'Ambient' | 'Sequence';
+export type AutopilotStyle = 'Ambient' | 'Sequence' | 'Water';
 export type AutopilotPart = 'melody' | 'accompaniment' | 'bass' | 'effects';
 
 export type NoteEvent = {
@@ -35,7 +36,8 @@ export type WorkerEvent =
 
 export type WorkerResponse =
     | { type: 'playNote', note: NoteEvent }
-    | { type: 'updateNote', note: NoteUpdateEvent };
+    | { type: 'updateNote', note: NoteUpdateEvent }
+    | { type: 'playNotesBatch', notes: NoteEvent[] };
 
 
 // --- MUSIC THEORY HELPERS ---
@@ -66,7 +68,7 @@ let state = {
         melody: 'synth' as Instrument,
         accompaniment: 'synth' as Instrument,
         bass: 'synth' as Instrument,
-        effects: 'autopilot_effect_star' as Instrument
+        effects: 'Starfall' as Instrument
     },
     scaleFrequencies: {
         bass: [] as number[],
@@ -88,6 +90,10 @@ let state = {
         notesInCurrentPhrase: 0,
         maxNotesInPhrase: 5,
         nextMelodyTick: 0,
+    },
+    water: {
+        arpeggioIndex: 0,
+        currentChordRootDegree: 0,
     }
 };
 
@@ -97,13 +103,14 @@ function updateHarmony(key: MusicKey, scale: MusicScale) {
     state.scaleFrequencies = {
         bass: getScaleFrequencies(key, scale, [1, 2]),
         accompaniment: getScaleFrequencies(key, scale, [3, 4]),
-        melody: getScaleFrequencies(key, scale, [3, 4]),
+        melody: getScaleFrequencies(key, scale, [4, 5]),
         effects: getScaleFrequencies(key, scale, [4, 5]),
     };
     // Reset melody memory on harmony change
     state.sequence.lastMelodyNoteIndex = null;
     state.ambient.lastChordChangeTick = -Infinity;
     state.ambient.lastMelodyDegree = null;
+    state.water.arpeggioIndex = 0;
 }
 
 // --- "AMBIENT" STYLE ---
@@ -233,9 +240,74 @@ function tickSequence(time: number) {
     }
 }
 
+// --- "WATER" STYLE ---
+function tickWater(time: number) {
+    const ticksPerMeasure = 16;
+    const ticksForChordChange = ticksPerMeasure * 2;
+
+    // Change chord root every 2 measures
+    if (state.tick16n % ticksForChordChange === 0) {
+        state.water.currentChordRootDegree = Math.floor(Math.random() * state.scaleFrequencies.bass.length);
+    }
+    
+    // Play bass note at the start of each chord change
+    if (state.tick16n % ticksForChordChange === 0) {
+        const bassFreq = state.scaleFrequencies.bass[state.water.currentChordRootDegree];
+        if (bassFreq) {
+             self.postMessage({ type: 'playNote', note: {
+                part: 'bass', freq: bassFreq, dur: '2m', vel: 0.5, time
+            }});
+        }
+    }
+
+    // Play melody "drop" note randomly
+    if (state.tick16n % 4 === 0 && Math.random() < 0.25) {
+        const melodyFreq = state.scaleFrequencies.melody[Math.floor(Math.random() * state.scaleFrequencies.melody.length)];
+         if (melodyFreq) {
+             self.postMessage({ type: 'playNote', note: {
+                part: 'melody', freq: melodyFreq, dur: '8n', vel: 0.8, time
+            }});
+        }
+    }
+
+    // Accompaniment arpeggio - BATCHED
+    if (state.tick16n % ticksPerMeasure === 0) {
+        const chordDegrees = [
+            state.water.currentChordRootDegree,
+            state.water.currentChordRootDegree + 2,
+            state.water.currentChordRootDegree + 4,
+            state.water.currentChordRootDegree + 2,
+        ];
+        
+        const arpeggioPattern = [0, 1, 2, 3, 0, 2, 1, 3, 0, 3, 1, 2, 0, 1, 3, 2];
+        const notesBatch: NoteEvent[] = [];
+
+        for (let i = 0; i < 16; i++) {
+            const patternIndex = arpeggioPattern[i];
+            const degree = chordDegrees[patternIndex % chordDegrees.length];
+            const noteFreq = state.scaleFrequencies.accompaniment[degree % state.scaleFrequencies.accompaniment.length];
+            
+            if (noteFreq) {
+                const noteTime = time + (i * (60 / state.currentBpm / 4)); // time of the current 16th note
+                notesBatch.push({
+                    part: 'accompaniment',
+                    freq: noteFreq,
+                    dur: '16n',
+                    vel: 0.3 + (Math.random() * 0.2),
+                    time: noteTime,
+                });
+            }
+        }
+        if (notesBatch.length > 0) {
+            self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
+        }
+    }
+}
+
+
 // --- UNIVERSAL EFFECTS TICK ---
 function tickEffects(time: number) {
-    if (Math.random() < 0.03) { // Lower probability for less frequent effects
+    if (Math.random() < 0.05) { // Lower probability for less frequent effects
         const freq = state.scaleFrequencies.effects[Math.floor(Math.random() * state.scaleFrequencies.effects.length)];
         const event: NoteEvent = {
             part: 'effects',
@@ -259,6 +331,9 @@ function tick(time: number) {
             break;
         case 'Sequence':
             tickSequence(time);
+            break;
+        case 'Water':
+            tickWater(time);
             break;
     }
 
@@ -286,6 +361,10 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             state.ambient.currentChordDegree = 0;
             state.ambient.lastChordChangeTick = -Infinity; // Force immediate chord
             state.ambient.lastMelodyDegree = null;
+            // Reset water state
+            state.water.arpeggioIndex = 0;
+            state.water.currentChordRootDegree = 0;
+
             break;
         case 'stop':
             state.isRunning = false;

@@ -25,7 +25,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
-import type { NoteEvent, WorkerResponse, AutopilotStyle, AutopilotPart as WorkerAutopilotPart } from '@/lib/autopilot-worker';
+import type { NoteEvent, WorkerResponse, AutopilotStyle, AutopilotPart as WorkerAutopilotPart, NoteUpdateEvent } from '@/lib/autopilot-worker';
 
 
 export const tempos: Tempo[] = [
@@ -36,9 +36,11 @@ export const tempos: Tempo[] = [
     { name: 'Allegretto', bpm: 130 },
 ];
 
-export type Instrument = 'synth' | 'organ' | 'theremin' | 'E-Bells' | 'mellotron' | 'G-Drops' | 'ebass' | 'autopilot_effect_star' | 'autopilot_effect_meteor';
+export type Instrument = 'synth' | 'organ' | 'theremin' | 'E-Bells' | 'mellotron' | 'G-Drops' | 'ebass' | 'autopilot_effect_star' | 'autopilot_effect_meteor' | 'autopilot_effect_bell' | 'autopilot_effect_chimes';
 export const instruments: Instrument[] = ['synth', 'organ', 'theremin', 'E-Bells', 'mellotron', 'G-Drops', 'ebass'];
-export const autopilotInstruments: Instrument[] = ['synth', 'organ', 'theremin', 'E-Bells', 'mellotron', 'G-Drops', 'autopilot_effect_star', 'autopilot_effect_meteor'];
+export const autopilotInstruments: Instrument[] = ['synth', 'organ', 'theremin', 'E-Bells', 'mellotron', 'G-Drops', 'autopilot_effect_star', 'autopilot_effect_meteor', 'autopilot_effect_bell', 'autopilot_effect_chimes'];
+
+export const autopilotEffects: Instrument[] = ['Starfall', 'Meteor', 'G-Drops', 'E-Chimes'];
 
 
 export type MusicKey = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B';
@@ -47,7 +49,7 @@ export const musicKeys: MusicKey[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G',
 export type MusicScale = 'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentatonic';
 export const musicScales: MusicScale[] = ['Major', 'Minor', 'Major Pentatonic', 'Minor Pentatonic'];
 
-export const autopilotStyles: AutopilotStyle[] = ['Ambient', 'Sequence'];
+export const autopilotStyles: AutopilotStyle[] = ['Ambient', 'Sequence', 'Water'];
 
 
 const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
@@ -85,7 +87,7 @@ export default function Home() {
         melody: 'synth',
         accompaniment: 'mellotron',
         bass: 'synth',
-        effects: 'autopilot_effect_star'
+        effects: 'Starfall'
     });
     
     // --- Engine Ref ---
@@ -117,6 +119,8 @@ export default function Home() {
                     audioEngine.current?.playWorkerNote(e.data.note);
                 } else if (e.data.type === 'updateNote' && e.data.note) {
                     audioEngine.current?.updateWorkerNote(e.data.note);
+                } else if (e.data.type === 'playNotesBatch' && e.data.notes) {
+                    audioEngine.current?.playWorkerNotesBatch(e.data.notes);
                 }
             };
             autopilotWorker.current = worker;
@@ -129,7 +133,7 @@ export default function Home() {
             mainEngine.setAutopilotInstrument('melody', 'synth');
             mainEngine.setAutopilotInstrument('accompaniment', 'mellotron');
             mainEngine.setAutopilotInstrument('bass', 'synth');
-            mainEngine.setAutopilotInstrument('effects', 'autopilot_effect_star');
+            mainEngine.setAutopilotInstrument('effects', 'Starfall');
 
             mainEngine.setHarmony('G', 'Major');
             
@@ -140,7 +144,7 @@ export default function Home() {
                 melody: 'synth',
                 accompaniment: 'mellotron',
                 bass: 'synth',
-                effects: 'autopilot_effect_star'
+                effects: 'Starfall'
             }});
             
             Tone.Transport.scheduleRepeat((time) => {
