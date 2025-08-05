@@ -49,7 +49,7 @@ export const musicKeys: MusicKey[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G',
 export type MusicScale = 'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentatonic';
 export const musicScales: MusicScale[] = ['Major', 'Minor', 'Major Pentatonic', 'Minor Pentatonic'];
 
-export const autopilotStyles: AutopilotStyle[] = ['Ambient', 'Sequence', 'Water'];
+export const autopilotStyles: AutopilotStyle[] = ['Ambient', 'Sequence', 'Water', 'Air'];
 
 
 const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
@@ -86,7 +86,7 @@ export default function Home() {
     const [autopilotPartInstruments, setAutopilotPartInstruments] = useState<Record<WorkerAutopilotPart, Instrument>>({
         melody: 'synth',
         accompaniment: 'mellotron',
-        bass: 'synth',
+        bass: 'ebass',
         effects: 'Starfall'
     });
     
@@ -132,7 +132,7 @@ export default function Home() {
             mainEngine.setBassInstrument('ebass');
             mainEngine.setAutopilotInstrument('melody', 'synth');
             mainEngine.setAutopilotInstrument('accompaniment', 'mellotron');
-            mainEngine.setAutopilotInstrument('bass', 'synth');
+            mainEngine.setAutopilotInstrument('bass', 'ebass');
             mainEngine.setAutopilotInstrument('effects', 'Starfall');
 
             mainEngine.setHarmony('G', 'Major');
@@ -143,7 +143,7 @@ export default function Home() {
             worker.postMessage({ type: 'setInstruments', instruments: {
                 melody: 'synth',
                 accompaniment: 'mellotron',
-                bass: 'synth',
+                bass: 'ebass',
                 effects: 'Starfall'
             }});
             
@@ -459,3 +459,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
