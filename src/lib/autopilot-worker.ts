@@ -102,7 +102,8 @@ let state = {
         isResting: false,
         restMeasures: 0,
         totalRestMeasures: 2,
-        currentArpPattern: [0, 1, 2],
+        currentArpPattern: [0, 1, 2] as number[],
+        currentBassPattern: [] as boolean[],
     }
 };
 
@@ -323,10 +324,15 @@ function tickAir(time: number) {
     const ticksPerBeat = 4;
     const chordProgression = [0, 3, 4, 0]; // I-IV-V-I
     const arpeggioPatterns = [ [0, 1, 2], [2, 1, 0], [0, 2, 1], [1, 2, 0] ];
+    const bassPatterns: boolean[][] = [
+        [true, false, false, true, false, false, true, false, true, false, false, true, false, false, true, false], // Syncopated
+        [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false], // On the beat
+        [false, false, true, false, true, false, true, false, false, false, true, false, true, false, true, false]  // More syncopated
+    ];
 
     const notesBatch: NoteEvent[] = [];
     
-    // --- PHRASING LOGIC ---
+    // --- PHRASING LOGIC for Melody & Bass Pattern---
     if (state.tick16n % (ticksPerMeasure) === 0) {
         if (state.air.isResting) {
             state.air.restMeasures++;
@@ -334,7 +340,8 @@ function tickAir(time: number) {
                 state.air.isResting = false;
                 state.air.phraseMeasures = 0;
                 state.air.totalPhraseMeasures = 2 + Math.floor(Math.random() * 3); // Play for 2-4 measures
-                 state.air.currentArpPattern = arpeggioPatterns[Math.floor(Math.random() * arpeggioPatterns.length)];
+                state.air.currentArpPattern = arpeggioPatterns[Math.floor(Math.random() * arpeggioPatterns.length)];
+                state.air.currentBassPattern = bassPatterns[Math.floor(Math.random() * bassPatterns.length)];
             }
         } else {
             state.air.phraseMeasures++;
@@ -346,26 +353,12 @@ function tickAir(time: number) {
         }
     }
 
-    // --- CHORD, BASS & ACCOMPANIMENT LOGIC ---
-    if (state.tick16n % (ticksPerMeasure * 2) === 0) { // Slower chord changes
+    // --- CHORD & ACCOMPANIMENT LOGIC ---
+    // Change chord every 2 measures
+    if (state.tick16n % (ticksPerMeasure * 2) === 0) { 
         state.air.currentChordIndex = (state.air.currentChordIndex + 1) % chordProgression.length;
 
-        // BASS - Pulsing root note on every beat
-        const bassRootDegree = chordProgression[state.air.currentChordIndex];
-        const bassFreq = state.scaleFrequencies.bass[bassRootDegree % state.scaleFrequencies.bass.length];
-        if (bassFreq) {
-            for (let i=0; i < 8; i++) { // Every half measure for 2 measures
-                 notesBatch.push({
-                    part: 'bass',
-                    freq: bassFreq,
-                    dur: '8n',
-                    vel: 0.6,
-                    time: time + (i * ticksPerBeat * 2 * (60 / state.currentBpm / 4))
-                });
-            }
-        }
-
-        // ACCOMPANIMENT - Held pad
+        // ACCOMPANIMENT - Held pad for the duration of the chord
         const accompRootDegree = chordProgression[state.air.currentChordIndex];
         const chordDegrees = [accompRootDegree, accompRootDegree + 2, accompRootDegree + 4];
         chordDegrees.forEach((degree, index) => {
@@ -382,12 +375,29 @@ function tickAir(time: number) {
         });
     }
 
+    // --- BASS LOGIC ---
+    if (!state.air.isResting && state.air.currentBassPattern.length > 0) {
+        const patternIndex = state.tick16n % 16;
+        if (state.air.currentBassPattern[patternIndex]) {
+            const bassRootDegree = chordProgression[state.air.currentChordIndex];
+            const bassFreq = state.scaleFrequencies.bass[bassRootDegree % state.scaleFrequencies.bass.length];
+            if (bassFreq) {
+                notesBatch.push({
+                    part: 'bass',
+                    freq: bassFreq,
+                    dur: '8n',
+                    vel: 0.7,
+                    time: time,
+                });
+            }
+        }
+    }
+
     // --- MELODY LOGIC (only play if not resting) ---
     if (!state.air.isResting && state.tick16n % ticksPerBeat === 0) {
         const rootDegree = chordProgression[state.air.currentChordIndex];
         const triadDegrees = [rootDegree, rootDegree + 2, rootDegree + 4];
 
-        // Pick one note from the triad based on the current arpeggio pattern
         const patternIndex = (state.tick16n / ticksPerBeat) % state.air.currentArpPattern.length;
         const triadNoteIndex = state.air.currentArpPattern[patternIndex];
         const noteDegree = triadDegrees[triadNoteIndex];
@@ -404,7 +414,8 @@ function tickAir(time: number) {
             });
         }
     }
-
+    
+    // --- SEND BATCH ---
     if (notesBatch.length > 0) {
         self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
     }
@@ -482,6 +493,7 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             state.air.restMeasures = 0;
             state.air.totalRestMeasures = 0; // No rest at the very beginning
             state.air.currentArpPattern = [0, 1, 2];
+            state.air.currentBassPattern = [];
 
             break;
         case 'stop':
