@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { MixerControls } from '@/components/mixer-controls';
+import { MixerControls, AutopilotMixerControls } from '@/components/mixer-controls';
 import { SlidersHorizontal, Drum, Zap, Bot, Power } from 'lucide-react';
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
@@ -92,6 +92,7 @@ export function BeatBoxControls({
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isTempoOpen, setIsTempoOpen] = useState(false);
     const [isAutopilotOpen, setIsAutopilotOpen] = useState(false);
+    const [isAutopilotMixerOpen, setIsAutopilotMixerOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<'Meditative' | 'Classic'>('Meditative');
     
     const { classicPatterns, meditativePatterns, offPattern } = useMemo(() => {
@@ -120,11 +121,35 @@ export function BeatBoxControls({
                 <DialogHeader>
                     <DialogTitle>Autopilot Controls</DialogTitle>
                 </DialogHeader>
-                <div className='py-4 space-y-6 pr-4'>
+                <div className='py-4 space-y-6'>
                     <div className="flex items-center space-x-2">
                         <Switch id="autopilot-switch" checked={isAutopilotOn} onCheckedChange={onAutopilotToggle} />
                         <Label htmlFor="autopilot-switch">Autopilot On/Off</Label>
                     </div>
+                    <Dialog open={isAutopilotMixerOpen} onOpenChange={setIsAutopilotMixerOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" className="w-full">
+                                <SlidersHorizontal className="w-4 h-4 mr-2" />
+                                Autopilot Mixer
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Autopilot & Effects Mixer</DialogTitle>
+                            </DialogHeader>
+                             <ScrollArea className="h-auto max-h-[70vh]">
+                                <div className="pr-4 py-4">
+                                     <AutopilotMixerControls
+                                        initialVolumes={initialVolumes} 
+                                        onVolumeChange={onVolumeChange}
+                                        initialEffects={initialEffects}
+                                        onEffectChange={onEffectChange}
+                                        isMobile={isMobile}
+                                    />
+                                </div>
+                            </ScrollArea>
+                        </DialogContent>
+                    </Dialog>
                 </div>
             </DialogContent>
         </Dialog>
@@ -238,7 +263,7 @@ export function BeatBoxControls({
                             <DialogTitle>Mixer</DialogTitle>
                         </DialogHeader>
                         <ScrollArea className="h-auto max-h-[70vh]">
-                            <div className="pr-4">
+                            <div className="pr-4 py-4">
                                 <MixerControls 
                                     initialVolumes={initialVolumes} 
                                     onVolumeChange={onVolumeChange}
@@ -367,7 +392,7 @@ export function BeatBoxControls({
                             <DialogTitle>Mixer</DialogTitle>
                         </DialogHeader>
                         <ScrollArea className="h-auto max-h-[70vh]">
-                             <div className="pr-4">
+                             <div className="pr-4 py-4">
                                 <MixerControls 
                                     initialVolumes={initialVolumes} 
                                     onVolumeChange={onVolumeChange}

@@ -6,6 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Music, Waves, Drum, Bot, Anchor, Sparkles } from 'lucide-react';
 import { Separator } from './ui/separator';
 import { useState, useCallback } from 'react';
+import { Button } from "./ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { ScrollArea } from "./ui/scroll-area";
+import { SlidersHorizontal } from 'lucide-react';
+import { cn } from "@/lib/utils";
 
 type Volumes = { 
     melody: number; 
@@ -164,31 +169,55 @@ export function MixerControls({ initialVolumes, onVolumeChange, initialEffects, 
                     onDelayChange={(v) => handleEffectChange('drums', 'delay', v)}
                 />
             </div>
-
-            <Separator />
-            
-            <div className="space-y-4">
-                 <InstrumentControls 
-                    label="Autopilot"
-                    icon={Bot}
-                    volume={volumes.autopilot}
-                    reverb={effects.autopilot.reverb}
-                    delay={effects.autopilot.delay}
-                    onVolumeChange={(v) => handleVolumeChange('autopilot', v)}
-                    onReverbChange={(v) => handleEffectChange('autopilot', 'reverb', v)}
-                    onDelayChange={(v) => handleEffectChange('autopilot', 'delay', v)}
-                />
-                 <InstrumentControls 
-                    label="Effects"
-                    icon={Sparkles}
-                    volume={volumes.effects}
-                    reverb={effects.effects.reverb}
-                    delay={effects.effects.delay}
-                    onVolumeChange={(v) => handleVolumeChange('effects', v)}
-                    onReverbChange={(v) => handleEffectChange('effects', 'reverb', v)}
-                    onDelayChange={(v) => handleEffectChange('effects', 'delay', v)}
-                />
-            </div>
         </div>
     );
+}
+
+export function AutopilotMixerControls({ initialVolumes, onVolumeChange, initialEffects, onEffectChange }: MixerControlsProps) {
+    const [volumes, setVolumes] = useState(initialVolumes);
+    const [effects, setEffects] = useState(initialEffects);
+
+    const handleVolumeChange = useCallback((instrument: keyof Volumes, value: number) => {
+        const newVolumes = { ...volumes, [instrument]: value };
+        setVolumes(newVolumes);
+        onVolumeChange(newVolumes);
+    }, [volumes, onVolumeChange]);
+
+    const handleEffectChange = useCallback((instrument: keyof Effects, effect: 'reverb' | 'delay', value: number) => {
+        const newEffects = {
+            ...effects,
+            [instrument]: {
+                // @ts-ignore
+                ...effects[instrument],
+                [effect]: value
+            }
+        };
+        setEffects(newEffects);
+        onEffectChange(newEffects);
+    }, [effects, onEffectChange]);
+
+    return (
+        <div className="p-1 space-y-4">
+            <InstrumentControls 
+                label="Autopilot"
+                icon={Bot}
+                volume={volumes.autopilot}
+                reverb={effects.autopilot.reverb}
+                delay={effects.autopilot.delay}
+                onVolumeChange={(v) => handleVolumeChange('autopilot', v)}
+                onReverbChange={(v) => handleEffectChange('autopilot', 'reverb', v)}
+                onDelayChange={(v) => handleEffectChange('autopilot', 'delay', v)}
+            />
+            <InstrumentControls 
+                label="Effects"
+                icon={Sparkles}
+                volume={volumes.effects}
+                reverb={effects.effects.reverb}
+                delay={effects.effects.delay}
+                onVolumeChange={(v) => handleVolumeChange('effects', v)}
+                onReverbChange={(v) => handleEffectChange('effects', 'reverb', v)}
+                onDelayChange={(v) => handleEffectChange('effects', 'delay', v)}
+            />
+        </div>
+    )
 }
