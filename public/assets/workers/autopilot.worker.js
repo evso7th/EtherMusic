@@ -1,39 +1,48 @@
+// public/assets/workers/autopilot.worker.js
 
-// --- STATE ---
+// Import Tone.js from a CDN or a local copy if you have one.
+// Note: Using importScripts is the standard way to load external scripts in a worker.
+try {
+    importScripts("https://cdnjs.cloudflare.com/ajax/libs/tone/15.0.4/Tone.min.js");
+} catch (e) {
+    console.error("Failed to import Tone.js into worker:", e);
+}
+
+
+// --- WORKER STATE ---
 let isRunning = false;
 let tickInterval = null;
 let noteIndex = 0;
 let scaleNotes = [];
 let currentBpm = 90;
-let currentKey = 'C';
-let currentScale = 'Major';
 
-// --- MUSIC THEORY ---
-const scaleIntervals = {
-    'Major': [0, 2, 4, 5, 7, 9, 11],
-    'Minor': [0, 2, 3, 5, 7, 8, 10],
-    'Major Pentatonic': [0, 2, 4, 7, 9],
-    'Minor Pentatonic': [0, 3, 5, 7, 10],
-};
+// --- MUSIC THEORY & UTILITIES ---
+function updateScaleNotes(key, scale) {
+    // This is a simplified version. Tone.js is not fully available in the same way,
+    // so we'll construct the scale manually for now.
+    const scaleIntervals = {
+        'Major': [0, 2, 4, 5, 7, 9, 11],
+        'Minor': [0, 2, 3, 5, 7, 8, 10],
+        'Major Pentatonic': [0, 2, 4, 7, 9],
+        'Minor Pentatonic': [0, 3, 5, 7, 10],
+    };
+    
+    // For simplicity, we'll stick to octave 4 for the test
+    const octave = 4;
+    const baseNote = `${key}${octave}`;
+    const intervals = scaleIntervals[scale];
 
-function getNoteName(key, octave, interval) {
-    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const keyIndex = noteNames.indexOf(key);
-    const noteIndex = (keyIndex + interval) % 12;
-    return noteNames[noteIndex] + octave;
-}
-
-function updateScaleNotes() {
-    const intervals = scaleIntervals[currentScale] || scaleIntervals['Major'];
-    const notes = [];
-    const octaves = [4, 5]; 
-    for (const octave of octaves) {
-        for (const interval of intervals) {
-            notes.push(getNoteName(currentKey, octave, interval));
-        }
+    if (self.Tone && self.Tone.Frequency) {
+        scaleNotes = intervals.map(interval => 
+            new self.Tone.Frequency(baseNote).transpose(interval).toFrequency()
+        );
+         // Add the octave higher note to complete the scale
+        scaleNotes.push(new self.Tone.Frequency(baseNote).transpose(12).toFrequency());
+    } else {
+        // Fallback or error if Tone.js is not loaded
+        console.error("Tone.js is not available in the worker.");
+        scaleNotes = [];
     }
-    // Simple C Major scale for now as a fallback
-    scaleNotes = notes.length > 0 ? notes : ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5'];
 }
 
 
@@ -41,22 +50,20 @@ function updateScaleNotes() {
 function tick() {
     if (!isRunning || scaleNotes.length === 0) return;
 
-    // The worker sends the note name, the main thread will convert to freq and schedule
-    const noteToPlay = scaleNotes[noteIndex % scaleNotes.length];
+    const noteToPlayFreq = scaleNotes[noteIndex % scaleNotes.length];
     
-    // The worker only needs to provide the note info.
-    // The main thread's AudioEngine will handle the absolute timing with Tone.now()
+    // We now send a frequency, not a note name.
     const noteEvent = {
-        freq: noteToPlay,
-        dur: '8n', // Note duration
-        vel: 0.8,
-        time: 0, // This will be replaced by main thread
+        freq: noteToPlayFreq,
+        dur: '8n',
+        vel: 0.8
     };
     
     self.postMessage({ type: 'playNote', note: noteEvent });
     
     noteIndex++;
 }
+
 
 // --- MESSAGE HANDLER ---
 self.onmessage = function (event) {
@@ -66,8 +73,7 @@ self.onmessage = function (event) {
             if (isRunning) return;
             isRunning = true;
             noteIndex = 0;
-            // Interval for 8th notes based on BPM
-            const intervalMs = (60 / currentBpm) * 1000 / 2; 
+            const intervalMs = (60 / currentBpm) * 1000 / 2; // for 8th notes
             if (tickInterval) clearInterval(tickInterval);
             tickInterval = setInterval(tick, intervalMs);
             break;
@@ -80,21 +86,25 @@ self.onmessage = function (event) {
             }
             break;
         case 'setHarmony':
-            currentKey = data.key;
-            currentScale = data.scale;
-            updateScaleNotes();
+             if ('key' in data && 'scale' in data) {
+                updateScaleNotes(data.key, data.scale);
+            }
             break;
         case 'setTempo':
-            currentBpm = data.bpm;
-            // If running, restart the interval with the new tempo
-            if (isRunning) {
-                if (tickInterval) clearInterval(tickInterval);
-                const newIntervalMs = (60 / currentBpm) * 1000 / 2;
-                tickInterval = setInterval(tick, newIntervalMs);
+            if ('bpm' in data) {
+                currentBpm = data.bpm;
+                if (isRunning) {
+                    if (tickInterval) clearInterval(tickInterval);
+                    const newIntervalMs = (60 / currentBpm) * 1000 / 2;
+                    tickInterval = setInterval(tick, newIntervalMs);
+                }
             }
             break;
     }
 };
 
-// Initial setup
-updateScaleNotes();
+// Initial setup, assuming Tone.js will be loaded by the time this is needed.
+// A more robust solution might wait for a 'ready' message.
+setTimeout(() => {
+    updateScaleNotes('C', 'Major Pentatonic');
+}, 100); // Give Tone.js a moment to load

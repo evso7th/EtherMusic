@@ -145,13 +145,13 @@ export class AudioEngine {
         this.createPresets();
         this.initializeVoicePools();
         
-        // A single, one-voice synth for the worker.
-        this.autopilotSynth = new Tone.Synth(this.presets.synth.options).connect(this.channels.autopilot);
-        
         this.latchEngine = new LatchEngine(this);
         
         this.drumMachine = new DrumMachine(this.channels.drums);
         await this.drumMachine.initialize();
+
+        // A single, one-voice synth for the worker.
+        this.autopilotSynth = new Tone.Synth(this.presets.synth.options).connect(this.channels.autopilot);
         
         this.isInitialized = true;
         console.log(`AudioEngine initialized.`);
@@ -299,21 +299,22 @@ export class AudioEngine {
     }
 
     public playWorkerNote(note: NoteEvent) {
-        if (!this.isInitialized || !this.autopilotSynth || !note) return;
-        // The worker sends notes with absolute time already calculated
-        this.autopilotSynth.triggerAttackRelease(note.freq, note.dur, note.time, note.vel);
+        if (!this.isInitialized || !this.autopilotSynth) return;
+        // The worker sends note with frequency. Let the main thread's Transport schedule it.
+        const time = Tone.now() + 0.1; // Add small buffer
+        this.autopilotSynth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
     }
     
     public stopAllSounds() {
         this.voicePools.forEach(pool => pool.forEach(voice => voice.release(0.1)));
-        this.autopilotSynth?.triggerRelease();
+        this.autopilotSynth?.releaseAll();
         this.orbManager?.removeAllOrbs();
         this.latchEngine.stopAll();
         if (this.isInitialized) this.drumMachine.stop();
     }
     
     public stopAllAutopilotSounds() {
-        this.autopilotSynth?.triggerRelease();
+        this.autopilotSynth?.releaseAll();
         // This is important to clear any scheduled but not yet played notes.
         Tone.Transport.cancel();
     }

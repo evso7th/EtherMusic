@@ -1,6 +1,3 @@
-
-'use client';
-// This file is no longer used in the simplified architecture
-// and can be removed in the future.
-// All logic is now in autopilot.worker.js, page.tsx, and audio-engine.ts.
+// This file is intentionally left blank as it is no longer used in the simplified architecture.
+// All communication is handled directly between page.tsx and the worker.
 export {};
