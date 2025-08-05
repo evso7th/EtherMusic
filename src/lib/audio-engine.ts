@@ -301,9 +301,7 @@ export class AudioEngine {
 
     public playWorkerNote(note: NoteEvent) {
         if (!this.isInitialized || !this.autopilotSynth) return;
-        // The worker sends note with frequency. Let the main thread's Transport schedule it.
-        const time = Tone.now() + 0.1; // Add small buffer
-        this.autopilotSynth.triggerAttackRelease(note.freq, note.dur, time, note.vel);
+        this.autopilotSynth.triggerAttackRelease(note.freq, note.dur, note.time, note.vel);
     }
     
     public stopAllSounds() {

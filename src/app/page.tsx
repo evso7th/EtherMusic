@@ -15,6 +15,7 @@ import { HelpGuide } from '@/components/help-guide';
 import { AudioEngine } from '@/lib/audio-engine';
 import { beatPatterns } from '@/lib/drum-machine';
 import { OrbManager } from '@/lib/orb-manager';
+import * as Tone from 'tone';
 import {
   Dialog,
   DialogContent,
@@ -24,7 +25,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
-import type { AutopilotPart, NoteEvent } from '@/lib/autopilot-worker';
+import type { AutopilotPart, NoteEvent, WorkerResponse } from '@/lib/autopilot-worker';
 
 
 export const tempos: Tempo[] = [
@@ -86,7 +87,7 @@ export default function Home() {
     const autopilotWorker = useRef<Worker>();
     const orbManager = useRef<OrbManager>();
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
-    
+    const transportEventId = useRef<number | null>(null);
 
     // --- Engine Initialization ---
     useEffect(() => {
@@ -108,8 +109,8 @@ export default function Home() {
             mainEngine.setOrbManager(om);
 
             // Create Autopilot Worker
-            const worker = new Worker('/assets/workers/autopilot.worker.js');
-            worker.onmessage = (e: MessageEvent<any>) => {
+            const worker = new Worker(new URL('../lib/autopilot-worker.ts', import.meta.url));
+            worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
                 if (e.data.type === 'playNote' && e.data.note) {
                     audioEngine.current?.playWorkerNote(e.data.note);
                 }
@@ -138,6 +139,11 @@ export default function Home() {
             worker.postMessage({ type: 'setHarmony', key: 'C', scale: 'Major Pentatonic' });
             worker.postMessage({ type: 'setTempo', bpm: tempos[2].bpm });
             
+            // Create the "Eternal Metronome Tick" for the worker
+            transportEventId.current = Tone.Transport.scheduleRepeat((time) => {
+                autopilotWorker.current?.postMessage({ type: 'tick', time });
+            }, '8n');
+
             setIsReady(true);
             console.log('Audio engines and worker initialized and ready.');
         } catch(e) {
@@ -199,11 +205,8 @@ export default function Home() {
 
     const handleAutopilotToggle = useCallback((isOn: boolean) => {
         setIsAutopilotOn(isOn);
-        if (isOn) {
-            autopilotWorker.current?.postMessage({ type: 'start' });
-        } else {
-            autopilotWorker.current?.postMessage({ type: 'stop' });
-        }
+        // This is a simple toggle. The eternal tick in `initializeAudio` does the heavy lifting.
+        autopilotWorker.current?.postMessage({ type: isOn ? 'start' : 'stop' });
     }, []);
 
     const handlePlayPause = useCallback(async () => {
@@ -222,7 +225,6 @@ export default function Home() {
         setIsPlaying(false);
         if (isAutopilotOn) {
             handleAutopilotToggle(false);
-            setIsAutopilotOn(false);
         }
         audioEngine.current.stop();
     }, [isAutopilotOn, handleAutopilotToggle]);

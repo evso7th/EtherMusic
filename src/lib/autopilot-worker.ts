@@ -1,13 +1,13 @@
 
+import * as Tone from 'tone';
 import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
-import type { InstrumentPart } from './audio-engine';
 import type { Unit } from 'tone/build/esm/core/type/Units';
 
 // --- TYPE DEFINITIONS ---
-export type { AutopilotPart };
+export type AutopilotPart = 'melody'; // Simplified for now
 
 export type NoteEvent = {
-    part: 'autopilot_melody'; // For now, only one part
+    part: AutopilotPart;
     freq: number;
     dur: Unit.Time;
     vel: number;
@@ -17,78 +17,68 @@ export type NoteEvent = {
 export type WorkerEvent =
     | { type: 'start' }
     | { type: 'stop' }
+    | { type: 'tick', time: number }
     | { type: 'setHarmony', key: MusicKey, scale: MusicScale }
     | { type: 'setTempo', bpm: number };
-
 
 export type WorkerResponse =
     | { type: 'playNote', note: NoteEvent };
 
 // --- WORKER STATE ---
 let isRunning = false;
-let tickInterval: any = null;
 let noteIndex = 0;
-let scaleNotes: string[] = [];
+let scaleFrequencies: number[] = [];
 let currentBpm: number = 90;
 
 // --- MUSIC THEORY & UTILITIES ---
-const scaleIntervalMap: { [key in MusicScale]: string[] } = {
-    'Major': ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5'],
-    'Minor': ['C4', 'D4', 'Eb4', 'F4', 'G4', 'Ab4', 'Bb4', 'C5'],
-    'Major Pentatonic': ['C4', 'D4', 'E4', 'G4', 'A4', 'C5'],
-    'Minor Pentatonic': ['C4', 'Eb4', 'F4', 'G4', 'Bb4', 'C5'],
-};
-
 function updateScaleNotes(key: MusicKey, scale: MusicScale) {
-    // Note: for simplicity, this example doesn't transpose the key yet.
-    // It always uses the C Major scale notes.
-    scaleNotes = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5'];
+    const scaleIntervals: { [key in MusicScale]: string[] } = {
+        'Major': ['0', '2', '4', '5', '7', '9', '11'],
+        'Minor': ['0', '2', '3', '5', '7', '8', '10'],
+        'Major Pentatonic': ['0', '2', '4', '7', '9'],
+        'Minor Pentatonic': ['0', '3', '5', '7', '10'],
+    };
+    const intervals = scaleIntervals[scale];
+    const notesInOctave4 = intervals.map(interval => Tone.Frequency(key + '4').transpose(parseInt(interval)).toFrequency());
+    const notesInOctave5 = intervals.map(interval => Tone.Frequency(key + '5').transpose(parseInt(interval)).toFrequency());
+    scaleFrequencies = [...notesInOctave4, notesInOctave5[0]].sort((a,b) => a-b);
 }
 
-
 // --- CORE LOGIC ---
-function tick() {
-    if (!isRunning || scaleNotes.length === 0) return;
+function tick(time: number) {
+    // Only generate a note if the worker is running
+    if (!isRunning || scaleFrequencies.length === 0) return;
 
-    // Calculate the time for the note to be played.
-    // The main thread's Tone.now() is the source of truth, but we can't access it here.
-    // So we just send the note and let the main thread schedule it immediately.
-    // This is not perfect for timing, but it's the simplest approach without a complex scheduler.
-    const noteToPlay = scaleNotes[noteIndex % scaleNotes.length];
+    const noteToPlayFreq = scaleFrequencies[noteIndex % scaleFrequencies.length];
     
     const noteEvent: NoteEvent = {
-        part: 'autopilot_melody',
-        freq: noteToPlay as unknown as number, // Tone.js can handle note names
+        part: 'melody',
+        freq: noteToPlayFreq,
         dur: '8n',
-        vel: 0.8,
-        time: 0, // Main thread will use Tone.now()
+        vel: Math.random() * 0.3 + 0.5, // Add some velocity variation
+        time: time, // The exact time is provided by the main thread's Transport
     };
     
+    // Post the note back to the main thread
     self.postMessage({ type: 'playNote', note: noteEvent });
     
     noteIndex++;
 }
-
 
 // --- MESSAGE HANDLER ---
 self.onmessage = function (event: MessageEvent<WorkerEvent>) {
     const { type, ...data } = event.data;
     switch (type) {
         case 'start':
-            if (isRunning) return;
             isRunning = true;
-            noteIndex = 0;
-            const intervalMs = (60 / currentBpm) * 1000 / 2; // 8th notes
-            if (tickInterval) clearInterval(tickInterval);
-            tickInterval = setInterval(tick, intervalMs);
+            noteIndex = 0; // Reset sequence on start
             break;
         case 'stop':
-            if (!isRunning) return;
             isRunning = false;
-            if (tickInterval) {
-                clearInterval(tickInterval);
-                tickInterval = null;
-            }
+            break;
+        case 'tick':
+            // Directly call tick with the time from the main thread
+            tick(data.time);
             break;
         case 'setHarmony':
              if ('key' in data && 'scale' in data) {
@@ -96,18 +86,14 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             }
             break;
         case 'setTempo':
+            // The worker no longer needs to know the tempo, as it's driven by external ticks.
+            // We can keep this for future use if needed.
             if ('bpm' in data) {
                 currentBpm = data.bpm as number;
-                // If running, restart the interval with the new tempo
-                if (isRunning) {
-                    if (tickInterval) clearInterval(tickInterval);
-                    const intervalMs = (60 / currentBpm) * 1000 / 2; // 8th notes
-                    tickInterval = setInterval(tick, intervalMs);
-                }
             }
             break;
     }
 };
 
 // Initial setup
-updateScaleNotes('C', 'Major');
+updateScaleNotes('C', 'Major Pentatonic');
