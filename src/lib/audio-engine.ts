@@ -322,7 +322,7 @@ export class AudioEngine {
                 this.testSynth.triggerAttack(note, time, 0.8);
                 this.testSynth.triggerRelease(time + new Tone.Time('8n').toSeconds());
             }
-        }, scale, "8n.").start(0);
+        }, scale, "8n").start(0);
 
         this.testSequence.loop = true;
         
