@@ -114,7 +114,7 @@ export class AudioEngine {
     };
     
     private testSequence: Tone.Sequence | null = null;
-    private autopilotPolySynth: Tone.PolySynth | null = null;
+    private testSynth: Tone.Synth | null = null;
 
 
     constructor() {
@@ -147,11 +147,8 @@ export class AudioEngine {
         this.createPresets();
         this.initializeVoicePools();
         
-        // Dedicated PolySynth for Autopilot to prevent voice stealing issues
-        this.autopilotPolySynth = new Tone.PolySynth(Tone.Synth, {
-            maxPolyphony: 8,
-            ...this.presets.synth.options
-        }).connect(this.channels.autopilot);
+        // A single, one-voice synth for testing.
+        this.testSynth = new Tone.Synth(this.presets.synth.options).connect(this.channels.autopilot);
         
         this.latchEngine = new LatchEngine(this);
         
@@ -172,9 +169,9 @@ export class AudioEngine {
             melody: 3,
             bass: 3,
             latch: 3,
-            autopilot_melody: 4, // Kept for future complex autopilot
-            autopilot_accompaniment: 4, // Kept for future complex autopilot
-            autopilot_bass: 2, // Kept for future complex autopilot
+            autopilot_melody: 8,
+            autopilot_accompaniment: 4,
+            autopilot_bass: 2,
             autopilot_effects: 4
         };
 
@@ -202,7 +199,7 @@ export class AudioEngine {
         this.reconfigurePool('melody', this.currentInstruments.melody);
         this.reconfigurePool('bass', this.currentInstruments.bass);
         this.reconfigurePool('latch', this.currentInstruments.bass);
-        // We will now use the dedicated PolySynth for melody, so no need to reconfigure this pool for now
+        this.reconfigurePool('autopilot_melody', this.currentInstruments.autopilot);
         this.reconfigurePool('autopilot_bass', 'autopilot_bass');
         this.reconfigurePool('autopilot_effects', 'autopilot_effect_star');
     }
@@ -305,12 +302,11 @@ export class AudioEngine {
     }
 
     public playTestNote() {
-        if (!this.isInitialized) return;
+        if (!this.isInitialized || !this.testSynth) return;
 
         if (this.testSequence) {
             this.testSequence.stop(0).dispose();
             this.testSequence = null;
-            console.log("Stopping test scale.");
             if (Tone.Transport.state === 'started') {
                  Tone.Transport.pause();
                  Tone.Transport.position = 0;
@@ -321,7 +317,7 @@ export class AudioEngine {
         const scale = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5'];
         
         this.testSequence = new Tone.Sequence((time, note) => {
-             this.autopilotPolySynth?.triggerAttackRelease(note, "8n", time, 0.8);
+             this.testSynth?.triggerAttackRelease(note, "8n", time, 0.8);
         }, scale, "8n").start(0);
 
         this.testSequence.loop = true;
@@ -329,25 +325,15 @@ export class AudioEngine {
         if (Tone.Transport.state !== 'started') {
             Tone.Transport.start();
         }
-        console.log("Playing test scale.");
     }
 
 
     public playAutopilotEvent(note: NoteEvent, time: number) {
         if (!this.isInitialized || note.freq === null || note.freq === undefined) return;
         
-        // Use PolySynth for melodic parts to avoid voice allocation issues
-        if (note.part === 'autopilot_melody' || note.part === 'autopilot_accompaniment') {
-            this.autopilotPolySynth?.triggerAttackRelease(note.freq, note.dur, time, note.vel);
-            return;
-        }
+        const part = note.part.startsWith('autopilot_') ? 'autopilot_melody' : note.part;
 
-        if (note.part === 'autopilot_effects') {
-             const effectName = Math.random() > 0.5 ? 'autopilot_effect_star' : 'autopilot_effect_meteor';
-             this.reconfigurePool('autopilot_effects', effectName);
-        }
-        
-        const voice = this.getVoiceFromPool(note.part);
+        const voice = this.getVoiceFromPool(part as InstrumentPart);
         if (voice) {
             voice.attackRelease(note.freq, note.dur, time, note.vel);
         }
@@ -355,7 +341,7 @@ export class AudioEngine {
     
     public stopAllSounds() {
         this.voicePools.forEach(pool => pool.forEach(voice => voice.release(0.1)));
-        this.autopilotPolySynth?.releaseAll();
+        this.testSynth?.triggerRelease();
         this.orbManager?.removeAllOrbs();
         this.latchEngine.stopAll();
         if (this.testSequence) {
@@ -370,7 +356,7 @@ export class AudioEngine {
                 pool.forEach(voice => voice.release(0.1));
             }
         });
-        this.autopilotPolySynth?.releaseAll();
+        this.testSynth?.triggerRelease();
         if (this.testSequence) {
             this.testSequence.stop(0);
         }
@@ -417,20 +403,15 @@ export class AudioEngine {
     }
 
     public setAutopilotInstrument(instrument: Instrument) {
-        if(!this.isInitialized || !this.autopilotPolySynth) return;
+        if(!this.isInitialized) return;
         this.currentInstruments.autopilot = instrument;
-        
-        const presetKey = this.getPresetKey('autopilot_melody', instrument);
-        const preset = this.presets[presetKey];
-        if (preset) {
-            // @ts-ignore
-            this.autopilotPolySynth.set({
-                ...preset.options,
-                // PolySynth doesn't have a 'type' property to change the synth itself,
-                // but we can update the options of its voices.
-                // This assumes the synth type (e.g., Tone.Synth) is what we want.
-                // For changing the synth *type*, we'd need to dispose and recreate the PolySynth.
-            });
+        this.reconfigurePool('autopilot_melody', instrument);
+
+        if (this.testSynth) {
+            const preset = this.presets[instrument];
+            if (preset) {
+                this.testSynth.set(preset.options);
+            }
         }
     }
 
@@ -516,3 +497,5 @@ export class AudioEngine {
         return freqs.reduce((prev, curr) => (Math.abs(curr - targetFreq) < Math.abs(prev - targetFreq) ? curr : prev));
     }
 }
+
+    
