@@ -392,7 +392,7 @@ export default function Home() {
                         <MemoizedThereminPad
                             onInteraction={handleThereminInteraction}
                             type="melody"
-                            frequencyRange={[220, 1760]}
+                            frequencyRange={[110, 880]}
                             color="hsl(var(--primary))"
                             instruments={instruments.filter(i => i !== 'ebass')}
                             activeInstrument={melodyInstrument}
@@ -459,7 +459,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
-
-    

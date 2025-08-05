@@ -101,10 +101,10 @@ function updateHarmony(key: MusicKey, scale: MusicScale) {
     state.currentKey = key;
     state.currentScale = scale;
     state.scaleFrequencies = {
-        bass: getScaleFrequencies(key, scale, [1, 2]),
+        bass: getScaleFrequencies(key, scale, [2, 3]),
         accompaniment: getScaleFrequencies(key, scale, [3, 4]),
-        melody: getScaleFrequencies(key, scale, [4, 5]),
-        effects: getScaleFrequencies(key, scale, [4, 5]),
+        melody: getScaleFrequencies(key, scale, [3, 4]),
+        effects: getScaleFrequencies(key, scale, [4]),
     };
     // Reset melody memory on harmony change
     state.sequence.lastMelodyNoteIndex = null;
@@ -396,5 +396,3 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
 
 // Initial setup
 updateHarmony(state.currentKey, state.currentScale);
-
-    
