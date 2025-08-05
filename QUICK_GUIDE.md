@@ -1,11 +1,12 @@
-
 # EtherMusic Quick Guide
 
 Welcome to EtherMusic! This is a simple guide to get you started on making cool sounds.
 
-## What is This?
+## What is This? (And What It Isn't)
 
-It's a virtual music box, a "Neuro Meditation Sound Processor." Think of it as an instrument that anyone can play, regardless of musical ability. You don't need to learn notes or chords. Just move your fingers and listen to what happens.
+**This is not a simplified Digital Audio Workstation (DAW) or a DJ mixer.** You won't produce a studio-quality track here.
+
+Instead, think of it as a **virtual music box**, a "Neuro-Meditation Sound Processor." It's an instrument that anyone can play, designed for relaxation, focus, and self-expression. We built it for everyone who loves music but feels intimidated by complex software and music theory. Here, you can't make a mistake.
 
 Our application is at the intersection of a creative tool, a meditation aid, and a digital wellness gadget. It is not for professional musicians, but for a wide audience that appreciates ambient music, mindfulness, and is looking for new forms of self-expression and relaxation.
 
@@ -47,11 +48,9 @@ Don't want to play yourself? Turn on the **Autopilot**!
 *   **Autopilot (`Bot` Icon):** Turns on the automatic music generator. The app will start creating its own complex parts for bass, accompaniment, and melody using arpeggiators and syncopation. You can still play along on the melody pad!
 *   **Style:** Choose a style to change how the Autopilot generates music:
     *   **Ambient:** Slow, evolving soundscapes.
-    *   **House:** Gentle, rhythmic patterns.
-    *   **Wind:** Light, airy, and spacious melodies.
     *   **Sequence:** Hypnotic, repeating arpeggios.
-    *   **Chimes:** The sound of tinkling glass or metal chimes.
-    *   **Drone:** A deep, continuous, and immersive background tone.
+    *   **Water:** Flowing, arpeggiated patterns resembling water droplets.
+    *   **Air:** Light, spacious, and "breathing" musical phrases.
     *   **Toccata:** Virtuosic and dramatic patterns inspired by the works of J.S. Bach.
     *   **Promenade:** Stately and majestic themes reminiscent of Mussorgsky's "Pictures at an Exhibition".
     *   **Space:** A slow, pulsing arpeggio in the style of Jean-Michel Jarre, with occasional "meteor" sound effects.
