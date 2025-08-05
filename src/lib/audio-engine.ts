@@ -113,9 +113,7 @@ export class AudioEngine {
         autopilot: 'synth'
     };
     
-    private testSequence: Tone.Sequence | null = null;
-    private testSynth: Tone.Synth | null = null;
-
+    private autopilotSynth: Tone.Synth | null = null;
 
     constructor() {
         // Orb manager is now initialized after engine is ready in page.tsx
@@ -147,8 +145,8 @@ export class AudioEngine {
         this.createPresets();
         this.initializeVoicePools();
         
-        // A single, one-voice synth for testing.
-        this.testSynth = new Tone.Synth(this.presets.synth.options).connect(this.channels.autopilot);
+        // A single, one-voice synth for the worker.
+        this.autopilotSynth = new Tone.Synth(this.presets.synth.options).connect(this.channels.autopilot);
         
         this.latchEngine = new LatchEngine(this);
         
@@ -156,7 +154,7 @@ export class AudioEngine {
         await this.drumMachine.initialize();
         
         this.isInitialized = true;
-        console.log(`AudioEngine initialized with dedicated voice pools.`);
+        console.log(`AudioEngine initialized.`);
     }
 
     public setOrbManager(orbManager: OrbManager) {
@@ -169,23 +167,25 @@ export class AudioEngine {
             melody: 3,
             bass: 3,
             latch: 3,
-            autopilot_melody: 8,
-            autopilot_accompaniment: 4,
-            autopilot_bass: 2,
-            autopilot_effects: 4
+            autopilot_melody: 0, // No longer used, worker has its own synth
+            autopilot_accompaniment: 0,
+            autopilot_bass: 0,
+            autopilot_effects: 0
         };
 
         const partToChannel: Record<InstrumentPart, Tone.Channel> = {
             melody: this.channels.melody,
             bass: this.channels.manualBass,
             latch: this.channels.latch,
-            autopilot_melody: this.channels.autopilot,
+            // Autopilot channels are not needed for pools anymore
+            autopilot_melody: this.channels.autopilot, 
             autopilot_accompaniment: this.channels.autopilot,
             autopilot_bass: this.channels.autopilot,
             autopilot_effects: this.channels.effects
         };
         
         for (const part of Object.keys(poolSizes) as InstrumentPart[]) {
+             if (poolSizes[part] === 0) continue;
             const size = poolSizes[part];
             const channel = partToChannel[part];
             const pool: Voice[] = [];
@@ -199,9 +199,6 @@ export class AudioEngine {
         this.reconfigurePool('melody', this.currentInstruments.melody);
         this.reconfigurePool('bass', this.currentInstruments.bass);
         this.reconfigurePool('latch', this.currentInstruments.bass);
-        this.reconfigurePool('autopilot_melody', this.currentInstruments.autopilot);
-        this.reconfigurePool('autopilot_bass', 'autopilot_bass');
-        this.reconfigurePool('autopilot_effects', 'autopilot_effect_star');
     }
 
     private reconfigurePool(part: InstrumentPart, instrumentName: Instrument | string) {
@@ -301,69 +298,22 @@ export class AudioEngine {
         }
     }
 
-    public playTestNote() {
-        if (!this.isInitialized || !this.testSynth) return;
-
-        if (this.testSequence) {
-            this.testSequence.stop(0).dispose();
-            this.testSequence = null;
-            if (Tone.Transport.state === 'started') {
-                 Tone.Transport.pause();
-                 Tone.Transport.position = 0;
-            }
-            return;
-        }
-        
-        const scale = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5'];
-        
-        this.testSequence = new Tone.Sequence((time, note) => {
-             if (this.testSynth) {
-                // Play note for 1/8, then rest for 1/16, which is clean
-                this.testSynth.triggerAttack(note, time, 0.8);
-                this.testSynth.triggerRelease(time + new Tone.Time('8n').toSeconds());
-            }
-        }, scale, "8n").start(0);
-
-        this.testSequence.loop = true;
-        
-        if (Tone.Transport.state !== 'started') {
-            Tone.Transport.start();
-        }
-    }
-
-
-    public playAutopilotEvent(note: NoteEvent, time: number) {
-        if (!this.isInitialized || note.freq === null || note.freq === undefined) return;
-        
-        const part = note.part.startsWith('autopilot_') ? 'autopilot_melody' : note.part;
-
-        const voice = this.getVoiceFromPool(part as InstrumentPart);
-        if (voice) {
-            voice.attackRelease(note.freq, note.dur, time, note.vel);
-        }
+    public playWorkerNote(note: NoteEvent) {
+        if (!this.isInitialized || !this.autopilotSynth || !note) return;
+        // The worker sends notes with absolute time already calculated
+        this.autopilotSynth.triggerAttackRelease(note.freq, note.dur, note.time, note.vel);
     }
     
     public stopAllSounds() {
         this.voicePools.forEach(pool => pool.forEach(voice => voice.release(0.1)));
-        this.testSynth?.triggerRelease();
+        this.autopilotSynth?.triggerRelease();
         this.orbManager?.removeAllOrbs();
         this.latchEngine.stopAll();
-        if (this.testSequence) {
-            this.testSequence.stop(0);
-        }
         if (this.isInitialized) this.drumMachine.stop();
     }
     
     public stopAllAutopilotSounds() {
-        this.voicePools.forEach((pool, part) => {
-            if (part.startsWith('autopilot_')) {
-                pool.forEach(voice => voice.release(0.1));
-            }
-        });
-        this.testSynth?.triggerRelease();
-        if (this.testSequence) {
-            this.testSequence.stop(0);
-        }
+        this.autopilotSynth?.triggerRelease();
         // This is important to clear any scheduled but not yet played notes.
         Tone.Transport.cancel();
     }
@@ -407,15 +357,11 @@ export class AudioEngine {
     }
 
     public setAutopilotInstrument(instrument: Instrument) {
-        if(!this.isInitialized) return;
+        if(!this.isInitialized || !this.autopilotSynth) return;
         this.currentInstruments.autopilot = instrument;
-        this.reconfigurePool('autopilot_melody', instrument);
-
-        if (this.testSynth) {
-            const preset = this.presets[instrument];
-            if (preset) {
-                this.testSynth.set(preset.options);
-            }
+        const preset = this.presets[instrument];
+        if (preset) {
+            this.autopilotSynth.set(preset.options);
         }
     }
 

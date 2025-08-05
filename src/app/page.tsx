@@ -13,7 +13,6 @@ import { PlaybackControls } from '@/components/playback-controls';
 import { ArrowRight } from 'lucide-react';
 import { HelpGuide } from '@/components/help-guide';
 import { AudioEngine } from '@/lib/audio-engine';
-import { AutopilotEngine } from '@/lib/autopilot-engine';
 import { beatPatterns } from '@/lib/drum-machine';
 import { OrbManager } from '@/lib/orb-manager';
 import {
@@ -25,7 +24,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
-import type { AutopilotPart } from '@/lib/autopilot-worker';
+import type { AutopilotPart, NoteEvent } from '@/lib/autopilot-worker';
 
 
 export const tempos: Tempo[] = [
@@ -84,7 +83,7 @@ export default function Home() {
     
     // --- Engine Ref ---
     const audioEngine = useRef<AudioEngine>();
-    const autopilotEngine = useRef<AutopilotEngine>();
+    const autopilotWorker = useRef<Worker>();
     const orbManager = useRef<OrbManager>();
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
     
@@ -95,19 +94,27 @@ export default function Home() {
     }, []);
 
     const initializeAudio = useCallback(async () => {
-        if (isReady || audioEngine.current) return;
+        if (isReady) return;
         
         try {
+            // Create Audio Engine
             const mainEngine = new AudioEngine();
             await mainEngine.initialize();
             audioEngine.current = mainEngine;
             
+            // Create Orb Manager
             const om = new OrbManager();
             orbManager.current = om;
             mainEngine.setOrbManager(om);
 
-            const apEngine = new AutopilotEngine(mainEngine);
-            autopilotEngine.current = apEngine; 
+            // Create Autopilot Worker
+            const worker = new Worker('/assets/workers/autopilot.worker.js');
+            worker.onmessage = (e: MessageEvent<any>) => {
+                if (e.data.type === 'playNote' && e.data.note) {
+                    audioEngine.current?.playWorkerNote(e.data.note);
+                }
+            };
+            autopilotWorker.current = worker;
             
             // Sync initial state with the engines
             mainEngine.setTempo(tempos[2].bpm);
@@ -127,10 +134,11 @@ export default function Home() {
             mainEngine.setHarmony('C', 'Major Pentatonic');
             mainEngine.setBeatPattern('Off');
             
-            apEngine.setHarmony('C', 'Major Pentatonic');
+            worker.postMessage({ type: 'setHarmony', key: 'C', scale: 'Major Pentatonic' });
+            worker.postMessage({ type: 'setTempo', bpm: tempos[2].bpm });
             
             setIsReady(true);
-            console.log('Audio engines initialized and ready.');
+            console.log('Audio engines and worker initialized and ready.');
         } catch(e) {
             console.error("Failed to initialize audio engines:", e);
             toast({
@@ -146,7 +154,7 @@ export default function Home() {
     const handleTempoChange = useCallback((tempo: Tempo) => {
         setActiveTempo(tempo);
         audioEngine.current?.setTempo(tempo.bpm);
-        autopilotEngine.current?.setTempo(tempo.bpm);
+        autopilotWorker.current?.postMessage({ type: 'setTempo', bpm: tempo.bpm });
     }, []);
 
     const handleVolumeChange = useCallback((newVolumes: any) => {
@@ -166,7 +174,7 @@ export default function Home() {
         setMusicKey(key);
         setMusicScale(scale);
         audioEngine.current?.setHarmony(key, scale);
-        autopilotEngine.current?.setHarmony(key, scale);
+        autopilotWorker.current?.postMessage({ type: 'setHarmony', key, scale });
     }, []);
     
     const handleMelodyInstrumentChange = useCallback((instrument: Instrument) => {
@@ -190,7 +198,11 @@ export default function Home() {
 
     const handleAutopilotToggle = useCallback((isOn: boolean) => {
         setIsAutopilotOn(isOn);
-        audioEngine.current?.playTestNote();
+        if (isOn) {
+            autopilotWorker.current?.postMessage({ type: 'start' });
+        } else {
+            autopilotWorker.current?.postMessage({ type: 'stop' });
+        }
     }, []);
 
     const handlePlayPause = useCallback(async () => {
@@ -201,12 +213,14 @@ export default function Home() {
     }, [isPlaying]);
     
     const handleStop = useCallback(async () => {
-        if (!audioEngine.current || !autopilotEngine.current) return;
+        if (!audioEngine.current) return;
         setIsPlaying(false);
-        setIsAutopilotOn(false); // Also turn off autopilot on stop
+        if (isAutopilotOn) {
+            handleAutopilotToggle(false);
+            setIsAutopilotOn(false);
+        }
         audioEngine.current.stop();
-        autopilotEngine.current.stop();
-    }, []);
+    }, [isAutopilotOn, handleAutopilotToggle]);
 
     const handleRecord = useCallback(() => {
         toast({ title: "Recording Unavailable", description: "This feature is temporarily disabled." });
@@ -248,11 +262,11 @@ export default function Home() {
 
     // Effect to start/stop autopilot with master play/pause
     useEffect(() => {
-        if (isReady && autopilotEngine.current) {
-            if (isPlaying && isAutopilotOn) {
-                autopilotEngine.current.start();
+        if (isReady && isAutopilotOn) {
+            if (isPlaying) {
+                autopilotWorker.current?.postMessage({ type: 'start' });
             } else {
-                autopilotEngine.current.stop();
+                autopilotWorker.current?.postMessage({ type: 'stop' });
             }
         }
     }, [isPlaying, isAutopilotOn, isReady]);
@@ -439,5 +453,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
