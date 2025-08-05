@@ -26,8 +26,7 @@ export type WorkerResponse =
 
 // --- WORKER STATE ---
 let isRunning = false;
-let noteIndex = 0;
-let currentBpm: number = 90;
+let noteIndex = 0; // Simple counter, driven by external ticks
 
 // --- MUSIC DATA: "Чижик-Пыжик" ---
 // Voice 1 (Melody)
@@ -50,101 +49,82 @@ const chizhikAccompaniment: (string | null)[] = [
     'A4', null, 'B4', null, 'A4', 'G4', 'F#4', null,
 ];
 
-const noteDuration = '8n'; // Each note is an eighth note
+const noteDuration = '8n';
 const totalNotesInLoop = chizhikMelody.length;
 
 // --- CORE LOGIC ---
 function tick(time: number) {
     if (!isRunning) return;
 
-    // --- Play Bass ---
-    // The bass part is independent of the melody index and based on the beat.
-    // We get the beat number from the Transport's progress.
-    const ticksInBeat = Tone.Transport.PPQ; // Pulses per quarter note
-    const currentTick = Tone.Transport.ticks;
-    const beatNumber = Math.floor(currentTick / ticksInBeat) % 4; // 0, 1, 2, 3 for a 4/4 measure
-
-    // We only play on the downbeat of each beat, so we check if the tick is at the start of a beat
-    if (currentTick % ticksInBeat === 0) {
-        const bassNoteName = 'C2';
-        
-        if (beatNumber < 3) { // First three beats are quarter notes
-            const bassEvent: NoteEvent = {
-                part: 'bass',
-                freq: Tone.Frequency(bassNoteName).toFrequency(),
-                dur: '4n',
-                vel: 0.9,
-                time: time,
-            };
-            self.postMessage({ type: 'playNote', note: bassEvent });
-        } else if (beatNumber === 3) { // Fourth beat has two 8th notes
-            // First 8th note
-            const firstEighth: NoteEvent = {
-                part: 'bass',
-                freq: Tone.Frequency(bassNoteName).toFrequency(),
-                dur: '8n',
-                vel: 0.9,
-                time: time,
-            };
-            self.postMessage({ type: 'playNote', note: firstEighth });
-            
-            // Second 8th note, scheduled for the "and" of the 4th beat
-            const secondEighth: NoteEvent = {
-                part: 'bass',
-                freq: Tone.Frequency(bassNoteName).toFrequency(),
-                dur: '8n',
-                vel: 0.8, // Slightly softer
-                time: time + Tone.Time('8n').toSeconds(),
-            };
-            self.postMessage({ type: 'playNote', note: secondEighth });
-        }
+    // --- Play Melody and Accompaniment using the simple index ---
+    const loopPosition = noteIndex % totalNotesInLoop;
+    
+    const melodyNoteName = chizhikMelody[loopPosition];
+    if (melodyNoteName) {
+        const melodyEvent: NoteEvent = {
+            part: 'melody',
+            freq: Tone.Frequency(melodyNoteName).toFrequency(),
+            dur: noteDuration,
+            vel: 0.7,
+            time: time,
+        };
+        self.postMessage({ type: 'playNote', note: melodyEvent });
     }
 
-
-    // --- Play Melody and Accompaniment ---
-    // Make sure we only trigger this once per 8th note step
-    const sixteenthsInStep = ticksInBeat / 2;
-    if (currentTick % sixteenthsInStep === 0) {
-        const loopPosition = noteIndex % totalNotesInLoop;
-        
-        const melodyNoteName = chizhikMelody[loopPosition];
-        if (melodyNoteName) {
-            const melodyEvent: NoteEvent = {
-                part: 'melody',
-                freq: Tone.Frequency(melodyNoteName).toFrequency(),
-                dur: noteDuration,
-                vel: 0.7,
-                time: time,
-            };
-            self.postMessage({ type: 'playNote', note: melodyEvent });
-        }
-
-        const accompanimentNoteName = chizhikAccompaniment[loopPosition];
-        if (accompanimentNoteName) {
-            const accompanimentEvent: NoteEvent = {
-                part: 'accompaniment',
-                freq: Tone.Frequency(accompanimentNoteName).toFrequency(),
-                dur: noteDuration,
-                vel: 0.5,
-                time: time,
-            };
-            self.postMessage({ type: 'playNote', note: accompanimentEvent });
-        }
-        
-        // --- Play random effect sound
-        if (Math.random() < 0.05) { // 5% chance on each 8th note step
-            const effectEvent: NoteEvent = {
-                part: 'effects',
-                freq: 1000 + Math.random() * 2000,
-                dur: '4n',
-                vel: 0.1 + Math.random() * 0.2,
-                time: time
-            };
-            self.postMessage({ type: 'playNote', note: effectEvent });
-        }
-
-        noteIndex++;
+    const accompanimentNoteName = chizhikAccompaniment[loopPosition];
+    if (accompanimentNoteName) {
+        const accompanimentEvent: NoteEvent = {
+            part: 'accompaniment',
+            freq: Tone.Frequency(accompanimentNoteName).toFrequency(),
+            dur: noteDuration,
+            vel: 0.5,
+            time: time,
+        };
+        self.postMessage({ type: 'playNote', note: accompanimentEvent });
     }
+
+    // --- Play Bass Part using the same simple index ---
+    // The pattern is 4 beats long, and we tick every 8th note, so a full pattern is 8 ticks.
+    const beatInMeasure = noteIndex % 8;
+    const bassNoteName = 'C2';
+    
+    // First 3 quarter notes (ticks 0, 2, 4)
+    if (beatInMeasure === 0 || beatInMeasure === 2 || beatInMeasure === 4) {
+        const bassEvent: NoteEvent = {
+            part: 'bass',
+            freq: Tone.Frequency(bassNoteName).toFrequency(),
+            dur: '4n',
+            vel: 0.9,
+            time: time,
+        };
+        self.postMessage({ type: 'playNote', note: bassEvent });
+    }
+    // Two 8th notes on the 4th beat (ticks 6, 7)
+    if (beatInMeasure === 6 || beatInMeasure === 7) {
+        const bassEvent: NoteEvent = {
+            part: 'bass',
+            freq: Tone.Frequency(bassNoteName).toFrequency(),
+            dur: '8n',
+            vel: beatInMeasure === 6 ? 0.9 : 0.8,
+            time: time,
+        };
+        self.postMessage({ type: 'playNote', note: bassEvent });
+    }
+    
+    // --- Play random effect sound ---
+    if (Math.random() < 0.05) { 
+        const effectEvent: NoteEvent = {
+            part: 'effects',
+            freq: 1000 + Math.random() * 2000,
+            dur: '4n',
+            vel: 0.1 + Math.random() * 0.2,
+            time: time
+        };
+        self.postMessage({ type: 'playNote', note: effectEvent });
+    }
+
+    // Increment the master index for the next tick
+    noteIndex++;
 }
 
 // --- MESSAGE HANDLER ---
@@ -153,7 +133,7 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
     switch (type) {
         case 'start':
             isRunning = true;
-            noteIndex = 0;
+            noteIndex = 0; // Reset index on start
             break;
         case 'stop':
             isRunning = false;
@@ -162,10 +142,7 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             tick(data.time);
             break;
         case 'setTempo':
-            if ('bpm' in data) {
-                currentBpm = data.bpm as number;
-                Tone.Transport.bpm.value = currentBpm;
-            }
+            // Tempo is handled by the main thread via the tick rate.
             break;
         case 'setHarmony':
             // Not used for fixed melody, but kept for future features.
