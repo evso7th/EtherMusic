@@ -14,8 +14,6 @@ import { HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import React from "react";
 import { guideContent } from "./help-guide-content";
-import { marked } from 'marked';
-import { useMemo } from 'react';
 
 
 interface HelpGuideProps extends ButtonProps {
@@ -25,18 +23,6 @@ interface HelpGuideProps extends ButtonProps {
 
 export const HelpGuide = ({ buttonVariant = "outline", buttonClassName, showText = true, size, ...props }: HelpGuideProps) => {
     
-    const content = useMemo(() => {
-        // Parse the markdown content into an HTML string ONCE.
-        const htmlContent = marked.parse(guideContent);
-        return (
-            <div 
-                className="prose prose-invert p-4" 
-                dangerouslySetInnerHTML={{ __html: htmlContent }}
-            />
-        );
-    }, []); // Empty dependency array ensures this runs only once.
-
-
     return (
         <Dialog>
             <DialogTrigger asChild>
@@ -55,7 +41,10 @@ export const HelpGuide = ({ buttonVariant = "outline", buttonClassName, showText
                     <DialogTitle>Quick Guide</DialogTitle>
                 </DialogHeader>
                 <ScrollArea className="h-[70vh] w-full">
-                    {content}
+                     <div 
+                        className="prose prose-invert p-4" 
+                        dangerouslySetInnerHTML={{ __html: guideContent }}
+                    />
                 </ScrollArea>
             </DialogContent>
         </Dialog>
