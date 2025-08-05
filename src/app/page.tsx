@@ -109,8 +109,11 @@ export default function Home() {
             const mainEngine = new AudioEngine();
             await mainEngine.initialize();
             audioEngine.current = mainEngine;
-            orbManager.current = new OrbManager(mainEngine);
             
+            const om = new OrbManager();
+            orbManager.current = om;
+            mainEngine.setOrbManager(om);
+
             const apEngine = new AutopilotEngine(mainEngine);
             autopilotEngine.current = apEngine; 
             
