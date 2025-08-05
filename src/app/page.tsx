@@ -13,7 +13,7 @@ import { PlaybackControls } from '@/components/playback-controls';
 import { ArrowRight } from 'lucide-react';
 import { HelpGuide } from '@/components/help-guide';
 import { AudioEngine } from '@/lib/audio-engine';
-import { AutopilotEngine } from '@/lib/autopilot-engine';
+// import { AutopilotEngine } from '@/lib/autopilot-engine';
 import { beatPatterns } from '@/lib/drum-machine';
 import { OrbManager } from '@/lib/orb-manager';
 import {
@@ -84,7 +84,7 @@ export default function Home() {
     
     // --- Engine Ref ---
     const audioEngine = useRef<AudioEngine>();
-    const autopilotEngine = useRef<AutopilotEngine>();
+    // const autopilotEngine = useRef<AutopilotEngine>();
     const orbManager = useRef<OrbManager>();
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
     
@@ -106,8 +106,8 @@ export default function Home() {
             orbManager.current = om;
             mainEngine.setOrbManager(om);
 
-            const apEngine = new AutopilotEngine(mainEngine);
-            autopilotEngine.current = apEngine; 
+            // const apEngine = new AutopilotEngine(mainEngine);
+            // autopilotEngine.current = apEngine; 
             
             // Sync initial state with the engines
             mainEngine.setTempo(tempos[2].bpm);
@@ -127,7 +127,7 @@ export default function Home() {
             mainEngine.setHarmony('C', 'Major Pentatonic');
             mainEngine.setBeatPattern('Off');
             
-            apEngine.setHarmony('C', 'Major Pentatonic');
+            // apEngine.setHarmony('C', 'Major Pentatonic');
             
             setIsReady(true);
             console.log('Audio engines initialized and ready.');
@@ -146,7 +146,7 @@ export default function Home() {
     const handleTempoChange = useCallback((tempo: Tempo) => {
         setActiveTempo(tempo);
         audioEngine.current?.setTempo(tempo.bpm);
-        autopilotEngine.current?.setTempo(tempo.bpm);
+        // autopilotEngine.current?.setTempo(tempo.bpm);
     }, []);
 
     const handleVolumeChange = useCallback((newVolumes: any) => {
@@ -166,7 +166,7 @@ export default function Home() {
         setMusicKey(key);
         setMusicScale(scale);
         audioEngine.current?.setHarmony(key, scale);
-        autopilotEngine.current?.setHarmony(key, scale);
+        // autopilotEngine.current?.setHarmony(key, scale);
     }, []);
     
     const handleMelodyInstrumentChange = useCallback((instrument: Instrument) => {
@@ -191,9 +191,7 @@ export default function Home() {
     const handleAutopilotToggle = useCallback((isOn: boolean) => {
         setIsAutopilotOn(isOn);
         if (isOn) {
-            autopilotEngine.current?.start();
-        } else {
-            autopilotEngine.current?.stop();
+            audioEngine.current?.playTestNote();
         }
     }, []);
 
@@ -205,11 +203,11 @@ export default function Home() {
     }, [isPlaying]);
     
     const handleStop = useCallback(async () => {
-        if (!audioEngine.current || !autopilotEngine.current) return;
+        if (!audioEngine.current) return; // || !autopilotEngine.current) return;
         setIsPlaying(false);
         setIsAutopilotOn(false); // Also turn off autopilot on stop
         audioEngine.current.stop();
-        autopilotEngine.current.stop();
+        // autopilotEngine.current.stop();
     }, []);
 
     const handleRecord = useCallback(() => {
@@ -251,15 +249,15 @@ export default function Home() {
     }, [isAppStarted, isReady, initializeAudio]);
 
     // Effect to start/stop autopilot with master play/pause
-    useEffect(() => {
-        if (isReady) {
-            if (isPlaying && isAutopilotOn) {
-                autopilotEngine.current?.start();
-            } else {
-                autopilotEngine.current?.stop();
-            }
-        }
-    }, [isPlaying, isAutopilotOn, isReady]);
+    // useEffect(() => {
+    //     if (isReady) {
+    //         if (isPlaying && isAutopilotOn) {
+    //             autopilotEngine.current?.start();
+    //         } else {
+    //             autopilotEngine.current?.stop();
+    //         }
+    //     }
+    // }, [isPlaying, isAutopilotOn, isReady]);
 
     const handleStartScreenInteraction = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
         if ((e.target as HTMLElement).closest('button')) return;
@@ -443,5 +441,3 @@ export default function Home() {
         </div>
     );
 }
-
-    

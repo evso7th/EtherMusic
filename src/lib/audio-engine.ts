@@ -295,6 +295,18 @@ export class AudioEngine {
         }
     }
 
+    public playTestNote() {
+        if (!this.isInitialized) return;
+        const voice = this.getVoiceFromPool('autopilot_melody');
+        if (voice) {
+            console.log("Playing test note C4");
+            voice.attackRelease("C4", "8n", Tone.now(), 0.8);
+        } else {
+            console.error("No available voice for test note.");
+        }
+    }
+
+
     public playAutopilotEvent(note: NoteEvent, time: number) {
         if (!this.isInitialized || note.freq === null || note.freq === undefined) return;
         
