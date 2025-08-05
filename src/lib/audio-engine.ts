@@ -314,18 +314,20 @@ export class AudioEngine {
                 // @ts-ignore
                 synthToUse.id = note.id;
             }
-            synthToUse.triggerAttackRelease(note.freq, note.dur, note.time, note.vel);
+            // Ensure the scheduled time is not in the past.
+            const playbackTime = Math.max(note.time, Tone.now());
+            synthToUse.triggerAttackRelease(note.freq, note.dur, playbackTime, note.vel);
         }
     }
 
     public playWorkerNotesBatch(notes: NoteEvent[]) {
         if (!this.isInitialized) return;
-        // Introduce a tiny offset to prevent events at the exact same time
+        
         let timeOffset = 0;
         notes.forEach(note => {
             const noteWithOffset = { ...note, time: note.time + timeOffset };
             this.playWorkerNote(noteWithOffset);
-            timeOffset += 0.001;
+            timeOffset += 0.001; 
         });
     }
     
