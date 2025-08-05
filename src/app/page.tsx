@@ -45,8 +45,9 @@ export const musicKeys: MusicKey[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G',
 export type MusicScale = 'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentatonic';
 export const musicScales: MusicScale[] = ['Major', 'Minor', 'Major Pentatonic', 'Minor Pentatonic'];
 
-export type AutopilotStyle = 'Ambient' | 'Trance' | 'Sequence' | 'Chimes' | 'Drone' | 'Toccata' | 'Promenade' | 'Space';
-export const autopilotStyles: AutopilotStyle[] = ['Ambient', 'Trance', 'Sequence', 'Chimes', 'Drone', 'Toccata', 'Promenade', 'Space'];
+// Simplified for debugging
+export type AutopilotStyle = 'Ambient';
+export const autopilotStyles: AutopilotStyle[] = ['Ambient'];
 
 
 const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
@@ -80,16 +81,7 @@ export default function Home() {
     const [musicScale, setMusicScale] = useState<MusicScale>('Major Pentatonic');
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
     const [isAutopilotOn, setIsAutopilotOn] = useState(false);
-    const [autopilotStyle, setAutopilotStyle] = useState<AutopilotStyle>('Ambient');
-    const [autopilotInstrument, setAutopilotInstrument] = useState<Instrument>('synth');
-    const [autopilotParts, setAutopilotParts] = useState<Record<AutopilotPart, boolean>>({
-        bass: true,
-        accompaniment: true,
-        melody: true,
-        effects: true
-    });
-
-
+    
     // --- Engine Ref ---
     const audioEngine = useRef<AudioEngine>();
     const autopilotEngine = useRef<AutopilotEngine>();
@@ -154,6 +146,7 @@ export default function Home() {
     const handleTempoChange = useCallback((tempo: Tempo) => {
         setActiveTempo(tempo);
         audioEngine.current?.setTempo(tempo.bpm);
+        autopilotEngine.current?.setTempo(tempo.bpm);
     }, []);
 
     const handleVolumeChange = useCallback((newVolumes: any) => {
@@ -187,7 +180,6 @@ export default function Home() {
     }, []);
 
     const handleAutopilotInstrumentChange = useCallback((instrument: Instrument) => {
-        setAutopilotInstrument(instrument);
         audioEngine.current?.setAutopilotInstrument(instrument);
     }, []);
     
@@ -196,32 +188,26 @@ export default function Home() {
         audioEngine.current?.setBassLatch(isOn);
     }, []);
 
-    const handleAutopilotPartsChange = useCallback((parts: Record<AutopilotPart, boolean>) => {
-        setAutopilotParts(parts);
-        autopilotEngine.current?.setAutopilotParts(parts);
-    }, []);
-
     const handleAutopilotToggle = useCallback((isOn: boolean) => {
         setIsAutopilotOn(isOn);
-        autopilotEngine.current?.setAutopilot(isOn, autopilotStyle, isPlaying);
-    }, [autopilotStyle, isPlaying]);
-
-    const handleAutopilotStyleChange = useCallback((newStyle: AutopilotStyle) => {
-        setAutopilotStyle(newStyle);
-        autopilotEngine.current?.setStyle(newStyle);
+        if (isOn) {
+            autopilotEngine.current?.start();
+        } else {
+            autopilotEngine.current?.stop();
+        }
     }, []);
-    
+
     const handlePlayPause = useCallback(async () => {
         if (!audioEngine.current) return;
         const willBePlaying = !isPlaying;
         setIsPlaying(willBePlaying);
         await audioEngine.current.setPlaying(willBePlaying);
-        autopilotEngine.current?.setAutopilot(isAutopilotOn, autopilotStyle, willBePlaying);
-    }, [isPlaying, isAutopilotOn, autopilotStyle]);
+    }, [isPlaying]);
     
     const handleStop = useCallback(async () => {
         if (!audioEngine.current || !autopilotEngine.current) return;
         setIsPlaying(false);
+        setIsAutopilotOn(false); // Also turn off autopilot on stop
         audioEngine.current.stop();
         autopilotEngine.current.stop();
     }, []);
@@ -263,6 +249,17 @@ export default function Home() {
             initializeAudio();
         }
     }, [isAppStarted, isReady, initializeAudio]);
+
+    // Effect to start/stop autopilot with master play/pause
+    useEffect(() => {
+        if (isReady) {
+            if (isPlaying && isAutopilotOn) {
+                autopilotEngine.current?.start();
+            } else {
+                autopilotEngine.current?.stop();
+            }
+        }
+    }, [isPlaying, isAutopilotOn, isReady]);
 
     const handleStartScreenInteraction = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
         if ((e.target as HTMLElement).closest('button')) return;
@@ -419,15 +416,7 @@ export default function Home() {
                             onEffectChange={handleEffectChange}
                             isAutopilotOn={isAutopilotOn}
                             onAutopilotToggle={handleAutopilotToggle}
-                            autopilotStyles={autopilotStyles}
-                            activeAutopilotStyle={autopilotStyle}
-                            onAutopilotStyleChange={handleAutopilotStyleChange}
-                            autopilotInstrument={autopilotInstrument}
-                            onAutopilotInstrumentChange={handleAutopilotInstrumentChange}
-                            autopilotParts={autopilotParts}
-                            onAutopilotPartsChange={handleAutopilotPartsChange}
                             isMobile={isMobile}
-                            instruments={instruments.filter(i => i !== 'ebass')}
                         />
                     </div>
                 </main>
@@ -446,19 +435,13 @@ export default function Home() {
                         onEffectChange={handleEffectChange}
                         isAutopilotOn={isAutopilotOn}
                         onAutopilotToggle={handleAutopilotToggle}
-                        autopilotStyles={autopilotStyles}
-                        activeAutopilotStyle={autopilotStyle}
-                        onAutopilotStyleChange={handleAutopilotStyleChange}
-                        autopilotInstrument={autopilotInstrument}
-                        onAutopilotInstrumentChange={handleAutopilotInstrumentChange}
-                        autopilotParts={autopilotParts}
-                        onAutopilotPartsChange={handleAutopilotPartsChange}
                         isMobile={isMobile}
                         isLandscape={true}
-                        instruments={instruments.filter(i => i !== 'ebass')}
                     />
                 </div>
             </div>
         </div>
     );
 }
+
+    

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { Slider } from "@/components/ui/slider";
@@ -19,18 +18,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { MixerControls } from '@/components/mixer-controls';
-import { SlidersHorizontal, Drum, Zap, Bot, Wand2, Power, TestTube2, Music } from 'lucide-react';
+import { SlidersHorizontal, Drum, Zap, Bot, Power } from 'lucide-react';
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
-import type { AutopilotStyle, Instrument } from '@/app/page';
 import { Separator } from "./ui/separator";
 import { Switch } from "./ui/switch";
 import { ScrollArea } from "./ui/scroll-area";
-import type { AutopilotPart } from "@/lib/autopilot-worker";
-import { Checkbox } from "./ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-
 
 type BeatPattern = {
     name: string;
@@ -75,69 +69,8 @@ interface BeatBoxControlsProps {
     onEffectChange: (effects: Effects) => void;
     isAutopilotOn: boolean;
     onAutopilotToggle: (isOn: boolean) => void;
-    autopilotStyles: AutopilotStyle[];
-    activeAutopilotStyle: AutopilotStyle;
-    onAutopilotStyleChange: (style: AutopilotStyle) => void;
-    autopilotInstrument: Instrument;
-    onAutopilotInstrumentChange: (instrument: Instrument) => void;
-    autopilotParts: Record<AutopilotPart, boolean>;
-    onAutopilotPartsChange: (parts: Record<AutopilotPart, boolean>) => void;
     isMobile: boolean;
     isLandscape?: boolean;
-    instruments: Instrument[];
-}
-
-const AutopilotDebugDialog = ({
-    autopilotParts,
-    onAutopilotPartsChange
-}: {
-    autopilotParts: Record<AutopilotPart, boolean>;
-    onAutopilotPartsChange: (parts: Record<AutopilotPart, boolean>) => void;
-}) => {
-
-    const handleCheckedChange = (part: AutopilotPart, checked: boolean) => {
-        onAutopilotPartsChange({
-            ...autopilotParts,
-            [part]: checked
-        });
-    };
-    
-    return (
-        <Dialog>
-            <DialogTrigger asChild>
-                <Button variant="outline" size="icon" className="w-10 h-10 rounded-full">
-                    <TestTube2 className="w-5 h-5" />
-                </Button>
-            </DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Autopilot Debug</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                    <p className="text-sm text-muted-foreground">
-                        Use these controls to isolate and listen to individual autopilot parts.
-                    </p>
-                    <div className="space-y-2">
-                        {(Object.keys(autopilotParts) as AutopilotPart[]).map(part => (
-                             <div key={part} className="flex items-center space-x-2">
-                                <Checkbox
-                                    id={`check-${part}`}
-                                    checked={autopilotParts[part]}
-                                    onCheckedChange={(checked) => handleCheckedChange(part, !!checked)}
-                                />
-                                <label
-                                    htmlFor={`check-${part}`}
-                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 capitalize"
-                                >
-                                    {part.replace('autopilot_', '')}
-                                </label>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </DialogContent>
-        </Dialog>
-    )
 }
 
 export function BeatBoxControls({
@@ -153,27 +86,13 @@ export function BeatBoxControls({
     onEffectChange,
     isAutopilotOn,
     onAutopilotToggle,
-    autopilotStyles,
-    activeAutopilotStyle,
-    onAutopilotStyleChange,
-    autopilotInstrument,
-    onAutopilotInstrumentChange,
-    autopilotParts,
-    onAutopilotPartsChange,
     isMobile,
     isLandscape = false,
-    instruments,
 }: BeatBoxControlsProps) {
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isTempoOpen, setIsTempoOpen] = useState(false);
-    const [isStyleOpen, setIsStyleOpen] = useState(false);
+    const [isAutopilotOpen, setIsAutopilotOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<'Meditative' | 'Classic'>('Meditative');
-
-    const handleExit = () => {
-        if (typeof window !== "undefined") {
-            window.close();
-        }
-    };
     
     const { classicPatterns, meditativePatterns, offPattern } = useMemo(() => {
         return {
@@ -189,6 +108,28 @@ export function BeatBoxControls({
     
     const buttonSize = isMobile ? 'sm' : 'default';
 
+    const autopilotDialog = (
+        <Dialog open={isAutopilotOpen} onOpenChange={setIsAutopilotOpen}>
+            <DialogTrigger asChild>
+                <Button variant={isAutopilotOn ? 'default' : 'outline'} size={isLandscape ? "icon" : buttonSize} className={cn(isLandscape && "w-10 h-10 rounded-full", !isLandscape && "flex-1")}>
+                    <Bot className={cn("w-5 h-5", !isLandscape && "md:mr-2")} />
+                     {!isLandscape && <span className="hidden sm:inline">Autopilot</span>}
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Autopilot Controls</DialogTitle>
+                </DialogHeader>
+                <div className='py-4 space-y-6 pr-4'>
+                    <div className="flex items-center space-x-2">
+                        <Switch id="autopilot-switch" checked={isAutopilotOn} onCheckedChange={onAutopilotToggle} />
+                        <Label htmlFor="autopilot-switch">Autopilot On/Off</Label>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+
     if (isLandscape) {
         return (
             <div className="flex flex-col gap-2">
@@ -198,7 +139,6 @@ export function BeatBoxControls({
                             <Drum className="w-5 h-5" />
                         </Button>
                     </DialogTrigger>
-                    {/* Beat Patterns Dialog Content */}
                      <DialogContent>
                         <DialogHeader>
                             <DialogTitle>Beat Patterns</DialogTitle>
@@ -260,7 +200,6 @@ export function BeatBoxControls({
                             <Zap className="w-5 h-5" />
                         </Button>
                     </DialogTrigger>
-                     {/* Tempo Dialog Content */}
                      <DialogContent>
                         <DialogHeader>
                             <DialogTitle>Adjust Tempo</DialogTitle>
@@ -286,59 +225,7 @@ export function BeatBoxControls({
                     </DialogContent>
                 </Dialog>
                 
-                <Dialog open={isStyleOpen} onOpenChange={setIsStyleOpen}>
-                    <DialogTrigger asChild>
-                        <Button variant={isAutopilotOn ? 'default' : 'outline'} size="icon" className="w-10 h-10 rounded-full">
-                            <Bot className="w-5 h-5" />
-                        </Button>
-                    </DialogTrigger>
-                     {/* Autopilot Dialog Content */}
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Autopilot Controls</DialogTitle>
-                        </DialogHeader>
-                        <ScrollArea className="h-auto max-h-[70vh]">
-                            <div className='py-4 space-y-6 pr-4'>
-                                <div className="flex items-center space-x-2">
-                                    <Switch id="autopilot-switch" checked={isAutopilotOn} onCheckedChange={onAutopilotToggle} />
-                                    <Label htmlFor="autopilot-switch">Autopilot On/Off</Label>
-                                </div>
-                                <div className={cn("space-y-4 transition-opacity", !isAutopilotOn && "opacity-50 pointer-events-none")}>
-                                    <div>
-                                        <Label>Generation Style</Label>
-                                        <div className="grid grid-cols-3 gap-2 pt-2">
-                                            {autopilotStyles.map((style) => (
-                                                <Button
-                                                    key={style}
-                                                    variant={activeAutopilotStyle === style ? 'default' : 'outline'}
-                                                    onClick={() => onAutopilotStyleChange(style)}
-                                                    disabled={!isAutopilotOn}
-                                                    size="sm"
-                                                >
-                                                    {style}
-                                                </Button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <Label>Autopilot Instrument</Label>
-                                         <Select value={autopilotInstrument} onValueChange={onAutopilotInstrumentChange} disabled={!isAutopilotOn}>
-                                            <SelectTrigger className="capitalize mt-2">
-                                                <SelectValue placeholder="Instrument" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {instruments.map(inst => (
-                                                    <SelectItem key={inst} value={inst} className="capitalize">{inst}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-                            </div>
-                        </ScrollArea>
-                    </DialogContent>
-                </Dialog>
-
+                {autopilotDialog}
 
                 <Dialog>
                     <DialogTrigger asChild>
@@ -346,7 +233,6 @@ export function BeatBoxControls({
                             <SlidersHorizontal className="w-5 h-5"/>
                         </Button>
                     </DialogTrigger>
-                    {/* Mixer Dialog Content */}
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>Mixer</DialogTitle>
@@ -366,10 +252,6 @@ export function BeatBoxControls({
                 </Dialog>
                 
                 <HelpGuide buttonVariant="outline" size="icon" className="w-10 h-10 rounded-full" showText={false}/>
-                <AutopilotDebugDialog 
-                    autopilotParts={autopilotParts}
-                    onAutopilotPartsChange={onAutopilotPartsChange}
-                />
             </div>
         )
     }
@@ -471,59 +353,7 @@ export function BeatBoxControls({
                     </DialogContent>
                 </Dialog>
                 
-                <Dialog open={isStyleOpen} onOpenChange={setIsStyleOpen}>
-                    <DialogTrigger asChild>
-                        <Button variant={isAutopilotOn ? 'default' : 'outline'} className="flex-1" size={buttonSize}>
-                            <Bot className="w-4 h-4 md:mr-2" />
-                            <span className="hidden sm:inline">Autopilot</span>
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Autopilot Controls</DialogTitle>
-                        </DialogHeader>
-                        <ScrollArea className="h-auto max-h-[70vh]">
-                            <div className='py-4 space-y-6 pr-4'>
-                                <div className="flex items-center space-x-2">
-                                    <Switch id="autopilot-switch-portrait" checked={isAutopilotOn} onCheckedChange={onAutopilotToggle} />
-                                    <Label htmlFor="autopilot-switch-portrait">Autopilot On/Off</Label>
-                                </div>
-                                <div className={cn("space-y-4 transition-opacity", !isAutopilotOn && "opacity-50 pointer-events-none")}>
-                                    <div>
-                                        <Label>Generation Style</Label>
-                                        <div className="grid grid-cols-3 gap-2 pt-2">
-                                            {autopilotStyles.map((style) => (
-                                                <Button
-                                                    key={style}
-                                                    variant={activeAutopilotStyle === style ? 'default' : 'outline'}
-                                                    onClick={() => onAutopilotStyleChange(style)}
-                                                    disabled={!isAutopilotOn}
-                                                    size="sm"
-                                                >
-                                                    {style}
-                                                </Button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <Label>Autopilot Instrument</Label>
-                                         <Select value={autopilotInstrument} onValueChange={onAutopilotInstrumentChange} disabled={!isAutopilotOn}>
-                                            <SelectTrigger className="capitalize mt-2">
-                                                <SelectValue placeholder="Instrument" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {instruments.map(inst => (
-                                                    <SelectItem key={inst} value={inst} className="capitalize">{inst}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-                            </div>
-                        </ScrollArea>
-                    </DialogContent>
-                </Dialog>
-
+                {autopilotDialog}
 
                 <Dialog>
                     <DialogTrigger asChild>
@@ -551,13 +381,9 @@ export function BeatBoxControls({
                 </Dialog>
 
                 <HelpGuide buttonVariant="outline" buttonClassName="flex-1" size={buttonSize}/>
-
-                <AutopilotDebugDialog 
-                    autopilotParts={autopilotParts}
-                    onAutopilotPartsChange={onAutopilotPartsChange}
-                />
-
             </CardContent>
         </Card>
     );
 }
+
+    
