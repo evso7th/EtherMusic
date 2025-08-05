@@ -12,7 +12,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { PlaybackControls } from '@/components/playback-controls';
 import { ArrowRight } from 'lucide-react';
 import { HelpGuide } from '@/components/help-guide';
-import { AudioEngine, type InstrumentPart } from '@/lib/audio-engine';
+import { AudioEngine } from '@/lib/audio-engine';
 import { beatPatterns } from '@/lib/drum-machine';
 import { OrbManager } from '@/lib/orb-manager';
 import * as Tone from 'tone';
@@ -222,6 +222,9 @@ export default function Home() {
     const handleStop = useCallback(async () => {
         if (!audioEngine.current) return;
         audioEngine.current.stopAllSounds();
+        const offPattern = beatPatterns.find(p => p.name === 'Off')!;
+        setActivePattern(offPattern);
+        audioEngine.current.setBeatPattern(offPattern.name);
     }, []);
 
     const handleRecord = useCallback(() => {
@@ -375,7 +378,7 @@ export default function Home() {
                             color="hsl(var(--accent))"
                             isLatchOn={isBassLatchOn}
                             onLatchToggle={handleLatchToggle}
-                            instruments={instruments.filter(i => i !== 'theremin' && i !== 'G-Drops')}
+                            instruments={instruments.filter(i => i !== 'theremin' && i !== 'G-Drops' && !i.includes('effect'))}
                             activeInstrument={bassInstrument}
                             onInstrumentChange={handleBassInstrumentChange}
                             isPolyphonic
@@ -450,5 +453,3 @@ export default function Home() {
         </div>
     );
 }
-
-    

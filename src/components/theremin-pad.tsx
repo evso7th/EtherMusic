@@ -139,7 +139,7 @@ export function ThereminPad({
                                     </SelectTrigger>
                                     <SelectContent>
                                         {instruments.map(inst => (
-                                            <SelectItem key={inst} value={inst} className="capitalize">{inst.replace('-', ' ')}</SelectItem>
+                                            <SelectItem key={inst} value={inst} className="capitalize">{inst.replace(/_/g, ' ')}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -207,7 +207,7 @@ export function ThereminPad({
         >
             <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between p-2">
                 <div className="text-xs text-muted-foreground capitalize pl-2">
-                    {activeInstrument?.replace('-', ' ')}
+                    {activeInstrument?.replace(/_/g, ' ')}
                 </div>
                 <div className="flex items-center gap-2">
                     {renderSettingsControls()}
@@ -245,5 +245,3 @@ export function ThereminPad({
         </Card>
     );
 }
-
-    

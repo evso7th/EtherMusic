@@ -152,6 +152,16 @@ export function MixerControls({ initialVolumes, onVolumeChange, initialEffects, 
                     onReverbChange={(v) => handleEffectChange('manualBass', 'reverb', v)}
                     onDelayChange={(v) => handleEffectChange('manualBass', 'delay', v)}
                 />
+                 <InstrumentControls 
+                    label="E.Bass"
+                    icon={Guitar}
+                    volume={volumes.ebass}
+                    reverb={effects.ebass.reverb}
+                    delay={effects.ebass.delay}
+                    onVolumeChange={(v) => handleVolumeChange('ebass', v)}
+                    onReverbChange={(v) => handleEffectChange('ebass', 'reverb', v)}
+                    onDelayChange={(v) => handleEffectChange('ebass', 'delay', v)}
+                />
                 <InstrumentControls 
                     label="Latch"
                     icon={Anchor}
@@ -245,5 +255,3 @@ export function AutopilotMixerControls({ initialVolumes, onVolumeChange, initial
         </div>
     )
 }
-
-    

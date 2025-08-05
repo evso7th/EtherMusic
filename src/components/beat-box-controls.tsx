@@ -45,6 +45,8 @@ type Volumes = {
     latch: number; 
     drums: number; 
     autopilot: number;
+    accompaniment: number;
+    autopilotBass: number;
     effects: number;
     ebass: number;
 };
@@ -55,6 +57,8 @@ type Effects = {
     latch: { reverb: number, delay: number };
     drums: { reverb: number, delay: number };
     autopilot: { reverb: number, delay: number };
+    accompaniment: { reverb: number, delay: number };
+    autopilotBass: { reverb: number, delay: number };
     effects: { reverb: number, delay: number };
     ebass: { reverb: number, delay: number };
 };
@@ -206,13 +210,13 @@ export function BeatBoxControls({
                             label="Melody"
                             value={activeAutopilotInstruments.melody}
                             onChange={(inst) => onAutopilotInstrumentChange('melody', inst as Instrument)}
-                            instruments={autopilotInstruments.filter(i => !i.includes('bass') && !i.includes('meteor'))}
+                            instruments={autopilotInstruments.filter(i => !i.includes('bass') && !i.includes('effect'))}
                         />
                          <AutopilotInstrumentSelector 
                             label="Accompaniment"
                             value={activeAutopilotInstruments.accompaniment}
                             onChange={(inst) => onAutopilotInstrumentChange('accompaniment', inst as Instrument)}
-                            instruments={autopilotInstruments.filter(i => !i.includes('bass') && !i.includes('meteor'))}
+                            instruments={autopilotInstruments.filter(i => !i.includes('bass') && !i.includes('effect'))}
                         />
                          <AutopilotInstrumentSelector 
                             label="Bass"
@@ -514,5 +518,3 @@ export function BeatBoxControls({
         </Card>
     );
 }
-
-    

@@ -64,10 +64,14 @@ let state = {
         melody: [] as number[],
     },
     // Style-specific state
+    ambient: {
+        chordProgression: [0, 4, 5, 3], // I-V-vi-IV in 0-based scale degrees
+        currentChordDegree: 0,
+        lastChordChangeTick: 0,
+    },
     sequence: {
         bassNoteIndex: 0,
         accompanimentIndex: 0,
-        // Melody state
         lastMelodyNoteIndex: null as number | null,
         notesInCurrentPhrase: 0,
         maxNotesInPhrase: 5,
@@ -85,52 +89,63 @@ function updateHarmony(key: MusicKey, scale: MusicScale) {
     };
     // Reset melody memory on harmony change
     state.sequence.lastMelodyNoteIndex = null;
+    state.ambient.lastChordChangeTick = -Infinity;
 }
 
 
-// --- "AMBIENT" STYLE (previously Chizhik) ---
-const chizhikMelody: (string | null)[] = [
-    'G4', 'G4', 'A4', 'B4', 'B4', 'A4', 'G4', 'F#4',
-    'E4', 'E4', 'F#4', 'G4', 'G4', 'F#4', 'E4', 'D4',
-];
-const chordProgression: { [key: number]: string } = {
-    0: 'G', 2: 'D7', 4: 'G', 6: 'C', 8: 'G', 10: 'D7', 12: 'G', 14: 'D7'
-};
-const chordDefs: { [key: string]: string[] } = {
-    'G': ['G3', 'B3', 'D4'], 'D7': ['D3', 'F#3', 'A3', 'C4'], 'C': ['C3', 'E3', 'G3']
-};
-
+// --- "AMBIENT" STYLE (Mike Oldfield "Ascension" inspired) ---
 function tickAmbient(time: number) {
-    const totalMelodyNotesInLoop = chizhikMelody.length;
     const ticksPerMeasure = 16;
-    const melodyLoopPosition = Math.floor(state.tick16n / 2) % totalMelodyNotesInLoop;
-    const measure = Math.floor((state.tick16n % (ticksPerMeasure * 8)) / ticksPerMeasure);
-    const tickInMeasure = state.tick16n % ticksPerMeasure;
+    const ticksForChordChange = ticksPerMeasure * 2; // Change chord every 2 measures
 
-    // Accompaniment
-    if (tickInMeasure % 4 === 0) { // Play on quarter notes
-        const chordName = chordProgression[measure];
-        const chord = chordDefs[chordName];
-        if (chord) {
-            const noteName = chord[Math.floor(Math.random() * chord.length)];
+    // Change chord
+    if (state.tick16n - state.ambient.lastChordChangeTick >= ticksForChordChange) {
+        state.ambient.lastChordChangeTick = state.tick16n;
+        state.ambient.currentChordDegree = (state.ambient.currentChordDegree + 1) % state.ambient.chordProgression.length;
+        
+        const scale = state.scaleFrequencies.accompaniment;
+        const rootDegree = state.ambient.chordProgression[state.ambient.currentChordDegree];
+        
+        // Play Bass
+        const bassFreq = state.scaleFrequencies.bass[rootDegree % state.scaleFrequencies.bass.length];
+        const bassEvent: NoteEvent = {
+            part: 'bass', freq: bassFreq,
+            dur: '2m', vel: 0.6, time
+        };
+        self.postMessage({ type: 'playNote', note: bassEvent });
+
+        // Play Accompaniment Chord (Pad)
+        const chordIndices = [rootDegree, rootDegree + 2, rootDegree + 4];
+        chordIndices.forEach((degree, index) => {
+            const noteFreq = scale[degree % scale.length];
             const event: NoteEvent = {
-                part: 'accompaniment', freq: Tone.Frequency(noteName).toFrequency(),
-                dur: '2n', vel: 0.25, time,
+                part: 'accompaniment', freq: noteFreq,
+                dur: '1m', vel: 0.2 + (index * 0.05), time
+            };
+            self.postMessage({ type: 'playNote', note: event });
+        });
+    }
+
+    // Sparse Melody Note
+    if (state.tick16n % 8 === 0) { // Check every half note
+        if (Math.random() < 0.25) { // 25% chance to play
+            const melodyFreq = state.scaleFrequencies.melody[Math.floor(Math.random() * state.scaleFrequencies.melody.length)];
+             const event: NoteEvent = {
+                part: 'melody', freq: melodyFreq,
+                dur: '8n', vel: 0.7, time
             };
             self.postMessage({ type: 'playNote', note: event });
         }
     }
-
-    // Melody
-    if (state.tick16n % 2 === 0) {
-        const melodyNoteName = chizhikMelody[melodyLoopPosition];
-        if (melodyNoteName) {
-            const event: NoteEvent = {
-                part: 'melody', freq: Tone.Frequency(melodyNoteName).toFrequency(),
-                dur: '8n', vel: 0.6, time,
-            };
-            self.postMessage({ type: 'playNote', note: event });
-        }
+    
+    // Random Atmospheric Effect
+    if (Math.random() < 0.005) { // Very small chance on any tick
+        const effectFreq = 440 + (Math.random() * 2000);
+        const event: NoteEvent = {
+            part: 'effects', freq: effectFreq,
+            dur: '2n', vel: 0.5, time
+        };
+        self.postMessage({ type: 'playNote', note: event });
     }
 }
 
@@ -225,12 +240,16 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
         case 'start':
             state.isRunning = true;
             state.tick16n = 0;
+            // Reset sequence state
             state.sequence.bassNoteIndex = 0;
             state.sequence.accompanimentIndex = 0;
             state.sequence.lastMelodyNoteIndex = null;
             state.sequence.notesInCurrentPhrase = 0;
             state.sequence.maxNotesInPhrase = 5;
             state.sequence.nextMelodyTick = 0;
+            // Reset ambient state
+            state.ambient.currentChordDegree = 0;
+            state.ambient.lastChordChangeTick = -Infinity; // Force immediate chord
             break;
         case 'stop':
             state.isRunning = false;
@@ -250,6 +269,7 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             // @ts-ignore
             state.currentStyle = data.style;
             state.tick16n = 0; // Reset tick count on style change
+            state.ambient.lastChordChangeTick = -Infinity; // Force immediate chord change on style switch
             break;
         case 'setInstruments':
             // @ts-ignore
@@ -260,5 +280,3 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
 
 // Initial setup
 updateHarmony(state.currentKey, state.currentScale);
-
-    
