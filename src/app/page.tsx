@@ -386,7 +386,7 @@ export default function Home() {
                             activeInstrument={melodyInstrument}
                             onInstrumentChange={handleMelodyInstrumentChange}
                             musicKeys={musicKeys}
-                            activeKey={activeKey}
+                            activeKey={musicKey}
                             onKeyChange={(k) => handleHarmonyChange(k, musicScale)}
                             musicScales={musicScales}
                             activeScale={musicScale}
