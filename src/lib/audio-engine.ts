@@ -112,6 +112,8 @@ export class AudioEngine {
         bass: 'synth',
         autopilot: 'synth'
     };
+    
+    private testSequence: Tone.Sequence | null = null;
 
     constructor() {
         // Orb manager is now initialized after engine is ready in page.tsx
@@ -297,13 +299,34 @@ export class AudioEngine {
 
     public playTestNote() {
         if (!this.isInitialized) return;
-        const voice = this.getVoiceFromPool('autopilot_melody');
-        if (voice) {
-            console.log("Playing test note C4");
-            voice.attackRelease("C4", "8n", Tone.now(), 0.8);
-        } else {
-            console.error("No available voice for test note.");
+
+        if (this.testSequence) {
+            this.testSequence.stop(0);
+            this.testSequence.dispose();
+            this.testSequence = null;
+            console.log("Stopping test scale.");
+            if (Tone.Transport.state === 'started') {
+                 Tone.Transport.pause();
+                 Tone.Transport.position = 0;
+            }
+            return;
         }
+        
+        const scale = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5'];
+        
+        this.testSequence = new Tone.Sequence((time, note) => {
+             const voice = this.getVoiceFromPool('autopilot_melody');
+             if(voice) {
+                voice.attackRelease(note, "8n", time, 0.8);
+             }
+        }, scale, "8n").start(0);
+
+        this.testSequence.loop = true;
+        
+        if (Tone.Transport.state !== 'started') {
+            Tone.Transport.start();
+        }
+        console.log("Playing test scale.");
     }
 
 
@@ -325,6 +348,9 @@ export class AudioEngine {
         this.voicePools.forEach(pool => pool.forEach(voice => voice.release(0.1)));
         this.orbManager?.removeAllOrbs();
         this.latchEngine.stopAll();
+        if (this.testSequence) {
+            this.testSequence.stop(0);
+        }
         if (this.isInitialized) this.drumMachine.stop();
     }
     
@@ -334,6 +360,9 @@ export class AudioEngine {
                 pool.forEach(voice => voice.release(0.1));
             }
         });
+        if (this.testSequence) {
+            this.testSequence.stop(0);
+        }
         // This is important to clear any scheduled but not yet played notes.
         Tone.Transport.cancel();
     }

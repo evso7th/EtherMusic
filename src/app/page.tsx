@@ -190,9 +190,7 @@ export default function Home() {
 
     const handleAutopilotToggle = useCallback((isOn: boolean) => {
         setIsAutopilotOn(isOn);
-        if (isOn) {
-            audioEngine.current?.playTestNote();
-        }
+        audioEngine.current?.playTestNote();
     }, []);
 
     const handlePlayPause = useCallback(async () => {
