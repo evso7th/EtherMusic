@@ -4,7 +4,7 @@ import type { Instrument, MusicKey, MusicScale } from '@/app/page';
 import { LatchEngine } from './latch-engine';
 import { DrumMachine } from './drum-machine';
 import type { OrbManager } from './orb-manager';
-import type { NoteEvent } from './autopilot-worker';
+import type { NoteEvent, AutopilotPart as WorkerAutopilotPart } from './autopilot-worker';
 
 
 export type InstrumentPart = 
@@ -107,16 +107,17 @@ export class AudioEngine {
     private allowedFrequencies = { bass: [] as number[], melody: [] as number[] };
     private isBassLatchOn = false;
     
-    private currentInstruments: Record<'melody' | 'bass' | 'autopilot', Instrument> = {
+    private currentInstruments: Record<'melody' | 'bass', Instrument> = {
         melody: 'theremin',
         bass: 'ebass',
-        autopilot: 'synth'
     };
     
-    private autopilotMelodySynth: Tone.Synth | null = null;
-    private autopilotAccompanimentSynth: Tone.Synth | null = null;
-    private autopilotBassSynth: Tone.FMSynth | null = null;
-    private effectsSynth: Tone.FMSynth | null = null;
+    private autopilotSynths: Record<WorkerAutopilotPart, Tone.Synth | Tone.FMSynth | Tone.NoiseSynth | null> = {
+        melody: null,
+        accompaniment: null,
+        bass: null,
+        effects: null,
+    };
 
     constructor() {
         // All initialization is now in the async initialize() method
@@ -150,15 +151,10 @@ export class AudioEngine {
         this.createPresets();
         this.initializeVoicePools();
         
-        this.latchEngine = new LatchEngine(this);
-        
         this.drumMachine = new DrumMachine(this.channels.drums);
         await this.drumMachine.initialize();
-
-        this.autopilotMelodySynth = new Tone.Synth(this.presets.synth.options).connect(this.channels.autopilot);
-        this.autopilotAccompanimentSynth = new Tone.Synth(this.presets.synth.options).connect(this.channels.accompaniment);
-        this.autopilotBassSynth = new Tone.FMSynth(this.presets.ebass.options).connect(this.channels.autopilotBass);
-        this.effectsSynth = new Tone.FMSynth(this.presets.autopilot_effect_star.options).connect(this.channels.effects);
+        
+        this.latchEngine = new LatchEngine(this);
         
         // START THE ETERNAL METRONOME - ONCE AND FOREVER
         Tone.Transport.start(); 
@@ -309,24 +305,7 @@ export class AudioEngine {
     public playWorkerNote(note: NoteEvent) {
         if (!this.isInitialized) return;
     
-        let synthToUse: Tone.Synth | Tone.FMSynth | null = null;
-
-        switch(note.part) {
-            case 'melody':
-                synthToUse = this.autopilotMelodySynth;
-                break;
-            case 'accompaniment':
-                synthToUse = this.autopilotAccompanimentSynth;
-                break;
-            case 'bass':
-                synthToUse = this.autopilotBassSynth;
-                break;
-            case 'effects':
-                synthToUse = this.effectsSynth;
-                break;
-            default:
-                break;
-        }
+        const synthToUse = this.autopilotSynths[note.part];
     
         if (synthToUse) {
             synthToUse.triggerAttackRelease(note.freq, note.dur, note.time, note.vel);
@@ -337,21 +316,12 @@ export class AudioEngine {
         this.voicePools.forEach(pool => pool.forEach(voice => voice.release(0.1)));
         this.latchEngine.stopAll();
         
-        // Cancel all scheduled events and stop synths
-        this.autopilotMelodySynth?.releaseAll();
-        this.autopilotAccompanimentSynth?.releaseAll();
-        this.autopilotBassSynth?.releaseAll();
-        this.effectsSynth?.releaseAll();
+        for (const part in this.autopilotSynths) {
+            // @ts-ignore
+            this.autopilotSynths[part]?.releaseAll();
+        }
 
         this.orbManager?.removeAllOrbs();
-    }
-    
-    public stopAllAutopilotSounds() {
-        this.autopilotMelodySynth?.releaseAll();
-        this.autopilotAccompanimentSynth?.releaseAll();
-        this.autopilotBassSynth?.releaseAll();
-        this.effectsSynth?.releaseAll();
-        Tone.Transport.cancel();
     }
 
     public setTempo(bpm: number) { if(this.isInitialized) Tone.Transport.bpm.value = bpm; }
@@ -394,14 +364,37 @@ export class AudioEngine {
         this.reconfigurePool('latch', instrument);
     }
 
-    public setAutopilotInstrument(instrument: Instrument) {
-        if(!this.isInitialized) return;
-        this.currentInstruments.autopilot = instrument;
-        const preset = this.presets[instrument];
-        if (preset) {
-            this.autopilotMelodySynth?.set(preset.options);
-            this.autopilotAccompanimentSynth?.set(preset.options);
+    public setAutopilotInstrument(part: WorkerAutopilotPart, instrument: Instrument) {
+        if (!this.isInitialized) return;
+    
+        const existingSynth = this.autopilotSynths[part];
+        if (existingSynth) {
+            existingSynth.dispose();
         }
+    
+        const preset = this.presets[instrument];
+        if (!preset) return;
+    
+        let channel;
+        switch(part) {
+            case 'melody': channel = this.channels.autopilot; break;
+            case 'accompaniment': channel = this.channels.accompaniment; break;
+            case 'bass': channel = this.channels.autopilotBass; break;
+            case 'effects': channel = this.channels.effects; break;
+            default: channel = this.channels.autopilot;
+        }
+
+        let newSynth;
+        if (preset.type === 'FMSynth') {
+            newSynth = new Tone.FMSynth(preset.options).connect(channel);
+        } else if (preset.type === 'AMSynth') {
+            newSynth = new Tone.AMSynth(preset.options).connect(channel);
+        } else if (preset.type === 'NoiseSynth') {
+            newSynth = new Tone.NoiseSynth(preset.options).connect(channel);
+        } else {
+            newSynth = new Tone.Synth(preset.options).connect(channel);
+        }
+        this.autopilotSynths[part] = newSynth;
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {

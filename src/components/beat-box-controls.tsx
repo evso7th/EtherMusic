@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,14 +19,15 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { MixerControls, AutopilotMixerControls } from '@/components/mixer-controls';
-import { SlidersHorizontal, Drum, Zap, Bot, Power, Wand2 } from 'lucide-react';
+import { SlidersHorizontal, Drum, Zap, Bot, Power, Wand2, Music } from 'lucide-react';
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
 import { Separator } from "./ui/separator";
 import { Switch } from "./ui/switch";
 import { ScrollArea } from "./ui/scroll-area";
-import type { AutopilotStyle } from "@/lib/autopilot-worker";
+import type { AutopilotStyle, AutopilotPart } from "@/lib/autopilot-worker";
+import type { Instrument } from "@/app/page";
 
 type BeatPattern = {
     name: string;
@@ -73,9 +75,39 @@ interface BeatBoxControlsProps {
     autopilotStyles: AutopilotStyle[];
     activeAutopilotStyle: AutopilotStyle;
     onAutopilotStyleChange: (style: AutopilotStyle) => void;
+    autopilotInstruments: Instrument[];
+    activeAutopilotInstruments: Record<AutopilotPart, Instrument>;
+    onAutopilotInstrumentChange: (part: AutopilotPart, instrument: Instrument) => void;
     isMobile: boolean;
     isLandscape?: boolean;
 }
+
+const AutopilotInstrumentSelector = ({
+    label,
+    value,
+    onChange,
+    instruments
+}: {
+    label: string,
+    value: Instrument,
+    onChange: (instrument: Instrument) => void,
+    instruments: Instrument[]
+}) => (
+    <div className="grid grid-cols-4 items-center gap-4">
+        <Label htmlFor={`inst-${label}`} className="text-right">{label}</Label>
+        <Select value={value} onValueChange={onChange}>
+            <SelectTrigger id={`inst-${label}`} className="col-span-3 capitalize">
+                <SelectValue placeholder="Select instrument" />
+            </SelectTrigger>
+            <SelectContent>
+                {instruments.map(inst => (
+                    <SelectItem key={inst} value={inst} className="capitalize">{inst.replace(/_/g, ' ')}</SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    </div>
+);
+
 
 export function BeatBoxControls({
     patterns,
@@ -93,6 +125,9 @@ export function BeatBoxControls({
     autopilotStyles,
     activeAutopilotStyle,
     onAutopilotStyleChange,
+    autopilotInstruments,
+    activeAutopilotInstruments,
+    onAutopilotInstrumentChange,
     isMobile,
     isLandscape = false,
 }: BeatBoxControlsProps) {
@@ -163,6 +198,37 @@ export function BeatBoxControls({
                         </DialogContent>
                     </Dialog>
 
+                    <Separator />
+
+                    <div className="space-y-4">
+                        <h4 className="text-sm font-medium text-center text-muted-foreground">Instruments</h4>
+                        <AutopilotInstrumentSelector 
+                            label="Melody"
+                            value={activeAutopilotInstruments.melody}
+                            onChange={(inst) => onAutopilotInstrumentChange('melody', inst as Instrument)}
+                            instruments={autopilotInstruments.filter(i => !i.includes('bass') && !i.includes('meteor'))}
+                        />
+                         <AutopilotInstrumentSelector 
+                            label="Accompaniment"
+                            value={activeAutopilotInstruments.accompaniment}
+                            onChange={(inst) => onAutopilotInstrumentChange('accompaniment', inst as Instrument)}
+                            instruments={autopilotInstruments.filter(i => !i.includes('bass') && !i.includes('meteor'))}
+                        />
+                         <AutopilotInstrumentSelector 
+                            label="Bass"
+                            value={activeAutopilotInstruments.bass}
+                            onChange={(inst) => onAutopilotInstrumentChange('bass', inst as Instrument)}
+                             instruments={autopilotInstruments.filter(i => i.includes('ebass') || i.includes('bass') || i === 'synth')}
+                        />
+                         <AutopilotInstrumentSelector 
+                            label="Effects"
+                            value={activeAutopilotInstruments.effects}
+                            onChange={(inst) => onAutopilotInstrumentChange('effects', inst as Instrument)}
+                            instruments={autopilotInstruments.filter(i => i.includes('effect') || i === 'G-Drops')}
+                        />
+                    </div>
+
+                    <Separator />
 
                     <Dialog open={isAutopilotMixerOpen} onOpenChange={setIsAutopilotMixerOpen}>
                         <DialogTrigger asChild>

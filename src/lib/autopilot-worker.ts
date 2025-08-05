@@ -1,6 +1,6 @@
 
 import * as Tone from 'tone';
-import type { MusicKey, MusicScale } from '@/app/page';
+import type { Instrument, MusicKey, MusicScale } from '@/app/page';
 import type { Unit } from 'tone/build/esm/core/type/Units';
 
 // --- TYPE DEFINITIONS ---
@@ -21,7 +21,8 @@ export type WorkerEvent =
     | { type: 'tick', time: number }
     | { type: 'setHarmony', key: MusicKey, scale: MusicScale }
     | { type: 'setTempo', bpm: number }
-    | { type: 'setStyle', style: AutopilotStyle };
+    | { type: 'setStyle', style: AutopilotStyle }
+    | { type: 'setInstruments', instruments: Record<AutopilotPart, Instrument> };
 
 export type WorkerResponse =
     | { type: 'playNote', note: NoteEvent };
@@ -51,6 +52,12 @@ let state = {
     currentKey: 'G' as MusicKey,
     currentScale: 'Major' as MusicScale,
     currentBpm: 90,
+    instruments: {
+        melody: 'synth' as Instrument,
+        accompaniment: 'synth' as Instrument,
+        bass: 'ebass' as Instrument,
+        effects: 'autopilot_effect_star' as Instrument
+    },
     scaleFrequencies: {
         bass: [] as number[],
         accompaniment: [] as number[],
@@ -126,27 +133,29 @@ function tickAmbient(time: number) {
 
 // --- "SEQUENCE" STYLE (Mike Oldfield inspired) ---
 function tickSequence(time: number) {
-    // Bass part (plays every 4 ticks = quarter note)
-    if (state.tick16n % 4 === 0) {
+    // Bass part (plays every 8 ticks = half note)
+    if (state.tick16n % 8 === 0) {
         const bassFreq = state.scaleFrequencies.bass[state.sequence.bassNoteIndex % state.scaleFrequencies.bass.length];
         const event: NoteEvent = {
             part: 'bass', freq: bassFreq,
-            dur: '4n', vel: 0.8, time
+            dur: '2n', vel: 0.8, time
         };
         self.postMessage({ type: 'playNote', note: event });
         state.sequence.bassNoteIndex++;
     }
 
-    // Accompaniment (plays every tick = 16th note arpeggio)
-    const accompFreq = state.scaleFrequencies.accompaniment[state.sequence.accompanimentIndex % state.scaleFrequencies.accompaniment.length];
-    const event: NoteEvent = {
-        part: 'accompaniment', freq: accompFreq,
-        dur: '16n', vel: 0.4, time
-    };
-    self.postMessage({ type: 'playNote', note: event });
-    state.sequence.accompanimentIndex++;
-    if (Math.random() < 0.05) { // Occasionally jump in the arpeggio
-        state.sequence.accompanimentIndex += Math.floor(Math.random() * 4) - 2;
+    // Accompaniment (plays every 2 ticks = 8th note arpeggio)
+    if (state.tick16n % 2 === 0) {
+        const accompFreq = state.scaleFrequencies.accompaniment[state.sequence.accompanimentIndex % state.scaleFrequencies.accompaniment.length];
+        const event: NoteEvent = {
+            part: 'accompaniment', freq: accompFreq,
+            dur: '8n', vel: 0.4, time
+        };
+        self.postMessage({ type: 'playNote', note: event });
+        state.sequence.accompanimentIndex++;
+        if (Math.random() < 0.05) { // Occasionally jump in the arpeggio
+            state.sequence.accompanimentIndex += Math.floor(Math.random() * 4) - 2;
+        }
     }
 
 
@@ -163,11 +172,11 @@ function tickSequence(time: number) {
             const melodyFreq = state.sequence.melodyPhrase[state.sequence.melodyIndex];
             const event: NoteEvent = {
                 part: 'melody', freq: melodyFreq,
-                dur: '8n', vel: 0.7, time
+                dur: '4n', vel: 0.7, time
             };
             self.postMessage({ type: 'playNote', note: event });
             state.sequence.melodyIndex++;
-            state.sequence.nextMelodyTick = state.tick16n + 2; // Next note in 2 ticks (8th note)
+            state.sequence.nextMelodyTick = state.tick16n + 4; // Next note in 4 ticks (quarter note)
         }
     } else if (state.sequence.melodyPhrase.length === 0 && state.tick16n === state.sequence.nextMelodyTick) {
         // Time to create a new phrase
@@ -228,6 +237,10 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             // @ts-ignore
             state.currentStyle = data.style;
             state.tick16n = 0; // Reset tick count on style change
+            break;
+        case 'setInstruments':
+            // @ts-ignore
+            state.instruments = data.instruments;
             break;
     }
 };
