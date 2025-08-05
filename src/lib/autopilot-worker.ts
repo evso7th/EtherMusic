@@ -79,7 +79,6 @@ let state = {
         chordProgression: [0, 4, 5, 3], // I-V-vi-IV in 0-based scale degrees
         currentChordDegree: 0,
         lastChordChangeTick: -Infinity,
-        melodyNoteId: 1, // Unique ID for the continuous melody note
         lastMelodyDegree: null as number | null,
     },
     sequence: {
@@ -109,7 +108,7 @@ function updateHarmony(key: MusicKey, scale: MusicScale) {
 // --- "AMBIENT" STYLE ---
 function tickAmbient(time: number) {
     const ticksPerMeasure = 16;
-    const ticksForChordChange = ticksPerMeasure * 4;
+    const ticksForChordChange = ticksPerMeasure * 4; // Every 4 measures
 
     // --- BASS (Drone) & ACCOMPANIMENT (Pads) ---
     if (state.tick16n >= state.ambient.lastChordChangeTick + ticksForChordChange) {
@@ -137,38 +136,27 @@ function tickAmbient(time: number) {
         });
     }
 
-    // --- MELODY (Flowing, with Glissando) ---
-    // Change melody note every measure
+    // --- MELODY ---
     if (state.tick16n % ticksPerMeasure === 0) {
         let nextMelodyDegree;
-        
         if (state.ambient.lastMelodyDegree === null) {
-            // First note
             nextMelodyDegree = Math.floor(state.scaleFrequencies.melody.length / 2);
-            const initialFreq = state.scaleFrequencies.melody[nextMelodyDegree];
-            if (initialFreq) {
-                self.postMessage({ type: 'playNote', note: {
-                    id: state.ambient.melodyNoteId, part: 'melody',
-                    freq: initialFreq, dur: '1n', vel: 0.7, time: time
-                }});
-            }
         } else {
-            // Subsequent notes: move one step up or down
             const direction = Math.random() > 0.5 ? 1 : -1;
             nextMelodyDegree = state.ambient.lastMelodyDegree + direction;
-            // Clamp to stay within the scale
             nextMelodyDegree = Math.max(0, Math.min(state.scaleFrequencies.melody.length - 1, nextMelodyDegree));
-            
-            const nextFreq = state.scaleFrequencies.melody[nextMelodyDegree];
-            if (nextFreq) {
-                // Use glissando to slide to the new note over the duration of a measure
-                self.postMessage({ type: 'updateNote', note: {
-                    id: state.ambient.melodyNoteId,
-                    part: 'melody',
-                    freq: nextFreq,
-                    rampTime: '1m' // Ramp time is one measure
-                }});
-            }
+        }
+
+        const melodyFreq = state.scaleFrequencies.melody[nextMelodyDegree];
+        if (melodyFreq) {
+            const noteEvent: NoteEvent = {
+                part: 'melody',
+                freq: melodyFreq,
+                dur: '1m', // Note lasts for one measure
+                vel: 0.7,
+                time: time,
+            };
+            self.postMessage({ type: 'playNote', note: noteEvent });
         }
         state.ambient.lastMelodyDegree = nextMelodyDegree;
     }
