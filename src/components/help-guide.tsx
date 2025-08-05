@@ -13,7 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import React from "react";
-import { HelpGuideContent } from "./help-guide-content";
+import { guideContent } from "./help-guide-content";
 
 
 interface HelpGuideProps extends ButtonProps {
@@ -23,6 +23,16 @@ interface HelpGuideProps extends ButtonProps {
 
 export const HelpGuide = ({ buttonVariant = "outline", buttonClassName, showText = true, size, ...props }: HelpGuideProps) => {
     
+    // The content is now pre-rendered or will be handled differently.
+    // For now, we'll just display it raw to show the structure.
+    // In a real scenario, we would use a library that processes markdown at build time.
+    const content = (
+        <div 
+            className="prose prose-invert p-4" 
+            dangerouslySetInnerHTML={{ __html: guideContent.replace(/\n/g, '<br />') }} // Simple conversion for display
+        />
+    );
+
     return (
         <Dialog>
             <DialogTrigger asChild>
@@ -41,9 +51,7 @@ export const HelpGuide = ({ buttonVariant = "outline", buttonClassName, showText
                     <DialogTitle>Quick Guide</DialogTitle>
                 </DialogHeader>
                 <ScrollArea className="h-[70vh] w-full">
-                    <div className="prose prose-invert p-4">
-                        <HelpGuideContent />
-                    </div>
+                    {content}
                 </ScrollArea>
             </DialogContent>
         </Dialog>

@@ -1,7 +1,5 @@
 
-import ReactMarkdown from 'react-markdown';
-
-const guideContent = `
+export const guideContent = `
 # EtherMusic Quick Guide
 
 Welcome to EtherMusic! This is a simple guide to get you started on making cool sounds.
@@ -66,9 +64,3 @@ If you experience this, we recommend using these features separately for the smo
 
 Enjoy the process and let the music you create reflect your inner state.
 `;
-
-export function HelpGuideContent() {
-    return (
-        <ReactMarkdown>{guideContent}</ReactMarkdown>
-    );
-}
