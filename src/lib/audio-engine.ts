@@ -4,7 +4,7 @@ import type { Instrument, MusicKey, MusicScale } from '@/app/page';
 import { LatchEngine } from './latch-engine';
 import { DrumMachine } from './drum-machine';
 import type { OrbManager } from './orb-manager';
-import type { NoteEvent, AutopilotPart as WorkerAutopilotPart } from './autopilot-worker';
+import type { NoteEvent, WorkerAutopilotPart, NoteUpdateEvent } from './autopilot-worker';
 
 
 export type InstrumentPart = 
@@ -112,7 +112,7 @@ export class AudioEngine {
         bass: 'ebass',
     };
     
-    private autopilotSynths: Record<WorkerAutopilotPart, Tone.Synth | Tone.FMSynth | Tone.NoiseSynth | null> = {
+    private autopilotSynths: Record<WorkerAutopilotPart, (Tone.Synth | Tone.FMSynth | Tone.NoiseSynth | Tone.AMSynth) & { id?: number } | null> = {
         melody: null,
         accompaniment: null,
         bass: null,
@@ -308,17 +308,36 @@ export class AudioEngine {
         const synthToUse = this.autopilotSynths[note.part];
     
         if (synthToUse) {
+            // Assign an ID to the synth if it's a new one for a note that needs updating
+            if (note.id) {
+                synthToUse.id = note.id;
+            }
             synthToUse.triggerAttackRelease(note.freq, note.dur, note.time, note.vel);
         }
     }
     
+    public updateWorkerNote(note: NoteUpdateEvent) {
+        if (!this.isInitialized) return;
+        const synthToUpdate = this.autopilotSynths[note.part];
+    
+        if (synthToUpdate && synthToUpdate.id === note.id) {
+            if (synthToUpdate.frequency) {
+                synthToUpdate.frequency.rampTo(note.freq, note.rampTime);
+            }
+        }
+    }
+
     public stopAllSounds() {
         this.voicePools.forEach(pool => pool.forEach(voice => voice.release(0.1)));
         this.latchEngine.stopAll();
         
         for (const part in this.autopilotSynths) {
-            // @ts-ignore
-            this.autopilotSynths[part]?.releaseAll();
+            const synth = this.autopilotSynths[part as WorkerAutopilotPart];
+            if (synth) {
+                // Cancel any scheduled ramps or events
+                if (synth.frequency) synth.frequency.cancelScheduledValues(Tone.now());
+                synth.releaseAll();
+            }
         }
 
         this.orbManager?.removeAllOrbs();
@@ -375,7 +394,7 @@ export class AudioEngine {
         const preset = this.presets[instrument];
         if (!preset) return;
     
-        let channel;
+        let channel: Tone.Channel;
         switch(part) {
             case 'melody': channel = this.channels.autopilot; break;
             case 'accompaniment': channel = this.channels.accompaniment; break;
@@ -459,3 +478,5 @@ export class AudioEngine {
         return freqs.reduce((prev, curr) => (Math.abs(curr - targetFreq) < Math.abs(prev - targetFreq) ? curr : prev));
     }
 }
+
+    

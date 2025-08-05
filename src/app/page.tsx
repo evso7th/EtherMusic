@@ -84,7 +84,7 @@ export default function Home() {
     const [autopilotPartInstruments, setAutopilotPartInstruments] = useState<Record<WorkerAutopilotPart, Instrument>>({
         melody: 'synth',
         accompaniment: 'mellotron',
-        bass: 'ebass',
+        bass: 'synth',
         effects: 'autopilot_effect_star'
     });
     
@@ -115,6 +115,8 @@ export default function Home() {
             worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
                 if (e.data.type === 'playNote' && e.data.note) {
                     audioEngine.current?.playWorkerNote(e.data.note);
+                } else if (e.data.type === 'updateNote' && e.data.note) {
+                    audioEngine.current?.updateWorkerNote(e.data.note);
                 }
             };
             autopilotWorker.current = worker;
@@ -126,7 +128,7 @@ export default function Home() {
             mainEngine.setBassInstrument('ebass');
             mainEngine.setAutopilotInstrument('melody', 'synth');
             mainEngine.setAutopilotInstrument('accompaniment', 'mellotron');
-            mainEngine.setAutopilotInstrument('bass', 'ebass');
+            mainEngine.setAutopilotInstrument('bass', 'synth');
             mainEngine.setAutopilotInstrument('effects', 'autopilot_effect_star');
 
             mainEngine.setHarmony('G', 'Major');
@@ -137,7 +139,7 @@ export default function Home() {
             worker.postMessage({ type: 'setInstruments', instruments: {
                 melody: 'synth',
                 accompaniment: 'mellotron',
-                bass: 'ebass',
+                bass: 'synth',
                 effects: 'autopilot_effect_star'
             }});
             
@@ -221,10 +223,10 @@ export default function Home() {
     
     const handleStop = useCallback(async () => {
         if (!audioEngine.current) return;
-        audioEngine.current.stopAllSounds();
         const offPattern = beatPatterns.find(p => p.name === 'Off')!;
         setActivePattern(offPattern);
         audioEngine.current.setBeatPattern(offPattern.name);
+        audioEngine.current.stopAllSounds();
     }, []);
 
     const handleRecord = useCallback(() => {
@@ -453,3 +455,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
