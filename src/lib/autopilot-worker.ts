@@ -4,7 +4,7 @@ import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
 import type { Unit } from 'tone/build/esm/core/type/Units';
 
 // --- TYPE DEFINITIONS ---
-export type AutopilotPart = 'melody'; // Simplified for now
+export type AutopilotPart = 'melody' | 'effects'; // Added 'effects'
 
 export type NoteEvent = {
     part: AutopilotPart;
@@ -41,28 +41,39 @@ function updateScaleNotes(key: MusicKey, scale: MusicScale) {
     const intervals = scaleIntervals[scale];
     const notesInOctave4 = intervals.map(interval => Tone.Frequency(key + '4').transpose(parseInt(interval)).toFrequency());
     const notesInOctave5 = intervals.map(interval => Tone.Frequency(key + '5').transpose(parseInt(interval)).toFrequency());
-    scaleFrequencies = [...notesInOctave4, notesInOctave5[0]].sort((a,b) => a-b);
+    scaleFrequencies = [...notesInOctave4, ...notesInOctave5].sort((a,b) => a-b);
 }
 
 // --- CORE LOGIC ---
 function tick(time: number) {
-    // Only generate a note if the worker is running
     if (!isRunning || scaleFrequencies.length === 0) return;
 
-    const noteToPlayFreq = scaleFrequencies[noteIndex % scaleFrequencies.length];
-    
-    const noteEvent: NoteEvent = {
-        part: 'melody',
-        freq: noteToPlayFreq,
-        dur: '8n',
-        vel: Math.random() * 0.3 + 0.5, // Add some velocity variation
-        time: time, // The exact time is provided by the main thread's Transport
-    };
-    
-    // Post the note back to the main thread
-    self.postMessage({ type: 'playNote', note: noteEvent });
-    
-    noteIndex++;
+    // With a small probability, generate an effect instead of a melody note
+    if (Math.random() < 0.1) {
+        const effectFreq = 1000 + Math.random() * 2000; // High-pitched "star"
+        const effectEvent: NoteEvent = {
+            part: 'effects',
+            freq: effectFreq,
+            dur: '1n',
+            vel: Math.random() * 0.1 + 0.1,
+            time: time,
+        };
+        self.postMessage({ type: 'playNote', note: effectEvent });
+    } else {
+        const noteToPlayFreq = scaleFrequencies[noteIndex % scaleFrequencies.length];
+        
+        const noteEvent: NoteEvent = {
+            part: 'melody',
+            freq: noteToPlayFreq,
+            dur: '8n',
+            vel: Math.random() * 0.3 + 0.5,
+            time: time,
+        };
+        
+        self.postMessage({ type: 'playNote', note: noteEvent });
+        
+        noteIndex++;
+    }
 }
 
 // --- MESSAGE HANDLER ---
@@ -71,13 +82,12 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
     switch (type) {
         case 'start':
             isRunning = true;
-            noteIndex = 0; // Reset sequence on start
+            noteIndex = 0;
             break;
         case 'stop':
             isRunning = false;
             break;
         case 'tick':
-            // Directly call tick with the time from the main thread
             tick(data.time);
             break;
         case 'setHarmony':
@@ -86,8 +96,6 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             }
             break;
         case 'setTempo':
-            // The worker no longer needs to know the tempo, as it's driven by external ticks.
-            // We can keep this for future use if needed.
             if ('bpm' in data) {
                 currentBpm = data.bpm as number;
             }

@@ -25,7 +25,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
-import type { AutopilotPart, NoteEvent, WorkerResponse } from '@/lib/autopilot-worker';
+import type { NoteEvent, WorkerResponse } from '@/lib/autopilot-worker';
 
 
 export const tempos: Tempo[] = [
@@ -98,17 +98,14 @@ export default function Home() {
         if (isReady) return;
         
         try {
-            // Create Audio Engine
             const mainEngine = new AudioEngine();
             await mainEngine.initialize();
             audioEngine.current = mainEngine;
             
-            // Create Orb Manager
             const om = new OrbManager();
             orbManager.current = om;
             mainEngine.setOrbManager(om);
 
-            // Create Autopilot Worker
             const worker = new Worker(new URL('../lib/autopilot-worker.ts', import.meta.url));
             worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
                 if (e.data.type === 'playNote' && e.data.note) {
@@ -117,7 +114,6 @@ export default function Home() {
             };
             autopilotWorker.current = worker;
             
-            // Sync initial state with the engines
             mainEngine.setTempo(tempos[2].bpm);
             mainEngine.setVolumes({ melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, effects: -6, ebass: -6 });
             mainEngine.setEffects({
@@ -135,11 +131,9 @@ export default function Home() {
             mainEngine.setHarmony('C', 'Major Pentatonic');
             mainEngine.setBeatPattern('Off');
             
-            // Send initial settings to the worker ONCE.
             worker.postMessage({ type: 'setHarmony', key: 'C', scale: 'Major Pentatonic' });
             worker.postMessage({ type: 'setTempo', bpm: tempos[2].bpm });
             
-            // Create the "Eternal Metronome Tick" for the worker
             transportEventId.current = Tone.Transport.scheduleRepeat((time) => {
                 autopilotWorker.current?.postMessage({ type: 'tick', time });
             }, '8n');
@@ -274,7 +268,6 @@ export default function Home() {
         }
     }, []);
 
-    // Initial state for volumes and effects to pass to the MixerControls
     const initialVolumes = useRef({ melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, effects: -6, ebass: -6 });
     const initialEffects = useRef({
         melody: { reverb: -Infinity, delay: -60 },

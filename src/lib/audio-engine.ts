@@ -114,6 +114,7 @@ export class AudioEngine {
     };
     
     private autopilotSynth: Tone.Synth | null = null;
+    private effectsSynth: Tone.FMSynth | null = null;
 
     constructor() {
         // Orb manager is now initialized after engine is ready in page.tsx
@@ -151,8 +152,8 @@ export class AudioEngine {
         this.drumMachine = new DrumMachine(this.channels.drums);
         await this.drumMachine.initialize();
 
-        // A single, one-voice synth for the worker.
         this.autopilotSynth = new Tone.Synth(this.presets.synth.options).connect(this.channels.autopilot);
+        this.effectsSynth = new Tone.FMSynth(this.presets.autopilot_effect_star.options).connect(this.channels.effects);
         
         this.isInitialized = true;
         console.log(`AudioEngine initialized.`);
@@ -168,7 +169,7 @@ export class AudioEngine {
             melody: 3,
             bass: 3,
             latch: 3,
-            autopilot_melody: 0, // No longer used, worker has its own synth
+            autopilot_melody: 0,
             autopilot_accompaniment: 0,
             autopilot_bass: 0,
             autopilot_effects: 0
@@ -178,7 +179,6 @@ export class AudioEngine {
             melody: this.channels.melody,
             bass: this.channels.manualBass,
             latch: this.channels.latch,
-            // Autopilot channels are not needed for pools anymore
             autopilot_melody: this.channels.autopilot, 
             autopilot_accompaniment: this.channels.autopilot,
             autopilot_bass: this.channels.autopilot,
@@ -240,9 +240,9 @@ export class AudioEngine {
             return (part === 'melody' || part.startsWith('autopilot_')) ? 'E-Bells_melody' : 'E-Bells_bass';
         }
         if (part === 'autopilot_effects' || part === 'autopilot_bass') {
-            return instrumentName;
+            return instrumentName as string;
         }
-        return instrumentName;
+        return instrumentName as string;
     }
 
     private getVoiceFromPool(part: InstrumentPart, pointerId: number | null = null): Voice | null {
@@ -256,7 +256,6 @@ export class AudioEngine {
 
         const availableVoice = pool.find(v => v.isAvailable());
         if (!availableVoice) {
-            // console.warn(`No available voice in pool for part: ${part}`);
             return null;
         }
         return availableVoice;
@@ -300,13 +299,19 @@ export class AudioEngine {
     }
 
     public playWorkerNote(note: NoteEvent) {
-        if (!this.isInitialized || !this.autopilotSynth) return;
-        this.autopilotSynth.triggerAttackRelease(note.freq, note.dur, note.time, note.vel);
+        if (!this.isInitialized) return;
+
+        if (note.part === 'melody' && this.autopilotSynth) {
+            this.autopilotSynth.triggerAttackRelease(note.freq, note.dur, note.time, note.vel);
+        } else if (note.part === 'effects' && this.effectsSynth) {
+            this.effectsSynth.triggerAttackRelease(note.freq, note.dur, note.time, note.vel);
+        }
     }
     
     public stopAllSounds() {
         this.voicePools.forEach(pool => pool.forEach(voice => voice.release(0.1)));
         this.autopilotSynth?.releaseAll();
+        this.effectsSynth?.releaseAll();
         this.orbManager?.removeAllOrbs();
         this.latchEngine.stopAll();
         if (this.isInitialized) this.drumMachine.stop();
@@ -314,7 +319,7 @@ export class AudioEngine {
     
     public stopAllAutopilotSounds() {
         this.autopilotSynth?.releaseAll();
-        // This is important to clear any scheduled but not yet played notes.
+        this.effectsSynth?.releaseAll();
         Tone.Transport.cancel();
     }
 
@@ -393,8 +398,6 @@ export class AudioEngine {
     public stop() {
         if (this.isInitialized) {
             this.stopAllSounds();
-            // DO NOT STOP THE TRANSPORT
-            // We only stop the parts that are playing.
             this.drumMachine.stop();
         }
     }
@@ -410,7 +413,7 @@ export class AudioEngine {
             'E-Bells_bass': { type: 'FMSynth', options: { harmonicity: 1.4, modulationIndex: 15, oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 1.5, sustain: 0, release: 2.5 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.01, decay: 1.0, sustain: 0, release: 1.0 } } },
             'G-Drops': { type: 'FMSynth', options: { harmonicity: 0.5, modulationIndex: 3.5, oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.7, sustain: 0.1, release: 0.4 }, modulation: { type: 'triangle' }, modulationEnvelope: { attack: 0.01, decay: 0.5, sustain: 0, release: 0.2 } } },
             autopilot_bass: { type: 'Synth', options: { oscillator: { type: "fmsine", harmonicity: 0.5 }, filter: { Q: 1, type: 'lowpass', rolloff: -12 }, envelope: { attack: 0.1, decay: 0.3, sustain: 0.4, release: 1.2 }, filterEnvelope: { attack: 0.05, decay: 0.2, sustain: 0.1, release: 1, baseFrequency: 200, octaves: 1.5 } } },
-            autopilot_effect_star: { type: 'FMSynth', options: { harmonicity: 1.4, modulationIndex: 20, envelope: { attack: 0.01, decay: 1.2, release: 1.2 } } },
+            autopilot_effect_star: { type: 'FMSynth', options: { harmonicity: 3.4, modulationIndex: 10, envelope: { attack: 0.01, decay: 1.2, release: 1.2 } } },
             autopilot_effect_meteor: { type: 'NoiseSynth', options: { noise: { type: 'white' }, filter: { Q: 10 }, envelope: { attack: 0.01, decay: 0.3, release: 0.5 } } },
         };
     }
