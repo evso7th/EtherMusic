@@ -6,20 +6,20 @@ import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
 import type { WorkerEvent, WorkerResponse, AutopilotPart, NoteEvent } from './autopilot-worker';
 import type { AudioEngine } from './audio-engine';
 
-const LOOKAHEAD_TIME = 0.2; // seconds, how far ahead to schedule
-const SCHEDULE_INTERVAL = '16n'; // a 16th note, how often to check for scheduling
+const LOOKAHEAD_TIME_S = 0.2; // seconds
+const SCHEDULE_INTERVAL_S = 0.1; // seconds
 
 export class AutopilotEngine {
     private audioEngine: AudioEngine;
     private activeWorker: Worker | null = null;
     private currentStyle: AutopilotStyle = 'Ambient';
     private isAutopilotOn = false;
+    private isPlaying = false;
     
     private noteCache: NoteEvent[] = [];
     private nextMeasureToGenerate = 0;
     private schedulerEventId: number | null = null;
     private isGenerating = false;
-    private isPlaying = false; 
 
     private lastKnownState: {
         key: MusicKey;
@@ -38,20 +38,17 @@ export class AutopilotEngine {
 
     private handleWorkerMessage = (event: MessageEvent<WorkerResponse>) => {
         if (event.data.type === 'measureGenerated') {
-            const newNotes = event.data.notes;
-            newNotes.forEach(note => this.audioEngine.scheduleAutopilotNote(note));
+            this.noteCache.push(...event.data.notes);
             this.isGenerating = false;
         }
     }
     
-    private requestNextMeasureIfNeeded() {
-        if (this.isGenerating || !this.isPlaying || !this.isAutopilotOn) return;
+    private scheduler = () => {
+        if (!this.isAutopilotOn || !this.isPlaying) return;
 
+        // 1. Fill the note cache if needed
         const currentMeasure = Math.floor(Tone.Transport.position.toString().split(':')[0]);
-        const bufferMeasures = 2; // Keep 2 measures ahead
-        
-        // If we need to generate more measures to stay ahead
-        if(this.nextMeasureToGenerate <= currentMeasure + bufferMeasures) {
+        if (!this.isGenerating && this.nextMeasureToGenerate <= currentMeasure + 1) {
             this.isGenerating = true;
             this.postMessageToActiveWorker({
                 type: 'generateMeasure',
@@ -59,13 +56,27 @@ export class AutopilotEngine {
             });
             this.nextMeasureToGenerate++;
         }
+        
+        // 2. Schedule notes from the cache
+        const scheduleUntil = Tone.Transport.seconds + LOOKAHEAD_TIME_S;
+        
+        let notesToKeep = [];
+        for(const note of this.noteCache) {
+            const timeString = `${note.measure}:${Math.floor(note.subdivision/4)}:${note.subdivision % 4}`;
+            const noteTimeSeconds = Tone.Transport.toSeconds(timeString);
+
+            if (noteTimeSeconds < scheduleUntil && noteTimeSeconds >= Tone.Transport.seconds) {
+                 this.audioEngine.playAutopilotEvent(note, noteTimeSeconds);
+            }
+
+            // If the note's time is in the future, keep it.
+            if(noteTimeSeconds >= Tone.Transport.seconds) {
+                notesToKeep.push(note);
+            }
+        }
+        this.noteCache = notesToKeep;
     }
     
-    private mainLoop = () => {
-        if (!this.isAutopilotOn || !this.isPlaying) return;
-        this.requestNextMeasureIfNeeded();
-    }
-
     private setWorker(): void {
         if (this.activeWorker) {
             this.activeWorker.onmessage = null;
@@ -129,12 +140,9 @@ export class AutopilotEngine {
     }
 
     public start() {
-        if (this.schedulerEventId !== null) return;
+        if (this.schedulerEventId !== null || !this.isAutopilotOn || !this.isPlaying) return;
         this.resetAutopilot();
-        this.schedulerEventId = Tone.Transport.scheduleRepeat(this.mainLoop, SCHEDULE_INTERVAL);
-        // Immediately request the first measures
-        this.requestNextMeasureIfNeeded();
-        this.requestNextMeasureIfNeeded();
+        this.schedulerEventId = Tone.Transport.scheduleRepeat(this.scheduler, SCHEDULE_INTERVAL_S);
     }
 
     public stop() {
@@ -143,6 +151,7 @@ export class AutopilotEngine {
             this.schedulerEventId = null;
         }
         this.audioEngine.stopAllAutopilotSounds();
+        this.noteCache = [];
         this.nextMeasureToGenerate = 0;
         this.isGenerating = false;
         this.postMessageToActiveWorker({ type: 'reset' });
@@ -150,16 +159,18 @@ export class AutopilotEngine {
 
     private resetAutopilot() {
         this.audioEngine.stopAllAutopilotSounds();
+        this.noteCache = [];
         this.nextMeasureToGenerate = 0;
         this.isGenerating = false;
         this.postMessageToActiveWorker({ type: 'reset' });
         
+        if (this.schedulerEventId !== null) {
+            Tone.Transport.clear(this.schedulerEventId);
+            this.schedulerEventId = null;
+        }
+        
         if (this.isAutopilotOn && this.isPlaying) {
-             if (this.schedulerEventId !== null) {
-                Tone.Transport.clear(this.schedulerEventId);
-                this.schedulerEventId = null;
-            }
-            this.start();
+             this.start();
         }
     }
 
