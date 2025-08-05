@@ -114,6 +114,8 @@ export class AudioEngine {
     };
     
     private testSequence: Tone.Sequence | null = null;
+    private autopilotPolySynth: Tone.PolySynth | null = null;
+
 
     constructor() {
         // Orb manager is now initialized after engine is ready in page.tsx
@@ -145,6 +147,12 @@ export class AudioEngine {
         this.createPresets();
         this.initializeVoicePools();
         
+        // Dedicated PolySynth for Autopilot to prevent voice stealing issues
+        this.autopilotPolySynth = new Tone.PolySynth(Tone.Synth, {
+            maxPolyphony: 8,
+            ...this.presets.synth.options
+        }).connect(this.channels.autopilot);
+        
         this.latchEngine = new LatchEngine(this);
         
         this.drumMachine = new DrumMachine(this.channels.drums);
@@ -164,9 +172,9 @@ export class AudioEngine {
             melody: 3,
             bass: 3,
             latch: 3,
-            autopilot_melody: 4,
-            autopilot_accompaniment: 4,
-            autopilot_bass: 2,
+            autopilot_melody: 4, // Kept for future complex autopilot
+            autopilot_accompaniment: 4, // Kept for future complex autopilot
+            autopilot_bass: 2, // Kept for future complex autopilot
             autopilot_effects: 4
         };
 
@@ -194,8 +202,7 @@ export class AudioEngine {
         this.reconfigurePool('melody', this.currentInstruments.melody);
         this.reconfigurePool('bass', this.currentInstruments.bass);
         this.reconfigurePool('latch', this.currentInstruments.bass);
-        this.reconfigurePool('autopilot_melody', this.currentInstruments.autopilot);
-        this.reconfigurePool('autopilot_accompaniment', this.currentInstruments.autopilot);
+        // We will now use the dedicated PolySynth for melody, so no need to reconfigure this pool for now
         this.reconfigurePool('autopilot_bass', 'autopilot_bass');
         this.reconfigurePool('autopilot_effects', 'autopilot_effect_star');
     }
@@ -301,8 +308,7 @@ export class AudioEngine {
         if (!this.isInitialized) return;
 
         if (this.testSequence) {
-            this.testSequence.stop(0);
-            this.testSequence.dispose();
+            this.testSequence.stop(0).dispose();
             this.testSequence = null;
             console.log("Stopping test scale.");
             if (Tone.Transport.state === 'started') {
@@ -315,10 +321,7 @@ export class AudioEngine {
         const scale = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5'];
         
         this.testSequence = new Tone.Sequence((time, note) => {
-             const voice = this.getVoiceFromPool('autopilot_melody');
-             if(voice) {
-                voice.attackRelease(note, "8n", time, 0.8);
-             }
+             this.autopilotPolySynth?.triggerAttackRelease(note, "8n", time, 0.8);
         }, scale, "8n").start(0);
 
         this.testSequence.loop = true;
@@ -333,6 +336,12 @@ export class AudioEngine {
     public playAutopilotEvent(note: NoteEvent, time: number) {
         if (!this.isInitialized || note.freq === null || note.freq === undefined) return;
         
+        // Use PolySynth for melodic parts to avoid voice allocation issues
+        if (note.part === 'autopilot_melody' || note.part === 'autopilot_accompaniment') {
+            this.autopilotPolySynth?.triggerAttackRelease(note.freq, note.dur, time, note.vel);
+            return;
+        }
+
         if (note.part === 'autopilot_effects') {
              const effectName = Math.random() > 0.5 ? 'autopilot_effect_star' : 'autopilot_effect_meteor';
              this.reconfigurePool('autopilot_effects', effectName);
@@ -346,6 +355,7 @@ export class AudioEngine {
     
     public stopAllSounds() {
         this.voicePools.forEach(pool => pool.forEach(voice => voice.release(0.1)));
+        this.autopilotPolySynth?.releaseAll();
         this.orbManager?.removeAllOrbs();
         this.latchEngine.stopAll();
         if (this.testSequence) {
@@ -360,6 +370,7 @@ export class AudioEngine {
                 pool.forEach(voice => voice.release(0.1));
             }
         });
+        this.autopilotPolySynth?.releaseAll();
         if (this.testSequence) {
             this.testSequence.stop(0);
         }
@@ -406,10 +417,21 @@ export class AudioEngine {
     }
 
     public setAutopilotInstrument(instrument: Instrument) {
-        if(!this.isInitialized) return;
+        if(!this.isInitialized || !this.autopilotPolySynth) return;
         this.currentInstruments.autopilot = instrument;
-        this.reconfigurePool('autopilot_melody', instrument);
-        this.reconfigurePool('autopilot_accompaniment', instrument);
+        
+        const presetKey = this.getPresetKey('autopilot_melody', instrument);
+        const preset = this.presets[presetKey];
+        if (preset) {
+            // @ts-ignore
+            this.autopilotPolySynth.set({
+                ...preset.options,
+                // PolySynth doesn't have a 'type' property to change the synth itself,
+                // but we can update the options of its voices.
+                // This assumes the synth type (e.g., Tone.Synth) is what we want.
+                // For changing the synth *type*, we'd need to dispose and recreate the PolySynth.
+            });
+        }
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
