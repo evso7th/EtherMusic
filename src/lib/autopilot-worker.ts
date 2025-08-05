@@ -1,5 +1,4 @@
 
-
 import * as Tone from 'tone';
 import type { Instrument, MusicKey, MusicScale } from '@/app/page';
 import type { Unit } from 'tone/build/esm/core/type/Units';
@@ -73,6 +72,7 @@ let state = {
         bass: [] as number[],
         accompaniment: [] as number[],
         melody: [] as number[],
+        effects: [] as number[],
     },
     // Style-specific state
     ambient: {
@@ -98,6 +98,7 @@ function updateHarmony(key: MusicKey, scale: MusicScale) {
         bass: getScaleFrequencies(key, scale, [1, 2]),
         accompaniment: getScaleFrequencies(key, scale, [3, 4]),
         melody: getScaleFrequencies(key, scale, [3, 4]),
+        effects: getScaleFrequencies(key, scale, [4, 5]),
     };
     // Reset melody memory on harmony change
     state.sequence.lastMelodyNoteIndex = null;
@@ -232,6 +233,21 @@ function tickSequence(time: number) {
     }
 }
 
+// --- UNIVERSAL EFFECTS TICK ---
+function tickEffects(time: number) {
+    if (Math.random() < 0.03) { // Lower probability for less frequent effects
+        const freq = state.scaleFrequencies.effects[Math.floor(Math.random() * state.scaleFrequencies.effects.length)];
+        const event: NoteEvent = {
+            part: 'effects',
+            freq: freq,
+            dur: '4n',
+            vel: 0.5 + Math.random() * 0.3,
+            time: time,
+        };
+        self.postMessage({ type: 'playNote', note: event });
+    }
+}
+
 
 // --- MAIN TICK ROUTER ---
 function tick(time: number) {
@@ -245,6 +261,8 @@ function tick(time: number) {
             tickSequence(time);
             break;
     }
+
+    tickEffects(time);
     
     // Increment master tick
     state.tick16n++;
@@ -299,3 +317,5 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
 
 // Initial setup
 updateHarmony(state.currentKey, state.currentScale);
+
+    
