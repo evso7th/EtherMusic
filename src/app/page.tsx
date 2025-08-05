@@ -214,16 +214,16 @@ export default function Home() {
     const handlePlayPause = useCallback(async () => {
         if (!audioEngine.current) return;
         const willBePlaying = !isPlaying;
-        await audioEngine.current.setPlaying(willBePlaying);
         setIsPlaying(willBePlaying);
+        await audioEngine.current.setPlaying(willBePlaying);
         autopilotEngine.current?.setAutopilot(isAutopilotOn, autopilotStyle, willBePlaying);
     }, [isPlaying, isAutopilotOn, autopilotStyle]);
     
     const handleStop = useCallback(async () => {
         if (!audioEngine.current || !autopilotEngine.current) return;
+        setIsPlaying(false);
         audioEngine.current.stop();
         autopilotEngine.current.stop();
-        setIsPlaying(false);
     }, []);
 
     const handleRecord = useCallback(() => {

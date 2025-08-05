@@ -1,26 +1,11 @@
 
-// --- HELPERS ---
-function getNoteFrequency(key, octave, interval) {
-    const keyMap = { 'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5, 'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11 };
-    const A4 = 440;
-    const keyIndex = keyMap[key];
-    const midiNote = 12 * (octave + 1) + keyIndex + interval;
-    return Math.pow(2, (midiNote - 69) / 12) * A4;
-}
+'use strict';
 
-function getFrequencyFromDegree(degree, baseOctave) {
-    const scaleLength = scaleIntervals.length;
-    // THIS WAS THE BUG. It should be scaleLength === 0. An empty array has a length of 0, which is not a "truthy" value.
-    if (scaleLength === 0) return null;
+// This file cannot be converted to a module because it is a worker.
+// It must be a classic script.
 
-    const octave = baseOctave + Math.floor(degree / scaleLength);
-    const interval = scaleIntervals[degree % scaleLength];
-    
-    return getNoteFrequency(currentKey, octave, interval);
-}
-
-// --- STATE ---
 const SUBDIVISIONS = 16;
+
 let currentKey = 'C';
 let currentScale = 'Major Pentatonic';
 let currentStyle = 'Ambient';
@@ -34,8 +19,24 @@ const scaleIntervalMap = {
     'Minor Pentatonic': [0, 3, 5, 7, 10],
 };
 
+function getNoteFrequency(key, octave, interval) {
+    const A4 = 440;
+    const keyMap = { 'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5, 'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11 };
+    const keyIndex = keyMap[key];
+    const midiNote = 12 * (octave + 1) + keyIndex + interval;
+    return Math.pow(2, (midiNote - 69) / 12) * A4;
+}
 
-// --- PATTERN LIBRARY ---
+function getFrequencyFromDegree(degree, baseOctave) {
+    if (scaleIntervals.length === 0) return null;
+
+    const scaleLength = scaleIntervals.length;
+    const octave = baseOctave + Math.floor(degree / scaleLength);
+    const interval = scaleIntervals[degree % scaleLength];
+    
+    return getNoteFrequency(currentKey, octave, interval);
+}
+
 const patternLibrary = {
     Ambient: {
         baseOctaves: { bass: 2, accompaniment: 3, melody: 4 },
@@ -104,7 +105,7 @@ const patternLibrary = {
                 [ { degree: 0, dur: '16n', vel: 0.6 }, { degree: 2, dur: '16n', vel: 0.5 }, { degree: 4, dur: '16n', vel: 0.6 }, { degree: 2, dur: '16n', vel: 0.5 }, { degree: 5, dur: '16n', vel: 0.6 }, { degree: 4, dur: '16n', vel: 0.5 }, { degree: 7, dur: '16n', vel: 0.6 }, { degree: 5, dur: '16n', vel: 0.5 }, { degree: 4, dur: '16n', vel: 0.6 }, { degree: 2, dur: '16n', vel: 0.5 }, { degree: 0, dur: '16n', vel: 0.6 } ]
             ],
             fills: [
-                [ { degree: 7, dur: '8n', vel: 0.7 }, null, { degree: 9, dur: '8n', vel: 0.7 }, null, { degree: 11, dur: '8n', vel: 0.7 }, null, { degree: 12, dur: '8n', vel: 0.7 }, null, { degree: 11, dur: '8n', vel: 0.7 }, null, { degree: 9, dur: '8n', vel: 0.7 }, null, { degree: 7, dur: '8n', vel: 0.7 }, ],
+                [ { degree: 7, dur: '8n', vel: 0.7 }, null, { degree: 9, dur: '8n', vel: 0.7 }, null, { degree: 11, dur: '8n', vel: 0.7 }, null, { degree: 12, dur: '8n', vel: 0.7 }, null, { degree: 11, dur: '8n', vel: 0.7 }, null, { degree: 9, dur: '8n', vel: 0.7 }, null, { degree: 7, dur: '8n', vel: 0.7 } ],
             ]
         },
         melody: {
@@ -169,8 +170,6 @@ const patternLibrary = {
     },
 };
 
-
-// --- GENERATION LOGIC ---
 function generateMeasure(measure) {
     const style = patternLibrary[currentStyle];
     if (!style) return [];
@@ -179,11 +178,11 @@ function generateMeasure(measure) {
 
     const chooseRandom = (arr) => arr.length > 0 ? arr[Math.floor(Math.random() * arr.length)] : null;
     
-    const isFillMeasure = measure > 0 && measure % 4 === 3;
+    const isFillMeasure = measure % 4 === 3;
 
     const parts = ['bass', 'accompaniment', 'melody'];
     for (const partName of parts) {
-        if (!enabledParts[partName]) continue;
+        if (!enabledParts[`autopilot_${partName}`]) continue;
 
         const partStyle = style[partName];
         if (!partStyle) continue;
@@ -211,7 +210,7 @@ function generateMeasure(measure) {
         });
     }
 
-    if (enabledParts.effects && Math.random() < style.effects.probability) {
+    if (enabledParts.autopilot_effects && Math.random() < style.effects.probability) {
         const subdivision = Math.floor(Math.random() * SUBDIVISIONS);
         const freq = getFrequencyFromDegree(Math.floor(Math.random() * 12) + 5, style.baseOctaves.melody);
         if (freq) {
@@ -224,27 +223,39 @@ function generateMeasure(measure) {
     return notes;
 }
 
-// --- MESSAGE HANDLER ---
-self.onmessage = function (e) {
-    const { type, ...data } = e.data;
+self.onmessage = function (event) {
+    const { type, ...data } = event.data;
     switch (type) {
         case 'generateMeasure':
-            const notes = generateMeasure(data.measure);
-            self.postMessage({ type: 'measureGenerated', notes, measure: data.measure });
+            if ('measure' in data) {
+                const notes = generateMeasure(data.measure);
+                self.postMessage({ type: 'measureGenerated', notes, measure: data.measure });
+            }
             break;
         case 'setHarmony':
-            currentKey = data.key;
-            currentScale = data.scale;
-            scaleIntervals = scaleIntervalMap[currentScale] || [];
+             if ('key' in data && 'scale' in data) {
+                currentKey = data.key;
+                currentScale = data.scale;
+                scaleIntervals = scaleIntervalMap[currentScale] || [];
+            }
             break;
         case 'setParts':
-            enabledParts = data.parts;
+            if ('parts' in data) {
+                const newParts = {};
+                if (data.parts.bass) newParts.autopilot_bass = true;
+                if (data.parts.accompaniment) newParts.autopilot_accompaniment = true;
+                if (data.parts.melody) newParts.autopilot_melody = true;
+                if (data.parts.effects) newParts.autopilot_effects = true;
+                enabledParts = newParts;
+            }
             break;
         case 'setStyle':
-            currentStyle = data.style;
+            if('style' in data) {
+                currentStyle = data.style;
+            }
             break;
         case 'reset':
-            // This can be used to reset any internal state if needed
+            // Nothing to do here for now
             break;
     }
 };

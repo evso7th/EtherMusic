@@ -6,8 +6,8 @@ import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
 import type { WorkerEvent, WorkerResponse, AutopilotPart, NoteEvent } from './autopilot-worker';
 import type { AudioEngine } from './audio-engine';
 
-const LOOKAHEAD_TIME_S = 0.2; // seconds
-const SCHEDULE_INTERVAL_S = 0.1; // seconds
+const LOOKAHEAD_TIME_S = 0.2; // How far ahead to schedule notes
+const SCHEDULE_INTERVAL_MS = 100; // How often the scheduler runs
 
 export class AutopilotEngine {
     private audioEngine: AudioEngine;
@@ -18,7 +18,7 @@ export class AutopilotEngine {
     
     private noteCache: NoteEvent[] = [];
     private nextMeasureToGenerate = 0;
-    private schedulerEventId: number | null = null;
+    private schedulerIntervalId: ReturnType<typeof setInterval> | null = null;
     private isGenerating = false;
 
     private lastKnownState: {
@@ -39,12 +39,13 @@ export class AutopilotEngine {
     private handleWorkerMessage = (event: MessageEvent<WorkerResponse>) => {
         if (event.data.type === 'measureGenerated') {
             this.noteCache.push(...event.data.notes);
+            this.noteCache.sort((a, b) => a.measure - b.measure || a.subdivision - b.subdivision);
             this.isGenerating = false;
         }
     }
     
     private scheduler = () => {
-        if (!this.isAutopilotOn || !this.isPlaying) return;
+        if (!this.isAutopilotOn || !this.isPlaying || !this.audioEngine.isInitialized) return;
 
         // 1. Fill the note cache if needed
         const currentMeasure = Math.floor(Tone.Transport.position.toString().split(':')[0]);
@@ -60,17 +61,16 @@ export class AutopilotEngine {
         // 2. Schedule notes from the cache
         const scheduleUntil = Tone.Transport.seconds + LOOKAHEAD_TIME_S;
         
-        let notesToKeep = [];
-        for(const note of this.noteCache) {
-            const timeString = `${note.measure}:${Math.floor(note.subdivision/4)}:${note.subdivision % 4}`;
-            const noteTimeSeconds = Tone.Transport.toSeconds(timeString);
+        const notesToKeep = [];
+        for (const note of this.noteCache) {
+            const timeString = `${note.measure}:${Math.floor(note.subdivision / 4)}:${note.subdivision % 4}`;
+            const noteTimeSeconds = new Tone.Time(timeString).toSeconds();
 
             if (noteTimeSeconds < scheduleUntil && noteTimeSeconds >= Tone.Transport.seconds) {
-                 this.audioEngine.playAutopilotEvent(note, noteTimeSeconds);
+                this.audioEngine.playAutopilotEvent(note, noteTimeSeconds);
             }
 
-            // If the note's time is in the future, keep it.
-            if(noteTimeSeconds >= Tone.Transport.seconds) {
+            if (noteTimeSeconds >= Tone.Transport.seconds) {
                 notesToKeep.push(note);
             }
         }
@@ -130,7 +130,7 @@ export class AutopilotEngine {
         }
 
         const shouldBeRunning = isOn && isPlaying;
-        const isRunning = this.schedulerEventId !== null;
+        const isRunning = this.schedulerIntervalId !== null;
 
         if (shouldBeRunning && !isRunning) {
             this.start();
@@ -140,17 +140,16 @@ export class AutopilotEngine {
     }
 
     public start() {
-        if (this.schedulerEventId !== null || !this.isAutopilotOn || !this.isPlaying) return;
-        this.resetAutopilot();
-        this.schedulerEventId = Tone.Transport.scheduleRepeat(this.scheduler, SCHEDULE_INTERVAL_S);
-        // Prime the scheduler to run immediately
+        if (this.schedulerIntervalId !== null || !this.isAutopilotOn || !this.isPlaying) return;
+        this.resetAutopilot(true); // Soft reset before starting
+        this.schedulerIntervalId = setInterval(this.scheduler, SCHEDULE_INTERVAL_MS);
         this.scheduler();
     }
 
     public stop() {
-        if (this.schedulerEventId !== null) {
-            Tone.Transport.clear(this.schedulerEventId);
-            this.schedulerEventId = null;
+        if (this.schedulerIntervalId !== null) {
+            clearInterval(this.schedulerIntervalId);
+            this.schedulerIntervalId = null;
         }
         this.audioEngine.stopAllAutopilotSounds();
         this.noteCache = [];
@@ -159,21 +158,14 @@ export class AutopilotEngine {
         this.postMessageToActiveWorker({ type: 'reset' });
     }
 
-    private resetAutopilot() {
-        this.audioEngine.stopAllAutopilotSounds();
+    private resetAutopilot(isStarting: boolean = false) {
+        if (!isStarting) {
+           this.audioEngine.stopAllAutopilotSounds();
+        }
         this.noteCache = [];
-        this.nextMeasureToGenerate = 0;
+        this.nextMeasureToGenerate = Math.floor(Tone.Transport.position.toString().split(':')[0]);
         this.isGenerating = false;
         this.postMessageToActiveWorker({ type: 'reset' });
-        
-        if (this.schedulerEventId !== null) {
-            Tone.Transport.clear(this.schedulerEventId);
-            this.schedulerEventId = null;
-        }
-        
-        if (this.isAutopilotOn && this.isPlaying) {
-             this.start();
-        }
     }
 
     private syncWorkerState() {

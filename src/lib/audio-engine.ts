@@ -3,7 +3,7 @@ import * as Tone from 'tone';
 import type { Instrument, MusicKey, MusicScale } from '@/app/page';
 import { LatchEngine } from './latch-engine';
 import { DrumMachine } from './drum-machine';
-import { OrbManager } from './orb-manager';
+import type { OrbManager } from './orb-manager';
 import type { NoteEvent } from './autopilot-worker';
 
 
@@ -76,11 +76,13 @@ class Voice {
         
         const releaseTimeMs = new Tone.Time(this.synth.get().envelope.release).toMilliseconds();
         const totalDurationMs = new Tone.Time(dur).toMilliseconds() + releaseTimeMs;
-        const scheduledReleaseTime = (time - Tone.now()) * 1000;
+        
+        // Calculate the time in milliseconds from now until the note is scheduled to start
+        const scheduledStartTimeOffset = (time - Tone.now()) * 1000;
 
         this.releaseTimeoutId = setTimeout(() => {
             this.isBusy = false;
-        }, Math.max(0, scheduledReleaseTime) + totalDurationMs + 100);
+        }, Math.max(0, scheduledStartTimeOffset) + totalDurationMs + 100);
     }
     
     dispose() {
@@ -409,7 +411,7 @@ export class AudioEngine {
             this.stopAllSounds();
             if (Tone.Transport.state !== 'stopped') {
                 Tone.Transport.stop();
-                Tone.Transport.cancel();
+                Tone.Transport.cancel(0);
             };
         }
     }
