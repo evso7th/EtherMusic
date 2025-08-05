@@ -126,8 +126,7 @@ export class AudioEngine {
         if (this.isInitialized) return;
         await Tone.start();
         Tone.Transport.set({ bpm: 90, swing: 0, timeSignature: 4 });
-        Tone.Transport.start(); // START THE METRONOME AND NEVER STOP IT
-
+        
         // Master FX & Channels
         this.fx = {
             reverb: new Tone.Reverb({ decay: 8, wet: 1 }).toDestination(),
@@ -139,8 +138,8 @@ export class AudioEngine {
             latch: new Tone.Channel(-15),
             drums: new Tone.Channel(-9),
             autopilot: new Tone.Channel(-10),
-            accompaniment: new Tone.Channel(-12),
-            autopilotBass: new Tone.Channel(-8),
+            accompaniment: new Tone.Channel(-14),
+            autopilotBass: new Tone.Channel(-9),
             effects: new Tone.Channel(-6),
             ebass: new Tone.Channel(-6),
         };
@@ -334,13 +333,16 @@ export class AudioEngine {
     
     public stopAllSounds() {
         this.voicePools.forEach(pool => pool.forEach(voice => voice.release(0.1)));
+        this.latchEngine.stopAll();
+        if (this.isInitialized) this.drumMachine.setBeatPattern('Off');
+        
+        // Cancel all scheduled events and stop synths
         this.autopilotMelodySynth?.releaseAll();
         this.autopilotAccompanimentSynth?.releaseAll();
         this.autopilotBassSynth?.releaseAll();
         this.effectsSynth?.releaseAll();
+
         this.orbManager?.removeAllOrbs();
-        this.latchEngine.stopAll();
-        if (this.isInitialized) this.drumMachine.stop();
     }
     
     public stopAllAutopilotSounds() {
@@ -425,13 +427,6 @@ export class AudioEngine {
     }
     
     public releaseLatchVoice(voice: Voice) { voice.release(0.5); }
-
-    public stop() {
-        if (this.isInitialized) {
-            this.stopAllSounds();
-            this.drumMachine.stop();
-        }
-    }
     
     private createPresets() {
         this.presets = {
@@ -470,3 +465,5 @@ export class AudioEngine {
         return freqs.reduce((prev, curr) => (Math.abs(curr - targetFreq) < Math.abs(prev - targetFreq) ? curr : prev));
     }
 }
+
+    

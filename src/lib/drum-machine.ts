@@ -33,7 +33,7 @@ export class DrumMachine {
         // Initialize the part but don't start it immediately.
         this.drumPart = new Tone.Part((time, value) => {
              const playNote = (note: string, offset: number) => {
-               if (this.drumSamplers?.has(note)) {
+               if (this.drumSamplers?.has(note) && this.drumSamplers.loaded) {
                     this.drumSamplers.player(note).start(time + offset);
                }
            }
@@ -46,6 +46,7 @@ export class DrumMachine {
 
         this.drumPart.loop = true;
         this.drumPart.loopEnd = '4m';
+        this.drumPart.start(0); // Start immediately, it will be controlled by Tone.Transport
 
         this.isInitialized = true;
     }
@@ -60,11 +61,6 @@ export class DrumMachine {
         this.channel.send('reverb', effects.reverb);
         this.channel.send('delay', effects.delay);
     }
-    
-    public start() {
-        if (!this.isInitialized || !this.drumPart) return;
-        this.drumPart.start(0);
-    }
 
     public setBeatPattern(patternName: string) {
         if (!this.isInitialized || !this.drumPart) return;
@@ -73,7 +69,6 @@ export class DrumMachine {
         this.drumPart.clear();
 
         if (patternName === 'Off') {
-            this.stop();
             return;
         }
         
@@ -96,13 +91,6 @@ export class DrumMachine {
                 }
             });
         }
-    }
-    
-    public stop() {
-        if (!this.isInitialized || !this.drumPart) return;
-        this.drumPart.stop();
-        this.drumPart.clear();
-        this.drumSamplers?.stopAll();
     }
     
     private async loadDrumSamples() {
@@ -274,3 +262,5 @@ const beatPatternsData: { [key: string]: { groove: (string|string[])[][], fills:
         fills: []
     }
 };
+
+    

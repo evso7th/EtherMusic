@@ -57,7 +57,7 @@ export function PlaybackControls({
                     isRecording && 'animate-pulse-primary'
                 )}
                 aria-label={isRecording ? "Stop Recording" : "Record"} 
-                disabled={!isReady}
+                disabled={!isReady || true}
             >
                  <Circle className="w-5 h-5 md:w-6 md:h-6" />
             </Button>
@@ -89,3 +89,4 @@ export function PlaybackControls({
     );
 }
 
+    

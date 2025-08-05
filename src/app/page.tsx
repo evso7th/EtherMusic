@@ -160,7 +160,7 @@ export default function Home() {
 
     const handlePatternChange = useCallback((pattern: (typeof beatPatterns)[number]) => {
         setActivePattern(pattern);
-        audioEngine.current?.drumMachine.setBeatPattern(pattern.name);
+        audioEngine.current?.setBeatPattern(pattern.name);
     }, []);
 
     const handleHarmonyChange = useCallback((key: MusicKey, scale: MusicScale) => {
@@ -199,20 +199,18 @@ export default function Home() {
         const willBePlaying = !isPlaying;
         setIsPlaying(willBePlaying);
         if (willBePlaying) {
-            audioEngine.current.drumMachine.start();
+            Tone.Transport.start();
         } else {
-            audioEngine.current.drumMachine.stop();
+            Tone.Transport.pause();
         }
     }, [isPlaying]);
     
     const handleStop = useCallback(async () => {
         if (!audioEngine.current) return;
         setIsPlaying(false);
-        if (isAutopilotOn) {
-            handleAutopilotToggle(false);
-        }
-        audioEngine.current.stop();
-    }, [isAutopilotOn, handleAutopilotToggle]);
+        Tone.Transport.stop();
+        audioEngine.current.stopAllSounds();
+    }, []);
 
     const handleRecord = useCallback(() => {
         toast({ title: "Recording Unavailable", description: "This feature is temporarily disabled." });
@@ -435,3 +433,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
