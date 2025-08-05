@@ -29,7 +29,6 @@ let isRunning = false;
 let noteIndex = 0; // Simple counter, driven by external ticks
 
 // --- MUSIC DATA: "Чижик-Пыжик" ---
-// Voice 1 (Melody)
 const chizhikMelody: (string | null)[] = [
     'G4', 'G4', 'A4', 'B4', 'B4', 'A4', 'G4', 'F#4',
     'E4', 'E4', 'F#4', 'G4', 'G4', 'F#4', 'E4', 'D4',
@@ -39,7 +38,6 @@ const chizhikMelody: (string | null)[] = [
     'C5', 'G4', 'C5', 'G4', 'C5', 'B4', 'A4', null,
 ];
 
-// Voice 2 (Accompaniment)
 const chizhikAccompaniment: (string | null)[] = [
     'C4', null, 'C4', null, 'G3', null, 'C4', null,
     'C4', null, 'D4', null, 'G3', null, 'G3', null,
@@ -56,7 +54,7 @@ const totalNotesInLoop = chizhikMelody.length;
 function tick(time: number) {
     if (!isRunning) return;
 
-    // --- Play Melody and Accompaniment using the simple index ---
+    // --- Play Melody and Accompaniment (Guitarist) ---
     const loopPosition = noteIndex % totalNotesInLoop;
     
     const melodyNoteName = chizhikMelody[loopPosition];
@@ -83,19 +81,45 @@ function tick(time: number) {
         self.postMessage({ type: 'playNote', note: accompanimentEvent });
     }
 
-    // --- Play Bass Part on the first beat of every measure ---
+    // --- Play Bass Part on specific measures ---
     const ticksPerMeasure = 8; // 8 ticks of '8n' per 4/4 measure
-    const isFirstBeat = (noteIndex % ticksPerMeasure) === 0;
+    const isFirstBeatOfMeasure = (noteIndex % ticksPerMeasure) === 0;
 
-    if (isFirstBeat) {
-        const bassEvent: NoteEvent = {
-            part: 'bass',
-            freq: Tone.Frequency('C2').toFrequency(),
-            dur: '4n',
-            vel: 0.9,
-            time: time,
-        };
-        self.postMessage({ type: 'playNote', note: bassEvent });
+    if (isFirstBeatOfMeasure) {
+        const measureNumber = Math.floor(noteIndex / ticksPerMeasure) + 1;
+
+        if (measureNumber % 5 === 0) {
+            // On the 5th measure, play "boom-boom"
+            const bassNote1: NoteEvent = {
+                part: 'bass',
+                freq: Tone.Frequency('C2').toFrequency(),
+                dur: '8n',
+                vel: 0.9,
+                time: time,
+            };
+            self.postMessage({ type: 'playNote', note: bassNote1 });
+
+            // Schedule the second note right after the first
+            const bassNote2: NoteEvent = {
+                part: 'bass',
+                freq: Tone.Frequency('C2').toFrequency(),
+                dur: '8n',
+                vel: 0.8,
+                time: time + new Tone.Time('8n').toSeconds(),
+            };
+            self.postMessage({ type: 'playNote', note: bassNote2 });
+
+        } else if (measureNumber % 3 === 0) {
+            // On the 3rd measure, play one "boom"
+            const bassNote: NoteEvent = {
+                part: 'bass',
+                freq: Tone.Frequency('C2').toFrequency(),
+                dur: '4n',
+                vel: 0.9,
+                time: time,
+            };
+            self.postMessage({ type: 'playNote', note: bassNote });
+        }
     }
     
     // --- Play random effect sound ---
@@ -110,7 +134,6 @@ function tick(time: number) {
         self.postMessage({ type: 'playNote', note: effectEvent });
     }
 
-    // Increment the master index for the next tick
     noteIndex++;
 }
 
@@ -120,7 +143,7 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
     switch (type) {
         case 'start':
             isRunning = true;
-            noteIndex = 0; // Reset index on start
+            noteIndex = 0;
             break;
         case 'stop':
             isRunning = false;
@@ -129,10 +152,8 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             tick(data.time);
             break;
         case 'setTempo':
-            // Tempo is handled by the main thread via the tick rate.
             break;
         case 'setHarmony':
-            // Not used for fixed melody, but kept for future features.
             break;
     }
 };
