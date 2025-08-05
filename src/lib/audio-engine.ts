@@ -158,7 +158,7 @@ export class AudioEngine {
 
         this.autopilotMelodySynth = new Tone.Synth(this.presets.synth.options).connect(this.channels.autopilot);
         this.autopilotAccompanimentSynth = new Tone.Synth(this.presets.synth.options).connect(this.channels.accompaniment);
-        this.autopilotBassSynth = new Tone.FMSynth(this.presets.autopilot_bass.options).connect(this.channels.autopilotBass);
+        this.autopilotBassSynth = new Tone.FMSynth(this.presets.ebass.options).connect(this.channels.autopilotBass);
         this.effectsSynth = new Tone.FMSynth(this.presets.autopilot_effect_star.options).connect(this.channels.effects);
         
         this.isInitialized = true;
