@@ -300,11 +300,13 @@ export class AudioEngine {
 
     public playWorkerNote(note: NoteEvent) {
         if (!this.isInitialized) return;
-
-        if (note.part === 'melody' && this.autopilotSynth) {
-            this.autopilotSynth.triggerAttackRelease(note.freq, note.dur, note.time, note.vel);
-        } else if (note.part === 'effects' && this.effectsSynth) {
-            this.effectsSynth.triggerAttackRelease(note.freq, note.dur, note.time, note.vel);
+    
+        // Use the main autopilot synth for both melody and accompaniment for now.
+        // Use the effects synth for effects.
+        const synthToUse = note.part === 'effects' ? this.effectsSynth : this.autopilotSynth;
+    
+        if (synthToUse) {
+            synthToUse.triggerAttackRelease(note.freq, note.dur, note.time, note.vel);
         }
     }
     

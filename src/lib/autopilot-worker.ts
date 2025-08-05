@@ -1,10 +1,11 @@
 
 import * as Tone from 'tone';
-import type { MusicKey, MusicScale, AutopilotStyle } from '@/app/page';
+import type { MusicKey, MusicScale } from '@/app/page';
 import type { Unit } from 'tone/build/esm/core/type/Units';
 
 // --- TYPE DEFINITIONS ---
-export type AutopilotPart = 'melody' | 'effects'; // Added 'effects'
+// We now define parts for a more complex arrangement.
+export type AutopilotPart = 'melody' | 'accompaniment' | 'bass' | 'effects';
 
 export type NoteEvent = {
     part: AutopilotPart;
@@ -27,53 +28,66 @@ export type WorkerResponse =
 // --- WORKER STATE ---
 let isRunning = false;
 let noteIndex = 0;
-let scaleFrequencies: number[] = [];
 let currentBpm: number = 90;
 
-// --- MUSIC THEORY & UTILITIES ---
-function updateScaleNotes(key: MusicKey, scale: MusicScale) {
-    const scaleIntervals: { [key in MusicScale]: string[] } = {
-        'Major': ['0', '2', '4', '5', '7', '9', '11'],
-        'Minor': ['0', '2', '3', '5', '7', '8', '10'],
-        'Major Pentatonic': ['0', '2', '4', '7', '9'],
-        'Minor Pentatonic': ['0', '3', '5', '7', '10'],
-    };
-    const intervals = scaleIntervals[scale];
-    const notesInOctave4 = intervals.map(interval => Tone.Frequency(key + '4').transpose(parseInt(interval)).toFrequency());
-    const notesInOctave5 = intervals.map(interval => Tone.Frequency(key + '5').transpose(parseInt(interval)).toFrequency());
-    scaleFrequencies = [...notesInOctave4, ...notesInOctave5].sort((a,b) => a-b);
-}
+// --- MUSIC DATA: "Чижик-Пыжик" ---
+// Voice 1 (Melody)
+const chizhikMelody: (string | null)[] = [
+    'G4', 'G4', 'A4', 'B4', 'B4', 'A4', 'G4', 'F#4',
+    'E4', 'E4', 'F#4', 'G4', 'G4', 'F#4', 'E4', 'D4',
+    'G4', 'G4', 'A4', 'B4', 'B4', 'A4', 'G4', 'F#4',
+    'E4', 'E4', 'F#4', 'G4', 'G4', 'F#4', 'E4', 'D4',
+    'G4', 'D4', 'G4', 'D4', 'G4', 'A4', 'B4', null,
+    'C5', 'G4', 'C5', 'G4', 'C5', 'B4', 'A4', null,
+];
+
+// Voice 2 (Accompaniment)
+const chizhikAccompaniment: (string | null)[] = [
+    'C4', null, 'C4', null, 'G3', null, 'C4', null,
+    'C4', null, 'D4', null, 'G3', null, 'G3', null,
+    'C4', null, 'C4', null, 'G3', null, 'C4', null,
+    'C4', null, 'D4', null, 'G3', null, 'G3', null,
+    'B3', null, 'C4', null, 'D4', 'E4', 'G4', null,
+    'A4', null, 'B4', null, 'A4', 'G4', 'F#4', null,
+];
+
+const noteDuration = '8n'; // Each note is an eighth note
 
 // --- CORE LOGIC ---
 function tick(time: number) {
-    if (!isRunning || scaleFrequencies.length === 0) return;
+    if (!isRunning) return;
 
-    // With a small probability, generate an effect instead of a melody note
-    if (Math.random() < 0.1) {
-        const effectFreq = 1000 + Math.random() * 2000; // High-pitched "star"
-        const effectEvent: NoteEvent = {
-            part: 'effects',
-            freq: effectFreq,
-            dur: '1n',
-            vel: Math.random() * 0.1 + 0.1,
-            time: time,
-        };
-        self.postMessage({ type: 'playNote', note: effectEvent });
-    } else {
-        const noteToPlayFreq = scaleFrequencies[noteIndex % scaleFrequencies.length];
-        
-        const noteEvent: NoteEvent = {
+    // Determine the current position in the melody loop
+    const melody_idx = noteIndex % chizhikMelody.length;
+
+    // --- Play Melody ---
+    const melodyNoteName = chizhikMelody[melody_idx];
+    if (melodyNoteName) {
+        const melodyEvent: NoteEvent = {
             part: 'melody',
-            freq: noteToPlayFreq,
-            dur: '8n',
-            vel: Math.random() * 0.3 + 0.5,
+            freq: Tone.Frequency(melodyNoteName).toFrequency(),
+            dur: noteDuration,
+            vel: 0.7, // Melody is slightly louder
             time: time,
         };
-        
-        self.postMessage({ type: 'playNote', note: noteEvent });
-        
-        noteIndex++;
+        self.postMessage({ type: 'playNote', note: melodyEvent });
     }
+
+    // --- Play Accompaniment ---
+    const accompanimentNoteName = chizhikAccompaniment[melody_idx];
+    if (accompanimentNoteName) {
+        const accompanimentEvent: NoteEvent = {
+            part: 'accompaniment',
+            freq: Tone.Frequency(accompanimentNoteName).toFrequency(),
+            dur: noteDuration,
+            vel: 0.5, // Accompaniment is quieter
+            time: time,
+        };
+        self.postMessage({ type: 'playNote', note: accompanimentEvent });
+    }
+    
+    // Move to the next note index
+    noteIndex++;
 }
 
 // --- MESSAGE HANDLER ---
@@ -82,7 +96,7 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
     switch (type) {
         case 'start':
             isRunning = true;
-            noteIndex = 0;
+            noteIndex = 0; // Reset melody on start
             break;
         case 'stop':
             isRunning = false;
@@ -90,18 +104,14 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
         case 'tick':
             tick(data.time);
             break;
-        case 'setHarmony':
-             if ('key' in data && 'scale' in data) {
-                updateScaleNotes(data.key as MusicKey, data.scale as MusicScale);
-            }
-            break;
         case 'setTempo':
             if ('bpm' in data) {
                 currentBpm = data.bpm as number;
+                // We can use this in the future to adjust note durations, etc.
             }
+            break;
+        case 'setHarmony':
+            // This is not used for the fixed melody, but is kept for future features.
             break;
     }
 };
-
-// Initial setup
-updateScaleNotes('C', 'Major Pentatonic');
