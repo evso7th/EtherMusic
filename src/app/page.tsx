@@ -115,13 +115,14 @@ export default function Home() {
             autopilotWorker.current = worker;
             
             mainEngine.setTempo(tempos[2].bpm);
-            mainEngine.setVolumes({ melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, effects: -6, ebass: -6 });
+            mainEngine.setVolumes({ melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, accompaniment: -12, effects: -6, ebass: -6 });
             mainEngine.setEffects({
                 melody: { reverb: -Infinity, delay: -60 },
                 manualBass: { reverb: -Infinity, delay: -60 },
                 latch: { reverb: -Infinity, delay: -60 },
                 drums: { reverb: -Infinity, delay: -60 },
                 autopilot: { reverb: -Infinity, delay: -60 },
+                accompaniment: { reverb: -Infinity, delay: -60 },
                 effects: { reverb: -6, delay: -6 },
                 ebass: { reverb: -Infinity, delay: -60 }
             });
@@ -268,13 +269,14 @@ export default function Home() {
         }
     }, []);
 
-    const initialVolumes = useRef({ melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, effects: -6, ebass: -6 });
+    const initialVolumes = useRef({ melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, accompaniment: -12, effects: -6, ebass: -6 });
     const initialEffects = useRef({
         melody: { reverb: -Infinity, delay: -60 },
         manualBass: { reverb: -Infinity, delay: -60 },
         latch: { reverb: -Infinity, delay: -60 },
         drums: { reverb: -Infinity, delay: -60 },
         autopilot: { reverb: -Infinity, delay: -60 },
+        accompaniment: { reverb: -Infinity, delay: -60 },
         effects: { reverb: -6, delay: -6 },
         ebass: { reverb: -Infinity, delay: -60 }
     });

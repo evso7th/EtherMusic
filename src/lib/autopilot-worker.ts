@@ -85,6 +85,18 @@ function tick(time: number) {
         };
         self.postMessage({ type: 'playNote', note: accompanimentEvent });
     }
+
+    // --- Play random effect sound
+    if (Math.random() < 0.05) { // 5% chance on each tick
+        const effectEvent: NoteEvent = {
+            part: 'effects',
+            freq: 1000 + Math.random() * 2000, // High-pitched "sparkle"
+            dur: '4n',
+            vel: 0.1 + Math.random() * 0.2, // Random, quiet velocity
+            time: time
+        };
+        self.postMessage({ type: 'playNote', note: effectEvent });
+    }
     
     // Move to the next note index
     noteIndex++;

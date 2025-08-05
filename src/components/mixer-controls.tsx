@@ -3,7 +3,7 @@
 
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
-import { Music, Waves, Drum, Bot, Anchor, Sparkles } from 'lucide-react';
+import { Music, Waves, Drum, Bot, Anchor, Sparkles, GitCompareArrows } from 'lucide-react';
 import { Separator } from './ui/separator';
 import { useState, useCallback } from 'react';
 import { Button } from "./ui/button";
@@ -18,6 +18,7 @@ type Volumes = {
     latch: number; 
     drums: number; 
     autopilot: number;
+    accompaniment: number;
     effects: number;
     ebass: number;
 };
@@ -28,6 +29,7 @@ type Effects = {
     latch: { reverb: number, delay: number };
     drums: { reverb: number, delay: number };
     autopilot: { reverb: number, delay: number };
+    accompaniment: { reverb: number, delay: number };
     effects: { reverb: number, delay: number };
     ebass: { reverb: number, delay: number };
 };
@@ -199,7 +201,7 @@ export function AutopilotMixerControls({ initialVolumes, onVolumeChange, initial
     return (
         <div className="p-1 space-y-4">
             <InstrumentControls 
-                label="Autopilot"
+                label="Autopilot Melody"
                 icon={Bot}
                 volume={volumes.autopilot}
                 reverb={effects.autopilot.reverb}
@@ -207,6 +209,16 @@ export function AutopilotMixerControls({ initialVolumes, onVolumeChange, initial
                 onVolumeChange={(v) => handleVolumeChange('autopilot', v)}
                 onReverbChange={(v) => handleEffectChange('autopilot', 'reverb', v)}
                 onDelayChange={(v) => handleEffectChange('autopilot', 'delay', v)}
+            />
+            <InstrumentControls 
+                label="Autopilot Accompaniment"
+                icon={GitCompareArrows}
+                volume={volumes.accompaniment}
+                reverb={effects.accompaniment.reverb}
+                delay={effects.accompaniment.delay}
+                onVolumeChange={(v) => handleVolumeChange('accompaniment', v)}
+                onReverbChange={(v) => handleEffectChange('accompaniment', 'reverb', v)}
+                onDelayChange={(v) => handleEffectChange('accompaniment', 'delay', v)}
             />
             <InstrumentControls 
                 label="Effects"

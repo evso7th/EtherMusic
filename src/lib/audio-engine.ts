@@ -113,7 +113,8 @@ export class AudioEngine {
         autopilot: 'synth'
     };
     
-    private autopilotSynth: Tone.Synth | null = null;
+    private autopilotMelodySynth: Tone.Synth | null = null;
+    private autopilotAccompanimentSynth: Tone.Synth | null = null;
     private effectsSynth: Tone.FMSynth | null = null;
 
     constructor() {
@@ -137,6 +138,7 @@ export class AudioEngine {
             latch: new Tone.Channel(-15),
             drums: new Tone.Channel(-9),
             autopilot: new Tone.Channel(-10),
+            accompaniment: new Tone.Channel(-12),
             effects: new Tone.Channel(-6),
             ebass: new Tone.Channel(-6),
         };
@@ -152,7 +154,8 @@ export class AudioEngine {
         this.drumMachine = new DrumMachine(this.channels.drums);
         await this.drumMachine.initialize();
 
-        this.autopilotSynth = new Tone.Synth(this.presets.synth.options).connect(this.channels.autopilot);
+        this.autopilotMelodySynth = new Tone.Synth(this.presets.synth.options).connect(this.channels.autopilot);
+        this.autopilotAccompanimentSynth = new Tone.Synth(this.presets.synth.options).connect(this.channels.accompaniment);
         this.effectsSynth = new Tone.FMSynth(this.presets.autopilot_effect_star.options).connect(this.channels.effects);
         
         this.isInitialized = true;
@@ -180,7 +183,7 @@ export class AudioEngine {
             bass: this.channels.manualBass,
             latch: this.channels.latch,
             autopilot_melody: this.channels.autopilot, 
-            autopilot_accompaniment: this.channels.autopilot,
+            autopilot_accompaniment: this.channels.accompaniment,
             autopilot_bass: this.channels.autopilot,
             autopilot_effects: this.channels.effects
         };
@@ -227,11 +230,12 @@ export class AudioEngine {
         if ((part === 'bass' || part === 'latch') && instrumentName === 'ebass') {
             return this.channels.ebass;
         }
-        const partToChannelMap: Record<InstrumentPart, Tone.Channel> = {
+        const partToChannelMap: Record<string, Tone.Channel> = {
             melody: this.channels.melody, bass: this.channels.manualBass, latch: this.channels.latch,
-            autopilot_melody: this.channels.autopilot, autopilot_accompaniment: this.channels.autopilot,
+            autopilot_melody: this.channels.autopilot, autopilot_accompaniment: this.channels.accompaniment,
             autopilot_bass: this.channels.autopilot, autopilot_effects: this.channels.effects
         };
+        // @ts-ignore
         return partToChannelMap[part];
     }
     
@@ -301,9 +305,21 @@ export class AudioEngine {
     public playWorkerNote(note: NoteEvent) {
         if (!this.isInitialized) return;
     
-        // Use the main autopilot synth for both melody and accompaniment for now.
-        // Use the effects synth for effects.
-        const synthToUse = note.part === 'effects' ? this.effectsSynth : this.autopilotSynth;
+        let synthToUse: Tone.Synth | Tone.FMSynth | null = null;
+
+        switch(note.part) {
+            case 'melody':
+                synthToUse = this.autopilotMelodySynth;
+                break;
+            case 'accompaniment':
+                synthToUse = this.autopilotAccompanimentSynth;
+                break;
+            case 'effects':
+                synthToUse = this.effectsSynth;
+                break;
+            default:
+                break;
+        }
     
         if (synthToUse) {
             synthToUse.triggerAttackRelease(note.freq, note.dur, note.time, note.vel);
@@ -312,7 +328,8 @@ export class AudioEngine {
     
     public stopAllSounds() {
         this.voicePools.forEach(pool => pool.forEach(voice => voice.release(0.1)));
-        this.autopilotSynth?.releaseAll();
+        this.autopilotMelodySynth?.releaseAll();
+        this.autopilotAccompanimentSynth?.releaseAll();
         this.effectsSynth?.releaseAll();
         this.orbManager?.removeAllOrbs();
         this.latchEngine.stopAll();
@@ -320,7 +337,8 @@ export class AudioEngine {
     }
     
     public stopAllAutopilotSounds() {
-        this.autopilotSynth?.releaseAll();
+        this.autopilotMelodySynth?.releaseAll();
+        this.autopilotAccompanimentSynth?.releaseAll();
         this.effectsSynth?.releaseAll();
         Tone.Transport.cancel();
     }
@@ -334,6 +352,7 @@ export class AudioEngine {
         this.channels.latch.volume.value = volumes.latch;
         this.channels.drums.volume.value = volumes.drums;
         this.channels.autopilot.volume.value = volumes.autopilot;
+        this.channels.accompaniment.volume.value = volumes.accompaniment;
         this.channels.effects.volume.value = volumes.effects;
         this.channels.ebass.volume.value = volumes.ebass;
     }
@@ -364,11 +383,12 @@ export class AudioEngine {
     }
 
     public setAutopilotInstrument(instrument: Instrument) {
-        if(!this.isInitialized || !this.autopilotSynth) return;
+        if(!this.isInitialized) return;
         this.currentInstruments.autopilot = instrument;
         const preset = this.presets[instrument];
         if (preset) {
-            this.autopilotSynth.set(preset.options);
+            this.autopilotMelodySynth?.set(preset.options);
+            this.autopilotAccompanimentSynth?.set(preset.options);
         }
     }
 
