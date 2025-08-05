@@ -83,29 +83,18 @@ function tick(time: number) {
         self.postMessage({ type: 'playNote', note: accompanimentEvent });
     }
 
-    // --- Play Bass Part using the same simple index ---
-    // The pattern is 4 beats long, and we tick every 8th note, so a full pattern is 8 ticks.
+    // --- Play Bass Part on every other strong beat ---
+    // The pattern is 4 beats long, and we tick every 8th note, so a full measure is 8 ticks.
     const beatInMeasure = noteIndex % 8;
     const bassNoteName = 'C2';
     
-    // First 3 quarter notes (ticks 0, 2, 4)
-    if (beatInMeasure === 0 || beatInMeasure === 2 || beatInMeasure === 4) {
+    // Play on the 1st beat (tick 0) and 3rd beat (tick 4)
+    if (beatInMeasure === 0 || beatInMeasure === 4) {
         const bassEvent: NoteEvent = {
             part: 'bass',
             freq: Tone.Frequency(bassNoteName).toFrequency(),
-            dur: '4n',
+            dur: '4n', // Play a quarter note
             vel: 0.9,
-            time: time,
-        };
-        self.postMessage({ type: 'playNote', note: bassEvent });
-    }
-    // Two 8th notes on the 4th beat (ticks 6, 7)
-    if (beatInMeasure === 6 || beatInMeasure === 7) {
-        const bassEvent: NoteEvent = {
-            part: 'bass',
-            freq: Tone.Frequency(bassNoteName).toFrequency(),
-            dur: '8n',
-            vel: beatInMeasure === 6 ? 0.9 : 0.8,
             time: time,
         };
         self.postMessage({ type: 'playNote', note: bassEvent });
