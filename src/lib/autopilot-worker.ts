@@ -67,7 +67,7 @@ let state = {
     ambient: {
         chordProgression: [0, 4, 5, 3], // I-V-vi-IV in 0-based scale degrees
         currentChordDegree: 0,
-        lastChordChangeTick: 0,
+        lastChordChangeTick: -Infinity, // Start immediately
     },
     sequence: {
         bassNoteIndex: 0,
@@ -108,9 +108,11 @@ function tickAmbient(time: number) {
         
         // Play Bass
         const bassFreq = state.scaleFrequencies.bass[rootDegree % state.scaleFrequencies.bass.length];
+        // Use Tone.Transport.now() to ensure the event is scheduled in the future relative to the transport's clock
+        const scheduledTime = Tone.Transport.now() + 0.2; 
         const bassEvent: NoteEvent = {
             part: 'bass', freq: bassFreq,
-            dur: '2m', vel: 0.6, time
+            dur: '2m', vel: 0.6, time: scheduledTime
         };
         self.postMessage({ type: 'playNote', note: bassEvent });
 
@@ -120,7 +122,7 @@ function tickAmbient(time: number) {
             const noteFreq = scale[degree % scale.length];
             const event: NoteEvent = {
                 part: 'accompaniment', freq: noteFreq,
-                dur: '1m', vel: 0.2 + (index * 0.05), time
+                dur: '1m', vel: 0.2 + (index * 0.05), time: scheduledTime + 0.05 // slightly offset from bass
             };
             self.postMessage({ type: 'playNote', note: event });
         });
@@ -130,9 +132,9 @@ function tickAmbient(time: number) {
     if (state.tick16n % 8 === 0) { // Check every half note
         if (Math.random() < 0.25) { // 25% chance to play
             const melodyFreq = state.scaleFrequencies.melody[Math.floor(Math.random() * state.scaleFrequencies.melody.length)];
-             const event: NoteEvent = {
+            const event: NoteEvent = {
                 part: 'melody', freq: melodyFreq,
-                dur: '8n', vel: 0.7, time
+                dur: '8n', vel: 0.7, time: Tone.now() + 0.1
             };
             self.postMessage({ type: 'playNote', note: event });
         }
@@ -143,7 +145,7 @@ function tickAmbient(time: number) {
         const effectFreq = 440 + (Math.random() * 2000);
         const event: NoteEvent = {
             part: 'effects', freq: effectFreq,
-            dur: '2n', vel: 0.5, time
+            dur: '2n', vel: 0.5, time: Tone.now() + 0.1
         };
         self.postMessage({ type: 'playNote', note: event });
     }
@@ -153,22 +155,22 @@ function tickAmbient(time: number) {
 // --- "SEQUENCE" STYLE (Mike Oldfield inspired) ---
 function tickSequence(time: number) {
     // Bass part (plays every 8 ticks = half note)
-    if (state.tick16n % 8 === 0) {
+    if (state.tick16n % 16 === 0) { // Slower bass
         const bassFreq = state.scaleFrequencies.bass[state.sequence.bassNoteIndex % state.scaleFrequencies.bass.length];
         const event: NoteEvent = {
             part: 'bass', freq: bassFreq,
-            dur: '2n', vel: 0.8, time
+            dur: '1n', vel: 0.8, time
         };
         self.postMessage({ type: 'playNote', note: event });
         state.sequence.bassNoteIndex++;
     }
 
     // Accompaniment (plays every 4 ticks = quarter note arpeggio)
-    if (state.tick16n % 4 === 0) {
+    if (state.tick16n % 8 === 0) { // Slower accompaniment
         const accompFreq = state.scaleFrequencies.accompaniment[state.sequence.accompanimentIndex % state.scaleFrequencies.accompaniment.length];
         const event: NoteEvent = {
             part: 'accompaniment', freq: accompFreq,
-            dur: '8n', vel: 0.4, time
+            dur: '4n', vel: 0.4, time
         };
         self.postMessage({ type: 'playNote', note: event });
         state.sequence.accompanimentIndex++;
@@ -204,14 +206,14 @@ function tickSequence(time: number) {
         const melodyFreq = state.scaleFrequencies.melody[nextNoteIndex];
         const event: NoteEvent = {
             part: 'melody', freq: melodyFreq,
-            dur: '4n', vel: 0.7, time
+            dur: '2n', vel: 0.7, time // Slower melody
         };
         self.postMessage({ type: 'playNote', note: event });
         
         // Update state
         state.sequence.lastMelodyNoteIndex = nextNoteIndex;
         state.sequence.notesInCurrentPhrase++;
-        state.sequence.nextMelodyTick = state.tick16n + 4; // Next note is a quarter note away
+        state.sequence.nextMelodyTick = state.tick16n + 8; // Next note is a half note away
     }
 }
 
@@ -280,3 +282,5 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
 
 // Initial setup
 updateHarmony(state.currentKey, state.currentScale);
+
+    
