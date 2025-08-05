@@ -92,7 +92,7 @@ class Voice {
 
 export class AudioEngine {
     public isInitialized = false;
-    private orbManager: OrbManager;
+    private orbManager!: OrbManager;
     public drumMachine!: DrumMachine;
     private latchEngine!: LatchEngine;
 
@@ -111,8 +111,8 @@ export class AudioEngine {
         autopilot: 'synth'
     };
 
-    constructor(orbManager: OrbManager) {
-        this.orbManager = orbManager;
+    constructor() {
+        // Orb manager is now initialized after engine is ready in page.tsx
     }
 
     public async initialize() {
@@ -141,13 +141,18 @@ export class AudioEngine {
         this.createPresets();
         this.initializeVoicePools();
         
-        this.latchEngine = new LatchEngine(this, this.orbManager);
+        this.latchEngine = new LatchEngine(this);
         
         this.drumMachine = new DrumMachine(this.channels.drums);
         await this.drumMachine.initialize();
         
         this.isInitialized = true;
         console.log(`AudioEngine initialized with dedicated voice pools.`);
+    }
+
+    public setOrbManager(orbManager: OrbManager) {
+        this.orbManager = orbManager;
+        this.latchEngine.setOrbManager(orbManager);
     }
 
     private initializeVoicePools() {
@@ -264,7 +269,7 @@ export class AudioEngine {
         if (voice) {
             const time = Tone.now();
             voice.attack(quantizedFreq, vol*vol, time, pointerId);
-            this.orbManager.addOrb(pointerId, type, pos.x, pos.y);
+            this.orbManager?.addOrb(pointerId, type, pos.x, pos.y);
         }
     }
 
@@ -275,7 +280,7 @@ export class AudioEngine {
             const quantizedFreq = this.getClosestFrequency(freq, type);
             if (voice.synth.frequency) voice.synth.frequency.value = quantizedFreq;
             if (voice.synth.volume) voice.synth.volume.value = Tone.gainToDb(vol * vol);
-            this.orbManager.updateOrb(pointerId, pos.x, pos.y);
+            this.orbManager?.updateOrb(pointerId, pos.x, pos.y);
         }
     }
 
@@ -284,7 +289,7 @@ export class AudioEngine {
         const voice = this.getVoiceFromPool(type, pointerId);
         if (voice) {
             voice.release();
-            this.orbManager.removeOrb(pointerId);
+            this.orbManager?.removeOrb(pointerId);
         }
     }
 
@@ -304,7 +309,7 @@ export class AudioEngine {
     
     public stopAllSounds() {
         this.voicePools.forEach(pool => pool.forEach(voice => voice.release(0.1)));
-        this.orbManager.removeAllOrbs();
+        this.orbManager?.removeAllOrbs();
         this.latchEngine.stopAll();
         if (this.isInitialized) this.drumMachine.stop();
     }

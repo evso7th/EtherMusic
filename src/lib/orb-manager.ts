@@ -1,8 +1,8 @@
 
-
 "use client";
 
 import { cn } from '@/lib/utils';
+import type { AudioEngine } from './audio-engine';
 
 type OrbType = 'melody' | 'bass' | 'latch';
 
@@ -15,9 +15,11 @@ const ORB_COLORS = {
 export class OrbManager {
     private orbs = new Map<number, { element: HTMLDivElement; type: OrbType }>();
     private padElements: { [key in OrbType]?: HTMLElement | null } = {};
+    private engine: AudioEngine;
 
-    constructor() {
-        // Defer DOM access until methods are called
+    constructor(engine: AudioEngine) {
+        this.engine = engine;
+        this.engine.setOrbManager(this);
     }
 
     private getPadElement(type: OrbType): HTMLElement | null {

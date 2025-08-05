@@ -105,12 +105,11 @@ export default function Home() {
     const initializeAudio = useCallback(async () => {
         if (isReady || audioEngine.current) return;
         
-        orbManager.current = new OrbManager();
-
         try {
-            const mainEngine = new AudioEngine(orbManager.current);
+            const mainEngine = new AudioEngine();
             await mainEngine.initialize();
             audioEngine.current = mainEngine;
+            orbManager.current = new OrbManager(mainEngine);
             
             const apEngine = new AutopilotEngine(mainEngine);
             autopilotEngine.current = apEngine; 

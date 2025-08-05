@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import type { AudioEngine } from './audio-engine';
@@ -20,12 +19,15 @@ type LatchedBassNote = {
 export class LatchEngine {
     private isLatchOn = false;
     private audioEngine: AudioEngine;
-    private orbManager: OrbManager | null;
+    private orbManager: OrbManager | null = null;
     private latchedNotes = new Map<number, LatchedBassNote>();
     private allowedFrequencies: number[] = [];
 
-    constructor(audioEngine: AudioEngine, orbManager: OrbManager | null) {
+    constructor(audioEngine: AudioEngine) {
         this.audioEngine = audioEngine;
+    }
+
+    public setOrbManager(orbManager: OrbManager | null) {
         this.orbManager = orbManager;
     }
     

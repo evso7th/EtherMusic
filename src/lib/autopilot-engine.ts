@@ -82,7 +82,7 @@ export class AutopilotEngine {
             this.activeWorker.onmessage = null;
             this.activeWorker.terminate();
         }
-        const workerPath = `/assets/workers/ambient.worker.js`;
+        const workerPath = `/assets/workers/autopilot.worker.js`;
         try {
             this.activeWorker = new Worker(workerPath, { type: 'module' });
             this.activeWorker.onmessage = this.handleWorkerMessage;
@@ -143,6 +143,8 @@ export class AutopilotEngine {
         if (this.schedulerEventId !== null || !this.isAutopilotOn || !this.isPlaying) return;
         this.resetAutopilot();
         this.schedulerEventId = Tone.Transport.scheduleRepeat(this.scheduler, SCHEDULE_INTERVAL_S);
+        // Prime the scheduler to run immediately
+        this.scheduler();
     }
 
     public stop() {
@@ -176,9 +178,13 @@ export class AutopilotEngine {
 
     private syncWorkerState() {
         if (!this.activeWorker) return;
-        this.setHarmony(this.lastKnownState.key, this.lastKnownState.scale);
-        this.setAutopilotParts(this.lastKnownState.parts);
-        this.setStyle(this.currentStyle);
+        this.postMessageToActiveWorker({ 
+            type: 'setHarmony', 
+            key: this.lastKnownState.key, 
+            scale: this.lastKnownState.scale,
+        });
+        this.postMessageToActiveWorker({ type: 'setParts', parts: this.lastKnownState.parts });
+        this.postMessageToActiveWorker({ type: 'setStyle', style: this.currentStyle });
     }
 
     public dispose() {
