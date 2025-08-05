@@ -108,11 +108,10 @@ function updateHarmony(key: MusicKey, scale: MusicScale) {
 // --- "AMBIENT" STYLE ---
 function tickAmbient(time: number) {
     const ticksPerMeasure = 16;
-    const ticksForChordChange = ticksPerMeasure * 4; // Every 4 measures
+    const ticksForChordChange = ticksPerMeasure * 2; // Chord changes every 2 measures for more movement
 
     // --- BASS (Drone) & ACCOMPANIMENT (Pads) ---
-    if (state.tick16n >= state.ambient.lastChordChangeTick + ticksForChordChange) {
-        state.ambient.lastChordChangeTick = state.tick16n;
+    if (state.tick16n % ticksForChordChange === 0) {
         state.ambient.currentChordDegree = (state.ambient.currentChordDegree + 1) % state.ambient.chordProgression.length;
         const scaleRootDegree = state.ambient.chordProgression[state.ambient.currentChordDegree];
 
@@ -120,7 +119,7 @@ function tickAmbient(time: number) {
         const bassFreq = state.scaleFrequencies.bass[scaleRootDegree % state.scaleFrequencies.bass.length];
         if (bassFreq) {
             self.postMessage({ type: 'playNote', note: {
-                part: 'bass', freq: bassFreq, dur: '2m', vel: 0.6, time: time
+                part: 'bass', freq: bassFreq, dur: '2m', vel: 0.6, time
             }});
         }
 
@@ -137,14 +136,19 @@ function tickAmbient(time: number) {
     }
 
     // --- MELODY ---
+    // Play a new note every measure
     if (state.tick16n % ticksPerMeasure === 0) {
         let nextMelodyDegree;
         if (state.ambient.lastMelodyDegree === null) {
-            nextMelodyDegree = Math.floor(state.scaleFrequencies.melody.length / 2);
+            nextMelodyDegree = Math.floor(Math.random() * state.scaleFrequencies.melody.length);
         } else {
+            // Stepwise motion
             const direction = Math.random() > 0.5 ? 1 : -1;
             nextMelodyDegree = state.ambient.lastMelodyDegree + direction;
-            nextMelodyDegree = Math.max(0, Math.min(state.scaleFrequencies.melody.length - 1, nextMelodyDegree));
+            // Boundary check
+            if (nextMelodyDegree < 0 || nextMelodyDegree >= state.scaleFrequencies.melody.length) {
+                nextMelodyDegree = state.ambient.lastMelodyDegree - direction; // Go the other way
+            }
         }
 
         const melodyFreq = state.scaleFrequencies.melody[nextMelodyDegree];
@@ -152,7 +156,7 @@ function tickAmbient(time: number) {
             const noteEvent: NoteEvent = {
                 part: 'melody',
                 freq: melodyFreq,
-                dur: '1m', // Note lasts for one measure
+                dur: '1m',
                 vel: 0.7,
                 time: time,
             };
