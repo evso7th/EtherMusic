@@ -213,7 +213,7 @@ export function AutopilotMixerControls({ initialVolumes, onVolumeChange, initial
                 onDelayChange={(v) => handleEffectChange('autopilot', 'delay', v)}
             />
             <InstrumentControls 
-                label="Autopilot Accompaniment"
+                label="Accompaniment"
                 icon={GitCompareArrows}
                 volume={volumes.accompaniment}
                 reverb={effects.accompaniment.reverb}
@@ -245,3 +245,5 @@ export function AutopilotMixerControls({ initialVolumes, onVolumeChange, initial
         </div>
     )
 }
+
+    
