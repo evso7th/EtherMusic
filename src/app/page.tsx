@@ -134,6 +134,7 @@ export default function Home() {
             mainEngine.setHarmony('C', 'Major Pentatonic');
             mainEngine.setBeatPattern('Off');
             
+            // Send initial settings to the worker ONCE.
             worker.postMessage({ type: 'setHarmony', key: 'C', scale: 'Major Pentatonic' });
             worker.postMessage({ type: 'setTempo', bpm: tempos[2].bpm });
             
@@ -259,17 +260,6 @@ export default function Home() {
             initializeAudio();
         }
     }, [isAppStarted, isReady, initializeAudio]);
-
-    // Effect to start/stop autopilot with master play/pause
-    useEffect(() => {
-        if (isReady && isAutopilotOn) {
-            if (isPlaying) {
-                autopilotWorker.current?.postMessage({ type: 'start' });
-            } else {
-                autopilotWorker.current?.postMessage({ type: 'stop' });
-            }
-        }
-    }, [isPlaying, isAutopilotOn, isReady]);
 
     const handleStartScreenInteraction = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
         if ((e.target as HTMLElement).closest('button')) return;
