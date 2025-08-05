@@ -317,8 +317,8 @@ export class AudioEngine {
         const scale = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5'];
         
         this.testSequence = new Tone.Sequence((time, note) => {
-             this.testSynth?.triggerAttackRelease(note, "8n", time, 0.8);
-        }, scale, "8n").start(0);
+             this.testSynth?.triggerAttackRelease(note, "8n", time);
+        }, scale, "8n.").start(0);
 
         this.testSequence.loop = true;
         
@@ -497,5 +497,3 @@ export class AudioEngine {
         return freqs.reduce((prev, curr) => (Math.abs(curr - targetFreq) < Math.abs(prev - targetFreq) ? curr : prev));
     }
 }
-
-    
