@@ -14,6 +14,8 @@ import { HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import React from "react";
 import { guideContent } from "./help-guide-content";
+import { marked } from 'marked';
+import { useMemo } from 'react';
 
 
 interface HelpGuideProps extends ButtonProps {
@@ -23,15 +25,17 @@ interface HelpGuideProps extends ButtonProps {
 
 export const HelpGuide = ({ buttonVariant = "outline", buttonClassName, showText = true, size, ...props }: HelpGuideProps) => {
     
-    // The content is now pre-rendered or will be handled differently.
-    // For now, we'll just display it raw to show the structure.
-    // In a real scenario, we would use a library that processes markdown at build time.
-    const content = (
-        <div 
-            className="prose prose-invert p-4" 
-            dangerouslySetInnerHTML={{ __html: guideContent.replace(/\n/g, '<br />') }} // Simple conversion for display
-        />
-    );
+    const content = useMemo(() => {
+        // Parse the markdown content into an HTML string ONCE.
+        const htmlContent = marked.parse(guideContent);
+        return (
+            <div 
+                className="prose prose-invert p-4" 
+                dangerouslySetInnerHTML={{ __html: htmlContent }}
+            />
+        );
+    }, []); // Empty dependency array ensures this runs only once.
+
 
     return (
         <Dialog>
