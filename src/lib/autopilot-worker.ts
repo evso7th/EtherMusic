@@ -66,7 +66,7 @@ let state = {
     instruments: {
         melody: 'synth' as Instrument,
         accompaniment: 'synth' as Instrument,
-        bass: 'ebass' as Instrument,
+        bass: 'synth' as Instrument,
         effects: 'autopilot_effect_star' as Instrument
     },
     scaleFrequencies: {
@@ -110,27 +110,33 @@ function tickAmbient(time: number) {
     const ticksForChordChange = ticksPerMeasure * 2; // Change chord every 2 measures
 
     // --- BASS (Drone) & ACCOMPANIMENT (Pads) ---
-    if (state.tick16n % ticksForChordChange === 0) {
+    // Check if it's time to change the chord
+    if (state.tick16n >= state.ambient.lastChordChangeTick + ticksForChordChange) {
+        state.ambient.lastChordChangeTick = state.tick16n;
         state.ambient.currentChordDegree = (state.ambient.currentChordDegree + 1) % state.ambient.chordProgression.length;
         const scaleRootDegree = state.ambient.chordProgression[state.ambient.currentChordDegree];
 
         // Play Bass Drone
         const bassFreq = state.scaleFrequencies.bass[scaleRootDegree % state.scaleFrequencies.bass.length];
-        const bassEvent: NoteEvent = {
-            part: 'bass', freq: bassFreq,
-            dur: '2m', vel: 0.5, time: Tone.now()
-        };
-        self.postMessage({ type: 'playNote', note: bassEvent });
+        if (bassFreq) {
+            const bassEvent: NoteEvent = {
+                part: 'bass', freq: bassFreq,
+                dur: '2m', vel: 0.5, time: time
+            };
+            self.postMessage({ type: 'playNote', note: bassEvent });
+        }
 
         // Play Accompaniment Chord (Pad) - 3 notes
         const chordDegrees = [scaleRootDegree, scaleRootDegree + 2, scaleRootDegree + 4];
         chordDegrees.forEach((degree, index) => {
             const noteFreq = state.scaleFrequencies.accompaniment[degree % state.scaleFrequencies.accompaniment.length];
-            const event: NoteEvent = {
-                part: 'accompaniment', freq: noteFreq,
-                dur: '1m', vel: 0.2 + (Math.random() * 0.1), time: Tone.now() + (index * 0.1) // Stagger start times slightly
-            };
-            self.postMessage({ type: 'playNote', note: event });
+            if (noteFreq) {
+                const event: NoteEvent = {
+                    part: 'accompaniment', freq: noteFreq,
+                    dur: '1m', vel: 0.2 + (Math.random() * 0.1), time: time + (index * 0.1) // Stagger start times slightly
+                };
+                self.postMessage({ type: 'playNote', note: event });
+            }
         });
     }
 
@@ -138,24 +144,23 @@ function tickAmbient(time: number) {
     const ticksForMelodyChange = ticksPerMeasure * 4; // New melody note every 4 measures
     if (state.tick16n % ticksForMelodyChange === 0) {
         state.ambient.activeMelodyNoteId = Date.now() + Math.random();
+        
         const startDegree = Math.floor(Math.random() * state.scaleFrequencies.melody.length);
         const startFreq = state.scaleFrequencies.melody[startDegree];
         
-        // Find a target frequency that is different
         let endDegree = startDegree;
         while(endDegree === startDegree) {
             endDegree = Math.floor(Math.random() * state.scaleFrequencies.melody.length);
         }
         const endFreq = state.scaleFrequencies.melody[endDegree];
         
-        const melodyDuration = Tone.Time('4m').toSeconds();
-        const scheduledTime = Tone.now() + 0.1;
+        const melodyDuration = '4m';
 
         // Start the note
         const startEvent: NoteEvent = {
             id: state.ambient.activeMelodyNoteId,
             part: 'melody', freq: startFreq,
-            dur: melodyDuration, vel: 0.6, time: scheduledTime
+            dur: melodyDuration, vel: 0.7, time: time
         };
         self.postMessage({ type: 'playNote', note: startEvent });
 
