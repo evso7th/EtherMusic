@@ -87,13 +87,13 @@ interface HelpGuideProps extends ButtonProps {
     showText?: boolean;
 }
 
-const HelpGuideComponent = ({ buttonVariant = "outline", buttonClassName, showText = true, size, ...props }: HelpGuideProps) => {
+export const HelpGuide = ({ buttonVariant = "outline", buttonClassName, showText = true, size, ...props }: HelpGuideProps) => {
     const content = React.useMemo(() => <ReactMarkdown>{guideContent}</ReactMarkdown>, []);
     
     return (
         <Dialog>
             <DialogTrigger asChild>
-                <Button variant={buttonVariant} size={size || "icon"} className={cn("w-10 h-10", buttonClassName)} {...props}>
+                <Button variant={buttonVariant} size={size || (showText ? "default" : "icon")} className={cn(buttonClassName)} {...props}>
                     <HelpCircle className="w-5 h-5" />
                     <span className={cn(
                         "sr-only",
@@ -116,5 +116,3 @@ const HelpGuideComponent = ({ buttonVariant = "outline", buttonClassName, showTe
         </Dialog>
     )
 }
-
-export const HelpGuide = React.memo(HelpGuideComponent);
