@@ -160,7 +160,8 @@ export class AudioEngine {
         this.autopilotBassSynth = new Tone.FMSynth(this.presets.ebass.options).connect(this.channels.autopilotBass);
         this.effectsSynth = new Tone.FMSynth(this.presets.autopilot_effect_star.options).connect(this.channels.effects);
         
-        Tone.Transport.start(); // START THE ETERNAL METRONOME
+        // START THE ETERNAL METRONOME - ONCE AND FOREVER
+        Tone.Transport.start(); 
         this.isInitialized = true;
         console.log(`AudioEngine initialized and Transport started.`);
     }
