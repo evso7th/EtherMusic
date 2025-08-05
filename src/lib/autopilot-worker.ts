@@ -97,7 +97,12 @@ let state = {
     },
     air: {
         currentChordIndex: 0,
-        lastMelodyDegree: null as number | null,
+        phraseMeasures: 0,
+        totalPhraseMeasures: 4,
+        isResting: false,
+        restMeasures: 0,
+        totalRestMeasures: 2,
+        currentArpPattern: [0, 1, 2],
     }
 };
 
@@ -107,15 +112,18 @@ function updateHarmony(key: MusicKey, scale: MusicScale) {
     state.scaleFrequencies = {
         bass: getScaleFrequencies(key, scale, [2, 3]),
         accompaniment: getScaleFrequencies(key, scale, [3, 4]),
-        melody: getScaleFrequencies(key, scale, [3, 4]),
-        effects: getScaleFrequencies(key, scale, [4, 5]),
+        melody: getScaleFrequencies(key, scale, [4, 5]),
+        effects: getScaleFrequencies(key, scale, [5, 6]),
     };
     // Reset melody memory on harmony change
     state.sequence.lastMelodyNoteIndex = null;
     state.ambient.lastChordChangeTick = -Infinity;
     state.ambient.lastMelodyDegree = null;
     state.water.arpeggioIndex = 0;
-    state.air.lastMelodyDegree = null;
+    // Reset air state on harmony change
+    state.air.phraseMeasures = 0;
+    state.air.isResting = false;
+    state.air.restMeasures = 0;
 }
 
 // --- "AMBIENT" STYLE ---
@@ -312,57 +320,80 @@ function tickWater(time: number) {
 // --- "AIR" STYLE ---
 function tickAir(time: number) {
     const ticksPerMeasure = 16;
-    const ticksPerChordChange = ticksPerMeasure * 4; // Slow chord changes for a spacious feel
+    const ticksPerBeat = 4;
     const chordProgression = [0, 3, 4, 0]; // I-IV-V-I
+    const arpeggioPatterns = [ [0, 1, 2], [2, 1, 0], [0, 2, 1], [1, 2, 0] ];
+
     const notesBatch: NoteEvent[] = [];
+    
+    // --- PHRASING LOGIC ---
+    if (state.tick16n % (ticksPerMeasure) === 0) {
+        if (state.air.isResting) {
+            state.air.restMeasures++;
+            if (state.air.restMeasures >= state.air.totalRestMeasures) {
+                state.air.isResting = false;
+                state.air.phraseMeasures = 0;
+                state.air.totalPhraseMeasures = 2 + Math.floor(Math.random() * 3); // Play for 2-4 measures
+                 state.air.currentArpPattern = arpeggioPatterns[Math.floor(Math.random() * arpeggioPatterns.length)];
+            }
+        } else {
+            state.air.phraseMeasures++;
+            if (state.air.phraseMeasures >= state.air.totalPhraseMeasures) {
+                state.air.isResting = true;
+                state.air.restMeasures = 0;
+                state.air.totalRestMeasures = 1 + Math.floor(Math.random() * 2); // Rest for 1-2 measures
+            }
+        }
+    }
 
-    // --- BASS & ACCOMPANIMENT ---
-    if (state.tick16n % ticksPerChordChange === 0) {
+    // --- CHORD, BASS & ACCOMPANIMENT LOGIC ---
+    if (state.tick16n % (ticksPerMeasure * 2) === 0) { // Slower chord changes
         state.air.currentChordIndex = (state.air.currentChordIndex + 1) % chordProgression.length;
-        const rootDegree = chordProgression[state.air.currentChordIndex];
 
-        // Bass - Rhythmic and simple
-        for (let i = 0; i < 4; i++) { // Every half measure
-            const bassFreq = state.scaleFrequencies.bass[rootDegree % state.scaleFrequencies.bass.length];
-            if (bassFreq) {
-                notesBatch.push({
+        // BASS - Pulsing root note on every beat
+        const bassRootDegree = chordProgression[state.air.currentChordIndex];
+        const bassFreq = state.scaleFrequencies.bass[bassRootDegree % state.scaleFrequencies.bass.length];
+        if (bassFreq) {
+            for (let i=0; i < 8; i++) { // Every half measure for 2 measures
+                 notesBatch.push({
                     part: 'bass',
                     freq: bassFreq,
-                    dur: '2n',
+                    dur: '8n',
                     vel: 0.6,
-                    time: time + (i * ticksPerMeasure / 2 * (60 / state.currentBpm / 4))
+                    time: time + (i * ticksPerBeat * 2 * (60 / state.currentBpm / 4))
                 });
             }
         }
 
-        // Accompaniment - Enveloping pads
-        const chordDegrees = [rootDegree, rootDegree + 2, rootDegree + 4];
+        // ACCOMPANIMENT - Held pad
+        const accompRootDegree = chordProgression[state.air.currentChordIndex];
+        const chordDegrees = [accompRootDegree, accompRootDegree + 2, accompRootDegree + 4];
         chordDegrees.forEach((degree, index) => {
             const noteFreq = state.scaleFrequencies.accompaniment[degree % state.scaleFrequencies.accompaniment.length];
             if (noteFreq) {
                 notesBatch.push({
                     part: 'accompaniment',
                     freq: noteFreq,
-                    dur: '1m', // Hold for one measure
-                    vel: 0.3,
-                    time: time + (index * ticksPerMeasure * (60 / state.currentBpm / 4))
+                    dur: '2m', // Held for two measures
+                    vel: 0.35,
+                    time: time + (index * 0.05) // Slight flame
                 });
             }
         });
     }
 
-    // --- MELODY (ARPEGGIATED TRIADS) ---
-    // Every beat (4 ticks)
-    if (state.tick16n % 4 === 0) {
+    // --- MELODY LOGIC (only play if not resting) ---
+    if (!state.air.isResting && state.tick16n % ticksPerBeat === 0) {
         const rootDegree = chordProgression[state.air.currentChordIndex];
-        const triad = [rootDegree, rootDegree + 2, rootDegree + 4];
-        
-        // Pick one note from the triad to play
-        const degreeIndex = (state.tick16n / 4) % triad.length;
-        const noteDegree = triad[degreeIndex];
-        
+        const triadDegrees = [rootDegree, rootDegree + 2, rootDegree + 4];
+
+        // Pick one note from the triad based on the current arpeggio pattern
+        const patternIndex = (state.tick16n / ticksPerBeat) % state.air.currentArpPattern.length;
+        const triadNoteIndex = state.air.currentArpPattern[patternIndex];
+        const noteDegree = triadDegrees[triadNoteIndex];
+
         const melodyFreq = state.scaleFrequencies.melody[noteDegree % state.scaleFrequencies.melody.length];
-        
+
         if (melodyFreq) {
             notesBatch.push({
                 part: 'melody',
@@ -373,11 +404,12 @@ function tickAir(time: number) {
             });
         }
     }
-        
+
     if (notesBatch.length > 0) {
         self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
     }
 }
+
 
 
 // --- UNIVERSAL EFFECTS TICK ---
@@ -444,8 +476,12 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             state.water.currentChordRootDegree = 0;
             // Reset Air state
             state.air.currentChordIndex = 0;
-            state.air.lastMelodyDegree = null;
-
+            state.air.phraseMeasures = 0;
+            state.air.totalPhraseMeasures = 4;
+            state.air.isResting = true; // Start with a rest
+            state.air.restMeasures = 0;
+            state.air.totalRestMeasures = 0; // No rest at the very beginning
+            state.air.currentArpPattern = [0, 1, 2];
 
             break;
         case 'stop':
