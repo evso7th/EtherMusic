@@ -205,7 +205,6 @@ export default function Home() {
 
     const handleAutopilotToggle = useCallback((isOn: boolean) => {
         setIsAutopilotOn(isOn);
-        // This is a simple toggle. The eternal tick in `initializeAudio` does the heavy lifting.
         autopilotWorker.current?.postMessage({ type: isOn ? 'start' : 'stop' });
     }, []);
 
