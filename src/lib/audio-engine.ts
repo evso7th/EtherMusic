@@ -115,7 +115,7 @@ export class AudioEngine {
     
     private autopilotMelodySynth: Tone.Synth | null = null;
     private autopilotAccompanimentSynth: Tone.Synth | null = null;
-    private autopilotBassSynth: Tone.Synth | null = null;
+    private autopilotBassSynth: Tone.FMSynth | null = null;
     private effectsSynth: Tone.FMSynth | null = null;
 
     constructor() {
@@ -158,7 +158,7 @@ export class AudioEngine {
 
         this.autopilotMelodySynth = new Tone.Synth(this.presets.synth.options).connect(this.channels.autopilot);
         this.autopilotAccompanimentSynth = new Tone.Synth(this.presets.synth.options).connect(this.channels.accompaniment);
-        this.autopilotBassSynth = new Tone.Synth(this.presets.autopilot_bass.options).connect(this.channels.autopilotBass);
+        this.autopilotBassSynth = new Tone.FMSynth(this.presets.autopilot_bass.options).connect(this.channels.autopilotBass);
         this.effectsSynth = new Tone.FMSynth(this.presets.autopilot_effect_star.options).connect(this.channels.effects);
         
         this.isInitialized = true;
@@ -443,7 +443,7 @@ export class AudioEngine {
             'E-Bells_melody': { type: 'FMSynth', options: { harmonicity: 1.4, modulationIndex: 20, oscillator: { type: 'sine' }, envelope: { attack: 0.001, decay: 1.6, sustain: 0, release: 1.6 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.002, decay: 0.4, sustain: 0, release: 0.4 } } },
             'E-Bells_bass': { type: 'FMSynth', options: { harmonicity: 1.4, modulationIndex: 15, oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 1.5, sustain: 0, release: 2.5 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.01, decay: 1.0, sustain: 0, release: 1.0 } } },
             'G-Drops': { type: 'FMSynth', options: { harmonicity: 0.5, modulationIndex: 3.5, oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.7, sustain: 0.1, release: 0.4 }, modulation: { type: 'triangle' }, modulationEnvelope: { attack: 0.01, decay: 0.5, sustain: 0, release: 0.2 } } },
-            autopilot_bass: { type: 'Synth', options: { oscillator: { type: "fmsine", harmonicity: 0.5 }, filter: { Q: 1, type: 'lowpass', rolloff: -12 }, envelope: { attack: 0.1, decay: 0.3, sustain: 0.4, release: 1.2 }, filterEnvelope: { attack: 0.05, decay: 0.2, sustain: 0.1, release: 1, baseFrequency: 200, octaves: 1.5 } } },
+            autopilot_bass: { type: 'FMSynth', options: { harmonicity: 0.8, modulationIndex: 5, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.4 }, modulation: { type: "square" }, modulationEnvelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 } } },
             autopilot_effect_star: { type: 'FMSynth', options: { harmonicity: 3.4, modulationIndex: 10, envelope: { attack: 0.01, decay: 1.2, release: 1.2 } } },
             autopilot_effect_meteor: { type: 'NoiseSynth', options: { noise: { type: 'white' }, filter: { Q: 10 }, envelope: { attack: 0.01, decay: 0.3, release: 0.5 } } },
         };
