@@ -79,7 +79,6 @@ let state = {
         chordProgression: [0, 4, 5, 3], // I-V-vi-IV in 0-based scale degrees
         currentChordDegree: 0,
         lastChordChangeTick: -Infinity,
-        activeMelodyNoteId: null as number | null,
     },
     sequence: {
         bassNoteIndex: 0,
@@ -97,7 +96,7 @@ function updateHarmony(key: MusicKey, scale: MusicScale) {
     state.scaleFrequencies = {
         bass: getScaleFrequencies(key, scale, [1, 2]),
         accompaniment: getScaleFrequencies(key, scale, [3, 4]),
-        melody: getScaleFrequencies(key, scale, [3, 4]),
+        melody: getScaleFrequencies(key, scale, [4, 5]), // Higher octaves for melody
     };
     // Reset melody memory on harmony change
     state.sequence.lastMelodyNoteIndex = null;
@@ -140,38 +139,22 @@ function tickAmbient(time: number) {
         });
     }
 
-    // --- MELODY (Slow Pitch Bend) ---
-    const ticksForMelodyChange = ticksPerMeasure * 4; // New melody note every 4 measures
-    if (state.tick16n % ticksForMelodyChange === 0) {
-        state.ambient.activeMelodyNoteId = Date.now() + Math.random();
-        
-        const startDegree = Math.floor(Math.random() * state.scaleFrequencies.melody.length);
-        const startFreq = state.scaleFrequencies.melody[startDegree];
-        
-        let endDegree = startDegree;
-        while(endDegree === startDegree) {
-            endDegree = Math.floor(Math.random() * state.scaleFrequencies.melody.length);
+    // --- MELODY (Sparse, chime-like notes) ---
+    // Low probability of playing a note on the first beat of a measure
+    if (state.tick16n % ticksPerMeasure === 0 && Math.random() < 0.25) {
+        const degree = Math.floor(Math.random() * state.scaleFrequencies.melody.length);
+        const freq = state.scaleFrequencies.melody[degree];
+
+        if (freq) {
+            const event: NoteEvent = {
+                part: 'melody',
+                freq: freq,
+                dur: '4n', // Short note duration, but the synth's release will be long
+                vel: 0.8,
+                time: time
+            };
+            self.postMessage({ type: 'playNote', note: event });
         }
-        const endFreq = state.scaleFrequencies.melody[endDegree];
-        
-        const melodyDuration = '4m';
-
-        // Start the note
-        const startEvent: NoteEvent = {
-            id: state.ambient.activeMelodyNoteId,
-            part: 'melody', freq: startFreq,
-            dur: melodyDuration, vel: 0.7, time: time
-        };
-        self.postMessage({ type: 'playNote', note: startEvent });
-
-        // Schedule the pitch bend
-        const updateEvent: NoteUpdateEvent = {
-            id: state.ambient.activeMelodyNoteId,
-            part: 'melody',
-            freq: endFreq,
-            rampTime: melodyDuration,
-        };
-        self.postMessage({ type: 'updateNote', note: updateEvent });
     }
 }
 
@@ -276,7 +259,6 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             // Reset ambient state
             state.ambient.currentChordDegree = 0;
             state.ambient.lastChordChangeTick = -Infinity; // Force immediate chord
-            state.ambient.activeMelodyNoteId = null;
             break;
         case 'stop':
             state.isRunning = false;
@@ -297,7 +279,6 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             state.currentStyle = data.style;
             state.tick16n = 0; // Reset tick count on style change
             state.ambient.lastChordChangeTick = -Infinity; // Force immediate chord change on style switch
-            state.ambient.activeMelodyNoteId = null;
             break;
         case 'setInstruments':
             // @ts-ignore
