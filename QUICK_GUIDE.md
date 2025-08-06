@@ -33,6 +33,8 @@ There are two large, glowing pads. They are your main instruments.
     *   **To remove a note:** Tap on an existing orb or in the same spot again to stop that specific note.
     *   You can have up to three notes latched at once.
 
+**💡 Pro Tip for Desktop:** Latch mode is your best friend when playing with a mouse! Turn it on to set a bass drone or chord. The bass will play by itself, freeing up your mouse to focus on the Melody Pad.
+
 ## Bottom Control Bar
 
 Here you control the rhythm and atmosphere. You can change any of these settings on the fly, even during playback!
