@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
 import type { NoteEvent, WorkerResponse, AutopilotStyle, AutopilotPart as WorkerAutopilotPart, NoteUpdateEvent } from '@/lib/autopilot-worker';
+import { CookieConsent } from '@/components/cookie-consent';
 
 
 function getCookie(name: string): string | null {
@@ -48,6 +49,7 @@ function setCookie(name: string, value: string, days: number) {
 }
 
 
+
 const defaultVolumes = { melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, accompaniment: -14, autopilotBass: -9, effects: -6 };
 const defaultEffects = {
     melody: { reverb: -Infinity, delay: -60 },
@@ -61,6 +63,9 @@ const defaultEffects = {
 };
 
 function loadSettings() {
+    if (getCookie("ethermusic_consent") !== 'true') {
+        return { volumes: defaultVolumes, effects: defaultEffects };
+    }
     try {
         const savedVolumes = getCookie("ethermusic_volumes");
         const savedEffects = getCookie("ethermusic_effects");
@@ -79,6 +84,9 @@ function loadSettings() {
 }
 
 function saveSettings(volumes: any, effects: any) {
+    if (getCookie("ethermusic_consent") !== 'true') {
+        return;
+    }
     try {
         setCookie("ethermusic_volumes", JSON.stringify(volumes), 365);
         setCookie("ethermusic_effects", JSON.stringify(effects), 365);
@@ -229,6 +237,29 @@ export default function Home() {
     }, [isReady, toast]);
     
     // --- UI Event Handlers ---
+    
+    const handlePlay = useCallback(() => {
+        if (!isReady) return;
+        Tone.Transport.start();
+        setIsPlaying(true);
+    }, [isReady]);
+
+    const handlePatternChange = useCallback((pattern: (typeof beatPatterns)[number]) => {
+        setActivePattern(pattern);
+        audioEngine.current?.setBeatPattern(pattern.name);
+        if (pattern.name !== 'Off' && Tone.Transport.state !== 'started') {
+            handlePlay();
+        }
+    }, [handlePlay]);
+    
+    const handleAutopilotToggle = useCallback((isOn: boolean) => {
+        setIsAutopilotOn(isOn);
+        autopilotWorker.current?.postMessage({ type: isOn ? 'start' : 'stop' });
+        if (isOn && Tone.Transport.state !== 'started') {
+            handlePlay();
+        }
+    }, [handlePlay]);
+
     const handleTempoChange = useCallback((tempo: Tempo) => {
         setActiveTempo(tempo);
         audioEngine.current?.setTempo(tempo.bpm);
@@ -245,15 +276,6 @@ export default function Home() {
         audioEngine.current?.setEffects(newEffects);
         initialSettings.current.effects = newEffects;
         saveSettings(initialSettings.current.volumes, newEffects);
-    }, []);
-
-    const handlePatternChange = useCallback((pattern: (typeof beatPatterns)[number]) => {
-        setActivePattern(pattern);
-        audioEngine.current?.setBeatPattern(pattern.name);
-        if (pattern.name !== 'Off' && Tone.Transport.state !== 'started') {
-            Tone.Transport.start();
-            setIsPlaying(true);
-        }
     }, []);
 
     const handleHarmonyChange = useCallback((key: MusicKey, scale: MusicScale) => {
@@ -285,25 +307,10 @@ export default function Home() {
         audioEngine.current?.setBassLatch(isOn);
     }, []);
 
-    const handleAutopilotToggle = useCallback((isOn: boolean) => {
-        setIsAutopilotOn(isOn);
-        autopilotWorker.current?.postMessage({ type: isOn ? 'start' : 'stop' });
-        if (isOn && Tone.Transport.state !== 'started') {
-            Tone.Transport.start();
-            setIsPlaying(true);
-        }
-    }, []);
-
     const handleAutopilotStyleChange = useCallback((style: AutopilotStyle) => {
         setAutopilotStyle(style);
         autopilotWorker.current?.postMessage({ type: 'setStyle', style });
     }, []);
-
-    const handlePlay = useCallback(() => {
-        if (!isReady) return;
-        Tone.Transport.start();
-        setIsPlaying(true);
-    }, [isReady]);
 
     const handlePause = useCallback(() => {
         if (!isReady) return;
@@ -392,6 +399,7 @@ export default function Home() {
                     <p>&copy; 2025, EVS</p>
                     <p className="mt-2">v.1.035</p>
                 </footer>
+                <CookieConsent />
             </div>
         )
     }
@@ -534,9 +542,14 @@ export default function Home() {
                     />
                 </div>
             </div>
+            <CookieConsent />
         </div>
     );
 }
 
+
+    
+
+    
 
     
