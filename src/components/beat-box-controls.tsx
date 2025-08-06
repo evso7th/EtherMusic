@@ -19,7 +19,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { MixerControls, AutopilotMixerControls } from '@/components/mixer-controls';
-import { SlidersHorizontal, Drum, Zap, Bot, Power, Wand2, Music } from 'lucide-react';
+import { SlidersHorizontal, Drum, Zap, Bot, Power, Wand2, Music, Save, FolderDown } from 'lucide-react';
 import { useState, useMemo, memo, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
@@ -83,6 +83,8 @@ interface BeatBoxControlsProps {
     onAutopilotInstrumentChange: (part: AutopilotPart, instrument: Instrument) => void;
     isMobile: boolean;
     isLandscape?: boolean;
+    onSavePreset: (style: AutopilotStyle) => void;
+    onLoadPreset: (style: AutopilotStyle) => void;
 }
 
 const MemoizedAutopilotInstrumentSelector = memo(function AutopilotInstrumentSelector({
@@ -113,10 +115,9 @@ const MemoizedAutopilotInstrumentSelector = memo(function AutopilotInstrumentSel
     )
 });
 
-const ControlButtonWithTooltip = memo(function ControlButtonWithTooltip({ tooltipText, children, isMobile, ...props}: Omit<React.ComponentProps<typeof Button>, 'isMobile'> & { tooltipText: string, children: React.ReactNode, isMobile: boolean }) {
-    if (isMobile) {
-        return <Button {...props}>{children}</Button>;
-    }
+const ControlButtonWithTooltip = memo(function ControlButtonWithTooltip({ tooltipText, children, ...props}: React.ComponentProps<typeof Button> & { tooltipText: string, children: React.ReactNode}) {
+    // isMobile is implicitly available in context, so we don't need to pass it as a prop
+    // This was the source of the React warning.
     return (
         <Tooltip>
             <TooltipTrigger asChild>
@@ -151,6 +152,8 @@ export function BeatBoxControls({
     onAutopilotInstrumentChange,
     isMobile,
     isLandscape = false,
+    onSavePreset,
+    onLoadPreset,
 }: BeatBoxControlsProps) {
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isTempoOpen, setIsTempoOpen] = useState(false);
@@ -162,7 +165,7 @@ export function BeatBoxControls({
     // Local state for autopilot instrument settings
     const [tempAutopilotInstruments, setTempAutopilotInstruments] = useState(activeAutopilotInstruments);
 
-    // Sync local state when the dialog opens
+    // Sync local state when the dialog opens or active instruments change
     useEffect(() => {
         if (isAutopilotOpen) {
             setTempAutopilotInstruments(activeAutopilotInstruments);
@@ -201,113 +204,146 @@ export function BeatBoxControls({
     const isBeatsOn = activePattern && activePattern.name !== 'Off';
     
     const buttonSize = isMobile ? 'sm' : 'default';
+    
+    const controlButtonWrapper = (tooltipText: string, children: React.ReactNode) => {
+        if (isMobile) return children;
+        return (
+             <Tooltip>
+                <TooltipTrigger asChild>
+                    {children}
+                </TooltipTrigger>
+                <TooltipContent>
+                    <p>{tooltipText}</p>
+                </TooltipContent>
+            </Tooltip>
+        )
+    };
 
     const autopilotDialog = (
         <Dialog open={isAutopilotOpen} onOpenChange={handleAutopilotDialogChange}>
             <DialogTrigger asChild>
-                 <ControlButtonWithTooltip 
-                    tooltipText="Autopilot"
-                    isMobile={isMobile}
-                    variant={isAutopilotOn ? 'default' : 'outline'} size={isLandscape ? "icon" : buttonSize} className={cn(isLandscape && "w-10 h-10 rounded-full", !isLandscape && "flex-1")}>
-                    <Bot className={cn("w-5 h-5", !isLandscape && "md:mr-2")} />
-                     {!isLandscape && <span className="hidden sm:inline">Autopilot</span>}
-                </ControlButtonWithTooltip>
+                 {controlButtonWrapper("Autopilot", 
+                    <Button
+                        variant={isAutopilotOn ? 'default' : 'outline'} size={isLandscape ? "icon" : buttonSize} className={cn(isLandscape && "w-10 h-10 rounded-full", !isLandscape && "flex-1")}>
+                        <Bot className={cn("w-5 h-5", !isLandscape && "md:mr-2")} />
+                        {!isLandscape && <span className="hidden sm:inline">Autopilot</span>}
+                    </Button>
+                )}
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Autopilot Controls</DialogTitle>
                 </DialogHeader>
-                <div className='py-4 space-y-4'>
-                    <div className="flex items-center space-x-2">
-                        <Switch id="autopilot-switch" checked={isAutopilotOn} onCheckedChange={onAutopilotToggle} />
-                        <Label htmlFor="autopilot-switch">Autopilot On/Off</Label>
-                    </div>
+                 <ScrollArea className="h-auto max-h-[70vh]">
+                    <div className='py-4 pr-4 space-y-4'>
+                        <div className="flex items-center space-x-2">
+                            <Switch id="autopilot-switch" checked={isAutopilotOn} onCheckedChange={onAutopilotToggle} />
+                            <Label htmlFor="autopilot-switch">Autopilot On/Off</Label>
+                        </div>
 
-                    <Dialog open={isStyleOpen} onOpenChange={setIsStyleOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant="outline" className="w-full" disabled={!isAutopilotOn}>
-                                <Wand2 className="w-4 h-4 mr-2" />
-                                Style: {activeAutopilotStyle}
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Autopilot Style</DialogTitle>
-                            </DialogHeader>
-                             <div className="grid grid-cols-2 gap-2 py-4">
-                                {autopilotStyles.map((style) => (
-                                    <Button
-                                        key={style}
-                                        variant={activeAutopilotStyle === style ? 'default' : 'outline'}
-                                        onClick={() => {
-                                            onAutopilotStyleChange(style);
-                                            setIsStyleOpen(false);
-                                        }}
-                                    >
-                                        {style}
-                                    </Button>
-                                ))}
-                            </div>
-                        </DialogContent>
-                    </Dialog>
-
-                    <Separator />
-
-                    <div className="space-y-4">
-                        <h4 className="text-sm font-medium text-center text-muted-foreground">Instruments</h4>
-                        <MemoizedAutopilotInstrumentSelector 
-                            label="Melody"
-                            value={tempAutopilotInstruments.melody}
-                            onChange={(inst) => handleTempInstrumentChange('melody', inst as Instrument)}
-                            instruments={autopilotInstruments.filter(i => !i.includes('bass') && !i.includes('effect'))}
-                        />
-                         <MemoizedAutopilotInstrumentSelector 
-                            label="Accompaniment"
-                            value={tempAutopilotInstruments.accompaniment}
-                            onChange={(inst) => handleTempInstrumentChange('accompaniment', inst as Instrument)}
-                            instruments={autopilotInstruments.filter(i => !i.includes('bass') && !i.includes('effect'))}
-                        />
-                         <MemoizedAutopilotInstrumentSelector 
-                            label="Bass"
-                            value={tempAutopilotInstruments.bass}
-                            onChange={(inst) => handleTempInstrumentChange('bass', inst as Instrument)}
-                             instruments={autopilotInstruments.filter(i => (i.includes('bass') || i === 'synth' || i === 'organ' || i === 'mellotron') && !i.includes('effect'))}
-                        />
-                         <MemoizedAutopilotInstrumentSelector 
-                            label="Effects"
-                            value={tempAutopilotInstruments.effects}
-                            onChange={(inst) => handleTempInstrumentChange('effects', inst as Instrument)}
-                            instruments={autopilotInstruments.filter(i => i.includes('effect') || i === 'G-Drops')}
-                        />
-                    </div>
-
-                    <Separator />
-
-                    <Dialog open={isAutopilotMixerOpen} onOpenChange={setIsAutopilotMixerOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant="outline" className="w-full">
-                                <SlidersHorizontal className="w-4 h-4 mr-2" />
-                                Autopilot Mixer
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Autopilot & Effects Mixer</DialogTitle>
-                            </DialogHeader>
-                             <ScrollArea className="h-auto max-h-[70vh]">
-                                <div className="pr-4 py-4">
-                                     <AutopilotMixerControls
-                                        initialVolumes={initialVolumes} 
-                                        onVolumeChange={onVolumeChange}
-                                        initialEffects={initialEffects}
-                                        onEffectChange={onEffectChange}
-                                        isMobile={isMobile}
-                                    />
+                        <Dialog open={isStyleOpen} onOpenChange={setIsStyleOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" className="w-full" disabled={!isAutopilotOn}>
+                                    <Wand2 className="w-4 h-4 mr-2" />
+                                    Style: {activeAutopilotStyle}
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Autopilot Style</DialogTitle>
+                                </DialogHeader>
+                                <div className="grid grid-cols-2 gap-2 py-4">
+                                    {autopilotStyles.map((style) => (
+                                        <Button
+                                            key={style}
+                                            variant={activeAutopilotStyle === style ? 'default' : 'outline'}
+                                            onClick={() => {
+                                                onAutopilotStyleChange(style);
+                                                setIsStyleOpen(false);
+                                            }}
+                                        >
+                                            {style}
+                                        </Button>
+                                    ))}
                                 </div>
-                            </ScrollArea>
-                        </DialogContent>
-                    </Dialog>
-                </div>
+                            </DialogContent>
+                        </Dialog>
+
+                        <Separator />
+
+                        <div className="space-y-4">
+                            <h4 className="text-sm font-medium text-center text-muted-foreground">Instruments</h4>
+                            <MemoizedAutopilotInstrumentSelector 
+                                label="Melody"
+                                value={tempAutopilotInstruments.melody}
+                                onChange={(inst) => handleTempInstrumentChange('melody', inst as Instrument)}
+                                instruments={autopilotInstruments.filter(i => !i.includes('bass') && !i.includes('effect'))}
+                            />
+                            <MemoizedAutopilotInstrumentSelector 
+                                label="Accompaniment"
+                                value={tempAutopilotInstruments.accompaniment}
+                                onChange={(inst) => handleTempInstrumentChange('accompaniment', inst as Instrument)}
+                                instruments={autopilotInstruments.filter(i => !i.includes('bass') && !i.includes('effect'))}
+                            />
+                            <MemoizedAutopilotInstrumentSelector 
+                                label="Bass"
+                                value={tempAutopilotInstruments.bass}
+                                onChange={(inst) => handleTempInstrumentChange('bass', inst as Instrument)}
+                                instruments={autopilotInstruments.filter(i => (i.includes('bass') || i === 'synth' || i === 'organ' || i === 'mellotron') && !i.includes('effect'))}
+                            />
+                            <MemoizedAutopilotInstrumentSelector 
+                                label="Effects"
+                                value={tempAutopilotInstruments.effects}
+                                onChange={(inst) => handleTempInstrumentChange('effects', inst as Instrument)}
+                                instruments={autopilotInstruments.filter(i => i.includes('effect') || i === 'G-Drops')}
+                            />
+                        </div>
+
+                        <Separator />
+
+                        <Dialog open={isAutopilotMixerOpen} onOpenChange={setIsAutopilotMixerOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" className="w-full">
+                                    <SlidersHorizontal className="w-4 h-4 mr-2" />
+                                    Autopilot Mixer
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Autopilot & Effects Mixer</DialogTitle>
+                                </DialogHeader>
+                                <ScrollArea className="h-auto max-h-[70vh]">
+                                    <div className="pr-4 py-4">
+                                        <AutopilotMixerControls
+                                            initialVolumes={initialVolumes} 
+                                            onVolumeChange={onVolumeChange}
+                                            initialEffects={initialEffects}
+                                            onEffectChange={onEffectChange}
+                                            isMobile={isMobile}
+                                        />
+                                    </div>
+                                </ScrollArea>
+                            </DialogContent>
+                        </Dialog>
+                        
+                        <Separator />
+                        
+                        <div>
+                             <h4 className="text-sm font-medium text-center text-muted-foreground mb-4">Presets for "{activeAutopilotStyle}"</h4>
+                             <div className="flex gap-2">
+                                <Button variant="outline" className="w-full" onClick={() => onSavePreset(activeAutopilotStyle)}>
+                                    <Save className="w-4 h-4 mr-2" />
+                                    Save Preset
+                                </Button>
+                                 <Button variant="outline" className="w-full" onClick={() => onLoadPreset(activeAutopilotStyle)}>
+                                    <FolderDown className="w-4 h-4 mr-2" />
+                                    Load Preset
+                                </Button>
+                            </div>
+                        </div>
+
+                    </div>
+                </ScrollArea>
             </DialogContent>
         </Dialog>
     );
@@ -318,7 +354,7 @@ export function BeatBoxControls({
                 <div className="flex flex-col gap-2">
                     <Dialog open={isBeatsOpen} onOpenChange={setIsBeatsOpen}>
                         <DialogTrigger asChild>
-                             <ControlButtonWithTooltip tooltipText="Beats" isMobile={isMobile} variant={isBeatsOn ? 'default' : 'outline'} size="icon" className="w-10 h-10 rounded-full">
+                             <ControlButtonWithTooltip tooltipText="Beats" variant={isBeatsOn ? 'default' : 'outline'} size="icon" className="w-10 h-10 rounded-full">
                                 <Drum className="w-5 h-5" />
                             </ControlButtonWithTooltip>
                         </DialogTrigger>
@@ -379,7 +415,7 @@ export function BeatBoxControls({
 
                     <Dialog open={isTempoOpen} onOpenChange={setIsTempoOpen}>
                         <DialogTrigger asChild>
-                             <ControlButtonWithTooltip tooltipText="Tempo" isMobile={isMobile} variant="outline" size="icon" className="w-10 h-10 rounded-full">
+                             <ControlButtonWithTooltip tooltipText="Tempo" variant="outline" size="icon" className="w-10 h-10 rounded-full">
                                 <Zap className="w-5 h-5" />
                             </ControlButtonWithTooltip>
                         </DialogTrigger>
@@ -408,13 +444,11 @@ export function BeatBoxControls({
                         </DialogContent>
                     </Dialog>
                     
-                    <TooltipProvider>
-                      {autopilotDialog}
-                    </TooltipProvider>
+                    {autopilotDialog}
 
                     <Dialog>
                         <DialogTrigger asChild>
-                             <ControlButtonWithTooltip tooltipText="Mixer" isMobile={isMobile} variant="outline" size="icon" className="w-10 h-10 rounded-full">
+                             <ControlButtonWithTooltip tooltipText="Mixer" variant="outline" size="icon" className="w-10 h-10 rounded-full">
                                 <SlidersHorizontal className="w-5 h-5"/>
                             </ControlButtonWithTooltip>
                         </DialogTrigger>
@@ -448,10 +482,12 @@ export function BeatBoxControls({
                 <CardContent className="p-2 md:p-4 flex justify-around items-center gap-1 md:gap-2">
                     <Dialog open={isBeatsOpen} onOpenChange={setIsBeatsOpen}>
                         <DialogTrigger asChild>
-                            <Button variant={isBeatsOn ? 'default' : 'outline'} className="flex-1" size={buttonSize}>
-                                <Drum className="w-4 h-4 md:mr-2" />
-                                <span className="hidden sm:inline">Beats</span>
-                            </Button>
+                             {controlButtonWrapper("Beats", 
+                                <Button variant={isBeatsOn ? 'default' : 'outline'} className="flex-1" size={buttonSize}>
+                                    <Drum className="w-4 h-4 md:mr-2" />
+                                    <span className="hidden sm:inline">Beats</span>
+                                </Button>
+                            )}
                         </DialogTrigger>
                         <DialogContent>
                             <DialogHeader>
@@ -510,10 +546,12 @@ export function BeatBoxControls({
 
                     <Dialog open={isTempoOpen} onOpenChange={setIsTempoOpen}>
                         <DialogTrigger asChild>
-                            <Button variant="outline" className="flex-1" size={buttonSize}>
-                                <Zap className="w-4 h-4 md:mr-2" />
-                                <span className="hidden sm:inline">Tempo</span>
-                            </Button>
+                            {controlButtonWrapper("Tempo", 
+                                <Button variant="outline" className="flex-1" size={buttonSize}>
+                                    <Zap className="w-4 h-4 md:mr-2" />
+                                    <span className="hidden sm:inline">Tempo</span>
+                                </Button>
+                            )}
                         </DialogTrigger>
                         <DialogContent>
                             <DialogHeader>
@@ -544,10 +582,12 @@ export function BeatBoxControls({
 
                     <Dialog>
                         <DialogTrigger asChild>
-                            <Button variant="outline" className="flex-1 px-2 md:px-4" size={buttonSize}>
-                                <SlidersHorizontal className="w-4 h-4 md:mr-2"/>
-                                <span className="hidden sm:inline">Mixer</span>
-                            </Button>
+                            {controlButtonWrapper("Mixer", 
+                                <Button variant="outline" className="flex-1 px-2 md:px-4" size={buttonSize}>
+                                    <SlidersHorizontal className="w-4 h-4 md:mr-2"/>
+                                    <span className="hidden sm:inline">Mixer</span>
+                                </Button>
+                            )}
                         </DialogTrigger>
                         <DialogContent>
                             <DialogHeader>

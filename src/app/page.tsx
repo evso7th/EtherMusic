@@ -95,6 +95,33 @@ function saveSettings(volumes: any, effects: any) {
     }
 }
 
+type AutopilotPreset = {
+    instruments: Record<WorkerAutopilotPart, Instrument>;
+    volumes: Pick<typeof defaultVolumes, 'autopilot' | 'accompaniment' | 'autopilotBass' | 'effects'>;
+    effects: Pick<typeof defaultEffects, 'autopilot' | 'accompaniment' | 'autopilotBass' | 'effects'>;
+};
+
+function loadAutopilotPresets(): Record<AutopilotStyle, AutopilotPreset> {
+    if (getCookie("ethermusic_consent") !== 'true') return {} as Record<AutopilotStyle, AutopilotPreset>;
+    try {
+        const savedPresets = getCookie("ethermusic_autopilot_presets");
+        return savedPresets ? JSON.parse(savedPresets) : {};
+    } catch (e) {
+        console.error("Failed to load autopilot presets", e);
+        return {};
+    }
+}
+
+function saveAutopilotPreset(style: AutopilotStyle, preset: AutopilotPreset) {
+    if (getCookie("ethermusic_consent") !== 'true') return;
+    try {
+        const allPresets = loadAutopilotPresets();
+        allPresets[style] = preset;
+        setCookie("ethermusic_autopilot_presets", JSON.stringify(allPresets), 365);
+    } catch (e) {
+        console.error("Failed to save autopilot preset", e);
+    }
+}
 
 
 export const tempos: Tempo[] = [
@@ -156,6 +183,8 @@ export default function Home() {
         bass: 'ebass',
         effects: 'autopilot_effect_star'
     });
+    const [volumes, setVolumes] = useState(defaultVolumes);
+    const [effects, setEffects] = useState(defaultEffects);
     
     // --- Engine Ref ---
     const audioEngine = useRef<AudioEngine>();
@@ -164,10 +193,13 @@ export default function Home() {
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
 
     const initialSettings = useRef(loadSettings());
+    const autopilotPresets = useRef(loadAutopilotPresets());
 
     // --- Engine Initialization ---
     useEffect(() => {
         setIsClient(true);
+        setVolumes(initialSettings.current.volumes);
+        setEffects(initialSettings.current.effects);
     }, []);
 
     const initializeAudio = useCallback(async () => {
@@ -267,16 +299,16 @@ export default function Home() {
     }, []);
 
     const handleVolumeChange = useCallback((newVolumes: any) => {
+        setVolumes(newVolumes);
         audioEngine.current?.setVolumes(newVolumes);
-        initialSettings.current.volumes = newVolumes;
-        saveSettings(newVolumes, initialSettings.current.effects);
-    }, []);
+        saveSettings(newVolumes, effects);
+    }, [effects]);
 
     const handleEffectChange = useCallback((newEffects: any) => {
+        setEffects(newEffects);
         audioEngine.current?.setEffects(newEffects);
-        initialSettings.current.effects = newEffects;
-        saveSettings(initialSettings.current.volumes, newEffects);
-    }, []);
+        saveSettings(volumes, newEffects);
+    }, [volumes]);
 
     const handleHarmonyChange = useCallback((key: MusicKey, scale: MusicScale) => {
         setMusicKey(key);
@@ -310,6 +342,11 @@ export default function Home() {
     const handleAutopilotStyleChange = useCallback((style: AutopilotStyle) => {
         setAutopilotStyle(style);
         autopilotWorker.current?.postMessage({ type: 'setStyle', style });
+        // Attempt to load preset for the new style
+        const preset = autopilotPresets.current[style];
+        if (preset) {
+            handleLoadAutopilotPreset(style);
+        }
     }, []);
 
     const handlePause = useCallback(() => {
@@ -368,6 +405,56 @@ export default function Home() {
             backgroundAudioRef.current.play().catch(error => console.error("Error playing background audio:", error));
         }
     }, []);
+
+    const handleSaveAutopilotPreset = useCallback((style: AutopilotStyle) => {
+        const preset: AutopilotPreset = {
+            instruments: autopilotPartInstruments,
+            volumes: {
+                autopilot: volumes.autopilot,
+                accompaniment: volumes.accompaniment,
+                autopilotBass: volumes.autopilotBass,
+                effects: volumes.effects,
+            },
+            effects: {
+                autopilot: effects.autopilot,
+                accompaniment: effects.accompaniment,
+                autopilotBass: effects.autopilotBass,
+                effects: effects.effects,
+            },
+        };
+        saveAutopilotPreset(style, preset);
+        autopilotPresets.current[style] = preset; // Update in-memory cache
+        toast({ title: "Preset Saved", description: `Settings for "${style}" style have been saved.`});
+    }, [autopilotPartInstruments, volumes, effects, toast]);
+
+    const handleLoadAutopilotPreset = useCallback((style: AutopilotStyle) => {
+        const preset = autopilotPresets.current[style];
+        if (preset) {
+            // Apply instruments
+            setAutopilotPartInstruments(preset.instruments);
+            autopilotWorker.current?.postMessage({ type: 'setInstruments', instruments: preset.instruments });
+            (Object.keys(preset.instruments) as WorkerAutopilotPart[]).forEach(part => {
+                audioEngine.current?.setAutopilotInstrument(part, preset.instruments[part]);
+            });
+
+            // Apply volumes
+            const newVolumes = { ...volumes, ...preset.volumes };
+            setVolumes(newVolumes);
+            audioEngine.current?.setVolumes(newVolumes);
+            saveSettings(newVolumes, effects);
+
+            // Apply effects
+            const newEffects = { ...effects, ...preset.effects };
+            setEffects(newEffects);
+            audioEngine.current?.setEffects(newEffects);
+            saveSettings(newVolumes, newEffects);
+
+            toast({ title: "Preset Loaded", description: `Settings for "${style}" style have been loaded.`});
+        } else {
+            toast({ title: "No Preset Found", description: `No saved preset for "${style}" style.`, variant: "destructive"});
+        }
+    }, [volumes, effects, toast]);
+
 
     if (!isClient) {
         return <Preloader />;
@@ -500,9 +587,9 @@ export default function Home() {
                             tempos={tempos}
                             activeTempo={activeTempo}
                             onTempoChange={handleTempoChange}
-                            initialVolumes={initialSettings.current.volumes}
+                            initialVolumes={volumes}
                             onVolumeChange={handleVolumeChange}
-                            initialEffects={initialSettings.current.effects}
+                            initialEffects={effects}
                             onEffectChange={handleEffectChange}
                             isAutopilotOn={isAutopilotOn}
                             onAutopilotToggle={handleAutopilotToggle}
@@ -513,6 +600,8 @@ export default function Home() {
                             activeAutopilotInstruments={autopilotPartInstruments}
                             onAutopilotInstrumentChange={handleAutopilotInstrumentChange}
                             isMobile={isMobile}
+                            onSavePreset={handleSaveAutopilotPreset}
+                            onLoadPreset={handleLoadAutopilotPreset}
                         />
                     </div>
                 </main>
@@ -525,9 +614,9 @@ export default function Home() {
                         tempos={tempos}
                         activeTempo={activeTempo}
                         onTempoChange={handleTempoChange}
-                        initialVolumes={initialSettings.current.volumes}
+                        initialVolumes={volumes}
                         onVolumeChange={handleVolumeChange}
-                        initialEffects={initialSettings.current.effects}
+                        initialEffects={effects}
                         onEffectChange={handleEffectChange}
                         isAutopilotOn={isAutopilotOn}
                         onAutopilotToggle={handleAutopilotToggle}
@@ -539,6 +628,8 @@ export default function Home() {
                         onAutopilotInstrumentChange={handleAutopilotInstrumentChange}
                         isMobile={isMobile}
                         isLandscape={true}
+                        onSavePreset={handleSaveAutopilotPreset}
+                        onLoadPreset={handleLoadAutopilotPreset}
                     />
                 </div>
             </div>
