@@ -397,7 +397,7 @@ export default function Home() {
                  <footer className="z-10 text-xs text-white/50 pb-4 text-center">
                     <p>Powered by theremin technology</p>
                     <p>&copy; 2025, EVS</p>
-                    <p className="mt-2">v.1.035</p>
+                    <p className="mt-2">v.1.1.0</p>
                 </footer>
                 <CookieConsent />
             </div>
