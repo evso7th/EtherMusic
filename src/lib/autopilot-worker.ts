@@ -68,7 +68,7 @@ let state = {
         melody: 'synth' as Instrument,
         accompaniment: 'synth' as Instrument,
         bass: 'ebass' as Instrument,
-        effects: 'Starfall' as Instrument
+        effects: 'autopilot_effect_star' as Instrument
     },
     scaleFrequencies: {
         bass: [] as number[],
@@ -692,5 +692,3 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
 
 // Initial setup
 updateHarmony(state.currentKey, state.currentScale);
-
-    
