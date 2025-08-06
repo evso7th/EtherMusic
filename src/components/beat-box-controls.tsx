@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { MixerControls, AutopilotMixerControls } from '@/components/mixer-controls';
 import { SlidersHorizontal, Drum, Zap, Bot, Power, Wand2, Music } from 'lucide-react';
-import { useState, useMemo, memo } from "react";
+import { useState, useMemo, memo, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
 import { Separator } from "./ui/separator";
@@ -113,7 +113,7 @@ const MemoizedAutopilotInstrumentSelector = memo(function AutopilotInstrumentSel
     )
 });
 
-const ControlButtonWithTooltip = memo(function ControlButtonWithTooltip({ tooltipText, children, isMobile, ...props}: { tooltipText: string, children: React.ReactNode, isMobile: boolean } & Omit<React.ComponentProps<typeof Button>, 'isMobile'>) {
+const ControlButtonWithTooltip = memo(function ControlButtonWithTooltip({ tooltipText, children, isMobile, ...props}: Omit<React.ComponentProps<typeof Button>, 'isMobile'> & { tooltipText: string, children: React.ReactNode, isMobile: boolean }) {
     if (isMobile) {
         return <Button {...props}>{children}</Button>;
     }
@@ -159,6 +159,35 @@ export function BeatBoxControls({
     const [isStyleOpen, setIsStyleOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<'Meditative' | 'Classic'>('Meditative');
     
+    // Local state for autopilot instrument settings
+    const [tempAutopilotInstruments, setTempAutopilotInstruments] = useState(activeAutopilotInstruments);
+
+    // Sync local state when the dialog opens
+    useEffect(() => {
+        if (isAutopilotOpen) {
+            setTempAutopilotInstruments(activeAutopilotInstruments);
+        }
+    }, [isAutopilotOpen, activeAutopilotInstruments]);
+
+    const handleTempInstrumentChange = (part: AutopilotPart, instrument: Instrument) => {
+        setTempAutopilotInstruments(prev => ({ ...prev, [part]: instrument }));
+    };
+
+    const applyInstrumentChanges = () => {
+        (Object.keys(tempAutopilotInstruments) as AutopilotPart[]).forEach(part => {
+            if (tempAutopilotInstruments[part] !== activeAutopilotInstruments[part]) {
+                onAutopilotInstrumentChange(part, tempAutopilotInstruments[part]);
+            }
+        });
+    };
+
+    const handleAutopilotDialogChange = (open: boolean) => {
+        if (!open) {
+            applyInstrumentChanges();
+        }
+        setIsAutopilotOpen(open);
+    };
+
     const { classicPatterns, meditativePatterns, offPattern } = useMemo(() => {
         return {
             classicPatterns: patterns.filter(p => p.type === 'Classic'),
@@ -174,7 +203,7 @@ export function BeatBoxControls({
     const buttonSize = isMobile ? 'sm' : 'default';
 
     const autopilotDialog = (
-        <Dialog open={isAutopilotOpen} onOpenChange={setIsAutopilotOpen}>
+        <Dialog open={isAutopilotOpen} onOpenChange={handleAutopilotDialogChange}>
             <DialogTrigger asChild>
                  <ControlButtonWithTooltip 
                     tooltipText="Autopilot"
@@ -228,26 +257,26 @@ export function BeatBoxControls({
                         <h4 className="text-sm font-medium text-center text-muted-foreground">Instruments</h4>
                         <MemoizedAutopilotInstrumentSelector 
                             label="Melody"
-                            value={activeAutopilotInstruments.melody}
-                            onChange={(inst) => onAutopilotInstrumentChange('melody', inst as Instrument)}
+                            value={tempAutopilotInstruments.melody}
+                            onChange={(inst) => handleTempInstrumentChange('melody', inst as Instrument)}
                             instruments={autopilotInstruments.filter(i => !i.includes('bass') && !i.includes('effect'))}
                         />
                          <MemoizedAutopilotInstrumentSelector 
                             label="Accompaniment"
-                            value={activeAutopilotInstruments.accompaniment}
-                            onChange={(inst) => onAutopilotInstrumentChange('accompaniment', inst as Instrument)}
+                            value={tempAutopilotInstruments.accompaniment}
+                            onChange={(inst) => handleTempInstrumentChange('accompaniment', inst as Instrument)}
                             instruments={autopilotInstruments.filter(i => !i.includes('bass') && !i.includes('effect'))}
                         />
                          <MemoizedAutopilotInstrumentSelector 
                             label="Bass"
-                            value={activeAutopilotInstruments.bass}
-                            onChange={(inst) => onAutopilotInstrumentChange('bass', inst as Instrument)}
+                            value={tempAutopilotInstruments.bass}
+                            onChange={(inst) => handleTempInstrumentChange('bass', inst as Instrument)}
                              instruments={autopilotInstruments.filter(i => (i.includes('bass') || i === 'synth' || i === 'organ' || i === 'mellotron') && !i.includes('effect'))}
                         />
                          <MemoizedAutopilotInstrumentSelector 
                             label="Effects"
-                            value={activeAutopilotInstruments.effects}
-                            onChange={(inst) => onAutopilotInstrumentChange('effects', inst as Instrument)}
+                            value={tempAutopilotInstruments.effects}
+                            onChange={(inst) => handleTempInstrumentChange('effects', inst as Instrument)}
                             instruments={autopilotInstruments.filter(i => i.includes('effect') || i === 'G-Drops')}
                         />
                     </div>
@@ -540,3 +569,5 @@ export function BeatBoxControls({
         </Card>
     );
 }
+
+    
