@@ -286,14 +286,16 @@ export class AudioEngine {
         const voice = this.getVoiceFromPool(type, pointerId);
         if (voice && voice.synth) {
             const quantizedFreq = this.getClosestFrequency(freq, type);
-            const rampTime = 0.02; // Short ramp time to avoid clicks
             if (voice.synth.frequency) {
-                voice.synth.frequency.rampTo(quantizedFreq, rampTime);
+                // With portamento on, we just need to set the value.
+                // Tone.js handles the smooth glide.
+                voice.synth.frequency.value = quantizedFreq;
             }
             if (voice.synth.volume) {
                  // Convert linear volume (0-1) to Decibels for Tone.js
                 const targetDb = Tone.gainToDb(vol * vol);
-                voice.synth.volume.rampTo(targetDb, rampTime);
+                // Ramping volume is still a good idea to prevent clicks from volume changes
+                voice.synth.volume.rampTo(targetDb, 0.02);
             }
             this.orbManager?.updateOrb(pointerId, pos.x, pos.y);
         }
@@ -474,14 +476,14 @@ export class AudioEngine {
     
     private createPresets() {
         this.presets = {
-            synth: { type: 'Synth', options: { oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } } },
-            organ: { type: 'Synth', options: { oscillator: { type: 'fatsawtooth', count: 3, spread: 20 }, envelope: { attack: 0.05, decay: 0.2, sustain: 0.7, release: 1.2 } } },
-            theremin: { type: 'Synth', options: { oscillator: { type: 'sine' }, envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 } } },
-            mellotron: { type: 'FMSynth', options: { harmonicity: 3, modulationIndex: 0.5, oscillator: { type: "sine" }, envelope: { attack: 0.1, decay: 0.2, sustain: 0.4, release: 0.8 }, modulation: { type: "sine" }, modulationEnvelope: { attack: 0.2, decay: 0.5, sustain: 0.1, release: 0.8 } } },
-            ebass: { type: 'FMSynth', options: { harmonicity: 1.0, modulationIndex: 5, oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 0.8 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.02, decay: 0.1, sustain: 0.5, release: 0.8 } } },
-            'E-Bells_melody': { type: 'FMSynth', options: { harmonicity: 1.4, modulationIndex: 20, oscillator: { type: 'sine' }, envelope: { attack: 0.001, decay: 1.6, sustain: 0, release: 1.6 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.002, decay: 0.4, sustain: 0, release: 0.4 } } },
-            'E-Bells_bass': { type: 'FMSynth', options: { harmonicity: 1.4, modulationIndex: 15, oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 1.5, sustain: 0, release: 2.5 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.01, decay: 1.0, sustain: 0, release: 1.0 } } },
-            'G-Drops': { type: 'FMSynth', options: { harmonicity: 0.5, modulationIndex: 3.5, oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.7, sustain: 0.1, release: 0.4 }, modulation: { type: 'triangle' }, modulationEnvelope: { attack: 0.01, decay: 0.5, sustain: 0, release: 0.2 } } },
+            synth: { type: 'Synth', options: { portamento: 0.02, oscillator: { type: 'fatsine4', spread: 40, count: 4 }, envelope: { attack: 0.04, decay: 0.5, sustain: 0.8, release: 0.7 } } },
+            organ: { type: 'Synth', options: { portamento: 0.02, oscillator: { type: 'fatsawtooth', count: 3, spread: 20 }, envelope: { attack: 0.05, decay: 0.2, sustain: 0.7, release: 1.2 } } },
+            theremin: { type: 'Synth', options: { portamento: 0.02, oscillator: { type: 'sine' }, envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.3 } } },
+            mellotron: { type: 'FMSynth', options: { portamento: 0.02, harmonicity: 3, modulationIndex: 0.5, oscillator: { type: "sine" }, envelope: { attack: 0.1, decay: 0.2, sustain: 0.4, release: 0.8 }, modulation: { type: "sine" }, modulationEnvelope: { attack: 0.2, decay: 0.5, sustain: 0.1, release: 0.8 } } },
+            ebass: { type: 'FMSynth', options: { portamento: 0.02, harmonicity: 1.0, modulationIndex: 5, oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 0.8 }, modulation: { type: 'sine' }, modulationEnvelope: { attack: 0.02, decay: 0.1, sustain: 0.5, release: 0.8 } } },
+            'E-Bells_melody': { type: 'FMSynth', options: { portamento: 0.02, harmonicity: 1.4, modulationIndex: 20, oscillator: { type: 'sine' }, envelope: { attack: 0.001, decay: 1.6, sustain: 0, release: 1.6 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.002, decay: 0.4, sustain: 0, release: 0.4 } } },
+            'E-Bells_bass': { type: 'FMSynth', options: { portamento: 0.02, harmonicity: 1.4, modulationIndex: 15, oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 1.5, sustain: 0, release: 2.5 }, modulation: { type: 'square' }, modulationEnvelope: { attack: 0.01, decay: 1.0, sustain: 0, release: 1.0 } } },
+            'G-Drops': { type: 'FMSynth', options: { portamento: 0.02, harmonicity: 0.5, modulationIndex: 3.5, oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.7, sustain: 0.1, release: 0.4 }, modulation: { type: 'triangle' }, modulationEnvelope: { attack: 0.01, decay: 0.5, sustain: 0, release: 0.2 } } },
             'autopilot_effect_star': { type: 'FMSynth', options: { harmonicity: 3.4, modulationIndex: 10, envelope: { attack: 0.01, decay: 1.2, release: 1.2 } } },
         };
     }
