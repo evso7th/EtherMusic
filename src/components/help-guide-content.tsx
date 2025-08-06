@@ -59,7 +59,7 @@ Don't want to play yourself? Turn on the **Autopilot**!
     *   **Air:** Light, spacious, and "breathing" musical phrases.
     *   **Toccata:** Starts with the famous theme by J.S. Bach, then evolves into virtuosic and dramatic patterns.
     *   **Promenade:** Begins with the stately theme from Mussorgsky's "Pictures at an Exhibition," then continues the majestic walk.
-    *   **Space:** A slow, pulsing arpeggio in the style of Jean-Michel Jarre, with occasional "meteor" sound effects.
+    *   **Space:** A slow, pulsing arpeggio inspired by the infinity and mystery of space, with occasional "meteor" sound effects.
 *   **Presets:** For each style, you can save and load your own instrument and mixer settings using the \`Save\` and \`Load\` buttons in the Autopilot menu.
 
 ## Top Right Controls
