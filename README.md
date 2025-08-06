@@ -6,7 +6,7 @@ This is not just another music-making app. EtherMusic is a digital zen garden, a
 
 In a world of complex Digital Audio Workstations (DAWs) that demand expertise, EtherMusic offers a different path. It's not a tool for producing the next hit song; it's a tool for producing the soundtrack to your current state of mind.
 
-*   **For Everyone:** You don't need to know music theory. It's impossible to play a wrong note. The built-in "Harmonizer" makes sure that any note you play sounds perfect. If you have music in your soul, EtherMusic gives you a way to express it. It's simple enough even for a small child, yet deep enough to be captivating for adults.
+*   **For Everyone:** You don't need to know music theory. It's impossible to play a wrong note. The built-in "Harmonizer" ensures that any note you play sounds perfect, making dissonance impossible. If you have music in your soul, EtherMusic gives you a way to express it. It's simple enough for a small child, yet deep enough to be captivating for adults.
 *   **Digital Wellness:** This is technology in service of mental well-being. It's a space to disconnect, experiment, and find a state of flow through sound.
 *   **The Beauty of the Moment:** The music you create is ephemeral, existing only in the now. It's about the process of creation and harmonizing your inner state, not about the final product.
 

@@ -17,7 +17,7 @@
 }
 ```
 
-*   **Ключевой момент:** `"build": "next build"`. При наличии правильных настроек в `next.config.js`, эта команда автоматически выполнит и сборку, и статический экспорт.
+*   **Ключевой момент:** `"build": "next build"`. При наличии правильных настроек в `next.config.ts`, эта команда автоматически выполнит и сборку, и статический экспорт.
 
 ## 2. Настройка `next.config.ts`
 
@@ -43,6 +43,11 @@ const nextConfig: NextConfig = {
   },
   eslint: {
     ignoreDuringBuilds: true,
+  },
+
+  // Отключает индикатор сборки Next.js в углу экрана
+  devIndicators: {
+    buildActivity: false,
   },
 };
 
