@@ -111,8 +111,7 @@ const AutopilotInstrumentSelector = ({
     </div>
 );
 
-const ControlButtonWithTooltip = ({ tooltipText, children, ...props}: { tooltipText: string, children: React.ReactNode } & React.ComponentProps<typeof Button>) => {
-    const { isMobile } = props;
+const ControlButtonWithTooltip = ({ tooltipText, children, isMobile, ...props}: { tooltipText: string, children: React.ReactNode, isMobile: boolean } & Omit<React.ComponentProps<typeof Button>, 'isMobile'>) => {
     if (isMobile) {
         return <Button {...props}>{children}</Button>;
     }
