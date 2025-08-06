@@ -15,6 +15,8 @@ import type { Instrument, MusicKey, MusicScale } from '@/app/page';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 
 interface ThereminPadProps {
     type: 'melody' | 'bass';
@@ -65,6 +67,7 @@ export function ThereminPad({
 }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const isMobile = useIsMobile();
     
     const calculateInteraction = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (!padRef.current) return null;
@@ -114,84 +117,102 @@ export function ThereminPad({
         }
     }, [onInteraction, type, calculateInteraction, isDisabled]);
     
-     const renderSettingsControls = () => (
-        <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-            <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className={cn("h-8 capitalize",
+     const renderSettingsControls = () => {
+        const triggerButton = (
+             <Button variant="outline" size="sm" className={cn("h-8 capitalize",
                     type === 'melody' ? "border-primary text-primary hover:bg-primary hover:text-primary-foreground" : "border-accent text-accent hover:bg-accent hover:text-accent-foreground"
                 )}>
-                    <SlidersHorizontal className="w-4 h-4 mr-0 sm:mr-2" />
-                    <span className="hidden sm:inline">Settings</span>
-                </Button>
-            </SheetTrigger>
-            <SheetContent>
-                <SheetHeader>
-                    <SheetTitle>{padTitles[type]} Settings</SheetTitle>
-                </SheetHeader>
-                 <ScrollArea className="h-[85vh]">
-                    <div className="py-4 pr-4 space-y-6">
-                        {instruments && activeInstrument && onInstrumentChange && (
-                            <div className="space-y-2">
-                                <Label>Instrument</Label>
-                                <Select value={activeInstrument} onValueChange={onInstrumentChange}>
-                                    <SelectTrigger className="capitalize">
-                                        <SelectValue placeholder="Instrument" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {instruments.map(inst => (
-                                            <SelectItem key={inst} value={inst} className="capitalize">{inst.replace(/_/g, ' ')}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        )}
-                        
-                        {type === 'melody' && (
-                            <>
-                                <Separator />
-                                {musicKeys && activeKey && onKeyChange && (
-                                    <div className="space-y-2">
-                                        <Label>Music Key</Label>
-                                        <Select value={activeKey} onValueChange={onKeyChange}>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Key" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {musicKeys.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                )}
-                                {musicScales && activeScale && onScaleChange && (
-                                    <div className="space-y-2">
-                                        <Label>Music Scale</Label>
-                                        <Select value={activeScale} onValueChange={onScaleChange}>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Scale" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {musicScales.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                )}
-                             </>
-                        )}
-                        
-                         <Separator />
+                <SlidersHorizontal className="w-4 h-4 mr-0 sm:mr-2" />
+                <span className="hidden sm:inline">Settings</span>
+            </Button>
+        );
 
-                        <Button 
-                            onClick={() => setIsSettingsOpen(false)} 
-                            className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                            variant="outline"
-                        >
-                            Done
-                        </Button>
-                    </div>
-                </ScrollArea>
-            </SheetContent>
-        </Sheet>
-    );
+        const sheetTrigger = isMobile ? (
+            <SheetTrigger asChild>{triggerButton}</SheetTrigger>
+        ) : (
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <SheetTrigger asChild>{triggerButton}</SheetTrigger>
+                </TooltipTrigger>
+                <TooltipContent>
+                    <p>Instrument & Harmony Settings</p>
+                </TooltipContent>
+            </Tooltip>
+        );
+
+
+        return (
+            <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+                {sheetTrigger}
+                <SheetContent>
+                    <SheetHeader>
+                        <SheetTitle>{padTitles[type]} Settings</SheetTitle>
+                    </SheetHeader>
+                     <ScrollArea className="h-[85vh]">
+                        <div className="py-4 pr-4 space-y-6">
+                            {instruments && activeInstrument && onInstrumentChange && (
+                                <div className="space-y-2">
+                                    <Label>Instrument</Label>
+                                    <Select value={activeInstrument} onValueChange={onInstrumentChange}>
+                                        <SelectTrigger className="capitalize">
+                                            <SelectValue placeholder="Instrument" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {instruments.map(inst => (
+                                                <SelectItem key={inst} value={inst} className="capitalize">{inst.replace(/_/g, ' ')}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+                            
+                            {type === 'melody' && (
+                                <>
+                                    <Separator />
+                                    {musicKeys && activeKey && onKeyChange && (
+                                        <div className="space-y-2">
+                                            <Label>Music Key</Label>
+                                            <Select value={activeKey} onValueChange={onKeyChange}>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Key" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {musicKeys.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    )}
+                                    {musicScales && activeScale && onScaleChange && (
+                                        <div className="space-y-2">
+                                            <Label>Music Scale</Label>
+                                            <Select value={activeScale} onValueChange={onScaleChange}>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Scale" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {musicScales.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    )}
+                                 </>
+                            )}
+                            
+                             <Separator />
+
+                            <Button 
+                                onClick={() => setIsSettingsOpen(false)} 
+                                className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                                variant="outline"
+                            >
+                                Done
+                            </Button>
+                        </div>
+                    </ScrollArea>
+                </SheetContent>
+            </Sheet>
+        );
+     }
 
 
     const [title, subtitle] = padTitles[type].split(' ');
@@ -210,12 +231,23 @@ export function ThereminPad({
                     {activeInstrument?.replace(/_/g, ' ')}
                 </div>
                 <div className="flex items-center gap-2">
-                    {renderSettingsControls()}
+                     <TooltipProvider>
+                        {renderSettingsControls()}
+                    </TooltipProvider>
                     {type === 'bass' && onLatchToggle && (
-                        <div className="flex items-center space-x-1 h-8">
-                            <Switch id="latch-mode" checked={isLatchOn} onCheckedChange={onLatchToggle} />
-                            <Label htmlFor="latch-mode" className="flex items-center gap-1 text-xs"><Anchor className="w-3 h-3" /> Latch</Label>
-                        </div>
+                         <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <div className="flex items-center space-x-1 h-8">
+                                        <Switch id="latch-mode" checked={isLatchOn} onCheckedChange={onLatchToggle} />
+                                        <Label htmlFor="latch-mode" className="flex items-center gap-1 text-xs"><Anchor className="w-3 h-3" /> Latch</Label>
+                                    </div>
+                                </TooltipTrigger>
+                                <TooltipContent hidden={isMobile}>
+                                    <p>Hold bass notes</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                     )}
                 </div>
             </CardHeader>

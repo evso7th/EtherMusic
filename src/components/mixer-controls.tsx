@@ -123,7 +123,7 @@ export function MixerControls({ initialVolumes, onVolumeChange, initialEffects, 
     
     const handleVolumeCommit = useCallback((instrument: keyof Volumes, value: number) => {
         const newVolumes = { ...volumes, [instrument]: value };
-        setVolumes(newVolumes);
+        // No need to setVolumes here again, it's already done by the live change handler
         onVolumeChange(newVolumes);
     }, [volumes, onVolumeChange]);
 
@@ -133,7 +133,7 @@ export function MixerControls({ initialVolumes, onVolumeChange, initialEffects, 
     
     const handleEffectCommit = useCallback((instrument: keyof Effects, effect: 'reverb' | 'delay', value: number) => {
         const newEffects = { ...effects, [instrument]: { ...effects[instrument], [effect]: value }};
-        setEffects(newEffects);
+        // No need to setEffects here again, it's already done by the live change handler
         onEffectChange(newEffects);
     }, [effects, onEffectChange]);
 
@@ -207,7 +207,7 @@ export function AutopilotMixerControls({ initialVolumes, onVolumeChange, initial
     
     const handleVolumeCommit = useCallback((instrument: keyof Volumes, value: number) => {
         const newVolumes = { ...volumes, [instrument]: value };
-        setVolumes(newVolumes);
+        // No need to setVolumes here again, it's already done by the live change handler
         onVolumeChange(newVolumes);
     }, [volumes, onVolumeChange]);
 
@@ -217,7 +217,7 @@ export function AutopilotMixerControls({ initialVolumes, onVolumeChange, initial
     
     const handleEffectCommit = useCallback((instrument: keyof Effects, effect: 'reverb' | 'delay', value: number) => {
         const newEffects = { ...effects, [instrument]: { ...effects[instrument], [effect]: value }};
-        setEffects(newEffects);
+        // No need to setEffects here again, it's already done by the live change handler
         onEffectChange(newEffects);
     }, [effects, onEffectChange]);
 

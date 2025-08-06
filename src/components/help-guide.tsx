@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 import React, { useMemo } from "react";
 import { guideContent } from "./help-guide-content";
 import { marked } from "marked";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 
 
 interface HelpGuideProps extends ButtonProps {
@@ -34,19 +36,38 @@ export const HelpGuide = ({ buttonVariant = "outline", buttonClassName, showText
         )
     }, []);
 
+    const isMobile = useIsMobile();
+
+    const triggerButton = (
+        <Button variant={buttonVariant} size={size || (showText ? "default" : "icon")} className={cn(buttonClassName)} {...props}>
+            <HelpCircle className="w-5 h-5" />
+            <span className={cn(
+                "sr-only",
+                showText && "sm:not-sr-only sm:ml-2 sm:inline"
+            )}>
+                Help
+            </span>
+        </Button>
+    );
+
+    const dialogTrigger = isMobile ? (
+        <DialogTrigger asChild>{triggerButton}</DialogTrigger>
+    ) : (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <DialogTrigger asChild>{triggerButton}</DialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent>
+                <p>Help</p>
+            </TooltipContent>
+        </Tooltip>
+    );
+
     return (
         <Dialog>
-            <DialogTrigger asChild>
-                <Button variant={buttonVariant} size={size || (showText ? "default" : "icon")} className={cn(buttonClassName)} {...props}>
-                    <HelpCircle className="w-5 h-5" />
-                    <span className={cn(
-                        "sr-only",
-                        showText && "sm:not-sr-only sm:ml-2 sm:inline"
-                    )}>
-                        Help
-                    </span>
-                </Button>
-            </DialogTrigger>
+            <TooltipProvider>
+                {dialogTrigger}
+            </TooltipProvider>
             <DialogContent className="max-w-[90vw] md:max-w-xl lg:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Quick Guide</DialogTitle>

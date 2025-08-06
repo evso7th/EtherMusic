@@ -15,6 +15,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface PlaybackControlsProps {
     isPlaying: boolean;
@@ -25,6 +27,24 @@ interface PlaybackControlsProps {
     onStop: () => void;
     isReady: boolean;
 }
+
+const ControlButton = ({ tooltip, children, ...props }: { tooltip: string, children: React.ReactNode } & React.ComponentProps<typeof Button>) => {
+    const isMobile = useIsMobile();
+    if (isMobile) {
+        return <Button {...props}>{children}</Button>;
+    }
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Button {...props}>{children}</Button>
+            </TooltipTrigger>
+            <TooltipContent>
+                <p>{tooltip}</p>
+            </TooltipContent>
+        </Tooltip>
+    );
+};
+
 
 export function PlaybackControls({ 
     isPlaying,
@@ -43,8 +63,9 @@ export function PlaybackControls({
     };
 
     return (
-        <>
-             <Button 
+        <TooltipProvider>
+             <ControlButton
+                tooltip={isPlaying ? "Pause" : "Play"}
                 onClick={isPlaying ? onPause : onPlay} 
                 size="icon" 
                 variant="outline" 
@@ -53,11 +74,12 @@ export function PlaybackControls({
                 disabled={!isReady}
              >
                 {isPlaying ? <Pause className="w-5 h-5 md:w-6 md:h-6" /> : <Play className="w-5 h-5 md:w-6 md:h-6" />}
-            </Button>
-             <Button onClick={onStop} size="icon" variant="outline" className="w-10 h-10 rounded-full" aria-label="Stop" disabled={!isReady}>
+            </ControlButton>
+             <ControlButton tooltip="Stop" onClick={onStop} size="icon" variant="outline" className="w-10 h-10 rounded-full" aria-label="Stop" disabled={!isReady}>
                 <StopCircle className="w-5 h-5 md:w-6 md:h-6" />
-            </Button>
-            <Button 
+            </ControlButton>
+            <ControlButton
+                tooltip="Record"
                 onClick={onRecord} 
                 variant={isRecording ? 'destructive' : 'outline'} 
                 size="icon" 
@@ -69,13 +91,20 @@ export function PlaybackControls({
                 disabled={!isReady || true}
             >
                  <Circle className="w-5 h-5 md:w-6 md:h-6" />
-            </Button>
+            </ControlButton>
             <AlertDialog>
-                <AlertDialogTrigger asChild>
-                    <Button size="icon" variant="outline" className="w-10 h-10 rounded-full" aria-label="Exit App">
-                        <Power className="w-5 h-5 md:w-6 md:h-6" />
-                    </Button>
-                </AlertDialogTrigger>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <AlertDialogTrigger asChild>
+                            <Button size="icon" variant="outline" className="w-10 h-10 rounded-full" aria-label="Exit App">
+                                <Power className="w-5 h-5 md:w-6 md:h-6" />
+                            </Button>
+                        </AlertDialogTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Exit</p>
+                    </TooltipContent>
+                </Tooltip>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>End Meditation?</AlertDialogTitle>
@@ -94,6 +123,6 @@ export function PlaybackControls({
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </>
+        </TooltipProvider>
     );
 }
