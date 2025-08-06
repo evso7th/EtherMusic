@@ -28,6 +28,67 @@ import { cn } from '@/lib/utils';
 import type { NoteEvent, WorkerResponse, AutopilotStyle, AutopilotPart as WorkerAutopilotPart, NoteUpdateEvent } from '@/lib/autopilot-worker';
 
 
+function getCookie(name: string): string | null {
+    if (typeof document === 'undefined') return null;
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+    return null;
+}
+
+function setCookie(name: string, value: string, days: number) {
+    if (typeof document === 'undefined') return;
+    let expires = "";
+    if (days) {
+        const date = new Date();
+        date.setTime(date.getTime() + (days*24*60*60*1000));
+        expires = "; expires=" + date.toUTCString();
+    }
+    document.cookie = name + "=" + (value || "")  + expires + "; path=/; SameSite=Lax";
+}
+
+
+const defaultVolumes = { melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, accompaniment: -14, autopilotBass: -9, effects: -6 };
+const defaultEffects = {
+    melody: { reverb: -Infinity, delay: -60 },
+    manualBass: { reverb: -Infinity, delay: -60 },
+    latch: { reverb: -Infinity, delay: -60 },
+    drums: { reverb: -Infinity, delay: -60 },
+    autopilot: { reverb: -Infinity, delay: -60 },
+    accompaniment: { reverb: -6, delay: -20 },
+    autopilotBass: { reverb: -Infinity, delay: -60 },
+    effects: { reverb: -6, delay: -6 },
+};
+
+function loadSettings() {
+    try {
+        const savedVolumes = getCookie("ethermusic_volumes");
+        const savedEffects = getCookie("ethermusic_effects");
+
+        const volumes = savedVolumes ? JSON.parse(savedVolumes) : defaultVolumes;
+        const effects = savedEffects ? JSON.parse(savedEffects) : defaultEffects;
+        
+        // Basic validation
+        if (typeof volumes.melody !== 'number') return { volumes: defaultVolumes, effects: defaultEffects };
+
+        return { volumes, effects };
+    } catch (e) {
+        console.error("Failed to load settings from cookies", e);
+        return { volumes: defaultVolumes, effects: defaultEffects };
+    }
+}
+
+function saveSettings(volumes: any, effects: any) {
+    try {
+        setCookie("ethermusic_volumes", JSON.stringify(volumes), 365);
+        setCookie("ethermusic_effects", JSON.stringify(effects), 365);
+    } catch (e) {
+        console.error("Failed to save settings to cookies", e);
+    }
+}
+
+
+
 export const tempos: Tempo[] = [
     { name: 'Largo', bpm: 50 },
     { name: 'Adagio', bpm: 70 },
@@ -94,6 +155,8 @@ export default function Home() {
     const orbManager = useRef<OrbManager>();
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
 
+    const initialSettings = useRef(loadSettings());
+
     // --- Engine Initialization ---
     useEffect(() => {
         setIsClient(true);
@@ -125,8 +188,8 @@ export default function Home() {
             autopilotWorker.current = worker;
             
             mainEngine.setTempo(tempos[2].bpm);
-            mainEngine.setVolumes(initialVolumes.current);
-            mainEngine.setEffects(initialEffects.current);
+            mainEngine.setVolumes(initialSettings.current.volumes);
+            mainEngine.setEffects(initialSettings.current.effects);
             mainEngine.setMelodyInstrument('theremin');
             mainEngine.setBassInstrument('ebass');
             mainEngine.setAutopilotInstrument('melody', 'synth');
@@ -174,10 +237,14 @@ export default function Home() {
 
     const handleVolumeChange = useCallback((newVolumes: any) => {
         audioEngine.current?.setVolumes(newVolumes);
+        initialSettings.current.volumes = newVolumes;
+        saveSettings(newVolumes, initialSettings.current.effects);
     }, []);
 
     const handleEffectChange = useCallback((newEffects: any) => {
         audioEngine.current?.setEffects(newEffects);
+        initialSettings.current.effects = newEffects;
+        saveSettings(initialSettings.current.volumes, newEffects);
     }, []);
 
     const handlePatternChange = useCallback((pattern: (typeof beatPatterns)[number]) => {
@@ -294,18 +361,6 @@ export default function Home() {
             backgroundAudioRef.current.play().catch(error => console.error("Error playing background audio:", error));
         }
     }, []);
-
-    const initialVolumes = useRef({ melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, accompaniment: -14, autopilotBass: -9, effects: -6 });
-    const initialEffects = useRef({
-        melody: { reverb: -Infinity, delay: -60 },
-        manualBass: { reverb: -Infinity, delay: -60 },
-        latch: { reverb: -Infinity, delay: -60 },
-        drums: { reverb: -Infinity, delay: -60 },
-        autopilot: { reverb: -Infinity, delay: -60 },
-        accompaniment: { reverb: -6, delay: -20 },
-        autopilotBass: { reverb: -Infinity, delay: -60 },
-        effects: { reverb: -6, delay: -6 },
-    });
 
     if (!isClient) {
         return <Preloader />;
@@ -437,9 +492,9 @@ export default function Home() {
                             tempos={tempos}
                             activeTempo={activeTempo}
                             onTempoChange={handleTempoChange}
-                            initialVolumes={initialVolumes.current}
+                            initialVolumes={initialSettings.current.volumes}
                             onVolumeChange={handleVolumeChange}
-                            initialEffects={initialEffects.current}
+                            initialEffects={initialSettings.current.effects}
                             onEffectChange={handleEffectChange}
                             isAutopilotOn={isAutopilotOn}
                             onAutopilotToggle={handleAutopilotToggle}
@@ -462,9 +517,9 @@ export default function Home() {
                         tempos={tempos}
                         activeTempo={activeTempo}
                         onTempoChange={handleTempoChange}
-                        initialVolumes={initialVolumes.current}
+                        initialVolumes={initialSettings.current.volumes}
                         onVolumeChange={handleVolumeChange}
-                        initialEffects={initialEffects.current}
+                        initialEffects={initialSettings.current.effects}
                         onEffectChange={handleEffectChange}
                         isAutopilotOn={isAutopilotOn}
                         onAutopilotToggle={handleAutopilotToggle}
@@ -482,3 +537,6 @@ export default function Home() {
         </div>
     );
 }
+
+
+    
