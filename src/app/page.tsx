@@ -49,7 +49,7 @@ export const musicKeys: MusicKey[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G',
 export type MusicScale = 'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentatonic';
 export const musicScales: MusicScale[] = ['Major', 'Minor', 'Major Pentatonic', 'Minor Pentatonic'];
 
-export const autopilotStyles: AutopilotStyle[] = ['Ambient', 'Sequence', 'Water', 'Air', 'Earth'];
+export const autopilotStyles: AutopilotStyle[] = ['Ambient', 'Sequence', 'Water', 'Air', 'Earth', 'Tibet', 'Space'];
 
 
 const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
@@ -459,5 +459,7 @@ export default function Home() {
         </div>
     );
 }
+
+    
 
     

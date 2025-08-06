@@ -5,7 +5,7 @@ import type { Instrument, MusicKey, MusicScale } from '@/app/page';
 import type { Unit } from 'tone/build/esm/core/type/Units';
 
 // --- TYPE DEFINITIONS ---
-export type AutopilotStyle = 'Ambient' | 'Sequence' | 'Water' | 'Air' | 'Earth';
+export type AutopilotStyle = 'Ambient' | 'Sequence' | 'Water' | 'Air' | 'Earth' | 'Tibet' | 'Space';
 export type AutopilotPart = 'melody' | 'accompaniment' | 'bass' | 'effects';
 
 export type NoteEvent = {
@@ -108,6 +108,14 @@ let state = {
     earth: {
         currentChordIndex: 0,
         lastMelodyTick: 0,
+    },
+    tibet: {
+        lastBowlTick: 0,
+        lastChantTick: 0,
+    },
+    space: {
+        arpIndex: 0,
+        lastLaserTick: 0,
     }
 };
 
@@ -500,6 +508,87 @@ function tickEarth(time: number) {
     }
 }
 
+// --- "TIBET" STYLE ---
+function tickTibet(time: number) {
+    const ticksPerFourMeasures = 16 * 4;
+
+    // Bass (Chant Drone)
+    const chantInterval = ticksPerFourMeasures * 2; // Very long drone
+    if (state.tick16n % chantInterval === 0) {
+        const rootFreq = state.scaleFrequencies.bass[0]; // Always use the root of the scale
+        if (rootFreq) {
+            self.postMessage({ type: 'playNote', note: {
+                part: 'bass', freq: rootFreq, dur: '8m', vel: 0.6, time
+            }});
+        }
+    }
+
+    // Melody (Singing Bowls)
+    const bowlInterval = 32 + Math.floor(Math.random() * 32); // 2 to 4 measures
+    if (state.tick16n >= state.tibet.lastBowlTick + bowlInterval) {
+        const bowlFreq = state.scaleFrequencies.melody[Math.floor(Math.random() * state.scaleFrequencies.melody.length)];
+        if (bowlFreq) {
+            self.postMessage({ type: 'playNote', note: {
+                part: 'melody', freq: bowlFreq, dur: '1m', vel: 0.9, time
+            }});
+        }
+        state.tibet.lastBowlTick = state.tick16n;
+    }
+}
+
+
+// --- "SPACE" STYLE ---
+function tickSpace(time: number) {
+    const ticksPerMeasure = 16;
+    
+    // Bass (Rhythmic sequence)
+    if (state.tick16n % 4 === 0) { // Every beat
+        const bassDegree = [0, 0, 3, 3, 4, 4, 0, 0][(Math.floor(state.tick16n / 4)) % 8];
+        const bassFreq = state.scaleFrequencies.bass[bassDegree % state.scaleFrequencies.bass.length];
+        if (bassFreq) {
+            self.postMessage({ type: 'playNote', note: {
+                part: 'bass', freq: bassFreq, dur: '8n', vel: 0.8, time
+            }});
+        }
+    }
+
+    // Accompaniment (Fast Arpeggio) - BATCHED for performance
+    if (state.tick16n % ticksPerMeasure === 0) {
+        const rootDegree = [0, 3, 4, 0][Math.floor(state.tick16n / ticksPerMeasure) % 4];
+        const chordDegrees = [rootDegree, rootDegree + 2, rootDegree + 4, rootDegree + 7];
+        const arpPattern = [0, 1, 2, 1, 3, 1, 2, 1, 0, 1, 2, 1, 3, 1, 2, 1];
+        
+        const notesBatch: NoteEvent[] = [];
+        for (let i = 0; i < 16; i++) {
+            const degreeIndex = arpPattern[i];
+            const noteDegree = chordDegrees[degreeIndex % chordDegrees.length];
+            const noteFreq = state.scaleFrequencies.accompaniment[noteDegree % state.scaleFrequencies.accompaniment.length];
+            if (noteFreq) {
+                const noteTime = time + (i * (60 / state.currentBpm / 4));
+                notesBatch.push({
+                    part: 'accompaniment', freq: noteFreq, dur: '16n', vel: 0.4, time: noteTime
+                });
+            }
+        }
+        if (notesBatch.length > 0) {
+            self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
+        }
+    }
+
+
+    // Effects (Lasers/Swooshes)
+    const laserInterval = 16 + Math.floor(Math.random() * 16);
+    if (state.tick16n >= state.space.lastLaserTick + laserInterval) {
+         const freq = state.scaleFrequencies.effects[Math.floor(Math.random() * state.scaleFrequencies.effects.length)];
+        if (freq) {
+             self.postMessage({ type: 'playNote', note: {
+                part: 'effects', freq: freq, dur: '8n', vel: 0.7, time
+            }});
+        }
+        state.space.lastLaserTick = state.tick16n;
+    }
+}
+
 
 // --- UNIVERSAL EFFECTS TICK ---
 function tickEffects(time: number) {
@@ -537,9 +626,17 @@ function tick(time: number) {
         case 'Earth':
             tickEarth(time);
             break;
+        case 'Tibet':
+            tickTibet(time);
+            break;
+        case 'Space':
+            tickSpace(time);
+            break;
     }
 
-    tickEffects(time);
+    if (state.currentStyle !== 'Tibet' && state.currentStyle !== 'Space') {
+        tickEffects(time);
+    }
     
     // Increment master tick
     state.tick16n++;
@@ -552,33 +649,18 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
         case 'start':
             state.isRunning = true;
             state.tick16n = 0;
-            // Reset sequence state
-            state.sequence.bassNoteIndex = 0;
-            state.sequence.accompanimentIndex = 0;
+            // Reset all style-specific states
             state.sequence.lastMelodyNoteIndex = null;
-            state.sequence.notesInCurrentPhrase = 0;
-            state.sequence.maxNotesInPhrase = 5;
             state.sequence.nextMelodyTick = 0;
-            // Reset ambient state
-            state.ambient.currentChordDegree = 0;
-            state.ambient.lastChordChangeTick = -Infinity; // Force immediate chord
+            state.ambient.lastChordChangeTick = -Infinity; 
             state.ambient.lastMelodyDegree = null;
-            // Reset water state
-            state.water.arpeggioIndex = 0;
-            state.water.currentChordRootDegree = 0;
-            // Reset Air state
-            state.air.currentChordIndex = 0;
-            state.air.phraseMeasures = 0;
-            state.air.totalPhraseMeasures = 4;
-            state.air.isResting = true; // Start with a rest
+            state.air.isResting = true;
             state.air.restMeasures = 0;
-            state.air.totalRestMeasures = 0; // No rest at the very beginning
-            state.air.currentArpPattern = [0, 1, 2];
-            state.air.currentBassPattern = [];
-            // Reset Earth state
-            state.earth.currentChordIndex = 0;
+            state.air.totalRestMeasures = 0;
             state.earth.lastMelodyTick = 0;
-
+            state.tibet.lastBowlTick = -Infinity;
+            state.tibet.lastChantTick = -Infinity;
+            state.space.lastLaserTick = 0;
             break;
         case 'stop':
             state.isRunning = false;
@@ -610,7 +692,5 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
 
 // Initial setup
 updateHarmony(state.currentKey, state.currentScale);
-
-    
 
     
