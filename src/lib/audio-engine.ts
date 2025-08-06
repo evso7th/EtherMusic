@@ -110,7 +110,7 @@ export class AudioEngine {
     
     private currentInstruments: Record<'melody' | 'bass', Instrument> = {
         melody: 'theremin',
-        bass: 'ebass',
+        bass: 'synth',
     };
     
     private autopilotSynths: Record<WorkerAutopilotPart, (Tone.Synth | Tone.FMSynth | Tone.NoiseSynth | Tone.AMSynth) & { id?: number } | null> = {
@@ -121,6 +121,8 @@ export class AudioEngine {
     };
 
     private lastAutopilotNoteTime: { [key in WorkerAutopilotPart]?: number } = {};
+    private mediaRecorder: MediaRecorder | null = null;
+    private recordedChunks: Blob[] = [];
 
     constructor() {
         // All initialization is now in the async initialize() method
@@ -158,8 +160,6 @@ export class AudioEngine {
         
         this.latchEngine = new LatchEngine(this);
         
-        // We DO NOT start the transport here. It's started by user action (Play button, enabling drums, etc)
-        // Tone.Transport.start(); 
         this.isInitialized = true;
         console.log(`AudioEngine initialized. Transport is ready to be started.`);
     }
@@ -498,5 +498,47 @@ export class AudioEngine {
         const freqs = this.allowedFrequencies[type];
         if (freqs.length === 0) return targetFreq;
         return freqs.reduce((prev, curr) => (Math.abs(curr - targetFreq) < Math.abs(prev - targetFreq) ? curr : prev));
+    }
+
+    // --- Recording ---
+
+    public startRecording() {
+        if (!this.isInitialized || this.mediaRecorder?.state === 'recording') return;
+        
+        const dest = Tone.getContext().createMediaStreamDestination();
+        Tone.getDestination().connect(dest);
+        
+        this.mediaRecorder = new MediaRecorder(dest.stream, { mimeType: 'audio/webm' });
+        this.recordedChunks = [];
+        
+        this.mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                this.recordedChunks.push(event.data);
+            }
+        };
+        
+        this.mediaRecorder.onstop = () => {
+            const blob = new Blob(this.recordedChunks, { type: 'audio/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            document.body.appendChild(a);
+            a.style.display = 'none';
+            a.href = url;
+            const date = new Date();
+            const dateString = `${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
+            a.download = `EtherMusic-Session-${dateString}.webm`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        };
+        
+        this.mediaRecorder.start();
+        console.log("Recording started.");
+    }
+    
+    public stopRecording() {
+        if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+            this.mediaRecorder.stop();
+        }
     }
 }

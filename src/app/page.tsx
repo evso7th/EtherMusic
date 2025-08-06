@@ -366,8 +366,18 @@ export default function Home() {
     }, []);
 
     const handleRecord = useCallback(() => {
-        toast({ title: "Recording Unavailable", description: "This feature is temporarily disabled." });
-    }, [toast]);
+        if (!audioEngine.current) return;
+
+        if (isRecording) {
+            audioEngine.current.stopRecording();
+            setIsRecording(false);
+            toast({ title: "Recording Stopped", description: "Your session has been saved." });
+        } else {
+            audioEngine.current.startRecording();
+            setIsRecording(true);
+            toast({ title: "Recording Started", description: "Press the record button again to stop." });
+        }
+    }, [isRecording, toast]);
     
      const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isReady || !audioEngine.current) return;

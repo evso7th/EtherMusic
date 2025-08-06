@@ -85,10 +85,10 @@ export function PlaybackControls({
                 size="icon" 
                 className={cn(
                     'w-10 h-10 rounded-full transition-colors',
-                    isRecording && 'animate-pulse-primary'
+                    isRecording && 'animate-pulse'
                 )}
                 aria-label={isRecording ? "Stop Recording" : "Record"} 
-                disabled={!isReady || true}
+                disabled={!isReady}
             >
                  <Circle className="w-5 h-5 md:w-6 md:h-6" />
             </ControlButton>

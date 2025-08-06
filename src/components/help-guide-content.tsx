@@ -75,4 +75,4 @@ The application is highly optimized to run smoothly on a wide range of devices, 
 However, if you are using a very old or low-power device, running the most complex **Autopilot** styles (like \`Toccata\` or \`Promenade\`) simultaneously with the **Drum Machine** might still be demanding. For the absolute smoothest experience in such cases, you can use these features separately.
 
 Enjoy the process and let the music you create reflect your inner state.
-`;
+`
