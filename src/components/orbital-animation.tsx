@@ -12,6 +12,7 @@ export function OrbitalAnimation({ isPlaying = false, tempo = 120 }: OrbitalAnim
   const pulseDuration = 60 / tempo;
 
   const animationStyle: CSSProperties = {
+    // @ts-ignore
     '--pulse-duration': `${pulseDuration}s`,
   };
 
@@ -26,8 +27,7 @@ export function OrbitalAnimation({ isPlaying = false, tempo = 120 }: OrbitalAnim
             key={i} 
             className={cn(
               styles.circle,
-              // Add pulsating class only to the first circle and only when playing
-              i === 0 && isPlaying && styles.pulsating
+               isPlaying && styles.pulsating
             )}
           ></div>
         ))}

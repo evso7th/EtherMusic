@@ -156,10 +156,10 @@ export class AudioEngine {
         
         this.latchEngine = new LatchEngine(this);
         
-        // START THE ETERNAL METRONOME - ONCE AND FOREVER
-        Tone.Transport.start(); 
+        // We DO NOT start the transport here. It's started by user action (Play button, enabling drums, etc)
+        // Tone.Transport.start(); 
         this.isInitialized = true;
-        console.log(`AudioEngine initialized and Transport started.`);
+        console.log(`AudioEngine initialized. Transport is ready to be started.`);
     }
 
     public setOrbManager(orbManager: OrbManager) {

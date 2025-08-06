@@ -40,9 +40,6 @@ export type Instrument = 'synth' | 'organ' | 'theremin' | 'E-Bells' | 'mellotron
 export const instruments: Instrument[] = ['synth', 'organ', 'theremin', 'E-Bells', 'mellotron', 'G-Drops', 'ebass'];
 export const autopilotInstruments: Instrument[] = ['synth', 'organ', 'theremin', 'E-Bells', 'mellotron', 'G-Drops', 'ebass', 'autopilot_effect_star', 'autopilot_effect_meteor', 'autopilot_effect_bell', 'autopilot_effect_chimes'];
 
-export const autopilotEffects: Instrument[] = ['Starfall', 'Meteor', 'G-Drops', 'E-Chimes'];
-
-
 export type MusicKey = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B';
 export const musicKeys: MusicKey[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
@@ -73,6 +70,7 @@ export default function Home() {
     const [isReady, setIsReady] = useState(false);
     
     // --- UI State ---
+    const [isPlaying, setIsPlaying] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
     const [activePattern, setActivePattern] = useState<(typeof beatPatterns)[number]>(beatPatterns.find(p => p.name === 'Off')!);
@@ -87,7 +85,7 @@ export default function Home() {
         melody: 'synth',
         accompaniment: 'mellotron',
         bass: 'ebass',
-        effects: 'Starfall'
+        effects: 'autopilot_effect_star'
     });
     
     // --- Engine Ref ---
@@ -108,6 +106,7 @@ export default function Home() {
             const mainEngine = new AudioEngine();
             await mainEngine.initialize();
             audioEngine.current = mainEngine;
+            setIsPlaying(Tone.Transport.state === 'started');
             
             const om = new OrbManager();
             orbManager.current = om;
@@ -133,7 +132,7 @@ export default function Home() {
             mainEngine.setAutopilotInstrument('melody', 'synth');
             mainEngine.setAutopilotInstrument('accompaniment', 'mellotron');
             mainEngine.setAutopilotInstrument('bass', 'ebass');
-            mainEngine.setAutopilotInstrument('effects', 'Starfall');
+            mainEngine.setAutopilotInstrument('effects', 'autopilot_effect_star');
 
             mainEngine.setHarmony('G', 'Major');
             
@@ -144,7 +143,7 @@ export default function Home() {
                 melody: 'synth',
                 accompaniment: 'mellotron',
                 bass: 'ebass',
-                effects: 'Starfall'
+                effects: 'autopilot_effect_star'
             }});
             
             Tone.Transport.scheduleRepeat((time) => {
@@ -184,6 +183,10 @@ export default function Home() {
     const handlePatternChange = useCallback((pattern: (typeof beatPatterns)[number]) => {
         setActivePattern(pattern);
         audioEngine.current?.setBeatPattern(pattern.name);
+        if (pattern.name !== 'Off' && Tone.Transport.state !== 'started') {
+            Tone.Transport.start();
+            setIsPlaying(true);
+        }
     }, []);
 
     const handleHarmonyChange = useCallback((key: MusicKey, scale: MusicScale) => {
@@ -218,15 +221,33 @@ export default function Home() {
     const handleAutopilotToggle = useCallback((isOn: boolean) => {
         setIsAutopilotOn(isOn);
         autopilotWorker.current?.postMessage({ type: isOn ? 'start' : 'stop' });
+        if (isOn && Tone.Transport.state !== 'started') {
+            Tone.Transport.start();
+            setIsPlaying(true);
+        }
     }, []);
 
     const handleAutopilotStyleChange = useCallback((style: AutopilotStyle) => {
         setAutopilotStyle(style);
         autopilotWorker.current?.postMessage({ type: 'setStyle', style });
     }, []);
+
+    const handlePlay = useCallback(() => {
+        if (!isReady) return;
+        Tone.Transport.start();
+        setIsPlaying(true);
+    }, [isReady]);
+
+    const handlePause = useCallback(() => {
+        if (!isReady) return;
+        Tone.Transport.pause();
+        setIsPlaying(false);
+    }, [isReady]);
     
     const handleStop = useCallback(async () => {
         if (!audioEngine.current) return;
+        Tone.Transport.stop();
+        setIsPlaying(false);
         const offPattern = beatPatterns.find(p => p.name === 'Off')!;
         setActivePattern(offPattern);
         audioEngine.current.setBeatPattern(offPattern.name);
@@ -327,7 +348,7 @@ export default function Home() {
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
             <div className="fixed inset-0 z-0 animate-pulse-container">
-                 <MemoizedOrbitalAnimation isPlaying={Tone.Transport.state === 'started'} tempo={activeTempo.bpm} />
+                 <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={activeTempo.bpm} />
             </div>
             
              <div className={cn(
@@ -366,7 +387,10 @@ export default function Home() {
                     </div>
                     <div className={cn("flex items-center gap-1 md:gap-2", "landscape:flex-col")}>
                          <PlaybackControls
+                            isPlaying={isPlaying}
                             isRecording={isRecording}
+                            onPlay={handlePlay}
+                            onPause={handlePause}
                             onRecord={handleRecord}
                             onStop={handleStop}
                             isReady={isReady}

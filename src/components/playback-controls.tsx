@@ -2,7 +2,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Circle, StopCircle, Power } from 'lucide-react';
+import { Circle, StopCircle, Power, Play, Pause } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -17,14 +17,20 @@ import {
 } from "@/components/ui/alert-dialog"
 
 interface PlaybackControlsProps {
+    isPlaying: boolean;
     isRecording: boolean;
+    onPlay: () => void;
+    onPause: () => void;
     onRecord: () => void;
     onStop: () => void;
     isReady: boolean;
 }
 
 export function PlaybackControls({ 
+    isPlaying,
     isRecording, 
+    onPlay,
+    onPause,
     onRecord, 
     onStop,
     isReady 
@@ -38,6 +44,16 @@ export function PlaybackControls({
 
     return (
         <>
+             <Button 
+                onClick={isPlaying ? onPause : onPlay} 
+                size="icon" 
+                variant="outline" 
+                className="w-10 h-10 rounded-full" 
+                aria-label={isPlaying ? "Pause" : "Play"} 
+                disabled={!isReady}
+             >
+                {isPlaying ? <Pause className="w-5 h-5 md:w-6 md:h-6" /> : <Play className="w-5 h-5 md:w-6 md:h-6" />}
+            </Button>
              <Button onClick={onStop} size="icon" variant="outline" className="w-10 h-10 rounded-full" aria-label="Stop" disabled={!isReady}>
                 <StopCircle className="w-5 h-5 md:w-6 md:h-6" />
             </Button>
@@ -81,5 +97,3 @@ export function PlaybackControls({
         </>
     );
 }
-
-    
