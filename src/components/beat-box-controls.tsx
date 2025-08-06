@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { MixerControls, AutopilotMixerControls } from '@/components/mixer-controls';
 import { SlidersHorizontal, Drum, Zap, Bot, Power, Wand2, Music } from 'lucide-react';
-import { useState, useMemo } from "react";
+import { useState, useMemo, memo } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
 import { Separator } from "./ui/separator";
@@ -85,7 +85,7 @@ interface BeatBoxControlsProps {
     isLandscape?: boolean;
 }
 
-const AutopilotInstrumentSelector = ({
+const MemoizedAutopilotInstrumentSelector = memo(function AutopilotInstrumentSelector({
     label,
     value,
     onChange,
@@ -95,23 +95,25 @@ const AutopilotInstrumentSelector = ({
     value: Instrument,
     onChange: (instrument: Instrument) => void,
     instruments: Instrument[]
-}) => (
-    <div className="grid grid-cols-4 items-center gap-4">
-        <Label htmlFor={`inst-${label}`} className="text-right">{label}</Label>
-        <Select value={value} onValueChange={onChange}>
-            <SelectTrigger id={`inst-${label}`} className="col-span-3 capitalize">
-                <SelectValue placeholder="Select instrument" />
-            </SelectTrigger>
-            <SelectContent>
-                {instruments.map(inst => (
-                    <SelectItem key={inst} value={inst} className="capitalize">{inst.replace(/_/g, ' ')}</SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
-    </div>
-);
+}) {
+    return (
+        <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor={`inst-${label}`} className="text-right">{label}</Label>
+            <Select value={value} onValueChange={onChange}>
+                <SelectTrigger id={`inst-${label}`} className="col-span-3 capitalize">
+                    <SelectValue placeholder="Select instrument" />
+                </SelectTrigger>
+                <SelectContent>
+                    {instruments.map(inst => (
+                        <SelectItem key={inst} value={inst} className="capitalize">{inst.replace(/_/g, ' ')}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
+    )
+});
 
-const ControlButtonWithTooltip = ({ tooltipText, children, isMobile, ...props}: { tooltipText: string, children: React.ReactNode, isMobile: boolean } & Omit<React.ComponentProps<typeof Button>, 'isMobile'>) => {
+const ControlButtonWithTooltip = memo(function ControlButtonWithTooltip({ tooltipText, children, isMobile, ...props}: { tooltipText: string, children: React.ReactNode, isMobile: boolean } & Omit<React.ComponentProps<typeof Button>, 'isMobile'>) {
     if (isMobile) {
         return <Button {...props}>{children}</Button>;
     }
@@ -125,7 +127,7 @@ const ControlButtonWithTooltip = ({ tooltipText, children, isMobile, ...props}: 
             </TooltipContent>
         </Tooltip>
     );
-};
+});
 
 
 export function BeatBoxControls({
@@ -224,25 +226,25 @@ export function BeatBoxControls({
 
                     <div className="space-y-4">
                         <h4 className="text-sm font-medium text-center text-muted-foreground">Instruments</h4>
-                        <AutopilotInstrumentSelector 
+                        <MemoizedAutopilotInstrumentSelector 
                             label="Melody"
                             value={activeAutopilotInstruments.melody}
                             onChange={(inst) => onAutopilotInstrumentChange('melody', inst as Instrument)}
                             instruments={autopilotInstruments.filter(i => !i.includes('bass') && !i.includes('effect'))}
                         />
-                         <AutopilotInstrumentSelector 
+                         <MemoizedAutopilotInstrumentSelector 
                             label="Accompaniment"
                             value={activeAutopilotInstruments.accompaniment}
                             onChange={(inst) => onAutopilotInstrumentChange('accompaniment', inst as Instrument)}
                             instruments={autopilotInstruments.filter(i => !i.includes('bass') && !i.includes('effect'))}
                         />
-                         <AutopilotInstrumentSelector 
+                         <MemoizedAutopilotInstrumentSelector 
                             label="Bass"
                             value={activeAutopilotInstruments.bass}
                             onChange={(inst) => onAutopilotInstrumentChange('bass', inst as Instrument)}
                              instruments={autopilotInstruments.filter(i => (i.includes('bass') || i === 'synth' || i === 'organ' || i === 'mellotron') && !i.includes('effect'))}
                         />
-                         <AutopilotInstrumentSelector 
+                         <MemoizedAutopilotInstrumentSelector 
                             label="Effects"
                             value={activeAutopilotInstruments.effects}
                             onChange={(inst) => onAutopilotInstrumentChange('effects', inst as Instrument)}
