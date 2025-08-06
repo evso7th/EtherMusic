@@ -144,7 +144,7 @@ export default function Home() {
     const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
     const [activePattern, setActivePattern] = useState<(typeof beatPatterns)[number]>(beatPatterns.find(p => p.name === 'Off')!);
     const [melodyInstrument, setMelodyInstrument] = useState<Instrument>('theremin');
-    const [bassInstrument, setBassInstrument] = useState<Instrument>('ebass');
+    const [bassInstrument, setBassInstrument] = useState<Instrument>('synth');
     const [musicKey, setMusicKey] = useState<MusicKey>('G');
     const [musicScale, setMusicScale] = useState<MusicScale>('Major');
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
@@ -199,7 +199,7 @@ export default function Home() {
             mainEngine.setVolumes(initialSettings.current.volumes);
             mainEngine.setEffects(initialSettings.current.effects);
             mainEngine.setMelodyInstrument('theremin');
-            mainEngine.setBassInstrument('ebass');
+            mainEngine.setBassInstrument('synth');
             mainEngine.setAutopilotInstrument('melody', 'synth');
             mainEngine.setAutopilotInstrument('accompaniment', 'mellotron');
             mainEngine.setAutopilotInstrument('bass', 'ebass');
@@ -552,3 +552,4 @@ export default function Home() {
     
 
     
+
