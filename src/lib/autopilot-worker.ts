@@ -143,6 +143,7 @@ function updateHarmony(key: MusicKey, scale: MusicScale) {
 function tickAmbient(time: number) {
     const ticksPerMeasure = 16;
     const ticksForChordChange = ticksPerMeasure * 2; // Chord changes every 2 measures for more movement
+    const notesBatch: NoteEvent[] = [];
 
     // --- BASS (Drone) & ACCOMPANIMENT (Pads) ---
     if (state.tick16n % ticksForChordChange === 0) {
@@ -152,9 +153,7 @@ function tickAmbient(time: number) {
         // Bass Drone
         const bassFreq = state.scaleFrequencies.bass[scaleRootDegree % state.scaleFrequencies.bass.length];
         if (bassFreq) {
-            self.postMessage({ type: 'playNote', note: {
-                part: 'bass', freq: bassFreq, dur: '2m', vel: 0.6, time
-            }});
+            notesBatch.push({ part: 'bass', freq: bassFreq, dur: '2m', vel: 0.6, time });
         }
 
         // Accompaniment Chord (Pad) - 3 notes
@@ -162,9 +161,9 @@ function tickAmbient(time: number) {
         chordDegrees.forEach((degree, index) => {
             const noteFreq = state.scaleFrequencies.accompaniment[degree % state.scaleFrequencies.accompaniment.length];
             if (noteFreq) {
-                self.postMessage({ type: 'playNote', note: {
+                notesBatch.push({
                     part: 'accompaniment', freq: noteFreq, dur: '1m', vel: 0.3 + (Math.random() * 0.1), time: time + (index * 0.1)
-                }});
+                });
             }
         });
     }
@@ -187,41 +186,38 @@ function tickAmbient(time: number) {
 
         const melodyFreq = state.scaleFrequencies.melody[nextMelodyDegree];
         if (melodyFreq) {
-            const noteEvent: NoteEvent = {
+            notesBatch.push({
                 part: 'melody',
                 freq: melodyFreq,
                 dur: '1m',
                 vel: 0.7,
                 time: time,
-            };
-            self.postMessage({ type: 'playNote', note: noteEvent });
+            });
         }
         state.ambient.lastMelodyDegree = nextMelodyDegree;
+    }
+
+    if (notesBatch.length > 0) {
+        self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
     }
 }
 
 
 // --- "SEQUENCE" STYLE (Mike Oldfield inspired) ---
 function tickSequence(time: number) {
+    const notesBatch: NoteEvent[] = [];
+
     // Bass part (plays every 8 ticks = half note)
     if (state.tick16n % 16 === 0) { // Slower bass
         const bassFreq = state.scaleFrequencies.bass[state.sequence.bassNoteIndex % state.scaleFrequencies.bass.length];
-        const event: NoteEvent = {
-            part: 'bass', freq: bassFreq,
-            dur: '1n', vel: 0.8, time
-        };
-        self.postMessage({ type: 'playNote', note: event });
+        notesBatch.push({ part: 'bass', freq: bassFreq, dur: '1n', vel: 0.8, time });
         state.sequence.bassNoteIndex++;
     }
 
     // Accompaniment (plays every 4 ticks = quarter note arpeggio)
     if (state.tick16n % 8 === 0) { // Slower accompaniment
         const accompFreq = state.scaleFrequencies.accompaniment[state.sequence.accompanimentIndex % state.scaleFrequencies.accompaniment.length];
-        const event: NoteEvent = {
-            part: 'accompaniment', freq: accompFreq,
-            dur: '4n', vel: 0.4, time
-        };
-        self.postMessage({ type: 'playNote', note: event });
+        notesBatch.push({ part: 'accompaniment', freq: accompFreq, dur: '4n', vel: 0.4, time });
         state.sequence.accompanimentIndex++;
         if (Math.random() < 0.05) { // Occasionally jump in the arpeggio
             state.sequence.accompanimentIndex += Math.floor(Math.random() * 4) - 2;
@@ -235,34 +231,28 @@ function tickSequence(time: number) {
             state.sequence.notesInCurrentPhrase = 0;
             state.sequence.maxNotesInPhrase = 3 + Math.floor(Math.random() * 3); // 3-5 notes
             state.sequence.nextMelodyTick = state.tick16n + 8 + Math.floor(Math.random() * 16); // Pause for 2-6 beats
-            return;
-        }
-
-        let nextNoteIndex;
-        // If it's the first note, pick one from the middle of the scale
-        if (state.sequence.lastMelodyNoteIndex === null) {
-            nextNoteIndex = Math.floor(state.scaleFrequencies.melody.length / 2) + (Math.floor(Math.random()*4)-2);
         } else {
-            // Stepwise motion: move 1 or 2 steps up or down the scale
-            const step = (Math.random() < 0.2) ? 2 : 1; // 20% chance of a 2-step jump
-            const direction = (Math.random() < 0.5) ? -1 : 1;
-            nextNoteIndex = state.sequence.lastMelodyNoteIndex + (step * direction);
-        }
+            let nextNoteIndex;
+            if (state.sequence.lastMelodyNoteIndex === null) {
+                nextNoteIndex = Math.floor(state.scaleFrequencies.melody.length / 2) + (Math.floor(Math.random()*4)-2);
+            } else {
+                const step = (Math.random() < 0.2) ? 2 : 1;
+                const direction = (Math.random() < 0.5) ? -1 : 1;
+                nextNoteIndex = state.sequence.lastMelodyNoteIndex + (step * direction);
+            }
 
-        // Keep the note within the scale boundaries
-        nextNoteIndex = Math.max(0, Math.min(state.scaleFrequencies.melody.length - 1, nextNoteIndex));
-        
-        const melodyFreq = state.scaleFrequencies.melody[nextNoteIndex];
-        const event: NoteEvent = {
-            part: 'melody', freq: melodyFreq,
-            dur: '2n', vel: 0.7, time // Slower melody
-        };
-        self.postMessage({ type: 'playNote', note: event });
-        
-        // Update state
-        state.sequence.lastMelodyNoteIndex = nextNoteIndex;
-        state.sequence.notesInCurrentPhrase++;
-        state.sequence.nextMelodyTick = state.tick16n + 8; // Next note is a half note away
+            nextNoteIndex = Math.max(0, Math.min(state.scaleFrequencies.melody.length - 1, nextNoteIndex));
+            
+            const melodyFreq = state.scaleFrequencies.melody[nextNoteIndex];
+            notesBatch.push({ part: 'melody', freq: melodyFreq, dur: '2n', vel: 0.7, time });
+            
+            state.sequence.lastMelodyNoteIndex = nextNoteIndex;
+            state.sequence.notesInCurrentPhrase++;
+            state.sequence.nextMelodyTick = state.tick16n + 8;
+        }
+    }
+    if (notesBatch.length > 0) {
+        self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
     }
 }
 
@@ -270,33 +260,27 @@ function tickSequence(time: number) {
 function tickWater(time: number) {
     const ticksPerMeasure = 16;
     const ticksForChordChange = ticksPerMeasure * 2;
+    const notesBatch: NoteEvent[] = [];
 
     // Change chord root every 2 measures
     if (state.tick16n % ticksForChordChange === 0) {
         state.water.currentChordRootDegree = Math.floor(Math.random() * state.scaleFrequencies.bass.length);
-    }
-    
-    // Play bass note at the start of each chord change
-    if (state.tick16n % ticksForChordChange === 0) {
+        // Play bass note at the start of each chord change
         const bassFreq = state.scaleFrequencies.bass[state.water.currentChordRootDegree];
         if (bassFreq) {
-             self.postMessage({ type: 'playNote', note: {
-                part: 'bass', freq: bassFreq, dur: '2m', vel: 0.5, time
-            }});
+             notesBatch.push({ part: 'bass', freq: bassFreq, dur: '2m', vel: 0.5, time });
         }
     }
-
+    
     // Play melody "drop" note randomly
     if (state.tick16n % 4 === 0 && Math.random() < 0.25) {
         const melodyFreq = state.scaleFrequencies.melody[Math.floor(Math.random() * state.scaleFrequencies.melody.length)];
          if (melodyFreq) {
-             self.postMessage({ type: 'playNote', note: {
-                part: 'melody', freq: melodyFreq, dur: '8n', vel: 0.8, time
-            }});
+             notesBatch.push({ part: 'melody', freq: melodyFreq, dur: '8n', vel: 0.8, time });
         }
     }
 
-    // Accompaniment arpeggio - BATCHED
+    // Accompaniment arpeggio
     if (state.tick16n % ticksPerMeasure === 0) {
         const chordDegrees = [
             state.water.currentChordRootDegree,
@@ -306,27 +290,22 @@ function tickWater(time: number) {
         ];
         
         const arpeggioPattern = [0, 1, 2, 3, 0, 2, 1, 3, 0, 3, 1, 2, 0, 1, 3, 2];
-        const notesBatch: NoteEvent[] = [];
-
         for (let i = 0; i < 16; i++) {
             const patternIndex = arpeggioPattern[i];
             const degree = chordDegrees[patternIndex % chordDegrees.length];
             const noteFreq = state.scaleFrequencies.accompaniment[degree % state.scaleFrequencies.accompaniment.length];
             
             if (noteFreq) {
-                const noteTime = time + (i * (60 / state.currentBpm / 4)); // time of the current 16th note
+                const noteTime = time + (i * (60 / state.currentBpm / 4));
                 notesBatch.push({
-                    part: 'accompaniment',
-                    freq: noteFreq,
-                    dur: '16n',
-                    vel: 0.3 + (Math.random() * 0.2),
-                    time: noteTime,
+                    part: 'accompaniment', freq: noteFreq, dur: '16n', vel: 0.3 + (Math.random() * 0.2), time: noteTime
                 });
             }
         }
-        if (notesBatch.length > 0) {
-            self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
-        }
+    }
+
+    if (notesBatch.length > 0) {
+        self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
     }
 }
 
@@ -369,20 +348,12 @@ function tickAir(time: number) {
     // Change chord every 2 measures
     if (state.tick16n % (ticksPerMeasure * 2) === 0) { 
         state.air.currentChordIndex = (state.air.currentChordIndex + 1) % chordProgression.length;
-
-        // ACCOMPANIMENT - Held pad for the duration of the chord
         const accompRootDegree = chordProgression[state.air.currentChordIndex];
         const chordDegrees = [accompRootDegree, accompRootDegree + 2, accompRootDegree + 4];
         chordDegrees.forEach((degree, index) => {
             const noteFreq = state.scaleFrequencies.accompaniment[degree % state.scaleFrequencies.accompaniment.length];
             if (noteFreq) {
-                notesBatch.push({
-                    part: 'accompaniment',
-                    freq: noteFreq,
-                    dur: '2m', // Held for two measures
-                    vel: 0.35,
-                    time: time + (index * 0.05) // Slight flame
-                });
+                notesBatch.push({ part: 'accompaniment', freq: noteFreq, dur: '2m', vel: 0.35, time: time + (index * 0.05) });
             }
         });
     }
@@ -394,13 +365,7 @@ function tickAir(time: number) {
             const bassRootDegree = chordProgression[state.air.currentChordIndex];
             const bassFreq = state.scaleFrequencies.bass[bassRootDegree % state.scaleFrequencies.bass.length];
             if (bassFreq) {
-                notesBatch.push({
-                    part: 'bass',
-                    freq: bassFreq,
-                    dur: '8n',
-                    vel: 0.7,
-                    time: time,
-                });
+                notesBatch.push({ part: 'bass', freq: bassFreq, dur: '8n', vel: 0.7, time: time });
             }
         }
     }
@@ -409,25 +374,16 @@ function tickAir(time: number) {
     if (!state.air.isResting && state.tick16n % ticksPerBeat === 0) {
         const rootDegree = chordProgression[state.air.currentChordIndex];
         const triadDegrees = [rootDegree, rootDegree + 2, rootDegree + 4];
-
         const patternIndex = (state.tick16n / ticksPerBeat) % state.air.currentArpPattern.length;
         const triadNoteIndex = state.air.currentArpPattern[patternIndex];
         const noteDegree = triadDegrees[triadNoteIndex];
-
         const melodyFreq = state.scaleFrequencies.melody[noteDegree % state.scaleFrequencies.melody.length];
 
         if (melodyFreq) {
-            notesBatch.push({
-                part: 'melody',
-                freq: melodyFreq,
-                dur: '8n',
-                vel: 0.7,
-                time: time,
-            });
+            notesBatch.push({ part: 'melody', freq: melodyFreq, dur: '8n', vel: 0.7, time: time });
         }
     }
     
-    // --- SEND BATCH ---
     if (notesBatch.length > 0) {
         self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
     }
@@ -439,100 +395,76 @@ function tickEarth(time: number) {
     const ticksPerMeasure = 16;
     const ticksPerTwoMeasures = ticksPerMeasure * 2;
     const ticksPerFourMeasures = ticksPerMeasure * 4;
-    const chordProgression = [0, 5, 3, 4]; // I-vi-IV-V - a very stable, classic progression
+    const chordProgression = [0, 5, 3, 4]; // I-vi-IV-V
+    const notesBatch: NoteEvent[] = [];
 
-    // Change chord every four measures for a very slow, evolving feel
+    // Change chord every four measures
     if (state.tick16n % ticksPerFourMeasures === 0) {
         state.earth.currentChordIndex = (state.earth.currentChordIndex + 1) % chordProgression.length;
-    }
-
-    // --- BASS ---
-    // Play a long, sustained bass note at the beginning of each new chord
-    if (state.tick16n % ticksPerFourMeasures === 0) {
+        // BASS
         const rootDegree = chordProgression[state.earth.currentChordIndex];
         const bassFreq = state.scaleFrequencies.bass[rootDegree % state.scaleFrequencies.bass.length];
         if (bassFreq) {
-            self.postMessage({ type: 'playNote', note: {
-                part: 'bass',
-                freq: bassFreq,
-                dur: '4m', // Held for the full four measures
-                vel: 0.7,
-                time
-            }});
+            notesBatch.push({ part: 'bass', freq: bassFreq, dur: '4m', vel: 0.7, time });
         }
     }
 
-    // --- ACCOMPANIMENT ---
-    // Play a wide, slow chord every two measures, letting it ring out
+    // ACCOMPANIMENT
     if (state.tick16n % ticksPerTwoMeasures === 0) {
         const rootDegree = chordProgression[state.earth.currentChordIndex];
-        const chordDegrees = [rootDegree, rootDegree + 2, rootDegree + 4]; // Basic triad
-        
-        const notesBatch: NoteEvent[] = [];
+        const chordDegrees = [rootDegree, rootDegree + 2, rootDegree + 4];
         chordDegrees.forEach((degree, index) => {
             const noteFreq = state.scaleFrequencies.accompaniment[degree % state.scaleFrequencies.accompaniment.length];
             if (noteFreq) {
-                notesBatch.push({
-                    part: 'accompaniment',
-                    freq: noteFreq,
-                    dur: '2m', // Held for two measures
-                    vel: 0.4,
-                    time: time + (index * 0.1) // Strum the chord slightly
-                });
+                notesBatch.push({ part: 'accompaniment', freq: noteFreq, dur: '2m', vel: 0.4, time: time + (index * 0.1) });
             }
         });
-        if(notesBatch.length > 0) {
-            self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
-        }
     }
 
-    // --- MELODY ---
-    // Play a single, very sparse melody note, maybe once every 4 or 8 measures
+    // MELODY
     const nextMelodyTick = state.earth.lastMelodyTick + ticksPerFourMeasures;
-    if (state.tick16n >= nextMelodyTick && Math.random() > 0.3) { // 70% chance to play a melody note
+    if (state.tick16n >= nextMelodyTick && Math.random() > 0.3) {
         const rootDegree = chordProgression[state.earth.currentChordIndex];
-        // Pick a note from the current chord
         const melodyNoteDegree = rootDegree + [0, 2, 4][Math.floor(Math.random() * 3)];
         const melodyFreq = state.scaleFrequencies.melody[melodyNoteDegree % state.scaleFrequencies.melody.length];
         
         if (melodyFreq) {
-             self.postMessage({ type: 'playNote', note: {
-                part: 'melody',
-                freq: melodyFreq,
-                dur: '1m', // Long, majestic note
-                vel: 0.8,
-                time: time
-            }});
+             notesBatch.push({ part: 'melody', freq: melodyFreq, dur: '1m', vel: 0.8, time: time });
         }
         state.earth.lastMelodyTick = state.tick16n;
+    }
+
+    if (notesBatch.length > 0) {
+        self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
     }
 }
 
 // --- "TIBET" STYLE ---
 function tickTibet(time: number) {
     const ticksPerFourMeasures = 16 * 4;
+    const notesBatch: NoteEvent[] = [];
 
     // Bass (Chant Drone)
-    const chantInterval = ticksPerFourMeasures * 2; // Very long drone
+    const chantInterval = ticksPerFourMeasures * 2;
     if (state.tick16n % chantInterval === 0) {
-        const rootFreq = state.scaleFrequencies.bass[0]; // Always use the root of the scale
+        const rootFreq = state.scaleFrequencies.bass[0];
         if (rootFreq) {
-            self.postMessage({ type: 'playNote', note: {
-                part: 'bass', freq: rootFreq, dur: '8m', vel: 0.6, time
-            }});
+            notesBatch.push({ part: 'bass', freq: rootFreq, dur: '8m', vel: 0.6, time });
         }
     }
 
     // Melody (Singing Bowls)
-    const bowlInterval = 32 + Math.floor(Math.random() * 32); // 2 to 4 measures
+    const bowlInterval = 32 + Math.floor(Math.random() * 32);
     if (state.tick16n >= state.tibet.lastBowlTick + bowlInterval) {
         const bowlFreq = state.scaleFrequencies.melody[Math.floor(Math.random() * state.scaleFrequencies.melody.length)];
         if (bowlFreq) {
-            self.postMessage({ type: 'playNote', note: {
-                part: 'melody', freq: bowlFreq, dur: '1m', vel: 0.9, time
-            }});
+            notesBatch.push({ part: 'melody', freq: bowlFreq, dur: '1m', vel: 0.9, time });
         }
         state.tibet.lastBowlTick = state.tick16n;
+    }
+
+    if (notesBatch.length > 0) {
+        self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
     }
 }
 
@@ -540,68 +472,57 @@ function tickTibet(time: number) {
 // --- "SPACE" STYLE ---
 function tickSpace(time: number) {
     const ticksPerMeasure = 16;
+    const notesBatch: NoteEvent[] = [];
     
     // Bass (Rhythmic sequence)
-    if (state.tick16n % 4 === 0) { // Every beat
+    if (state.tick16n % 4 === 0) {
         const bassDegree = [0, 0, 3, 3, 4, 4, 0, 0][(Math.floor(state.tick16n / 4)) % 8];
         const bassFreq = state.scaleFrequencies.bass[bassDegree % state.scaleFrequencies.bass.length];
         if (bassFreq) {
-            self.postMessage({ type: 'playNote', note: {
-                part: 'bass', freq: bassFreq, dur: '8n', vel: 0.8, time
-            }});
+            notesBatch.push({ part: 'bass', freq: bassFreq, dur: '8n', vel: 0.8, time });
         }
     }
 
-    // Accompaniment (Fast Arpeggio) - BATCHED for performance
+    // Accompaniment (Fast Arpeggio)
     if (state.tick16n % ticksPerMeasure === 0) {
         const rootDegree = [0, 3, 4, 0][Math.floor(state.tick16n / ticksPerMeasure) % 4];
         const chordDegrees = [rootDegree, rootDegree + 2, rootDegree + 4, rootDegree + 7];
         const arpPattern = [0, 1, 2, 1, 3, 1, 2, 1, 0, 1, 2, 1, 3, 1, 2, 1];
         
-        const notesBatch: NoteEvent[] = [];
         for (let i = 0; i < 16; i++) {
             const degreeIndex = arpPattern[i];
             const noteDegree = chordDegrees[degreeIndex % chordDegrees.length];
             const noteFreq = state.scaleFrequencies.accompaniment[noteDegree % state.scaleFrequencies.accompaniment.length];
             if (noteFreq) {
                 const noteTime = time + (i * (60 / state.currentBpm / 4));
-                notesBatch.push({
-                    part: 'accompaniment', freq: noteFreq, dur: '16n', vel: 0.4, time: noteTime
-                });
+                notesBatch.push({ part: 'accompaniment', freq: noteFreq, dur: '16n', vel: 0.4, time: noteTime });
             }
         }
-        if (notesBatch.length > 0) {
-            self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
-        }
     }
-
 
     // Effects (Lasers/Swooshes)
     const laserInterval = 16 + Math.floor(Math.random() * 16);
     if (state.tick16n >= state.space.lastLaserTick + laserInterval) {
          const freq = state.scaleFrequencies.effects[Math.floor(Math.random() * state.scaleFrequencies.effects.length)];
         if (freq) {
-             self.postMessage({ type: 'playNote', note: {
-                part: 'effects', freq: freq, dur: '8n', vel: 0.7, time
-            }});
+             notesBatch.push({ part: 'effects', freq: freq, dur: '8n', vel: 0.7, time });
         }
         state.space.lastLaserTick = state.tick16n;
+    }
+
+    if (notesBatch.length > 0) {
+        self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
     }
 }
 
 
 // --- UNIVERSAL EFFECTS TICK ---
 function tickEffects(time: number) {
-    if (Math.random() < 0.05) { // Lower probability for less frequent effects
+    if (Math.random() < 0.05) { // Lower probability
         const freq = state.scaleFrequencies.effects[Math.floor(Math.random() * state.scaleFrequencies.effects.length)];
-        const event: NoteEvent = {
-            part: 'effects',
-            freq: freq,
-            dur: '4n',
-            vel: 0.5 + Math.random() * 0.3,
-            time: time,
-        };
-        self.postMessage({ type: 'playNote', note: event });
+        self.postMessage({ type: 'playNote', note: {
+            part: 'effects', freq: freq, dur: '4n', vel: 0.5 + Math.random() * 0.3, time: time
+        }});
     }
 }
 
@@ -611,34 +532,19 @@ function tick(time: number) {
     if (!state.isRunning) return;
 
     switch(state.currentStyle) {
-        case 'Ambient':
-            tickAmbient(time);
-            break;
-        case 'Sequence':
-            tickSequence(time);
-            break;
-        case 'Water':
-            tickWater(time);
-            break;
-        case 'Air':
-            tickAir(time);
-            break;
-        case 'Earth':
-            tickEarth(time);
-            break;
-        case 'Tibet':
-            tickTibet(time);
-            break;
-        case 'Space':
-            tickSpace(time);
-            break;
+        case 'Ambient': tickAmbient(time); break;
+        case 'Sequence': tickSequence(time); break;
+        case 'Water': tickWater(time); break;
+        case 'Air': tickAir(time); break;
+        case 'Earth': tickEarth(time); break;
+        case 'Tibet': tickTibet(time); break;
+        case 'Space': tickSpace(time); break;
     }
 
     if (state.currentStyle !== 'Tibet' && state.currentStyle !== 'Space') {
         tickEffects(time);
     }
     
-    // Increment master tick
     state.tick16n++;
 }
 
@@ -679,9 +585,9 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
         case 'setStyle':
             // @ts-ignore
             state.currentStyle = data.style;
-            state.tick16n = 0; // Reset tick count on style change
-            state.ambient.lastChordChangeTick = -Infinity; // Force immediate chord change on style switch
-            state.ambient.lastMelodyDegree = null; // Reset melody on style change
+            state.tick16n = 0;
+            state.ambient.lastChordChangeTick = -Infinity;
+            state.ambient.lastMelodyDegree = null;
             break;
         case 'setInstruments':
             // @ts-ignore

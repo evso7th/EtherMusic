@@ -120,6 +120,8 @@ export class AudioEngine {
         effects: null,
     };
 
+    private lastAutopilotNoteTime: { [key in WorkerAutopilotPart]?: number } = {};
+
     constructor() {
         // All initialization is now in the async initialize() method
     }
@@ -310,8 +312,17 @@ export class AudioEngine {
                 // @ts-ignore
                 synthToUse.id = note.id;
             }
-            // Ensure the scheduled time is not in the past.
-            const playbackTime = Math.max(note.time, Tone.now());
+            
+            const now = Tone.now();
+            let playbackTime = Math.max(note.time, now);
+
+            // Ensure playback time is strictly greater than the last one for this part
+            const lastTime = this.lastAutopilotNoteTime[note.part] || 0;
+            if (playbackTime <= lastTime) {
+                playbackTime = lastTime + 0.001; // Add a tiny offset
+            }
+            this.lastAutopilotNoteTime[note.part] = playbackTime;
+
             synthToUse.triggerAttackRelease(note.freq, note.dur, playbackTime, note.vel);
         }
     }
@@ -319,11 +330,9 @@ export class AudioEngine {
     public playWorkerNotesBatch(notes: NoteEvent[]) {
         if (!this.isInitialized) return;
         
-        let timeOffset = 0;
+        // This function is now just a loop, the unique time logic is in playWorkerNote
         notes.forEach(note => {
-            const noteWithOffset = { ...note, time: note.time + timeOffset };
-            this.playWorkerNote(noteWithOffset);
-            timeOffset += 0.001; 
+            this.playWorkerNote(note);
         });
     }
     
@@ -350,7 +359,7 @@ export class AudioEngine {
                 synth.triggerRelease();
             }
         }
-
+        this.lastAutopilotNoteTime = {}; // Reset last note times
         this.orbManager?.removeAllOrbs();
     }
 
@@ -428,6 +437,7 @@ export class AudioEngine {
             newSynth = new Tone.Synth(preset.options).connect(channel);
         }
         this.autopilotSynths[part] = newSynth;
+        this.lastAutopilotNoteTime[part] = 0; // Reset time for the new instrument
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
