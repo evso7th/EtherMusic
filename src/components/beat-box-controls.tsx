@@ -408,7 +408,9 @@ export function BeatBoxControls({
                         </DialogContent>
                     </Dialog>
                     
-                    {autopilotDialog}
+                    <TooltipProvider>
+                      {autopilotDialog}
+                    </TooltipProvider>
 
                     <Dialog>
                         <DialogTrigger asChild>
@@ -441,132 +443,134 @@ export function BeatBoxControls({
     }
 
     return (
-        <Card className="bg-card/50">
-            <CardContent className="p-2 md:p-4 flex justify-around items-center gap-1 md:gap-2">
-                <Dialog open={isBeatsOpen} onOpenChange={setIsBeatsOpen}>
-                    <DialogTrigger asChild>
-                        <Button variant={isBeatsOn ? 'default' : 'outline'} className="flex-1" size={buttonSize}>
-                            <Drum className="w-4 h-4 md:mr-2" />
-                            <span className="hidden sm:inline">Beats</span>
-                        </Button>
-                    </DialogTrigger>
-                     <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Beat Patterns</DialogTitle>
-                        </DialogHeader>
-                        <ScrollArea className="h-auto max-h-[70vh]">
-                            <div className="space-y-4 py-4 pr-4">
-                                <div className="flex items-center justify-center space-x-2">
-                                    <Label htmlFor="category-switch-portrait" className={cn(selectedCategory !== 'Classic' && "text-muted-foreground")}>Classic</Label>
-                                    <Switch 
-                                        id="category-switch-portrait"
-                                        checked={selectedCategory === 'Meditative'}
-                                        onCheckedChange={(checked) => setSelectedCategory(checked ? 'Meditative' : 'Classic')}
-                                    />
-                                    <Label htmlFor="category-switch-portrait" className={cn(selectedCategory !== 'Meditative' && "text-muted-foreground")}>Meditative</Label>
+        <TooltipProvider>
+            <Card className="bg-card/50">
+                <CardContent className="p-2 md:p-4 flex justify-around items-center gap-1 md:gap-2">
+                    <Dialog open={isBeatsOpen} onOpenChange={setIsBeatsOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant={isBeatsOn ? 'default' : 'outline'} className="flex-1" size={buttonSize}>
+                                <Drum className="w-4 h-4 md:mr-2" />
+                                <span className="hidden sm:inline">Beats</span>
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Beat Patterns</DialogTitle>
+                            </DialogHeader>
+                            <ScrollArea className="h-auto max-h-[70vh]">
+                                <div className="space-y-4 py-4 pr-4">
+                                    <div className="flex items-center justify-center space-x-2">
+                                        <Label htmlFor="category-switch-portrait" className={cn(selectedCategory !== 'Classic' && "text-muted-foreground")}>Classic</Label>
+                                        <Switch 
+                                            id="category-switch-portrait"
+                                            checked={selectedCategory === 'Meditative'}
+                                            onCheckedChange={(checked) => setSelectedCategory(checked ? 'Meditative' : 'Classic')}
+                                        />
+                                        <Label htmlFor="category-switch-portrait" className={cn(selectedCategory !== 'Meditative' && "text-muted-foreground")}>Meditative</Label>
+                                    </div>
+                                
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {patternsToShow.map((pattern) => (
+                                            <Button
+                                                key={pattern.name}
+                                                variant={activePattern.name === pattern.name ? 'default' : 'outline'}
+                                                onClick={() => {
+                                                    onPatternChange(pattern);
+                                                    setIsBeatsOpen(false);
+                                                }}
+                                            >
+                                                {pattern.name}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                    
+                                    {offPattern && (
+                                        <div>
+                                            <Separator className="my-3" />
+                                            <Button
+                                                key={offPattern.name}
+                                                variant={'outline'}
+                                                onClick={() => {
+                                                    onPatternChange(offPattern);
+                                                    setIsBeatsOpen(false);
+                                                }}
+                                                className={cn(
+                                                    "w-full",
+                                                    activePattern.name === offPattern.name && "border-primary text-primary"
+                                                )}
+                                            >
+                                                {offPattern.name}
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
-                            
-                                <div className="grid grid-cols-2 gap-2">
-                                    {patternsToShow.map((pattern) => (
+                            </ScrollArea>
+                        </DialogContent>
+                    </Dialog>
+
+                    <Dialog open={isTempoOpen} onOpenChange={setIsTempoOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" className="flex-1" size={buttonSize}>
+                                <Zap className="w-4 h-4 md:mr-2" />
+                                <span className="hidden sm:inline">Tempo</span>
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Adjust Tempo</DialogTitle>
+                            </DialogHeader>
+                            <ScrollArea className="h-auto max-h-[70vh]">
+                                <div className="grid grid-cols-1 gap-2 py-4 pr-4">
+                                    {tempos.map((tempo) => (
                                         <Button
-                                            key={pattern.name}
-                                            variant={activePattern.name === pattern.name ? 'default' : 'outline'}
+                                            key={tempo.name}
+                                            variant={activeTempo.name === tempo.name ? 'default' : 'outline'}
                                             onClick={() => {
-                                                onPatternChange(pattern);
-                                                setIsBeatsOpen(false);
+                                                onTempoChange(tempo);
+                                                setIsTempoOpen(false);
                                             }}
+                                            className="flex justify-between w-full"
                                         >
-                                            {pattern.name}
+                                            <span>{tempo.name}</span>
+                                            <span className="text-sm text-muted-foreground">{tempo.bpm} BPM</span>
                                         </Button>
                                     ))}
                                 </div>
-                                
-                                {offPattern && (
-                                    <div>
-                                        <Separator className="my-3" />
-                                        <Button
-                                            key={offPattern.name}
-                                            variant={'outline'}
-                                            onClick={() => {
-                                                onPatternChange(offPattern);
-                                                setIsBeatsOpen(false);
-                                            }}
-                                            className={cn(
-                                                "w-full",
-                                                activePattern.name === offPattern.name && "border-primary text-primary"
-                                            )}
-                                        >
-                                            {offPattern.name}
-                                        </Button>
-                                    </div>
-                                )}
-                            </div>
-                        </ScrollArea>
-                    </DialogContent>
-                </Dialog>
+                            </ScrollArea>
+                        </DialogContent>
+                    </Dialog>
+                    
+                    {autopilotDialog}
 
-                <Dialog open={isTempoOpen} onOpenChange={setIsTempoOpen}>
-                    <DialogTrigger asChild>
-                         <Button variant="outline" className="flex-1" size={buttonSize}>
-                            <Zap className="w-4 h-4 md:mr-2" />
-                            <span className="hidden sm:inline">Tempo</span>
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Adjust Tempo</DialogTitle>
-                        </DialogHeader>
-                         <ScrollArea className="h-auto max-h-[70vh]">
-                            <div className="grid grid-cols-1 gap-2 py-4 pr-4">
-                                {tempos.map((tempo) => (
-                                    <Button
-                                        key={tempo.name}
-                                        variant={activeTempo.name === tempo.name ? 'default' : 'outline'}
-                                        onClick={() => {
-                                            onTempoChange(tempo);
-                                            setIsTempoOpen(false);
-                                        }}
-                                        className="flex justify-between w-full"
-                                    >
-                                        <span>{tempo.name}</span>
-                                        <span className="text-sm text-muted-foreground">{tempo.bpm} BPM</span>
-                                    </Button>
-                                ))}
-                            </div>
-                        </ScrollArea>
-                    </DialogContent>
-                </Dialog>
-                
-                {autopilotDialog}
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" className="flex-1 px-2 md:px-4" size={buttonSize}>
+                                <SlidersHorizontal className="w-4 h-4 md:mr-2"/>
+                                <span className="hidden sm:inline">Mixer</span>
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Mixer</DialogTitle>
+                            </DialogHeader>
+                            <ScrollArea className="h-auto max-h-[70vh]">
+                                <div className="pr-4 py-4">
+                                    <MixerControls 
+                                        initialVolumes={initialVolumes} 
+                                        onVolumeChange={onVolumeChange}
+                                        initialEffects={initialEffects}
+                                        onEffectChange={onEffectChange}
+                                        isMobile={isMobile}
+                                    />
+                                </div>
+                            </ScrollArea>
+                        </DialogContent>
+                    </Dialog>
 
-                <Dialog>
-                    <DialogTrigger asChild>
-                        <Button variant="outline" className="flex-1 px-2 md:px-4" size={buttonSize}>
-                            <SlidersHorizontal className="w-4 h-4 md:mr-2"/>
-                             <span className="hidden sm:inline">Mixer</span>
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Mixer</DialogTitle>
-                        </DialogHeader>
-                        <ScrollArea className="h-auto max-h-[70vh]">
-                             <div className="pr-4 py-4">
-                                <MixerControls 
-                                    initialVolumes={initialVolumes} 
-                                    onVolumeChange={onVolumeChange}
-                                    initialEffects={initialEffects}
-                                    onEffectChange={onEffectChange}
-                                    isMobile={isMobile}
-                                />
-                            </div>
-                        </ScrollArea>
-                    </DialogContent>
-                </Dialog>
-
-                <HelpGuide buttonVariant="outline" buttonClassName="flex-1" size={buttonSize}/>
-            </CardContent>
-        </Card>
+                    <HelpGuide buttonVariant="outline" buttonClassName="flex-1" size={buttonSize}/>
+                </CardContent>
+            </Card>
+        </TooltipProvider>
     );
 }
 
