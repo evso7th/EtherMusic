@@ -1,5 +1,7 @@
 
 import type {NextConfig} from 'next';
+import WorkboxWebpackPlugin from 'workbox-webpack-plugin';
+import path from 'path';
 
 const nextConfig: NextConfig = {
   // This option includes the static export mode.
@@ -18,6 +20,21 @@ const nextConfig: NextConfig = {
   },
   eslint: {
     ignoreDuringBuilds: true,
+  },
+  
+  webpack(config, { isServer, dev }) {
+    if (!isServer && !dev) {
+        config.plugins.push(
+            new WorkboxWebpackPlugin.InjectManifest({
+                swSrc: path.join(__dirname, 'src', 'lib', 'sw.js'),
+                swDest: path.join(__dirname, 'out', 'sw.js'),
+                // We don't need to precache all the assets because we are in an SPA.
+                // We will cache them on demand.
+                injectionPoint: 'self.__WB_MANIFEST',
+            })
+        );
+    }
+    return config;
   },
 };
 
