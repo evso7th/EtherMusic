@@ -12,8 +12,9 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import React from "react";
+import React, { useMemo } from "react";
 import { guideContent } from "./help-guide-content";
+import { marked } from "marked";
 
 
 interface HelpGuideProps extends ButtonProps {
@@ -23,6 +24,16 @@ interface HelpGuideProps extends ButtonProps {
 
 export const HelpGuide = ({ buttonVariant = "outline", buttonClassName, showText = true, size, ...props }: HelpGuideProps) => {
     
+    const content = useMemo(() => {
+        const html = marked.parse(guideContent) as string;
+        return (
+            <div
+                className="prose prose-invert p-4"
+                dangerouslySetInnerHTML={{ __html: html }}
+            />
+        )
+    }, []);
+
     return (
         <Dialog>
             <DialogTrigger asChild>
@@ -41,9 +52,7 @@ export const HelpGuide = ({ buttonVariant = "outline", buttonClassName, showText
                     <DialogTitle>Quick Guide</DialogTitle>
                 </DialogHeader>
                 <ScrollArea className="h-[70vh] w-full">
-                     <div 
-                        dangerouslySetInnerHTML={{ __html: guideContent }}
-                    />
+                     {content}
                 </ScrollArea>
             </DialogContent>
         </Dialog>
