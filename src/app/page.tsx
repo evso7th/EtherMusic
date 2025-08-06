@@ -497,7 +497,7 @@ export default function Home() {
 
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
-            <div className="fixed inset-0 z-0 animate-pulse-container">
+            <div className="fixed inset-0 z-0">
                  <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={activeTempo.bpm} />
             </div>
             
@@ -637,6 +637,8 @@ export default function Home() {
     );
 }
 
+
+    
 
     
 
