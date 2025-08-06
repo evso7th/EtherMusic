@@ -191,6 +191,7 @@ export default function Home() {
     const autopilotWorker = useRef<Worker>();
     const orbManager = useRef<OrbManager>();
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
+    const lastInteractionTime = useRef(0);
 
     const initialSettings = useRef(loadSettings());
     const autopilotPresets = useRef(loadAutopilotPresets());
@@ -381,10 +382,17 @@ export default function Home() {
     
      const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isReady || !audioEngine.current) return;
+        
         const engine = audioEngine.current;
+        
         if (state === 'down' && data) {
             engine.startNote(type, data.pointerId, data.frequency, data.volume, {x: data.x, y: data.y});
         } else if (state === 'move' && data) {
+            const now = Date.now();
+            if (now - lastInteractionTime.current < 100) { // 100ms throttle
+                return;
+            }
+            lastInteractionTime.current = now;
             engine.updateNote(type, data.pointerId, data.frequency, data.volume, {x: data.x, y: data.y});
         } else if (state === 'up' && data) {
             engine.stopNote(type, data.pointerId);
@@ -649,6 +657,8 @@ export default function Home() {
     );
 }
 
+
+    
 
     
 
