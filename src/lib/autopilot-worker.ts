@@ -5,7 +5,7 @@ import type { Instrument, MusicKey, MusicScale } from '@/app/page';
 import type { Unit } from 'tone/build/esm/core/type/Units';
 
 // --- TYPE DEFINITIONS ---
-export type AutopilotStyle = 'Ambient' | 'Sequence' | 'Water' | 'Air';
+export type AutopilotStyle = 'Ambient' | 'Sequence' | 'Water' | 'Air' | 'Earth';
 export type AutopilotPart = 'melody' | 'accompaniment' | 'bass' | 'effects';
 
 export type NoteEvent = {
@@ -104,6 +104,10 @@ let state = {
         totalRestMeasures: 2,
         currentArpPattern: [0, 1, 2] as number[],
         currentBassPattern: [] as boolean[],
+    },
+    earth: {
+        currentChordIndex: 0,
+        lastMelodyTick: 0,
     }
 };
 
@@ -422,6 +426,80 @@ function tickAir(time: number) {
 }
 
 
+// --- "EARTH" STYLE ---
+function tickEarth(time: number) {
+    const ticksPerMeasure = 16;
+    const ticksPerTwoMeasures = ticksPerMeasure * 2;
+    const ticksPerFourMeasures = ticksPerMeasure * 4;
+    const chordProgression = [0, 5, 3, 4]; // I-vi-IV-V - a very stable, classic progression
+
+    // Change chord every four measures for a very slow, evolving feel
+    if (state.tick16n % ticksPerFourMeasures === 0) {
+        state.earth.currentChordIndex = (state.earth.currentChordIndex + 1) % chordProgression.length;
+    }
+
+    // --- BASS ---
+    // Play a long, sustained bass note at the beginning of each new chord
+    if (state.tick16n % ticksPerFourMeasures === 0) {
+        const rootDegree = chordProgression[state.earth.currentChordIndex];
+        const bassFreq = state.scaleFrequencies.bass[rootDegree % state.scaleFrequencies.bass.length];
+        if (bassFreq) {
+            self.postMessage({ type: 'playNote', note: {
+                part: 'bass',
+                freq: bassFreq,
+                dur: '4m', // Held for the full four measures
+                vel: 0.7,
+                time
+            }});
+        }
+    }
+
+    // --- ACCOMPANIMENT ---
+    // Play a wide, slow chord every two measures, letting it ring out
+    if (state.tick16n % ticksPerTwoMeasures === 0) {
+        const rootDegree = chordProgression[state.earth.currentChordIndex];
+        const chordDegrees = [rootDegree, rootDegree + 2, rootDegree + 4]; // Basic triad
+        
+        const notesBatch: NoteEvent[] = [];
+        chordDegrees.forEach((degree, index) => {
+            const noteFreq = state.scaleFrequencies.accompaniment[degree % state.scaleFrequencies.accompaniment.length];
+            if (noteFreq) {
+                notesBatch.push({
+                    part: 'accompaniment',
+                    freq: noteFreq,
+                    dur: '2m', // Held for two measures
+                    vel: 0.4,
+                    time: time + (index * 0.1) // Strum the chord slightly
+                });
+            }
+        });
+        if(notesBatch.length > 0) {
+            self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
+        }
+    }
+
+    // --- MELODY ---
+    // Play a single, very sparse melody note, maybe once every 4 or 8 measures
+    const nextMelodyTick = state.earth.lastMelodyTick + ticksPerFourMeasures;
+    if (state.tick16n >= nextMelodyTick && Math.random() > 0.3) { // 70% chance to play a melody note
+        const rootDegree = chordProgression[state.earth.currentChordIndex];
+        // Pick a note from the current chord
+        const melodyNoteDegree = rootDegree + [0, 2, 4][Math.floor(Math.random() * 3)];
+        const melodyFreq = state.scaleFrequencies.melody[melodyNoteDegree % state.scaleFrequencies.melody.length];
+        
+        if (melodyFreq) {
+             self.postMessage({ type: 'playNote', note: {
+                part: 'melody',
+                freq: melodyFreq,
+                dur: '1m', // Long, majestic note
+                vel: 0.8,
+                time: time
+            }});
+        }
+        state.earth.lastMelodyTick = state.tick16n;
+    }
+}
+
 
 // --- UNIVERSAL EFFECTS TICK ---
 function tickEffects(time: number) {
@@ -455,6 +533,9 @@ function tick(time: number) {
             break;
         case 'Air':
             tickAir(time);
+            break;
+        case 'Earth':
+            tickEarth(time);
             break;
     }
 
@@ -494,6 +575,9 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
             state.air.totalRestMeasures = 0; // No rest at the very beginning
             state.air.currentArpPattern = [0, 1, 2];
             state.air.currentBassPattern = [];
+            // Reset Earth state
+            state.earth.currentChordIndex = 0;
+            state.earth.lastMelodyTick = 0;
 
             break;
         case 'stop':
@@ -526,5 +610,7 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
 
 // Initial setup
 updateHarmony(state.currentKey, state.currentScale);
+
+    
 
     
