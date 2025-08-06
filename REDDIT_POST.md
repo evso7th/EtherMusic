@@ -39,7 +39,7 @@ This is where we started to get it right. The industry-standard approach is a **
 3.  Use it to play the note.
 4.  When the note is released, the synth is marked as "available" again. **It is never destroyed.**
 
-**The Reality:** This was a game-changer for manual playing. The sound was crystal clear. The Crackle Dragon was gone, the GC Goblins were banished. We had won!
+**The Reality:** This was a game-changer for manual playing. The sound was crystal clear. The Crackle Dragon was gone, ahe GC Goblins were banished. We had won!
 
 ...but we had forgotten about our Autopilot feature.
 
@@ -69,3 +69,5 @@ This was the final, liberating step.
 *   **Batch** messages from your Worker to the main thread to reduce overhead.
 
 It was a painful journey, but we learned a ton. Hope this helps someone else avoid our mistakes! You can feel the result of our efforts at [https://ethermusic.app/](https://ethermusic.app/).
+
+The path to victory is thorny, but it is achievable. Persistence and a clear vision of the end result. This is what's important.
