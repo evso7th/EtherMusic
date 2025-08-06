@@ -39,7 +39,7 @@ This is where we started to get it right. The industry-standard approach is a **
 3.  Use it to play the note.
 4.  When the note is released, the synth is marked as "available" again. **It is never destroyed.**
 
-**The Reality:** This was a game-changer for manual playing. The sound was crystal clear. The Crackle Dragon was gone, ahe GC Goblins were banished. We had won!
+**The Reality:** This was a game-changer for manual playing. The sound was crystal clear. The Crackle Dragon was gone, the GC Goblins were banished. We had won!
 
 ...but we had forgotten about our Autopilot feature.
 

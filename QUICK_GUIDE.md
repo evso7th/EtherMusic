@@ -64,8 +64,8 @@ Don't want to play yourself? Turn on the **Autopilot**!
 
 ## A Note on Performance
 
-**Important:** On older or less powerful mobile devices, using the **Latch** mode simultaneously with the **Autopilot** and the **Drum Machine** can sometimes lead to sound artifacts like clicks, freezes, or stuttering. The audio engine is powerful, but it requires significant resources.
+The application is highly optimized to run smoothly on a wide range of devices, including older smartphones. The architecture is designed to prevent audio artifacts like clicks, freezes, or stuttering.
 
-If you experience this, we recommend using these features separately for the smoothest experience (e.g., play manually with the drum machine, or use the Autopilot without the Latch mode).
+However, if you are using a very old or low-power device, running the most complex **Autopilot** styles (like `Toccata` or `Promenade`) simultaneously with the **Drum Machine** might still be demanding. For the absolute smoothest experience in such cases, you can use these features separately.
 
 Enjoy the process and let the music you create reflect your inner state.
