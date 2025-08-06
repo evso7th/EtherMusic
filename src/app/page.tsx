@@ -524,7 +524,9 @@ export default function Home() {
                                         <DialogTitle>What is This?</DialogTitle>
                                     </DialogHeader>
                                     <div className="text-sm text-muted-foreground space-y-4 py-4">
-                                        <p>It's a virtual music box, a "Neuro Meditation Sound Processor."</p>
+                                        <p>This is not a professional tool, but a **virtual music box**, a "Neuro-Meditation Sound Processor."</p>
+                                        <p>It's an instrument that anyone can play, designed for relaxation and self-expression. The music you create is for the here and now, to harmonize your inner state.</p>
+                                        <p>It's simple enough for a child, yet engaging for adults.</p>
                                     </div>
                                 </DialogContent>
                             </Dialog>
