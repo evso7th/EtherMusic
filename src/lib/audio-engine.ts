@@ -143,7 +143,6 @@ export class AudioEngine {
             accompaniment: new Tone.Channel(-14),
             autopilotBass: new Tone.Channel(-9),
             effects: new Tone.Channel(-6),
-            ebass: new Tone.Channel(-6),
         };
         for (const channel of Object.values(this.channels)) {
             channel.connect(this.fx.reverb).connect(this.fx.delay).toDestination();
@@ -208,7 +207,7 @@ export class AudioEngine {
 
     private reconfigurePool(part: InstrumentPart, instrumentName: Instrument | string) {
         const pool = this.voicePools.get(part);
-        const channel = this.getChannelForPart(part, instrumentName);
+        const channel = this.getChannelForPart(part);
         let presetKey = this.getPresetKey(part, instrumentName);
         const preset = this.presets[presetKey];
         
@@ -227,10 +226,7 @@ export class AudioEngine {
         }
     }
     
-    private getChannelForPart(part: InstrumentPart, instrumentName: string | Instrument): Tone.Channel {
-        if ((part === 'bass' || part === 'latch') && instrumentName === 'ebass') {
-            return this.channels.ebass;
-        }
+    private getChannelForPart(part: InstrumentPart): Tone.Channel {
         const partToChannelMap: Record<string, Tone.Channel> = {
             melody: this.channels.melody, bass: this.channels.manualBass, latch: this.channels.latch,
             autopilot_melody: this.channels.autopilot, autopilot_accompaniment: this.channels.accompaniment,
@@ -370,7 +366,6 @@ export class AudioEngine {
         this.channels.accompaniment.volume.value = volumes.accompaniment;
         this.channels.autopilotBass.volume.value = volumes.autopilotBass;
         this.channels.effects.volume.value = volumes.effects;
-        this.channels.ebass.volume.value = volumes.ebass;
     }
 
     public setEffects(effects: Record<string, any>) {
@@ -495,6 +490,3 @@ export class AudioEngine {
         return freqs.reduce((prev, curr) => (Math.abs(curr - targetFreq) < Math.abs(prev - targetFreq) ? curr : prev));
     }
 }
-
-    
-    

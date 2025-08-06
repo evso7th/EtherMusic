@@ -48,7 +48,6 @@ type Volumes = {
     accompaniment: number;
     autopilotBass: number;
     effects: number;
-    ebass: number;
 };
 
 type Effects = {
@@ -60,7 +59,6 @@ type Effects = {
     accompaniment: { reverb: number, delay: number };
     autopilotBass: { reverb: number, delay: number };
     effects: { reverb: number, delay: number };
-    ebass: { reverb: number, delay: number };
 };
 
 interface BeatBoxControlsProps {

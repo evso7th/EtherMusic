@@ -274,7 +274,7 @@ export default function Home() {
         }
     }, []);
 
-    const initialVolumes = useRef({ melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, accompaniment: -14, autopilotBass: -9, effects: -6, ebass: -6 });
+    const initialVolumes = useRef({ melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, accompaniment: -14, autopilotBass: -9, effects: -6 });
     const initialEffects = useRef({
         melody: { reverb: -Infinity, delay: -60 },
         manualBass: { reverb: -Infinity, delay: -60 },
@@ -284,7 +284,6 @@ export default function Home() {
         accompaniment: { reverb: -6, delay: -20 },
         autopilotBass: { reverb: -Infinity, delay: -60 },
         effects: { reverb: -6, delay: -6 },
-        ebass: { reverb: -Infinity, delay: -60 }
     });
 
     if (!isClient) {
@@ -459,7 +458,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
-
-    

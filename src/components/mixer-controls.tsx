@@ -21,7 +21,6 @@ type Volumes = {
     accompaniment: number;
     autopilotBass: number;
     effects: number;
-    ebass: number;
 };
 
 type Effects = {
@@ -33,7 +32,6 @@ type Effects = {
     accompaniment: { reverb: number, delay: number };
     autopilotBass: { reverb: number, delay: number };
     effects: { reverb: number, delay: number };
-    ebass: { reverb: number, delay: number };
 };
 
 interface MixerControlsProps {
@@ -167,19 +165,6 @@ export function MixerControls({ initialVolumes, onVolumeChange, initialEffects, 
                     onReverbCommit={(v) => handleEffectCommit('manualBass', 'reverb', v)}
                     onDelayChange={(v) => handleEffectChange('manualBass', 'delay', v)}
                     onDelayCommit={(v) => handleEffectCommit('manualBass', 'delay', v)}
-                />
-                 <InstrumentControls 
-                    label="E.Bass"
-                    icon={Guitar}
-                    volume={volumes.ebass}
-                    reverb={effects.ebass.reverb}
-                    delay={effects.ebass.delay}
-                    onVolumeChange={(v) => handleVolumeChange('ebass', v)}
-                    onVolumeCommit={(v) => handleVolumeCommit('ebass', v)}
-                    onReverbChange={(v) => handleEffectChange('ebass', 'reverb', v)}
-                    onReverbCommit={(v) => handleEffectCommit('ebass', 'reverb', v)}
-                    onDelayChange={(v) => handleEffectChange('ebass', 'delay', v)}
-                    onDelayCommit={(v) => handleEffectCommit('ebass', 'delay', v)}
                 />
                 <InstrumentControls 
                     label="Latch"
