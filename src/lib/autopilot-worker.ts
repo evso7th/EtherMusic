@@ -5,7 +5,7 @@ import type { Instrument, MusicKey, MusicScale } from '@/app/page';
 import type { Unit } from 'tone/build/esm/core/type/Units';
 
 // --- TYPE DEFINITIONS ---
-export type AutopilotStyle = 'Ambient' | 'Sequence' | 'Water' | 'Air' | 'Earth' | 'Tibet' | 'Space';
+export type AutopilotStyle = 'Ambient' | 'Sequence' | 'Water' | 'Air' | 'Toccata' | 'Promenade' | 'Space';
 export type AutopilotPart = 'melody' | 'accompaniment' | 'bass' | 'effects';
 
 export type NoteEvent = {
@@ -56,6 +56,10 @@ const getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]
     return allFrequencies.sort((a,b) => a - b);
 };
 
+function noteToFreq(note: string): number {
+    return Tone.Frequency(note).toFrequency();
+}
+
 // --- WORKER STATE ---
 let state = {
     isRunning: false,
@@ -105,13 +109,15 @@ let state = {
         currentArpPattern: [0, 1, 2] as number[],
         currentBassPattern: [] as boolean[],
     },
-    earth: {
-        currentChordIndex: 0,
-        lastMelodyTick: 0,
+    toccata: {
+        sequenceIndex: 0,
+        hasPlayedIntro: false,
+        lastArpTick: 0,
+        arpStep: 0,
     },
-    tibet: {
-        lastBowlTick: 0,
-        lastChantTick: 0,
+    promenade: {
+        sequenceIndex: 0,
+        hasPlayedIntro: false,
     },
     space: {
         arpIndex: 0,
@@ -390,48 +396,54 @@ function tickAir(time: number) {
 }
 
 
-// --- "EARTH" STYLE ---
-function tickEarth(time: number) {
-    const ticksPerMeasure = 16;
-    const ticksPerTwoMeasures = ticksPerMeasure * 2;
-    const ticksPerFourMeasures = ticksPerMeasure * 4;
-    const chordProgression = [0, 5, 3, 4]; // I-vi-IV-V
+// --- "TOCCATA" STYLE ---
+function tickToccata(time: number) {
     const notesBatch: NoteEvent[] = [];
+    // Force D Minor for this style
+    const key = 'D';
+    const scale = 'Minor';
+    const melodyOctave = 5;
+    const bassOctave = 3;
 
-    // Change chord every four measures
-    if (state.tick16n % ticksPerFourMeasures === 0) {
-        state.earth.currentChordIndex = (state.earth.currentChordIndex + 1) % chordProgression.length;
-        // BASS
-        const rootDegree = chordProgression[state.earth.currentChordIndex];
-        const bassFreq = state.scaleFrequencies.bass[rootDegree % state.scaleFrequencies.bass.length];
-        if (bassFreq) {
-            notesBatch.push({ part: 'bass', freq: bassFreq, dur: '4m', vel: 0.7, time });
-        }
-    }
+    const introSequence = [
+        { note: `A${melodyOctave}`, dur: '16n', part: 'melody' },
+        { note: `G${melodyOctave}`, dur: '16n', part: 'melody' },
+        { note: `A${melodyOctave}`, dur: '8n', part: 'melody' },
+        { note: `A${melodyOctave-1}`, dur: '2n', part: 'bass' },
+    ];
+    
+    if (!state.toccata.hasPlayedIntro) {
+        if (state.toccata.sequenceIndex < introSequence.length) {
+            const item = introSequence[state.toccata.sequenceIndex];
+            const freq = noteToFreq(item.note);
+            notesBatch.push({ part: item.part as AutopilotPart, freq, dur: item.dur, vel: 0.9, time });
+            state.toccata.sequenceIndex++;
 
-    // ACCOMPANIMENT
-    if (state.tick16n % ticksPerTwoMeasures === 0) {
-        const rootDegree = chordProgression[state.earth.currentChordIndex];
-        const chordDegrees = [rootDegree, rootDegree + 2, rootDegree + 4];
-        chordDegrees.forEach((degree, index) => {
-            const noteFreq = state.scaleFrequencies.accompaniment[degree % state.scaleFrequencies.accompaniment.length];
-            if (noteFreq) {
-                notesBatch.push({ part: 'accompaniment', freq: noteFreq, dur: '2m', vel: 0.4, time: time + (index * 0.1) });
+            if (state.toccata.sequenceIndex === introSequence.length) {
+                state.toccata.hasPlayedIntro = true;
+                state.toccata.lastArpTick = state.tick16n;
             }
-        });
-    }
-
-    // MELODY
-    const nextMelodyTick = state.earth.lastMelodyTick + ticksPerFourMeasures;
-    if (state.tick16n >= nextMelodyTick && Math.random() > 0.3) {
-        const rootDegree = chordProgression[state.earth.currentChordIndex];
-        const melodyNoteDegree = rootDegree + [0, 2, 4][Math.floor(Math.random() * 3)];
-        const melodyFreq = state.scaleFrequencies.melody[melodyNoteDegree % state.scaleFrequencies.melody.length];
-        
-        if (melodyFreq) {
-             notesBatch.push({ part: 'melody', freq: melodyFreq, dur: '1m', vel: 0.8, time: time });
         }
-        state.earth.lastMelodyTick = state.tick16n;
+    } else {
+        // Generative part - fast arpeggios
+        if (state.tick16n >= state.toccata.lastArpTick + 2) {
+            const arpNotes = getScaleFrequencies(key, scale, [4, 5]);
+            const noteCount = 4;
+            for (let i = 0; i < noteCount; i++) {
+                const noteIndex = (state.toccata.arpStep + i) % arpNotes.length;
+                const freq = arpNotes[noteIndex];
+                const noteTime = time + (i * (60 / state.currentBpm / 4)); // 16th notes
+                notesBatch.push({ part: 'melody', freq, dur: '16n', vel: 0.7, time: noteTime });
+            }
+            state.toccata.arpStep = (state.toccata.arpStep + 1) % arpNotes.length;
+            state.toccata.lastArpTick = state.tick16n;
+        }
+         // Add a sustained bass note
+        if (state.tick16n % 32 === 0) {
+            const bassNotes = getScaleFrequencies(key, scale, [2]);
+            const bassFreq = bassNotes[Math.floor(Math.random() * bassNotes.length)];
+            notesBatch.push({ part: 'bass', freq: bassFreq, dur: '2n', vel: 0.8, time });
+        }
     }
 
     if (notesBatch.length > 0) {
@@ -439,28 +451,54 @@ function tickEarth(time: number) {
     }
 }
 
-// --- "TIBET" STYLE ---
-function tickTibet(time: number) {
-    const ticksPerFourMeasures = 16 * 4;
+
+// --- "PROMENADE" STYLE ---
+function tickPromenade(time: number) {
     const notesBatch: NoteEvent[] = [];
+    const key = 'B'; 
+    const scale = 'Major';
 
-    // Bass (Chant Drone)
-    const chantInterval = ticksPerFourMeasures * 2;
-    if (state.tick16n % chantInterval === 0) {
-        const rootFreq = state.scaleFrequencies.bass[0];
-        if (rootFreq) {
-            notesBatch.push({ part: 'bass', freq: rootFreq, dur: '8m', vel: 0.6, time });
-        }
-    }
+    const introMelody = [
+        { note: `F#4`, dur: '4n', part: 'melody' }, { note: `G#4`, dur: '4n', part: 'melody' }, { note: `A#4`, dur: '4n', part: 'melody' },
+        { note: `F#4`, dur: '4n', part: 'melody' }, { note: `E4`, dur: '4n', part: 'melody' }, { note: `F#4`, dur: '4n', part: 'melody' },
+        { note: `G#4`, dur: '4n', part: 'melody' }, { note: `A#4`, dur: '4n', part: 'melody' }, { note: `G#4`, dur: '4n', part: 'melody' }, { note: `F#4`, dur: '4n', part: 'melody' }
+    ];
 
-    // Melody (Singing Bowls)
-    const bowlInterval = 32 + Math.floor(Math.random() * 32);
-    if (state.tick16n >= state.tibet.lastBowlTick + bowlInterval) {
-        const bowlFreq = state.scaleFrequencies.melody[Math.floor(Math.random() * state.scaleFrequencies.melody.length)];
-        if (bowlFreq) {
-            notesBatch.push({ part: 'melody', freq: bowlFreq, dur: '1m', vel: 0.9, time });
+    const introChords = [
+        { notes: [`B2`, `F#3`, `B3`], dur: '2n', part: 'accompaniment'},
+        { notes: [`G#3`, `C#4`, `E4`], dur: '2n', part: 'accompaniment' },
+        { notes: [`A#3`, `D#4`, `F#4`], dur: '2n', part: 'accompaniment' },
+    ];
+    
+    if (!state.promenade.hasPlayedIntro) {
+        const step = state.promenade.sequenceIndex;
+        if (step < introMelody.length) {
+            if (state.tick16n % 8 === 0) { // Play every half note
+                const item = introMelody[step];
+                notesBatch.push({ part: 'melody', freq: noteToFreq(item.note), dur: '4n', vel: 0.8, time });
+
+                if (step % 4 === 0) { // Play chord on the beat
+                    const chord = introChords[Math.floor(step/4) % introChords.length];
+                    chord.notes.forEach(note => {
+                        notesBatch.push({ part: 'accompaniment', freq: noteToFreq(note), dur: '2n', vel: 0.5, time });
+                    });
+                }
+                state.promenade.sequenceIndex++;
+            }
+        } else {
+            state.promenade.hasPlayedIntro = true;
         }
-        state.tibet.lastBowlTick = state.tick16n;
+    } else {
+        // Generative part
+        if (state.tick16n % 16 === 0) { // Every measure
+            const scaleNotes = getScaleFrequencies(key, scale, [4]);
+            const melodyFreq = scaleNotes[Math.floor(Math.random() * scaleNotes.length)];
+            notesBatch.push({ part: 'melody', freq: melodyFreq, dur: '2n', vel: 0.7, time });
+
+            const bassNotes = getScaleFrequencies(key, scale, [2, 3]);
+            const bassFreq = bassNotes[Math.floor(Math.random() * bassNotes.length)];
+            notesBatch.push({ part: 'bass', freq: bassFreq, dur: '1n', vel: 0.6, time });
+        }
     }
 
     if (notesBatch.length > 0) {
@@ -536,17 +574,32 @@ function tick(time: number) {
         case 'Sequence': tickSequence(time); break;
         case 'Water': tickWater(time); break;
         case 'Air': tickAir(time); break;
-        case 'Earth': tickEarth(time); break;
-        case 'Tibet': tickTibet(time); break;
+        case 'Toccata': tickToccata(time); break;
+        case 'Promenade': tickPromenade(time); break;
         case 'Space': tickSpace(time); break;
     }
 
-    if (state.currentStyle !== 'Tibet' && state.currentStyle !== 'Space') {
+    if (state.currentStyle !== 'Toccata' && state.currentStyle !== 'Promenade' && state.currentStyle !== 'Space') {
         tickEffects(time);
     }
     
     state.tick16n++;
 }
+
+function resetStyleSpecificState() {
+    state.sequence.lastMelodyNoteIndex = null;
+    state.sequence.nextMelodyTick = 0;
+    state.ambient.lastChordChangeTick = -Infinity; 
+    state.ambient.lastMelodyDegree = null;
+    state.air.isResting = true;
+    state.air.restMeasures = 0;
+    state.air.totalRestMeasures = 0;
+    state.toccata = { sequenceIndex: 0, hasPlayedIntro: false, lastArpTick: 0, arpStep: 0 };
+    state.promenade = { sequenceIndex: 0, hasPlayedIntro: false };
+    state.space.lastLaserTick = 0;
+    state.tick16n = 0;
+}
+
 
 // --- MESSAGE HANDLER ---
 self.onmessage = function (event: MessageEvent<WorkerEvent>) {
@@ -554,19 +607,7 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
     switch (type) {
         case 'start':
             state.isRunning = true;
-            state.tick16n = 0;
-            // Reset all style-specific states
-            state.sequence.lastMelodyNoteIndex = null;
-            state.sequence.nextMelodyTick = 0;
-            state.ambient.lastChordChangeTick = -Infinity; 
-            state.ambient.lastMelodyDegree = null;
-            state.air.isResting = true;
-            state.air.restMeasures = 0;
-            state.air.totalRestMeasures = 0;
-            state.earth.lastMelodyTick = 0;
-            state.tibet.lastBowlTick = -Infinity;
-            state.tibet.lastChantTick = -Infinity;
-            state.space.lastLaserTick = 0;
+            resetStyleSpecificState();
             break;
         case 'stop':
             state.isRunning = false;
@@ -585,9 +626,7 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
         case 'setStyle':
             // @ts-ignore
             state.currentStyle = data.style;
-            state.tick16n = 0;
-            state.ambient.lastChordChangeTick = -Infinity;
-            state.ambient.lastMelodyDegree = null;
+            resetStyleSpecificState();
             break;
         case 'setInstruments':
             // @ts-ignore
