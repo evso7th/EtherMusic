@@ -42,7 +42,6 @@ export const HelpGuide = ({ buttonVariant = "outline", buttonClassName, showText
                 </DialogHeader>
                 <ScrollArea className="h-[70vh] w-full">
                      <div 
-                        className="prose prose-invert p-4" 
                         dangerouslySetInnerHTML={{ __html: guideContent }}
                     />
                 </ScrollArea>
