@@ -8,7 +8,9 @@ Welcome to EtherMusic! This is a simple guide to get you started on making cool 
 
 **This is not a simplified Digital Audio Workstation (DAW) or a DJ mixer.** You won't produce a studio-quality track here.
 
-Instead, think of it as a **virtual music box**, a "Neuro-Meditation Sound Processor." It's an instrument that anyone can play, designed for relaxation, focus, and self-expression. We built it for everyone who loves music but feels intimidated by complex software and music theory. Here, you can't make a mistake.
+Instead, think of it as a **virtual music box**, a "Neuro-Meditation Sound Processor." It's an instrument that anyone can play, designed for relaxation, focus, and self-expression. We built it for everyone who loves music but feels intimidated by complex software and music theory. 
+
+**Here, you can't make a mistake.** All sounds are mathematically harmonized in real-time by the "Harmonizer" — the second heart of the application. This means any note you play will always sound good. Dissonance is simply impossible.
 
 Our application is at the intersection of a creative tool, a meditation aid, and a digital wellness gadget. It is not for professional musicians, but for a wide audience that appreciates ambient music, mindfulness, and is looking for new forms of self-expression and relaxation.
 
