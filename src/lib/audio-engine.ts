@@ -284,10 +284,17 @@ export class AudioEngine {
     public updateNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}) {
         if (!this.isInitialized) return;
         const voice = this.getVoiceFromPool(type, pointerId);
-        if (voice) {
+        if (voice && voice.synth) {
             const quantizedFreq = this.getClosestFrequency(freq, type);
-            if (voice.synth.frequency) voice.synth.frequency.value = quantizedFreq;
-            if (voice.synth.volume) voice.synth.volume.value = Tone.gainToDb(vol * vol);
+            const rampTime = 0.02; // Short ramp time to avoid clicks
+            if (voice.synth.frequency) {
+                voice.synth.frequency.rampTo(quantizedFreq, rampTime);
+            }
+            if (voice.synth.volume) {
+                 // Convert linear volume (0-1) to Decibels for Tone.js
+                const targetDb = Tone.gainToDb(vol * vol);
+                voice.synth.volume.rampTo(targetDb, rampTime);
+            }
             this.orbManager?.updateOrb(pointerId, pos.x, pos.y);
         }
     }
