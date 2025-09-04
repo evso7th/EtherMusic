@@ -26,7 +26,7 @@ import { HelpGuide } from "./help-guide";
 import { Separator } from "./ui/separator";
 import { Switch } from "./ui/switch";
 import { ScrollArea } from "./ui/scroll-area";
-import type { AutopilotStyle, AutopilotPart } from "@/lib/autopilot-worker";
+import type { AutopilotPart } from "@/lib/autopilot-worker";
 import type { Instrument } from "@/app/page";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 
@@ -75,16 +75,11 @@ interface BeatBoxControlsProps {
     onEffectChange: (effects: Effects) => void;
     isAutopilotOn: boolean;
     onAutopilotToggle: (isOn: boolean) => void;
-    autopilotStyles: AutopilotStyle[];
-    activeAutopilotStyle: AutopilotStyle;
-    onAutopilotStyleChange: (style: AutopilotStyle) => void;
     autopilotInstruments: Instrument[];
     activeAutopilotInstruments: Record<AutopilotPart, Instrument>;
     onAutopilotInstrumentChange: (part: AutopilotPart, instrument: Instrument) => void;
     isMobile: boolean;
     isLandscape?: boolean;
-    onSavePreset: (style: AutopilotStyle) => void;
-    onLoadPreset: (style: AutopilotStyle) => void;
 }
 
 const MemoizedAutopilotInstrumentSelector = memo(function AutopilotInstrumentSelector({
@@ -144,22 +139,16 @@ export function BeatBoxControls({
     onEffectChange,
     isAutopilotOn,
     onAutopilotToggle,
-    autopilotStyles,
-    activeAutopilotStyle,
-    onAutopilotStyleChange,
     autopilotInstruments,
     activeAutopilotInstruments,
     onAutopilotInstrumentChange,
     isMobile,
     isLandscape = false,
-    onSavePreset,
-    onLoadPreset,
 }: BeatBoxControlsProps) {
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isTempoOpen, setIsTempoOpen] = useState(false);
     const [isAutopilotOpen, setIsAutopilotOpen] = useState(false);
     const [isAutopilotMixerOpen, setIsAutopilotMixerOpen] = useState(false);
-    const [isStyleOpen, setIsStyleOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<'Meditative' | 'Classic'>('Meditative');
     
     // Local state for autopilot instrument settings
@@ -241,34 +230,6 @@ export function BeatBoxControls({
                             <Label htmlFor="autopilot-switch">Autopilot On/Off</Label>
                         </div>
 
-                        <Dialog open={isStyleOpen} onOpenChange={setIsStyleOpen}>
-                            <DialogTrigger asChild>
-                                <Button variant="outline" className="w-full" disabled={!isAutopilotOn}>
-                                    <Wand2 className="w-4 h-4 mr-2" />
-                                    Style: {activeAutopilotStyle}
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Autopilot Style</DialogTitle>
-                                </DialogHeader>
-                                <div className="grid grid-cols-2 gap-2 py-4">
-                                    {autopilotStyles.map((style) => (
-                                        <Button
-                                            key={style}
-                                            variant={activeAutopilotStyle === style ? 'default' : 'outline'}
-                                            onClick={() => {
-                                                onAutopilotStyleChange(style);
-                                                setIsStyleOpen(false);
-                                            }}
-                                        >
-                                            {style}
-                                        </Button>
-                                    ))}
-                                </div>
-                            </DialogContent>
-                        </Dialog>
-
                         <Separator />
 
                         <div className="space-y-4">
@@ -325,23 +286,6 @@ export function BeatBoxControls({
                                 </ScrollArea>
                             </DialogContent>
                         </Dialog>
-                        
-                        <Separator />
-                        
-                        <div>
-                             <h4 className="text-sm font-medium text-center text-muted-foreground mb-4">Presets for "{activeAutopilotStyle}"</h4>
-                             <div className="flex gap-2">
-                                <Button variant="outline" className="w-full" onClick={() => onSavePreset(activeAutopilotStyle)}>
-                                    <Save className="w-4 h-4 mr-2" />
-                                    Save Preset
-                                </Button>
-                                 <Button variant="outline" className="w-full" onClick={() => onLoadPreset(activeAutopilotStyle)}>
-                                    <FolderDown className="w-4 h-4 mr-2" />
-                                    Load Preset
-                                </Button>
-                            </div>
-                        </div>
-
                     </div>
                 </ScrollArea>
             </DialogContent>
@@ -613,5 +557,3 @@ export function BeatBoxControls({
         </TooltipProvider>
     );
 }
-
-    

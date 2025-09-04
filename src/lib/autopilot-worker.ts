@@ -1,18 +1,19 @@
 
+// @/lib/autopilot-worker.ts
+// This is the new, clean entry point for your custom autopilot logic.
+// All the old styles (Ambient, Toccata, etc.) have been removed.
 
-import * as Tone from 'tone';
-import type { Instrument, MusicKey, MusicScale } from '@/app/page';
-import type { Unit } from 'tone/build/esm/core/type/Units';
+import type { MusicKey, MusicScale, Instrument } from '@/app/page';
 
-// --- TYPE DEFINITIONS ---
-export type AutopilotStyle = 'Ambient' | 'Sequence' | 'Water' | 'Air' | 'Toccata' | 'Promenade' | 'Space';
+// --- TYPE DEFINITIONS (Keep these consistent with page.tsx) ---
+
 export type AutopilotPart = 'melody' | 'accompaniment' | 'bass' | 'effects';
 
 export type NoteEvent = {
-    id?: number; // Unique ID for notes that need to be updated
+    id?: number;
     part: AutopilotPart;
     freq: number;
-    dur: Unit.Time;
+    dur: string; // Use string notation like '4n', '8t', '1m'
     vel: number;
     time: number; // Absolute time for playback
 };
@@ -21,619 +22,108 @@ export type NoteUpdateEvent = {
     id: number;
     part: AutopilotPart;
     freq: number;
-    rampTime: Unit.Time;
+    rampTime: string;
 };
 
-
+// Events received from the main thread
 export type WorkerEvent =
     | { type: 'start' }
     | { type: 'stop' }
     | { type: 'tick', time: number }
     | { type: 'setHarmony', key: MusicKey, scale: MusicScale }
-    | { type: 'setTempo', bpm: number }
-    | { type: 'setStyle', style: AutopilotStyle }
-    | { type: 'setInstruments', instruments: Record<AutopilotPart, Instrument> };
+    | { type: 'setTempo', bpm: number };
 
+// Events sent back to the main thread
 export type WorkerResponse =
     | { type: 'playNote', note: NoteEvent }
     | { type: 'updateNote', note: NoteUpdateEvent }
     | { type: 'playNotesBatch', notes: NoteEvent[] };
 
 
-// --- MUSIC THEORY HELPERS ---
-const getScaleFrequencies = (key: MusicKey, scale: MusicScale, octaves: number[]): number[] => {
-    const scaleIntervals: { [key in MusicScale]: string[] } = {
-        'Major': ['0', '2', '4', '5', '7', '9', '11'], 'Minor': ['0', '2', '3', '5', '7', '8', '10'],
-        'Major Pentatonic': ['0', '2', '4', '7', '9'], 'Minor Pentatonic': ['0', '3', '5', '7', '10'],
-    };
-    let allFrequencies: number[] = [];
-    const intervals = scaleIntervals[scale];
-    octaves.forEach(octave => {
-        intervals.forEach(interval => {
-            allFrequencies.push(Tone.Frequency(key + octave).transpose(interval).toFrequency());
-        });
-    });
-    return allFrequencies.sort((a,b) => a - b);
-};
-
-function noteToFreq(note: string): number {
-    return Tone.Frequency(note).toFrequency();
-}
-
 // --- WORKER STATE ---
+// This is where you'll manage the state of your new autopilot.
 let state = {
     isRunning: false,
-    tick16n: 0,
-    currentStyle: 'Ambient' as AutopilotStyle,
+    tickCount: 0,
     currentKey: 'G' as MusicKey,
     currentScale: 'Major' as MusicScale,
     currentBpm: 90,
-    instruments: {
-        melody: 'synth' as Instrument,
-        accompaniment: 'synth' as Instrument,
-        bass: 'ebass' as Instrument,
-        effects: 'autopilot_effect_star' as Instrument
-    },
-    scaleFrequencies: {
-        bass: [] as number[],
-        accompaniment: [] as number[],
-        melody: [] as number[],
-        effects: [] as number[],
-    },
-    // Style-specific state
-    ambient: {
-        chordProgression: [0, 4, 5, 3], // I-V-vi-IV in 0-based scale degrees
-        currentChordDegree: 0,
-        lastChordChangeTick: -Infinity,
-        lastMelodyDegree: null as number | null,
-    },
-    sequence: {
-        bassNoteIndex: 0,
-        accompanimentIndex: 0,
-        lastMelodyNoteIndex: null as number | null,
-        notesInCurrentPhrase: 0,
-        maxNotesInPhrase: 5,
-        nextMelodyTick: 0,
-    },
-    water: {
-        arpeggioIndex: 0,
-        currentChordRootDegree: 0,
-    },
-    air: {
-        currentChordIndex: 0,
-        phraseMeasures: 0,
-        totalPhraseMeasures: 4,
-        isResting: false,
-        restMeasures: 0,
-        totalRestMeasures: 2,
-        currentArpPattern: [0, 1, 2] as number[],
-        currentBassPattern: [] as boolean[],
-    },
-    toccata: {
-        sequenceIndex: 0,
-        hasPlayedIntro: false,
-        lastArpTick: 0,
-        arpStep: 0,
-    },
-    promenade: {
-        sequenceIndex: 0,
-        hasPlayedIntro: false,
-    },
-    space: {
-        arpIndex: 0,
-        lastLaserTick: 0,
-    }
+    // Add any other state variables your new autopilot needs.
 };
 
-function updateHarmony(key: MusicKey, scale: MusicScale) {
-    state.currentKey = key;
-    state.currentScale = scale;
-    state.scaleFrequencies = {
-        bass: getScaleFrequencies(key, scale, [2, 3]),
-        accompaniment: getScaleFrequencies(key, scale, [3, 4]),
-        melody: getScaleFrequencies(key, scale, [4, 5]),
-        effects: getScaleFrequencies(key, scale, [5, 6]),
-    };
-    // Reset melody memory on harmony change
-    state.sequence.lastMelodyNoteIndex = null;
-    state.ambient.lastChordChangeTick = -Infinity;
-    state.ambient.lastMelodyDegree = null;
-    state.water.arpeggioIndex = 0;
-    // Reset air state on harmony change
-    state.air.phraseMeasures = 0;
-    state.air.isResting = false;
-    state.air.restMeasures = 0;
-}
 
-// --- "AMBIENT" STYLE ---
-function tickAmbient(time: number) {
-    const ticksPerMeasure = 16;
-    const ticksForChordChange = ticksPerMeasure * 2; // Chord changes every 2 measures for more movement
-    const notesBatch: NoteEvent[] = [];
+// --- YOUR NEW AUTOPILOT LOGIC ---
 
-    // --- BASS (Drone) & ACCOMPANIMENT (Pads) ---
-    if (state.tick16n % ticksForChordChange === 0) {
-        state.ambient.currentChordDegree = (state.ambient.currentChordDegree + 1) % state.ambient.chordProgression.length;
-        const scaleRootDegree = state.ambient.chordProgression[state.ambient.currentChordDegree];
-
-        // Bass Drone
-        const bassFreq = state.scaleFrequencies.bass[scaleRootDegree % state.scaleFrequencies.bass.length];
-        if (bassFreq) {
-            notesBatch.push({ part: 'bass', freq: bassFreq, dur: '2m', vel: 0.6, time });
-        }
-
-        // Accompaniment Chord (Pad) - 3 notes
-        const chordDegrees = [scaleRootDegree, scaleRootDegree + 2, scaleRootDegree + 4];
-        chordDegrees.forEach((degree, index) => {
-            const noteFreq = state.scaleFrequencies.accompaniment[degree % state.scaleFrequencies.accompaniment.length];
-            if (noteFreq) {
-                notesBatch.push({
-                    part: 'accompaniment', freq: noteFreq, dur: '1m', vel: 0.3 + (Math.random() * 0.1), time: time + (index * 0.1)
-                });
-            }
-        });
-    }
-
-    // --- MELODY ---
-    // Play a new note every measure
-    if (state.tick16n % ticksPerMeasure === 0) {
-        let nextMelodyDegree;
-        if (state.ambient.lastMelodyDegree === null) {
-            nextMelodyDegree = Math.floor(Math.random() * state.scaleFrequencies.melody.length);
-        } else {
-            // Stepwise motion
-            const direction = Math.random() > 0.5 ? 1 : -1;
-            nextMelodyDegree = state.ambient.lastMelodyDegree + direction;
-            // Boundary check
-            if (nextMelodyDegree < 0 || nextMelodyDegree >= state.scaleFrequencies.melody.length) {
-                nextMelodyDegree = state.ambient.lastMelodyDegree - direction; // Go the other way
-            }
-        }
-
-        const melodyFreq = state.scaleFrequencies.melody[nextMelodyDegree];
-        if (melodyFreq) {
-            notesBatch.push({
-                part: 'melody',
-                freq: melodyFreq,
-                dur: '1m',
-                vel: 0.7,
-                time: time,
-            });
-        }
-        state.ambient.lastMelodyDegree = nextMelodyDegree;
-    }
-
-    if (notesBatch.length > 0) {
-        self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
-    }
-}
-
-
-// --- "SEQUENCE" STYLE (Mike Oldfield inspired) ---
-function tickSequence(time: number) {
-    const notesBatch: NoteEvent[] = [];
-
-    // Bass part (plays every 8 ticks = half note)
-    if (state.tick16n % 16 === 0) { // Slower bass
-        const bassFreq = state.scaleFrequencies.bass[state.sequence.bassNoteIndex % state.scaleFrequencies.bass.length];
-        notesBatch.push({ part: 'bass', freq: bassFreq, dur: '1n', vel: 0.8, time });
-        state.sequence.bassNoteIndex++;
-    }
-
-    // Accompaniment (plays every 4 ticks = quarter note arpeggio)
-    if (state.tick16n % 8 === 0) { // Slower accompaniment
-        const accompFreq = state.scaleFrequencies.accompaniment[state.sequence.accompanimentIndex % state.scaleFrequencies.accompaniment.length];
-        notesBatch.push({ part: 'accompaniment', freq: accompFreq, dur: '4n', vel: 0.4, time });
-        state.sequence.accompanimentIndex++;
-        if (Math.random() < 0.05) { // Occasionally jump in the arpeggio
-            state.sequence.accompanimentIndex += Math.floor(Math.random() * 4) - 2;
-        }
-    }
-
-    // New Melodic Logic
-    if (state.tick16n >= state.sequence.nextMelodyTick) {
-        // Phrase finished, create a pause
-        if (state.sequence.notesInCurrentPhrase >= state.sequence.maxNotesInPhrase) {
-            state.sequence.notesInCurrentPhrase = 0;
-            state.sequence.maxNotesInPhrase = 3 + Math.floor(Math.random() * 3); // 3-5 notes
-            state.sequence.nextMelodyTick = state.tick16n + 8 + Math.floor(Math.random() * 16); // Pause for 2-6 beats
-        } else {
-            let nextNoteIndex;
-            if (state.sequence.lastMelodyNoteIndex === null) {
-                nextNoteIndex = Math.floor(state.scaleFrequencies.melody.length / 2) + (Math.floor(Math.random()*4)-2);
-            } else {
-                const step = (Math.random() < 0.2) ? 2 : 1;
-                const direction = (Math.random() < 0.5) ? -1 : 1;
-                nextNoteIndex = state.sequence.lastMelodyNoteIndex + (step * direction);
-            }
-
-            nextNoteIndex = Math.max(0, Math.min(state.scaleFrequencies.melody.length - 1, nextNoteIndex));
-            
-            const melodyFreq = state.scaleFrequencies.melody[nextNoteIndex];
-            notesBatch.push({ part: 'melody', freq: melodyFreq, dur: '2n', vel: 0.7, time });
-            
-            state.sequence.lastMelodyNoteIndex = nextNoteIndex;
-            state.sequence.notesInCurrentPhrase++;
-            state.sequence.nextMelodyTick = state.tick16n + 8;
-        }
-    }
-    if (notesBatch.length > 0) {
-        self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
-    }
-}
-
-// --- "WATER" STYLE ---
-function tickWater(time: number) {
-    const ticksPerMeasure = 16;
-    const ticksForChordChange = ticksPerMeasure * 2;
-    const notesBatch: NoteEvent[] = [];
-
-    // Change chord root every 2 measures
-    if (state.tick16n % ticksForChordChange === 0) {
-        state.water.currentChordRootDegree = Math.floor(Math.random() * state.scaleFrequencies.bass.length);
-        // Play bass note at the start of each chord change
-        const bassFreq = state.scaleFrequencies.bass[state.water.currentChordRootDegree];
-        if (bassFreq) {
-             notesBatch.push({ part: 'bass', freq: bassFreq, dur: '2m', vel: 0.5, time });
-        }
-    }
-    
-    // Play melody "drop" note randomly
-    if (state.tick16n % 4 === 0 && Math.random() < 0.25) {
-        const melodyFreq = state.scaleFrequencies.melody[Math.floor(Math.random() * state.scaleFrequencies.melody.length)];
-         if (melodyFreq) {
-             notesBatch.push({ part: 'melody', freq: melodyFreq, dur: '8n', vel: 0.8, time });
-        }
-    }
-
-    // Accompaniment arpeggio
-    if (state.tick16n % ticksPerMeasure === 0) {
-        const chordDegrees = [
-            state.water.currentChordRootDegree,
-            state.water.currentChordRootDegree + 2,
-            state.water.currentChordRootDegree + 4,
-            state.water.currentChordRootDegree + 2,
-        ];
-        
-        const arpeggioPattern = [0, 1, 2, 3, 0, 2, 1, 3, 0, 3, 1, 2, 0, 1, 3, 2];
-        for (let i = 0; i < 16; i++) {
-            const patternIndex = arpeggioPattern[i];
-            const degree = chordDegrees[patternIndex % chordDegrees.length];
-            const noteFreq = state.scaleFrequencies.accompaniment[degree % state.scaleFrequencies.accompaniment.length];
-            
-            if (noteFreq) {
-                const noteTime = time + (i * (60 / state.currentBpm / 4));
-                notesBatch.push({
-                    part: 'accompaniment', freq: noteFreq, dur: '16n', vel: 0.3 + (Math.random() * 0.2), time: noteTime
-                });
-            }
-        }
-    }
-
-    if (notesBatch.length > 0) {
-        self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
-    }
-}
-
-// --- "AIR" STYLE ---
-function tickAir(time: number) {
-    const ticksPerMeasure = 16;
-    const ticksPerBeat = 4;
-    const chordProgression = [0, 3, 4, 0]; // I-IV-V-I
-    const arpeggioPatterns = [ [0, 1, 2], [2, 1, 0], [0, 2, 1], [1, 2, 0] ];
-    const bassPatterns: boolean[][] = [
-        [true, false, false, true, false, false, true, false, true, false, false, true, false, false, true, false], // Syncopated
-        [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false], // On the beat
-        [false, false, true, false, true, false, true, false, false, false, true, false, true, false, true, false]  // More syncopated
-    ];
-
-    const notesBatch: NoteEvent[] = [];
-    
-    // --- PHRASING LOGIC for Melody & Bass Pattern---
-    if (state.tick16n % (ticksPerMeasure) === 0) {
-        if (state.air.isResting) {
-            state.air.restMeasures++;
-            if (state.air.restMeasures >= state.air.totalRestMeasures) {
-                state.air.isResting = false;
-                state.air.phraseMeasures = 0;
-                state.air.totalPhraseMeasures = 2 + Math.floor(Math.random() * 3); // Play for 2-4 measures
-                state.air.currentArpPattern = arpeggioPatterns[Math.floor(Math.random() * arpeggioPatterns.length)];
-                state.air.currentBassPattern = bassPatterns[Math.floor(Math.random() * bassPatterns.length)];
-            }
-        } else {
-            state.air.phraseMeasures++;
-            if (state.air.phraseMeasures >= state.air.totalPhraseMeasures) {
-                state.air.isResting = true;
-                state.air.restMeasures = 0;
-                state.air.totalRestMeasures = 1 + Math.floor(Math.random() * 2); // Rest for 1-2 measures
-            }
-        }
-    }
-
-    // --- CHORD & ACCOMPANIMENT LOGIC ---
-    // Change chord every 2 measures
-    if (state.tick16n % (ticksPerMeasure * 2) === 0) { 
-        state.air.currentChordIndex = (state.air.currentChordIndex + 1) % chordProgression.length;
-        const accompRootDegree = chordProgression[state.air.currentChordIndex];
-        const chordDegrees = [accompRootDegree, accompRootDegree + 2, accompRootDegree + 4];
-        chordDegrees.forEach((degree, index) => {
-            const noteFreq = state.scaleFrequencies.accompaniment[degree % state.scaleFrequencies.accompaniment.length];
-            if (noteFreq) {
-                notesBatch.push({ part: 'accompaniment', freq: noteFreq, dur: '2m', vel: 0.35, time: time + (index * 0.05) });
-            }
-        });
-    }
-
-    // --- BASS LOGIC ---
-    if (!state.air.isResting && state.air.currentBassPattern.length > 0) {
-        const patternIndex = state.tick16n % 16;
-        if (state.air.currentBassPattern[patternIndex]) {
-            const bassRootDegree = chordProgression[state.air.currentChordIndex];
-            const bassFreq = state.scaleFrequencies.bass[bassRootDegree % state.scaleFrequencies.bass.length];
-            if (bassFreq) {
-                notesBatch.push({ part: 'bass', freq: bassFreq, dur: '8n', vel: 0.7, time: time });
-            }
-        }
-    }
-
-    // --- MELODY LOGIC (only play if not resting) ---
-    if (!state.air.isResting && state.tick16n % ticksPerBeat === 0) {
-        const rootDegree = chordProgression[state.air.currentChordIndex];
-        const triadDegrees = [rootDegree, rootDegree + 2, rootDegree + 4];
-        const patternIndex = (state.tick16n / ticksPerBeat) % state.air.currentArpPattern.length;
-        const triadNoteIndex = state.air.currentArpPattern[patternIndex];
-        const noteDegree = triadDegrees[triadNoteIndex];
-        const melodyFreq = state.scaleFrequencies.melody[noteDegree % state.scaleFrequencies.melody.length];
-
-        if (melodyFreq) {
-            notesBatch.push({ part: 'melody', freq: melodyFreq, dur: '8n', vel: 0.7, time: time });
-        }
-    }
-    
-    if (notesBatch.length > 0) {
-        self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
-    }
-}
-
-
-// --- "TOCCATA" STYLE ---
-function tickToccata(time: number) {
-    const notesBatch: NoteEvent[] = [];
-    // Force D Minor for this style
-    const key = 'D';
-    const scale = 'Minor';
-    const melodyOctave = 5;
-    const bassOctave = 3;
-
-    const introSequence = [
-        { note: `A${melodyOctave}`, dur: '16n', part: 'melody' },
-        { note: `G${melodyOctave}`, dur: '16n', part: 'melody' },
-        { note: `A${melodyOctave}`, dur: '8n', part: 'melody' },
-        { note: `A${melodyOctave-1}`, dur: '2n', part: 'bass' },
-    ];
-    
-    if (!state.toccata.hasPlayedIntro) {
-        if (state.toccata.sequenceIndex < introSequence.length) {
-            const item = introSequence[state.toccata.sequenceIndex];
-            const freq = noteToFreq(item.note);
-            notesBatch.push({ part: item.part as AutopilotPart, freq, dur: item.dur, vel: 0.9, time });
-            state.toccata.sequenceIndex++;
-
-            if (state.toccata.sequenceIndex === introSequence.length) {
-                state.toccata.hasPlayedIntro = true;
-                state.toccata.lastArpTick = state.tick16n;
-            }
-        }
-    } else {
-        // Generative part - fast arpeggios
-        if (state.tick16n >= state.toccata.lastArpTick + 2) {
-            const arpNotes = getScaleFrequencies(key, scale, [4, 5]);
-            const noteCount = 4;
-            for (let i = 0; i < noteCount; i++) {
-                const noteIndex = (state.toccata.arpStep + i) % arpNotes.length;
-                const freq = arpNotes[noteIndex];
-                const noteTime = time + (i * (60 / state.currentBpm / 4)); // 16th notes
-                notesBatch.push({ part: 'melody', freq, dur: '16n', vel: 0.7, time: noteTime });
-            }
-            state.toccata.arpStep = (state.toccata.arpStep + 1) % arpNotes.length;
-            state.toccata.lastArpTick = state.tick16n;
-        }
-         // Add a sustained bass note
-        if (state.tick16n % 32 === 0) {
-            const bassNotes = getScaleFrequencies(key, scale, [2]);
-            const bassFreq = bassNotes[Math.floor(Math.random() * bassNotes.length)];
-            notesBatch.push({ part: 'bass', freq: bassFreq, dur: '2n', vel: 0.8, time });
-        }
-    }
-
-    if (notesBatch.length > 0) {
-        self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
-    }
-}
-
-
-// --- "PROMENADE" STYLE ---
-function tickPromenade(time: number) {
-    const notesBatch: NoteEvent[] = [];
-    const key = 'B'; 
-    const scale = 'Major';
-
-    const introMelody = [
-        { note: `F#4`, dur: '4n', part: 'melody' }, { note: `G#4`, dur: '4n', part: 'melody' }, { note: `A#4`, dur: '4n', part: 'melody' },
-        { note: `F#4`, dur: '4n', part: 'melody' }, { note: `E4`, dur: '4n', part: 'melody' }, { note: `F#4`, dur: '4n', part: 'melody' },
-        { note: `G#4`, dur: '4n', part: 'melody' }, { note: `A#4`, dur: '4n', part: 'melody' }, { note: `G#4`, dur: '4n', part: 'melody' }, { note: `F#4`, dur: '4n', part: 'melody' }
-    ];
-
-    const introChords = [
-        { notes: [`B2`, `F#3`, `B3`], dur: '2n', part: 'accompaniment'},
-        { notes: [`G#3`, `C#4`, `E4`], dur: '2n', part: 'accompaniment' },
-        { notes: [`A#3`, `D#4`, `F#4`], dur: '2n', part: 'accompaniment' },
-    ];
-    
-    if (!state.promenade.hasPlayedIntro) {
-        const step = state.promenade.sequenceIndex;
-        if (step < introMelody.length) {
-            if (state.tick16n % 8 === 0) { // Play every half note
-                const item = introMelody[step];
-                notesBatch.push({ part: 'melody', freq: noteToFreq(item.note), dur: '4n', vel: 0.8, time });
-
-                if (step % 4 === 0) { // Play chord on the beat
-                    const chord = introChords[Math.floor(step/4) % introChords.length];
-                    chord.notes.forEach(note => {
-                        notesBatch.push({ part: 'accompaniment', freq: noteToFreq(note), dur: '2n', vel: 0.5, time });
-                    });
-                }
-                state.promenade.sequenceIndex++;
-            }
-        } else {
-            state.promenade.hasPlayedIntro = true;
-        }
-    } else {
-        // Generative part
-        if (state.tick16n % 16 === 0) { // Every measure
-            const scaleNotes = getScaleFrequencies(key, scale, [4]);
-            const melodyFreq = scaleNotes[Math.floor(Math.random() * scaleNotes.length)];
-            notesBatch.push({ part: 'melody', freq: melodyFreq, dur: '2n', vel: 0.7, time });
-
-            const bassNotes = getScaleFrequencies(key, scale, [2, 3]);
-            const bassFreq = bassNotes[Math.floor(Math.random() * bassNotes.length)];
-            notesBatch.push({ part: 'bass', freq: bassFreq, dur: '1n', vel: 0.6, time });
-        }
-    }
-
-    if (notesBatch.length > 0) {
-        self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
-    }
-}
-
-
-// --- "SPACE" STYLE ---
-function tickSpace(time: number) {
-    const ticksPerMeasure = 16;
-    const notesBatch: NoteEvent[] = [];
-    
-    // Bass (Rhythmic sequence)
-    if (state.tick16n % 4 === 0) {
-        const bassDegree = [0, 0, 3, 3, 4, 4, 0, 0][(Math.floor(state.tick16n / 4)) % 8];
-        const bassFreq = state.scaleFrequencies.bass[bassDegree % state.scaleFrequencies.bass.length];
-        if (bassFreq) {
-            notesBatch.push({ part: 'bass', freq: bassFreq, dur: '8n', vel: 0.8, time });
-        }
-    }
-
-    // Accompaniment (Fast Arpeggio)
-    if (state.tick16n % ticksPerMeasure === 0) {
-        const rootDegree = [0, 3, 4, 0][Math.floor(state.tick16n / ticksPerMeasure) % 4];
-        const chordDegrees = [rootDegree, rootDegree + 2, rootDegree + 4, rootDegree + 7];
-        const arpPattern = [0, 1, 2, 1, 3, 1, 2, 1, 0, 1, 2, 1, 3, 1, 2, 1];
-        
-        for (let i = 0; i < 16; i++) {
-            const degreeIndex = arpPattern[i];
-            const noteDegree = chordDegrees[degreeIndex % chordDegrees.length];
-            const noteFreq = state.scaleFrequencies.accompaniment[noteDegree % state.scaleFrequencies.accompaniment.length];
-            if (noteFreq) {
-                const noteTime = time + (i * (60 / state.currentBpm / 4));
-                notesBatch.push({ part: 'accompaniment', freq: noteFreq, dur: '16n', vel: 0.4, time: noteTime });
-            }
-        }
-    }
-
-    // Effects (Lasers/Swooshes)
-    const laserInterval = 16 + Math.floor(Math.random() * 16);
-    if (state.tick16n >= state.space.lastLaserTick + laserInterval) {
-         const freq = state.scaleFrequencies.effects[Math.floor(Math.random() * state.scaleFrequencies.effects.length)];
-        if (freq) {
-             notesBatch.push({ part: 'effects', freq: freq, dur: '8n', vel: 0.7, time });
-        }
-        state.space.lastLaserTick = state.tick16n;
-    }
-
-    if (notesBatch.length > 0) {
-        self.postMessage({ type: 'playNotesBatch', notes: notesBatch });
-    }
-}
-
-
-// --- UNIVERSAL EFFECTS TICK ---
-function tickEffects(time: number) {
-    if (Math.random() < 0.05) { // Lower probability
-        const freq = state.scaleFrequencies.effects[Math.floor(Math.random() * state.scaleFrequencies.effects.length)];
-        self.postMessage({ type: 'playNote', note: {
-            part: 'effects', freq: freq, dur: '4n', vel: 0.5 + Math.random() * 0.3, time: time
-        }});
-    }
-}
-
-
-// --- MAIN TICK ROUTER ---
+/**
+ * This function is called every 16th note.
+ * @param time The precise time of the tick from Tone.Transport.
+ */
 function tick(time: number) {
     if (!state.isRunning) return;
 
-    switch(state.currentStyle) {
-        case 'Ambient': tickAmbient(time); break;
-        case 'Sequence': tickSequence(time); break;
-        case 'Water': tickWater(time); break;
-        case 'Air': tickAir(time); break;
-        case 'Toccata': tickToccata(time); break;
-        case 'Promenade': tickPromenade(time); break;
-        case 'Space': tickSpace(time); break;
+    const notesToPlay: NoteEvent[] = [];
+
+    // =================================================================
+    // TODO: IMPLEMENT YOUR NEW AUTOPILOT LOGIC HERE
+    //
+    // Example: Play a random melody note every 4 ticks (every quarter note)
+    //
+    // if (state.tickCount % 4 === 0) {
+    //     const melodyFreq = 440; // Replace with your scale logic
+    //     notesToPlay.push({
+    //         part: 'melody',
+    //         freq: melodyFreq,
+    //         dur: '8n',
+    //         vel: 0.8,
+    //         time: time
+    //     });
+    // }
+    // =================================================================
+
+
+    // Send any generated notes back to the main thread in a batch
+    if (notesToPlay.length > 0) {
+        self.postMessage({ type: 'playNotesBatch', notes: notesToPlay });
     }
 
-    if (state.currentStyle !== 'Toccata' && state.currentStyle !== 'Promenade' && state.currentStyle !== 'Space') {
-        tickEffects(time);
-    }
-    
-    state.tick16n++;
-}
-
-function resetStyleSpecificState() {
-    state.sequence.lastMelodyNoteIndex = null;
-    state.sequence.nextMelodyTick = 0;
-    state.ambient.lastChordChangeTick = -Infinity; 
-    state.ambient.lastMelodyDegree = null;
-    state.air.isResting = true;
-    state.air.restMeasures = 0;
-    state.air.totalRestMeasures = 0;
-    state.toccata = { sequenceIndex: 0, hasPlayedIntro: false, lastArpTick: 0, arpStep: 0 };
-    state.promenade = { sequenceIndex: 0, hasPlayedIntro: false };
-    state.space.lastLaserTick = 0;
-    state.tick16n = 0;
+    state.tickCount++;
 }
 
 
-// --- MESSAGE HANDLER ---
+// --- MESSAGE HANDLER (Boilerplate) ---
+// This handles communication with the main thread.
+// You shouldn't need to change this much.
 self.onmessage = function (event: MessageEvent<WorkerEvent>) {
     const { type, ...data } = event.data;
     switch (type) {
         case 'start':
+            console.log("[Autopilot Worker] Received START command.");
             state.isRunning = true;
-            resetStyleSpecificState();
+            state.tickCount = 0;
+            // Reset any of your custom state here
             break;
         case 'stop':
+            console.log("[Autopilot Worker] Received STOP command.");
             state.isRunning = false;
             break;
         case 'tick':
+            // This is the main heartbeat of the autopilot
             tick(data.time);
             break;
         case 'setTempo':
+            console.log(`[Autopilot Worker] Tempo set to: ${data.bpm}`);
             // @ts-ignore
             state.currentBpm = data.bpm;
             break;
         case 'setHarmony':
+             console.log(`[Autopilot Worker] Harmony set to: ${data.key} ${data.scale}`);
             // @ts-ignore
-            updateHarmony(data.key, data.scale);
-            break;
-        case 'setStyle':
+            state.currentKey = data.key;
             // @ts-ignore
-            state.currentStyle = data.style;
-            resetStyleSpecificState();
-            break;
-        case 'setInstruments':
-            // @ts-ignore
-            state.instruments = data.instruments;
+            state.currentScale = data.scale;
+            // You might want to recalculate your scale frequencies here
             break;
     }
 };
 
-// Initial setup
-updateHarmony(state.currentKey, state.currentScale);
+console.log("[Autopilot Worker] New worker instance initialized.");
