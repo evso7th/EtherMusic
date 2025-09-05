@@ -1,67 +1,8 @@
+
 // src/lib/autopilot-worker.ts
-import type { MusicKey, MusicScale } from '@/app/page';
+import { getScaleFrequencies, SCALES, ALL_NOTES } from './music';
+import type { MusicKey, MusicScale, AutopilotPart, NoteEvent, NoteUpdateEvent, WorkerEvent, WorkerResponse } from '@/types';
 
-// --- TYPE DEFINITIONS (Keep these consistent with page.tsx) ---
-
-export type AutopilotPart = 'melody' | 'accompaniment' | 'bass' | 'effects';
-
-export type NoteEvent = {
-    id?: number;
-    part: AutopilotPart;
-    freq: number;
-    dur: string; // Use string notation like '4n', '8t', '1m'
-    vel: number;
-    time: number; // Absolute time for playback
-};
-
-export type NoteUpdateEvent = {
-    id: number;
-    part: AutopilotPart;
-    freq: number;
-    rampTime: string;
-};
-
-// Events received from the main thread
-export type WorkerEvent =
-    | { type: 'start' }
-    | { type: 'stop' }
-    | { type: 'tick', time: number }
-    | { type: 'setHarmony', key: MusicKey, scale: MusicScale }
-    | { type: 'setTempo', bpm: number }
-    | { type: 'setDensity', density: number };
-
-// Events sent back to the main thread
-export type WorkerResponse =
-    | { type: 'playNote', note: NoteEvent }
-    | { type: 'updateNote', note: NoteUpdateEvent }
-    | { type: 'playNotesBatch', notes: NoteEvent[] };
-
-
-// --- UTILITIES ---
-const C4_FREQ = 261.63;
-export const ALL_NOTES: Record<MusicKey, number> = {
-    'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5,
-    'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11
-};
-
-export const SCALES: Record<MusicScale, number[]> = {
-    'Major': [0, 2, 4, 5, 7, 9, 11],
-    'Minor': [0, 2, 3, 5, 7, 8, 10],
-    'Major Pentatonic': [0, 2, 4, 7, 9],
-    'Minor Pentatonic': [0, 3, 5, 7, 10]
-};
-
-export function getScaleFrequencies(baseMidiNote: number, scaleSteps: number[], octaves: number[]): number[] {
-    const freqs: number[] = [];
-    octaves.forEach(octave => {
-        scaleSteps.forEach(interval => {
-            const midiNote = baseMidiNote + (octave * 12) + interval;
-            const freq = Math.pow(2, (midiNote - 69) / 12) * 440;
-            freqs.push(freq);
-        });
-    });
-    return freqs.sort((a,b) => a-b);
-}
 
 // --- WORKER STATE ---
 let state = {
@@ -193,7 +134,7 @@ function tick(time: number) {
 
     // Send any generated notes back to the main thread in a batch
     if (notesToPlay.length > 0) {
-        self.postMessage({ type: 'playNotesBatch', notes: notesToPlay });
+        self.postMessage({ type: 'playNotesBatch', notes: notesToPlay } as WorkerResponse);
     }
 
     state.tickCount++;
@@ -231,3 +172,5 @@ self.onmessage = function (event: MessageEvent<WorkerEvent>) {
 };
 
 console.log("[Autopilot Worker] New worker instance initialized.");
+
+    

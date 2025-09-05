@@ -10,7 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Anchor, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { Instrument, MusicKey, MusicScale } from '@/app/page';
+import type { Instrument, MusicKey, MusicScale } from '@/types';
+import { ALL_NOTES, SCALES } from '@/lib/music';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
@@ -285,3 +286,5 @@ export function ThereminPad({
         </Card>
     );
 }
+
+    

@@ -6,10 +6,14 @@ import * as Tone from 'tone';
 import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
-import type { NoteEvent, WorkerResponse, AutopilotPart as WorkerAutopilotPart, NoteUpdateEvent } from '@/lib/autopilot-worker';
-import type { Instrument, MusicKey, MusicScale, Tempo } from '@/app/page';
+import type { WorkerResponse } from '@/lib/autopilot-worker';
+import type { Instrument, MusicKey, MusicScale, Tempo, AutopilotPart } from '@/types';
 
-export function useAudioEngine() {
+type UseAudioEngineProps = {
+    worker: Worker | null;
+};
+
+export function useAudioEngine({ worker }: UseAudioEngineProps) {
     const { toast } = useToast();
     
     const [isAppStarted, setIsAppStarted] = useState(false);
@@ -17,10 +21,13 @@ export function useAudioEngine() {
     const [isPlaying, setIsPlaying] = useState(false);
     const [sleepTimerId, setSleepTimerId] = useState<NodeJS.Timeout | null>(null);
 
-
     const audioEngine = useRef<AudioEngine | null>(null);
-    const autopilotWorker = useRef<Worker | null>(null);
+    const autopilotWorker = useRef<Worker | null>(worker);
     const orbManager = useRef<OrbManager | null>(null);
+
+    useEffect(() => {
+        autopilotWorker.current = worker;
+    }, [worker]);
 
     const startApp = useCallback(async () => {
         if (isAppStarted) return;
@@ -34,9 +41,7 @@ export function useAudioEngine() {
             console.log("Initializing audio resources after user gesture...");
             await Tone.start();
             
-            // Create a native AudioContext *after* the user gesture
             const context = new AudioContext();
-            // Set Tone.js to use this new context
             Tone.setContext(context);
             
             const om = new OrbManager();
@@ -47,25 +52,25 @@ export function useAudioEngine() {
             engine.setOrbManager(om);
             audioEngine.current = engine;
 
-            const worker = new Worker(new URL('../lib/autopilot-worker.ts', import.meta.url));
-            
-            worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
-                const currentEngine = audioEngine.current;
-                if (!currentEngine) return;
+            if (autopilotWorker.current) {
+                autopilotWorker.current.onmessage = (e: MessageEvent<WorkerResponse>) => {
+                    const currentEngine = audioEngine.current;
+                    if (!currentEngine) return;
 
-                if (e.data.type === 'playNote' && e.data.note) {
-                    currentEngine.playWorkerNotesBatch([e.data.note]);
-                } else if (e.data.type === 'updateNote' && e.data.note) {
-                    currentEngine.updateWorkerNote(e.data.note);
-                } else if (e.data.type === 'playNotesBatch' && e.data.notes) {
-                    currentEngine.playWorkerNotesBatch(e.data.notes);
-                }
-            };
-            autopilotWorker.current = worker;
+                    if (e.data.type === 'playNote' && e.data.note) {
+                        currentEngine.playWorkerNotesBatch([e.data.note]);
+                    } else if (e.data.type === 'updateNote' && e.data.note) {
+                        currentEngine.updateWorkerNote(e.data.note);
+                    } else if (e.data.type === 'playNotesBatch' && e.data.notes) {
+                        currentEngine.playWorkerNotesBatch(e.data.notes);
+                    }
+                };
 
-            Tone.Transport.scheduleRepeat((time) => {
-                autopilotWorker.current?.postMessage({ type: 'tick', time });
-            }, '16n');
+                Tone.Transport.scheduleRepeat((time) => {
+                    autopilotWorker.current?.postMessage({ type: 'tick', time });
+                }, '16n');
+            }
+
 
             setIsReady(true);
             setIsPlaying(Tone.Transport.state === 'started');
@@ -126,7 +131,7 @@ export function useAudioEngine() {
         audioEngine.current?.setBassInstrument(instrument);
     }, []);
 
-    const setAutopilotInstrument = useCallback((part: WorkerAutopilotPart, instrument: Instrument) => {
+    const setAutopilotInstrument = useCallback((part: AutopilotPart, instrument: Instrument) => {
         audioEngine.current?.setAutopilotInstrument(part, instrument);
     }, []);
     
@@ -216,3 +221,5 @@ export function useAudioEngine() {
         orbManager: orbManager.current
     };
 }
+
+    

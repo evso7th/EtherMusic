@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, memo } from 'react';
 import { Button } from "@/components/ui/button";
 import { ThereminPad } from '@/components/theremin-pad';
-import { BeatBoxControls, type Tempo, autopilotStyles, type AutopilotStyle } from '@/components/beat-box-controls';
+import { BeatBoxControls, autopilotStyles } from '@/components/beat-box-controls';
 import { useToast } from "@/hooks/use-toast";
 import { OrbitalAnimation } from '@/components/orbital-animation';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -12,13 +12,14 @@ import { PlaybackControls } from '@/components/playback-controls';
 import { ArrowRight } from 'lucide-react';
 import { HelpGuide } from '@/components/help-guide';
 import { beatPatterns } from '@/lib/drum-machine';
-import type { AutopilotPart as WorkerAutopilotPart } from '@/lib/autopilot-worker';
 import { CookieConsent } from '@/components/cookie-consent';
 import { useAudioEngine } from '@/hooks/use-audio-engine';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SleepTimer } from '@/components/sleep-timer';
 import { useAutopilot } from '@/hooks/use-autopilot';
-import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/autopilot-worker';
+import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
+import { useWorker } from '@/hooks/use-worker';
+import type { Instrument, MusicKey, MusicScale, Tempo, AutopilotPart } from '@/types';
 
 
 function getCookie(name: string): string | null {
@@ -41,7 +42,7 @@ function setCookie(name: string, value: string, days: number) {
 }
 
 const defaultVolumes = { melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, accompaniment: -14, autopilotBass: -9, effects: -6 };
-const defaultAutopilotInstruments: Record<WorkerAutopilotPart, Instrument> = {
+const defaultAutopilotInstruments: Record<AutopilotPart, Instrument> = {
     melody: 'synth',
     accompaniment: 'mellotron',
     bass: 'ebass',
@@ -90,15 +91,9 @@ export const tempos: Tempo[] = [
     { name: 'Allegretto', bpm: 130 },
 ];
 
-export type Instrument = 'synth' | 'organ' | 'theremin' | 'E-Bells' | 'mellotron' | 'G-Drops' | 'ebass' | 'autopilot_effect_star' | 'autopilot_effect_meteor' | 'autopilot_effect_bell' | 'autopilot_effect_chimes';
 export const instruments: Instrument[] = ['synth', 'organ', 'theremin', 'E-Bells', 'mellotron', 'G-Drops', 'ebass'];
 export const autopilotInstruments: Instrument[] = ['synth', 'organ', 'theremin', 'E-Bells', 'mellotron', 'G-Drops', 'ebass', 'autopilot_effect_star', 'autopilot_effect_meteor', 'autopilot_effect_bell', 'autopilot_effect_chimes'];
 
-export type MusicKey = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B';
-export const musicKeys: MusicKey[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-
-export type MusicScale = 'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentatonic';
-export const musicScales: MusicScale[] = ['Major', 'Minor', 'Major Pentatonic', 'Minor Pentatonic'];
 
 const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
 const MemoizedThereminPad = memo(ThereminPad);
@@ -122,10 +117,13 @@ export default function Home() {
     useEffect(() => {
       setIsClient(true);
       if (typeof window !== 'undefined') {
-        setCookieConsent(getCookie("ethermusic_consent") === 'true');
+        const consent = getCookie("ethermusic_consent") === 'true';
+        setCookieConsent(consent);
       }
     }, []);
     
+    const autopilotWorker = useWorker(() => new Worker(new URL('../lib/autopilot-worker.ts', import.meta.url)));
+
     const {
         isAppStarted,
         isReady,
@@ -150,7 +148,7 @@ export default function Home() {
         stopAutopilot,
         setSleepTimer,
         orbManager
-    } = useAudioEngine();
+    } = useAudioEngine({ worker: autopilotWorker });
     
     const [isRecording, setIsRecording] = useState(false);
     const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
@@ -163,7 +161,7 @@ export default function Home() {
     
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
     const [isAutopilotOn, setIsAutopilotOn] = useState(false);
-    const [autopilotPartInstruments, setAutopilotPartInstruments] = useState<Record<WorkerAutopilotPart, Instrument>>(defaultAutopilotInstruments);
+    const [autopilotPartInstruments, setAutopilotPartInstruments] = useState<Record<AutopilotPart, Instrument>>(defaultAutopilotInstruments);
     const [volumes, setLocalVolumes] = useState(() => loadSettings().volumes);
 
 
@@ -173,7 +171,7 @@ export default function Home() {
         const scaleSteps = SCALES[musicScale];
 
         const melodyFreqs = getScaleFrequencies(baseMelodyNote, scaleSteps, [0, 1]);
-        const bassFreqs = getScaleFrequencies(baseBassNote, scaleSteps, [0, 1]);
+        const bassFreqs = getScaleFrequencies(baseBassNote, scaleSteps, [-2, -1]);
 
         setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
 
@@ -187,7 +185,6 @@ export default function Home() {
     
     const { activeStyle, savePreset, loadPreset, setActiveStyle } = useAutopilot(
         autopilotStyles[0],
-        autopilotPartInstruments,
         cookieConsent
     );
 
@@ -250,7 +247,7 @@ export default function Home() {
         setEngineBassInstrument(instrument);
     }, [setEngineBassInstrument]);
     
-    const handleAutopilotInstrumentChange = useCallback((part: WorkerAutopilotPart, instrument: Instrument) => {
+    const handleAutopilotInstrumentChange = useCallback((part: AutopilotPart, instrument: Instrument) => {
         const newInstruments = { ...autopilotPartInstruments, [part]: instrument };
         setAutopilotPartInstruments(newInstruments);
         setAutopilotInstrument(part, instrument);
@@ -378,10 +375,10 @@ export default function Home() {
                             instruments={instruments.filter(i => i !== 'ebass')}
                             activeInstrument={melodyInstrument}
                             onInstrumentChange={handleMelodyInstrumentChange}
-                            musicKeys={musicKeys}
+                            musicKeys={Object.keys(ALL_NOTES) as MusicKey[]}
                             activeKey={musicKey}
                             onKeyChange={(k) => handleHarmonyChange(k, musicScale)}
-                            musicScales={musicScales}
+                            musicScales={Object.keys(SCALES) as MusicScale[]}
                             activeScale={musicScale}
                             onScaleChange={(s) => handleHarmonyChange(musicKey, s)}
                             isPolyphonic
@@ -417,7 +414,7 @@ export default function Home() {
                         activeTempo={activeTempo}
                         onTempoChange={handleTempoChange}
                         initialVolumes={volumes}
-                        onVolumeChange={handleVolumeChange}
+                        onVolumeChange={onVolumeChange}
                         isAutopilotOn={isAutopilotOn}
                         onAutopilotToggle={handleAutopilotToggle}
                         autopilotInstruments={autopilotInstruments}
@@ -432,3 +429,5 @@ export default function Home() {
     );
 }
 
+
+    

@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
-import type { AutopilotStyle, AutopilotPart, Instrument, MusicKey, MusicScale, Tempo } from '@/app/page';
+import type { AutopilotStyle, AutopilotPart, Instrument, MusicKey, MusicScale, Tempo } from '@/types';
 
 const AUTOPILOT_PRESETS_COOKIE = 'ethermusic_autopilot_presets';
 
@@ -41,7 +41,6 @@ function setCookie(name: string, value: string, days: number) {
 
 export function useAutopilot(
     initialStyle: AutopilotStyle,
-    initialInstruments: Record<AutopilotPart, Instrument>,
     isCookieAllowed: boolean
 ) {
     const { toast } = useToast();
@@ -121,3 +120,5 @@ export function useAutopilot(
         handleStyleChange
     };
 }
+
+    

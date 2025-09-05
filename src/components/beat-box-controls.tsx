@@ -26,42 +26,14 @@ import { HelpGuide } from "./help-guide";
 import { Separator } from "./ui/separator";
 import { Switch } from "./ui/switch";
 import { ScrollArea } from "./ui/scroll-area";
-import type { AutopilotPart } from "@/lib/autopilot-worker";
-import type { Instrument } from "@/app/page";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { useAutopilot } from "@/hooks/use-autopilot";
+import type { BeatPattern, Tempo, AutopilotStyle, Volumes, Instrument, AutopilotPart } from '@/types';
 
-
-type BeatPattern = {
-    name: string;
-    type: 'Meditative' | 'Classic' | 'System';
-};
-
-export type Tempo = {
-    name: string;
-    bpm: number;
-};
-
-export type AutopilotStyle = {
-  name: 'Evolve';
-  description: string;
-}
 
 export const autopilotStyles: AutopilotStyle[] = [
     { name: 'Evolve', description: 'Continuously evolving ambient soundscape.' },
 ]
-
-
-type Volumes = { 
-    melody: number; 
-    manualBass: number;
-    latch: number; 
-    drums: number; 
-    autopilot: number;
-    accompaniment: number;
-    autopilotBass: number;
-    effects: number;
-};
 
 interface BeatBoxControlsProps {
     patterns: BeatPattern[];
@@ -565,3 +537,5 @@ export function BeatBoxControls({
         </TooltipProvider>
     );
 }
+
+    
