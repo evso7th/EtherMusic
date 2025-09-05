@@ -1,4 +1,3 @@
-
 // src/lib/audio-engine.ts
 
 import * as Tone from 'tone';
@@ -6,6 +5,7 @@ import type { Instrument, MusicKey, MusicScale } from '@/app/page';
 import { OrbManager } from './orb-manager';
 import type { AutopilotPart, NoteEvent, NoteUpdateEvent } from './autopilot-worker';
 
+// No longer includes effects
 type Volumes = { 
     melody: number; 
     manualBass: number;
@@ -14,39 +14,32 @@ type Volumes = {
     autopilot: number;
     accompaniment: number;
     autopilotBass: number;
-    effects: number;
-};
-
-type Effects = {
-    melody: { reverb: number, delay: number };
-    manualBass: { reverb: number, delay: number };
-    latch: { reverb: number, delay: number };
-    drums: { reverb: number, delay: number };
-    autopilot: { reverb: number, delay: number };
-    accompaniment: { reverb: number, delay: number };
-    autopilotBass: { reverb: number, delay: number };
-    effects: { reverb: number, delay: number };
+    effects: number; // Kept for type consistency, but effects are removed
 };
 
 type PartName = 'melody' | 'manualBass' | 'latch' | 'drums' | AutopilotPart;
 
+// Helper to convert dB to gain, as Tone.dbToGain is no longer ideal
+function dbToGain(db: number) {
+    if (db <= -100) return 0; // Or a very small number to represent silence
+    return Math.pow(10, db / 20);
+}
+
 /**
  * A modern, worklet-based audio engine for EtherMusic.
  * This engine acts as a central dispatcher and mixer.
- * It does not generate sound itself but manages and communicates with AudioWorkletNodes.
+ * It uses native Web Audio API nodes for mixing and routing.
  */
 export class AudioEngine {
     public isInitialized = false;
-    private context!: Tone.Context;
+    private context!: AudioContext;
     public orbManager!: OrbManager;
     private mediaRecorder: MediaRecorder | null = null;
     private recordedChunks: Blob[] = [];
 
     // Audio Nodes
-    private masterOut!: Tone.Gain;
-    private effectInput!: Tone.Gain;
-    private nodes = new Map<PartName, { worklet: AudioWorkletNode, gain: Tone.Gain }>();
-    private fx!: { reverb: Tone.Reverb, delay: Tone.FeedbackDelay };
+    private masterOut!: GainNode;
+    private nodes = new Map<PartName, { worklet: AudioWorkletNode, gain: GainNode }>();
     
     // Drum-specific properties
     private drumSamples: Record<string, AudioBuffer> = {};
@@ -57,22 +50,43 @@ export class AudioEngine {
     public async initialize() {
         if (this.isInitialized) return;
 
-        await Tone.start();
-        this.context = Tone.getContext();
+        // Still using Tone.start() for a reliable cross-browser way to start the context
+        await Tone.start(); 
+        const toneContext = Tone.getContext();
+        this.context = toneContext.rawContext;
         
         console.log('AudioContext started. Loading worklets and samples...');
 
-        this.masterOut = new Tone.Gain(1).toDestination();
-        this.effectInput = new Tone.Gain(1);
+        this.masterOut = this.context.createGain();
+        this.masterOut.connect(this.context.destination);
         
-        this.fx = {
-            reverb: new Tone.Reverb({ decay: 4, wet: 0.5 }).toDestination(),
-            delay: new Tone.FeedbackDelay("8n", 0.25).toDestination()
+        // Also connect to MediaRecorder destination if needed
+        const mediaStreamDest = this.context.createMediaStreamDestination();
+        this.masterOut.connect(mediaStreamDest);
+        this.mediaRecorder = new MediaRecorder(mediaStreamDest.stream, { mimeType: 'audio/webm' });
+        
+        this.mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                this.recordedChunks.push(event.data);
+            }
         };
         
-        this.effectInput.connect(this.fx.reverb);
-        this.effectInput.connect(this.fx.delay);
-        
+        this.mediaRecorder.onstop = () => {
+            const blob = new Blob(this.recordedChunks, { type: 'audio/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            document.body.appendChild(a);
+            a.style.display = 'none';
+            a.href = url;
+            const date = new Date();
+            const dateString = `${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
+            a.download = `EtherMusic-Session-${dateString}.webm`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        };
+
+
         await this.loadDrumSamples();
         
         await this.context.audioWorklet.addModule('/worklets/poly-synth-processor.js');
@@ -82,28 +96,25 @@ export class AudioEngine {
         this.createWorkletNode('manualBass');
         this.createWorkletNode('latch');
         
-        // Autopilot nodes will be created on demand
         this.createWorkletNode('autopilot');
         this.createWorkletNode('accompaniment');
         this.createWorkletNode('autopilotBass');
         this.createWorkletNode('effects');
 
-        // Create drum machine node
         this.createDrumNode();
         
         Tone.Transport.set({ bpm: 90, swing: 0, timeSignature: 4 });
         this.isInitialized = true;
-        console.log('AudioEngine initialized with Worklets.');
+        console.log('AudioEngine initialized with native Web Audio API nodes.');
     }
     
     private createWorkletNode(part: PartName) {
         if (this.nodes.has(part)) return;
 
-        const gainNode = new Tone.Gain(1);
+        const gainNode = this.context.createGain();
         gainNode.connect(this.masterOut);
-        gainNode.connect(this.effectInput);
 
-        const workletNode = new AudioWorkletNode(this.context.rawContext, 'poly-synth-processor');
+        const workletNode = new AudioWorkletNode(this.context, 'poly-synth-processor');
         workletNode.connect(gainNode);
 
         this.nodes.set(part, { worklet: workletNode, gain: gainNode });
@@ -112,10 +123,11 @@ export class AudioEngine {
 
     private async loadDrumSamples() {
         const sampleNames = ['kick_hard', 'kick_soft', 'kick_echo', 'kick', 'snare_hard', 'snare_soft', 'snare_verb', 'snare', 'snare_press', 'hat', 'hat_closed', 'hat_open'];
+        const toneContext = Tone.getContext();
         const promises = sampleNames.map(async name => {
             const response = await fetch(`/assets/drums/${name}.wav`);
             const arrayBuffer = await response.arrayBuffer();
-            this.drumSamples[name] = await this.context.decodeAudioData(arrayBuffer);
+            this.drumSamples[name] = await toneContext.decodeAudioData(arrayBuffer);
         });
         await Promise.all(promises);
         this.isDrumSamplesLoaded = true;
@@ -125,19 +137,18 @@ export class AudioEngine {
     private createDrumNode() {
         if (this.nodes.has('drums') || !this.isDrumSamplesLoaded) return;
         
-        const gainNode = new Tone.Gain(1);
+        const gainNode = this.context.createGain();
         gainNode.connect(this.masterOut);
-        gainNode.connect(this.effectInput);
-
-        // We need to transfer the sample data to the worklet.
-        // It must be in a format that can be handled by the structured clone algorithm.
-        const transferableSamples: Record<string, ArrayBuffer> = {};
+        
+        const transferableSamples: Record<string, { buffer: ArrayBuffer, sampleRate: number }> = {};
         for(const [name, audioBuffer] of Object.entries(this.drumSamples)) {
-            // For simplicity, we send the raw Float32Array data for one channel.
-            transferableSamples[name] = audioBuffer.getChannelData(0).buffer;
+            transferableSamples[name] = {
+                buffer: audioBuffer.getChannelData(0).buffer.slice(0), // slice to make it transferable
+                sampleRate: audioBuffer.sampleRate
+            };
         }
-
-        const workletNode = new AudioWorkletNode(this.context.rawContext, 'drum-processor', {
+        
+        const workletNode = new AudioWorkletNode(this.context, 'drum-processor', {
             processorOptions: { samples: transferableSamples }
         });
         workletNode.connect(gainNode);
@@ -145,6 +156,7 @@ export class AudioEngine {
         this.nodes.set('drums', { worklet: workletNode, gain: gainNode });
         console.log('Created worklet node for: drums');
     }
+
 
     public setOrbManager(orbManager: OrbManager) {
         this.orbManager = orbManager;
@@ -200,14 +212,10 @@ export class AudioEngine {
             if (nodeInfo) {
                 nodeInfo.worklet.port.postMessage({
                     type: 'noteOn',
-                    pointerId: note.id ?? Math.random(), // Autopilot notes don't have a pointer
+                    pointerId: note.id ?? Math.random(), 
                     frequency: note.freq,
                     volume: note.vel,
-                    // We don't pass time, as the worklet doesn't use Tone.Transport scheduling
                 });
-                // Note: The autopilot worker is responsible for sending noteOff messages
-                // or we can implement a duration in the worklet itself.
-                // For simplicity, we'll assume the worklet handles note duration.
             }
         });
     }
@@ -220,14 +228,17 @@ export class AudioEngine {
                 type: 'noteUpdate',
                 pointerId: note.id,
                 frequency: note.freq,
-                // Autopilot doesn't control volume via updates, only freq slides for now
             });
         }
     }
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
         const message = { type: 'setHarmony', key, scale };
-        this.nodes.forEach(node => node.worklet.port.postMessage(message));
+        this.nodes.forEach(node => {
+            if (node.worklet.name !== 'drum-processor') {
+                node.worklet.port.postMessage(message);
+            }
+        });
     }
     
     public setMelodyInstrument(instrument: Instrument) {
@@ -260,25 +271,21 @@ export class AudioEngine {
     public setVolumes(volumes: Volumes) {
         if (!this.isInitialized) return;
         const rampTime = this.context.currentTime + 0.05;
-        this.nodes.get('melody')?.gain.gain.linearRampToValueAtTime(Tone.dbToGain(volumes.melody), rampTime);
-        this.nodes.get('manualBass')?.gain.gain.linearRampToValueAtTime(Tone.dbToGain(volumes.manualBass), rampTime);
-        this.nodes.get('latch')?.gain.gain.linearRampToValueAtTime(Tone.dbToGain(volumes.latch), rampTime);
-        this.nodes.get('drums')?.gain.gain.linearRampToValueAtTime(Tone.dbToGain(volumes.drums), rampTime);
-        this.nodes.get('autopilot')?.gain.gain.linearRampToValueAtTime(Tone.dbToGain(volumes.autopilot), rampTime);
-        this.nodes.get('accompaniment')?.gain.gain.linearRampToValueAtTime(Tone.dbToGain(volumes.accompaniment), rampTime);
-        this.nodes.get('autopilotBass')?.gain.gain.linearRampToValueAtTime(Tone.dbToGain(volumes.autopilotBass), rampTime);
-        this.effectInput.gain.linearRampToValueAtTime(Tone.dbToGain(volumes.effects), rampTime);
+        this.nodes.get('melody')?.gain.gain.linearRampToValueAtTime(dbToGain(volumes.melody), rampTime);
+        this.nodes.get('manualBass')?.gain.gain.linearRampToValueAtTime(dbToGain(volumes.manualBass), rampTime);
+        this.nodes.get('latch')?.gain.gain.linearRampToValueAtTime(dbToGain(volumes.latch), rampTime);
+        this.nodes.get('drums')?.gain.gain.linearRampToValueAtTime(dbToGain(volumes.drums), rampTime);
+        this.nodes.get('autopilot')?.gain.gain.linearRampToValueAtTime(dbToGain(volumes.autopilot), rampTime);
+        this.nodes.get('accompaniment')?.gain.gain.linearRampToValueAtTime(dbToGain(volumes.accompaniment), rampTime);
+        this.nodes.get('autopilotBass')?.gain.gain.linearRampToValueAtTime(dbToGain(volumes.autopilotBass), rampTime);
+        // The "effects" gain now just acts as a master for effects, but we have no effects.
+        // It can be removed or repurposed if effects are added back natively.
+        // this.nodes.get('effects')?.gain.gain.linearRampToValueAtTime(dbToGain(volumes.effects), rampTime);
     }
     
-    public setEffects(effects: Effects) {
-         if (!this.isInitialized) return;
-        const rampTime = this.context.currentTime + 0.05;
-
-        // This is a simplified approach. A true per-instrument effect send would require
-        // a separate gain node for each instrument's send channel. For now, we'll
-        // just use the melody's effect settings as the global effect settings.
-        this.fx.reverb.wet.linearRampToValueAtTime(Tone.dbToGain(effects.melody.reverb), rampTime);
-        this.fx.delay.wet.linearRampToValueAtTime(Tone.dbToGain(effects.melody.delay), rampTime);
+    // Effects are removed. This method is now a no-op.
+    public setEffects(effects: any) {
+        // No-op
     }
     
     public stopAllSounds() {
@@ -291,35 +298,9 @@ export class AudioEngine {
     
     // --- Recording ---
     public startRecording() {
-        if (!this.isInitialized || this.mediaRecorder?.state === 'recording') return;
+        if (!this.mediaRecorder || this.mediaRecorder.state === 'recording') return;
         
-        const dest = this.context.createMediaStreamDestination();
-        this.masterOut.connect(dest); // Connect the master output to the recorder
-        
-        this.mediaRecorder = new MediaRecorder(dest.stream, { mimeType: 'audio/webm' });
         this.recordedChunks = [];
-        
-        this.mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0) {
-                this.recordedChunks.push(event.data);
-            }
-        };
-        
-        this.mediaRecorder.onstop = () => {
-            const blob = new Blob(this.recordedChunks, { type: 'audio/webm' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            document.body.appendChild(a);
-            a.style.display = 'none';
-            a.href = url;
-            const date = new Date();
-            const dateString = `${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
-            a.download = `EtherMusic-Session-${dateString}.webm`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-        };
-        
         this.mediaRecorder.start();
         console.log("Recording started.");
     }
@@ -330,5 +311,3 @@ export class AudioEngine {
         }
     }
 }
-
-    

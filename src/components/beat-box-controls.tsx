@@ -51,17 +51,6 @@ type Volumes = {
     effects: number;
 };
 
-type Effects = {
-    melody: { reverb: number, delay: number };
-    manualBass: { reverb: number, delay: number };
-    latch: { reverb: number, delay: number };
-    drums: { reverb: number, delay: number };
-    autopilot: { reverb: number, delay: number };
-    accompaniment: { reverb: number, delay: number };
-    autopilotBass: { reverb: number, delay: number };
-    effects: { reverb: number, delay: number };
-};
-
 interface BeatBoxControlsProps {
     patterns: BeatPattern[];
     activePattern: BeatPattern;
@@ -71,8 +60,6 @@ interface BeatBoxControlsProps {
     onTempoChange: (tempo: Tempo) => void;
     initialVolumes: Volumes;
     onVolumeChange: (volumes: Volumes) => void;
-    initialEffects: Effects;
-    onEffectChange: (effects: Effects) => void;
     isAutopilotOn: boolean;
     onAutopilotToggle: (isOn: boolean) => void;
     autopilotInstruments: Instrument[];
@@ -134,8 +121,6 @@ export function BeatBoxControls({
     onTempoChange,
     initialVolumes,
     onVolumeChange,
-    initialEffects,
-    onEffectChange,
     isAutopilotOn,
     onAutopilotToggle,
     autopilotInstruments,
@@ -269,15 +254,13 @@ export function BeatBoxControls({
                             </DialogTrigger>
                             <DialogContent>
                                 <DialogHeader>
-                                    <DialogTitle>Autopilot & Effects Mixer</DialogTitle>
+                                    <DialogTitle>Autopilot Mixer</DialogTitle>
                                 </DialogHeader>
                                 <ScrollArea className="h-auto max-h-[70vh]">
                                     <div className="pr-4 py-4">
                                         <AutopilotMixerControls
                                             initialVolumes={initialVolumes} 
                                             onVolumeChange={onVolumeChange}
-                                            initialEffects={initialEffects}
-                                            onEffectChange={onEffectChange}
                                             isMobile={isMobile}
                                         />
                                     </div>
@@ -403,8 +386,6 @@ export function BeatBoxControls({
                                     <MixerControls 
                                         initialVolumes={initialVolumes} 
                                         onVolumeChange={onVolumeChange}
-                                        initialEffects={initialEffects}
-                                        onEffectChange={onEffectChange}
                                         isMobile={isMobile}
                                     />
                                 </div>
@@ -540,8 +521,6 @@ export function BeatBoxControls({
                                     <MixerControls 
                                         initialVolumes={initialVolumes} 
                                         onVolumeChange={onVolumeChange}
-                                        initialEffects={initialEffects}
-                                        onEffectChange={onEffectChange}
                                         isMobile={isMobile}
                                     />
                                 </div>
