@@ -16,6 +16,7 @@ import { beatPatterns } from '@/lib/drum-machine';
 import type { AutopilotPart as WorkerAutopilotPart } from '@/lib/autopilot-worker';
 import { CookieConsent } from '@/components/cookie-consent';
 import { useAudioEngine } from '@/hooks/use-audio-engine';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 function getCookie(name: string): string | null {
     if (typeof document === 'undefined') return null;
@@ -116,8 +117,8 @@ export default function Home() {
         setTempo,
         setVolumes,
         setHarmony,
-        setMelodyInstrument,
-        setBassInstrument,
+        setMelodyInstrument: setEngineMelodyInstrument,
+        setBassInstrument: setEngineBassInstrument,
         setAutopilotInstrument,
         setBeatPattern,
         setBassLatch,
@@ -204,13 +205,13 @@ export default function Home() {
 
     const handleMelodyInstrumentChange = useCallback((instrument: Instrument) => {
         setMelodyInstrument(instrument);
-        setMelodyInstrument(instrument);
-    }, [setMelodyInstrument]);
+        setEngineMelodyInstrument(instrument);
+    }, [setEngineMelodyInstrument]);
 
     const handleBassInstrumentChange = useCallback((instrument: Instrument) => {
         setBassInstrument(instrument);
-        setBassInstrument(instrument);
-    }, [setBassInstrument]);
+        setEngineBassInstrument(instrument);
+    }, [setEngineBassInstrument]);
     
     const handleAutopilotInstrumentChange = useCallback((part: WorkerAutopilotPart, instrument: Instrument) => {
         setAutopilotPartInstruments(prev => {
@@ -396,3 +397,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
