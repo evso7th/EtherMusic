@@ -1,3 +1,4 @@
+
 // src/lib/audio-engine.ts
 
 import * as Tone from 'tone';
@@ -42,9 +43,9 @@ export class AudioEngine {
     private recordedChunks: Blob[] = [];
 
     // Audio Nodes
-    private masterOut!: GainNode;
-    private effectInput!: GainNode;
-    private nodes = new Map<PartName, { worklet: AudioWorkletNode, gain: GainNode }>();
+    private masterOut!: Tone.Gain;
+    private effectInput!: Tone.Gain;
+    private nodes = new Map<PartName, { worklet: AudioWorkletNode, gain: Tone.Gain }>();
     private fx!: { reverb: Tone.Reverb, delay: Tone.FeedbackDelay };
     
     // Drum-specific properties
@@ -61,17 +62,14 @@ export class AudioEngine {
         
         console.log('AudioContext started. Loading worklets and samples...');
 
-        this.masterOut = this.context.createGain();
-        this.effectInput = this.context.createGain();
+        this.masterOut = new Tone.Gain(1).toDestination();
+        this.effectInput = new Tone.Gain(1);
         
         this.fx = {
             reverb: new Tone.Reverb({ decay: 4, wet: 0.5 }).toDestination(),
             delay: new Tone.FeedbackDelay("8n", 0.25).toDestination()
         };
         
-        // Main dry signal path
-        this.masterOut.connect(this.context.destination);
-        // Effects send path
         this.effectInput.connect(this.fx.reverb);
         this.effectInput.connect(this.fx.delay);
         
@@ -101,7 +99,7 @@ export class AudioEngine {
     private createWorkletNode(part: PartName) {
         if (this.nodes.has(part)) return;
 
-        const gainNode = this.context.createGain();
+        const gainNode = new Tone.Gain(1);
         gainNode.connect(this.masterOut);
         gainNode.connect(this.effectInput);
 
@@ -127,7 +125,7 @@ export class AudioEngine {
     private createDrumNode() {
         if (this.nodes.has('drums') || !this.isDrumSamplesLoaded) return;
         
-        const gainNode = this.context.createGain();
+        const gainNode = new Tone.Gain(1);
         gainNode.connect(this.masterOut);
         gainNode.connect(this.effectInput);
 
@@ -158,7 +156,7 @@ export class AudioEngine {
         const node = this.nodes.get(part)?.worklet;
         node?.port.postMessage({ type: 'noteOn', pointerId, frequency: freq, volume: vol });
 
-        if (this.nodes.get('latch')?.worklet && this.isBassLatchOn) {
+        if (this.isBassLatchOn) {
             this.nodes.get('latch')?.worklet.port.postMessage({ type: 'noteOn', pointerId, frequency: freq, volume: vol });
         }
         
@@ -183,18 +181,15 @@ export class AudioEngine {
         this.orbManager?.removeOrb(pointerId);
     }
     
+    private isBassLatchOn: boolean = false;
     public setBassLatch(isOn: boolean) {
-        this.nodes.get('manualBass')?.worklet.port.postMessage({ type: 'latch', isOn });
-        this.nodes.get('latch')?.worklet.port.postMessage({ type: 'latch', isOn });
+        this.isBassLatchOn = isOn;
+        const message = { type: 'latch', isOn };
+        this.nodes.get('manualBass')?.worklet.port.postMessage(message);
+        this.nodes.get('latch')?.worklet.port.postMessage(message);
         if (!isOn) {
             this.orbManager.removeAllOrbs('latch');
         }
-    }
-    
-    private get isBassLatchOn(): boolean {
-        // This is a bit of a hack. A better way would be to have state sync.
-        // For now, we assume if the latch node exists, its mode is being managed.
-        return !!this.nodes.get('latch');
     }
 
     // --- Autopilot ---
@@ -232,12 +227,7 @@ export class AudioEngine {
 
     public setHarmony(key: MusicKey, scale: MusicScale) {
         const message = { type: 'setHarmony', key, scale };
-        this.nodes.get('melody')?.worklet.port.postMessage(message);
-        this.nodes.get('manualBass')?.worklet.port.postMessage(message);
-        this.nodes.get('latch')?.worklet.port.postMessage(message);
-        this.nodes.get('autopilot')?.worklet.port.postMessage(message);
-        this.nodes.get('accompaniment')?.worklet.port.postMessage(message);
-        this.nodes.get('autopilotBass')?.worklet.port.postMessage(message);
+        this.nodes.forEach(node => node.worklet.port.postMessage(message));
     }
     
     public setMelodyInstrument(instrument: Instrument) {
@@ -292,6 +282,7 @@ export class AudioEngine {
     }
     
     public stopAllSounds() {
+        if (!this.isInitialized) return;
         this.nodes.forEach(node => {
             node.worklet.port.postMessage({ type: 'allNotesOff' });
         });
@@ -339,3 +330,5 @@ export class AudioEngine {
         }
     }
 }
+
+    
