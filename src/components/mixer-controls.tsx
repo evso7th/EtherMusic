@@ -3,31 +3,9 @@
 
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
-import { Music, Waves, Drum, Bot, Anchor, Sparkles, GitCompareArrows, Guitar } from 'lucide-react';
-import { Separator } from './ui/separator';
+import { Music, Waves, Drum, Anchor } from 'lucide-react';
 import { useState, useCallback } from 'react';
-import { Button } from "./ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
-import { ScrollArea } from "./ui/scroll-area";
-import { SlidersHorizontal } from 'lucide-react';
-import { cn } from "@/lib/utils";
-
-type Volumes = { 
-    melody: number; 
-    manualBass: number;
-    latch: number; 
-    drums: number; 
-    autopilot: number;
-    accompaniment: number;
-    autopilotBass: number;
-    effects: number;
-};
-
-interface MixerControlsProps {
-    initialVolumes: Volumes;
-    onVolumeChange: (volumes: Volumes) => void;
-    isMobile: boolean;
-}
+import type { Volumes } from '@/types';
 
 const InstrumentControls = ({
     label,
@@ -61,7 +39,7 @@ const InstrumentControls = ({
 );
 
 
-export function MixerControls({ initialVolumes, onVolumeChange }: MixerControlsProps) {
+export function MixerControls({ initialVolumes, onVolumeChange }: { initialVolumes: Volumes, onVolumeChange: (volumes: Volumes) => void, isMobile: boolean }) {
     
     const [volumes, setVolumes] = useState(initialVolumes);
 
@@ -110,48 +88,6 @@ export function MixerControls({ initialVolumes, onVolumeChange }: MixerControlsP
     );
 }
 
-export function AutopilotMixerControls({ initialVolumes, onVolumeChange }: MixerControlsProps) {
-    const [volumes, setVolumes] = useState(initialVolumes);
-
-     const handleVolumeChange = useCallback((instrument: keyof Volumes, value: number) => {
-        setVolumes(prev => ({ ...prev, [instrument]: value }));
-    }, []);
-    
-    const handleVolumeCommit = useCallback((instrument: keyof Volumes, value: number) => {
-        const newVolumes = { ...volumes, [instrument]: value };
-        onVolumeChange(newVolumes);
-    }, [volumes, onVolumeChange]);
-
-    return (
-        <div className="p-1 space-y-4">
-            <InstrumentControls 
-                label="Autopilot Melody"
-                icon={Bot}
-                volume={volumes.autopilot}
-                onVolumeChange={(v) => handleVolumeChange('autopilot', v)}
-                onVolumeCommit={(v) => handleVolumeCommit('autopilot', v)}
-            />
-            <InstrumentControls 
-                label="Accompaniment"
-                icon={GitCompareArrows}
-                volume={volumes.accompaniment}
-                onVolumeChange={(v) => handleVolumeChange('accompaniment', v)}
-                onVolumeCommit={(v) => handleVolumeCommit('accompaniment', v)}
-            />
-            <InstrumentControls 
-                label="Autopilot Bass"
-                icon={Guitar}
-                volume={volumes.autopilotBass}
-                onVolumeChange={(v) => handleVolumeChange('autopilotBass', v)}
-                onVolumeCommit={(v) => handleVolumeCommit('autopilotBass', v)}
-            />
-            <InstrumentControls 
-                label="Effects"
-                icon={Sparkles}
-                volume={volumes.effects}
-                onVolumeChange={(v) => handleVolumeChange('effects', v)}
-                onVolumeCommit={(v) => handleVolumeCommit('effects', v)}
-            />
-        </div>
-    )
+export function AutopilotMixerControls() {
+    return null;
 }

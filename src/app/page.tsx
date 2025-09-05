@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, memo } from 'react';
 import { Button } from "@/components/ui/button";
 import { ThereminPad } from '@/components/theremin-pad';
-import { BeatBoxControls, autopilotStyles } from '@/components/beat-box-controls';
+import { BeatBoxControls } from '@/components/beat-box-controls';
 import { useToast } from "@/hooks/use-toast";
 import { OrbitalAnimation } from '@/components/orbital-animation';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -16,10 +16,8 @@ import { CookieConsent } from '@/components/cookie-consent';
 import { useAudioEngine } from '@/hooks/use-audio-engine';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SleepTimer } from '@/components/sleep-timer';
-import { useAutopilot } from '@/hooks/use-autopilot';
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
-import { useWorker } from '@/hooks/use-worker';
-import type { Instrument, MusicKey, MusicScale, Tempo, AutopilotPart } from '@/types';
+import type { Instrument, MusicKey, MusicScale, Tempo, Volumes } from '@/types';
 
 
 function getCookie(name: string): string | null {
@@ -41,13 +39,7 @@ function setCookie(name: string, value: string, days: number) {
     document.cookie = name + "=" + (value || "")  + expires + "; path=/; SameSite=Lax";
 }
 
-const defaultVolumes = { melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, accompaniment: -14, autopilotBass: -9, effects: -6 };
-const defaultAutopilotInstruments: Record<AutopilotPart, Instrument> = {
-    melody: 'synth',
-    accompaniment: 'mellotron',
-    bass: 'ebass',
-    effects: 'autopilot_effect_star'
-};
+const defaultVolumes: Volumes = { melody: -6, manualBass: -6, latch: -15, drums: -9 };
 
 function loadSettings() {
     if (typeof window === 'undefined') {
@@ -92,8 +84,6 @@ export const tempos: Tempo[] = [
 ];
 
 export const instruments: Instrument[] = ['synth', 'organ', 'theremin', 'E-Bells', 'mellotron', 'G-Drops', 'ebass'];
-export const autopilotInstruments: Instrument[] = ['synth', 'organ', 'theremin', 'E-Bells', 'mellotron', 'G-Drops', 'ebass', 'autopilot_effect_star', 'autopilot_effect_meteor', 'autopilot_effect_bell', 'autopilot_effect_chimes'];
-
 
 const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
 const MemoizedThereminPad = memo(ThereminPad);
@@ -122,8 +112,6 @@ export default function Home() {
       }
     }, []);
     
-    const autopilotWorker = useWorker(() => new Worker(new URL('../lib/autopilot-worker.ts', import.meta.url)));
-
     const {
         isAppStarted,
         isReady,
@@ -135,20 +123,16 @@ export default function Home() {
         setTempo,
         setVolumes,
         setHarmony,
-        setDensity,
         setMelodyInstrument: setEngineMelodyInstrument,
         setBassInstrument: setEngineBassInstrument,
-        setAutopilotInstrument,
         setBeatPattern,
         setBassLatch,
         startRecording,
         stopRecording,
         handleThereminInteraction,
-        startAutopilot,
-        stopAutopilot,
         setSleepTimer,
         orbManager
-    } = useAudioEngine({ worker: autopilotWorker });
+    } = useAudioEngine();
     
     const [isRecording, setIsRecording] = useState(false);
     const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
@@ -160,8 +144,6 @@ export default function Home() {
     const [allowedFrequencies, setAllowedFrequencies] = useState<{melody: number[], bass: number[]}>({melody: [], bass: []});
     
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
-    const [isAutopilotOn, setIsAutopilotOn] = useState(false);
-    const [autopilotPartInstruments, setAutopilotPartInstruments] = useState<Record<AutopilotPart, Instrument>>(defaultAutopilotInstruments);
     const [volumes, setLocalVolumes] = useState(() => loadSettings().volumes);
 
 
@@ -183,11 +165,6 @@ export default function Home() {
         }
     }, [isReady, setVolumes, volumes]);
     
-    const { activeStyle, savePreset, loadPreset, setActiveStyle } = useAutopilot(
-        autopilotStyles[0],
-        cookieConsent
-    );
-
     const handleStartApp = useCallback(() => {
         startApp();
     }, [startApp]);
@@ -220,7 +197,7 @@ export default function Home() {
 
     const handleTempoChange = useCallback((tempo: Tempo) => {
         setActiveTempo(tempo);
-        setTempo(tempo);
+        setTempo(tempo.bpm);
     }, [setTempo]);
 
     const handleVolumeChange = useCallback((newVolumes: any) => {
@@ -247,31 +224,11 @@ export default function Home() {
         setEngineBassInstrument(instrument);
     }, [setEngineBassInstrument]);
     
-    const handleAutopilotInstrumentChange = useCallback((part: AutopilotPart, instrument: Instrument) => {
-        const newInstruments = { ...autopilotPartInstruments, [part]: instrument };
-        setAutopilotPartInstruments(newInstruments);
-        setAutopilotInstrument(part, instrument);
-    }, [setAutopilotInstrument, autopilotPartInstruments]);
-    
     const handleLatchToggle = useCallback((isOn: boolean) => {
         setIsBassLatchOn(isOn);
         setBassLatch(isOn);
     }, [setBassLatch]);
     
-    const handleAutopilotToggle = useCallback((isOn: boolean) => {
-        setIsAutopilotOn(isOn);
-        if (isOn) {
-            startAutopilot();
-            const offPattern = beatPatterns.find(p => p.name === 'Off')!;
-            handlePatternChange(offPattern); 
-            if (!isPlaying) {
-                play();
-            }
-        } else {
-            stopAutopilot();
-        }
-    }, [isPlaying, play, startAutopilot, stopAutopilot, handlePatternChange]);
-
     if (!isClient) {
         return <Preloader />;
     }
@@ -395,11 +352,6 @@ export default function Home() {
                             onTempoChange={handleTempoChange}
                             initialVolumes={volumes}
                             onVolumeChange={handleVolumeChange}
-                            isAutopilotOn={isAutopilotOn}
-                            onAutopilotToggle={handleAutopilotToggle}
-                            autopilotInstruments={autopilotInstruments}
-                            activeAutopilotInstruments={autopilotPartInstruments}
-                            onAutopilotInstrumentChange={handleAutopilotInstrumentChange}
                             isMobile={isMobile}
                         />
                     </div>
@@ -414,12 +366,7 @@ export default function Home() {
                         activeTempo={activeTempo}
                         onTempoChange={handleTempoChange}
                         initialVolumes={volumes}
-                        onVolumeChange={onVolumeChange}
-                        isAutopilotOn={isAutopilotOn}
-                        onAutopilotToggle={handleAutopilotToggle}
-                        autopilotInstruments={autopilotInstruments}
-                        activeAutopilotInstruments={autopilotPartInstruments}
-                        onAutopilotInstrumentChange={handleAutopilotInstrumentChange}
+                        onVolumeChange={handleVolumeChange}
                         isMobile={isMobile}
                         isLandscape={true}
                     />
@@ -428,6 +375,3 @@ export default function Home() {
         </div>
     );
 }
-
-
-    

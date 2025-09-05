@@ -1,22 +1,18 @@
+
 // src/lib/audio-engine.ts
 
 import * as Tone from 'tone';
-import type { Instrument, MusicKey, MusicScale } from '@/app/page';
+import type { Instrument, MusicKey, MusicScale } from '@/types';
 import { OrbManager } from './orb-manager';
-import type { AutopilotPart, NoteEvent, NoteUpdateEvent } from './autopilot-worker';
 
 type Volumes = { 
     melody: number; 
     manualBass: number;
     latch: number; 
     drums: number; 
-    autopilot: number;
-    accompaniment: number;
-    autopilotBass: number;
-    effects: number;
 };
 
-type PartName = 'melody' | 'manualBass' | 'latch' | 'drums' | AutopilotPart;
+type PartName = 'melody' | 'manualBass' | 'latch' | 'drums';
 
 // Helper to convert dB to gain
 function dbToGain(db: number) {
@@ -46,7 +42,7 @@ export class AudioEngine {
     
     constructor(audioContext: AudioContext) {
         this.context = audioContext;
-        this.volumes = { melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, accompaniment: -14, autopilotBass: -9, effects: -6 };
+        this.volumes = { melody: -6, manualBass: -6, latch: -15, drums: -9 };
     }
     
     public getVolumes(): Volumes {
@@ -95,10 +91,6 @@ export class AudioEngine {
         this.createWorkletNode('melody', 'poly-synth-processor');
         this.createWorkletNode('manualBass', 'poly-synth-processor');
         this.createWorkletNode('latch', 'poly-synth-processor');
-        this.createWorkletNode('autopilot', 'poly-synth-processor');
-        this.createWorkletNode('accompaniment', 'poly-synth-processor');
-        this.createWorkletNode('autopilotBass', 'poly-synth-processor');
-        this.createWorkletNode('effects', 'poly-synth-processor');
 
         // Create drum node
         this.createDrumNode();
@@ -116,7 +108,7 @@ export class AudioEngine {
 
         const workletNode = new AudioWorkletNode(this.context, processorName, {
             processorOptions: {
-                polyphony: part === 'melody' || part === 'manualBass' || part === 'latch' ? 3 : 8
+                polyphony: (part === 'melody' || part === 'manualBass' || part === 'latch') ? 3 : 8
             }
         });
         workletNode.connect(gainNode);
@@ -126,8 +118,6 @@ export class AudioEngine {
     }
 
     private async loadDrumSamples() {
-        // This list is now empty as requested, to prevent 404 errors.
-        // The user will provide the samples.
         const sampleNames: string[] = [];
         
         const promises = sampleNames.map(async name => {
@@ -227,36 +217,6 @@ export class AudioEngine {
         }
     }
 
-    // --- Autopilot ---
-    public playWorkerNotesBatch(notes: NoteEvent[]) {
-        if (!this.isInitialized) return;
-        notes.forEach(note => {
-            const nodeInfo = this.nodes.get(note.part);
-            if (nodeInfo) {
-                const autopilotPointerId = note.id ?? (Math.random() * 1e6);
-                nodeInfo.worklet.port.postMessage({
-                    type: 'noteOn',
-                    pointerId: autopilotPointerId, 
-                    frequency: note.freq,
-                    volume: note.vel,
-                    duration: note.dur,
-                });
-            }
-        });
-    }
-
-    public updateWorkerNote(note: NoteUpdateEvent) {
-        if (!this.isInitialized) return;
-        const nodeInfo = this.nodes.get(note.part);
-        if (nodeInfo && note.id) {
-             nodeInfo.worklet.port.postMessage({
-                type: 'noteUpdate',
-                pointerId: note.id,
-                frequency: note.freq,
-            });
-        }
-    }
-
     public setHarmony(key: MusicKey, scale: MusicScale) {
         const message = { type: 'setHarmony', key, scale };
         this.nodes.forEach((nodeInfo, partName) => {
@@ -273,10 +233,6 @@ export class AudioEngine {
     public setBassInstrument(instrument: Instrument) {
         this.nodes.get('manualBass')?.worklet.port.postMessage({ type: 'setInstrument', instrument });
         this.nodes.get('latch')?.worklet.port.postMessage({ type: 'setInstrument', instrument });
-    }
-
-    public setAutopilotInstrument(part: AutopilotPart, instrument: Instrument) {
-        this.nodes.get(part)?.worklet.port.postMessage({ type: 'setInstrument', instrument });
     }
 
     // --- Global Controls ---
@@ -302,10 +258,6 @@ export class AudioEngine {
         this.nodes.get('manualBass')?.gain.gain.linearRampToValueAtTime(dbToGain(this.volumes.manualBass), rampTime);
         this.nodes.get('latch')?.gain.gain.linearRampToValueAtTime(dbToGain(this.volumes.latch), rampTime);
         this.nodes.get('drums')?.gain.gain.linearRampToValueAtTime(dbToGain(this.volumes.drums), rampTime);
-        this.nodes.get('autopilot')?.gain.gain.linearRampToValueAtTime(dbToGain(this.volumes.autopilot), rampTime);
-        this.nodes.get('accompaniment')?.gain.gain.linearRampToValueAtTime(dbToGain(this.volumes.accompaniment), rampTime);
-        this.nodes.get('autopilotBass')?.gain.gain.linearRampToValueAtTime(dbToGain(this.volumes.autopilotBass), rampTime);
-        this.nodes.get('effects')?.gain.gain.linearRampToValueAtTime(dbToGain(this.volumes.effects), rampTime);
     }
     
     public stopAllSounds() {
