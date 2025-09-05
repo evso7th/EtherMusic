@@ -1,9 +1,8 @@
 
-
 "use client";
 
 import type { PointerEvent } from 'react';
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -17,6 +16,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { OrbManager } from '@/lib/orb-manager';
 
 interface ThereminPadProps {
     type: 'melody' | 'bass';
@@ -28,18 +28,16 @@ interface ThereminPadProps {
     instruments?: Instrument[];
     activeInstrument?: Instrument;
     onInstrumentChange?: (instrument: Instrument) => void;
-    // Melody specific
     musicKeys?: MusicKey[];
     activeKey?: MusicKey;
     onKeyChange?: (key: MusicKey) => void;
     musicScales?: MusicScale[];
     activeScale?: MusicScale;
     onScaleChange?: (scale: MusicScale) => void;
-    // Bass specific
     isLatchOn?: boolean;
     onLatchToggle?: (checked: boolean) => void;
+    orbManager?: OrbManager;
 }
-
 
 const padTitles = {
     melody: "Melody Pad",
@@ -64,11 +62,21 @@ export function ThereminPad({
     onScaleChange,
     isLatchOn,
     onLatchToggle,
+    orbManager,
 }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const isMobile = useIsMobile();
     
+    // Manage orbs for latch mode
+    useEffect(() => {
+        if (type === 'bass' && orbManager) {
+            if (!isLatchOn) {
+                orbManager.removeAllOrbs('latch');
+            }
+        }
+    }, [isLatchOn, orbManager, type]);
+
     const calculateInteraction = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (!padRef.current) return null;
         const rect = padRef.current.getBoundingClientRect();
@@ -83,6 +91,7 @@ export function ThereminPad({
         const logMax = Math.log(maxFreq);
         const frequency = Math.exp(logMin + (logMax - logMin) * normalizedX);
         
+        // Volume is inverted: top is loud (0), bottom is quiet (1)
         const volume = 1 - normalizedY;
         
         return { x, y, frequency, volume, pointerId: event.pointerId };
@@ -99,23 +108,23 @@ export function ThereminPad({
     }, [calculateInteraction, onInteraction, type, isDisabled]);
 
     const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
-        if (isDisabled || !(event.buttons > 0)) return;
+        if (isDisabled || !(event.buttons > 0) || (type === 'bass' && isLatchOn)) return;
         
         const interactionData = calculateInteraction(event);
         if (interactionData) {
             onInteraction(type, interactionData, 'move');
         }
-    }, [calculateInteraction, onInteraction, type, isDisabled]);
+    }, [calculateInteraction, onInteraction, type, isDisabled, isLatchOn]);
 
     const handlePointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
-        if (isDisabled) return;
+        if (isDisabled || (type === 'bass' && isLatchOn)) return;
         const interactionData = calculateInteraction(event);
         onInteraction(type, interactionData, 'up');
         
         if ((event.target as HTMLElement).hasPointerCapture(event.pointerId)) {
             (event.target as HTMLElement).releasePointerCapture(event.pointerId);
         }
-    }, [onInteraction, type, calculateInteraction, isDisabled]);
+    }, [onInteraction, type, calculateInteraction, isDisabled, isLatchOn]);
     
      const renderSettingsControls = () => {
         const triggerButton = (
@@ -144,7 +153,7 @@ export function ThereminPad({
         return (
             <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
                 {sheetTrigger}
-                <SheetContent>
+                <SheetContent side={isMobile ? "bottom" : "right"}>
                     <SheetHeader>
                         <SheetTitle>{padTitles[type]} Settings</SheetTitle>
                     </SheetHeader>
@@ -221,7 +230,7 @@ export function ThereminPad({
         <Card 
             className={cn(
                 "flex flex-col h-full bg-card/50 border-2 border-transparent transition-all duration-300",
-                (isLatchOn && type === 'bass') && "border-accent ring-4 ring-accent/50",
+                (isLatchOn && type === 'bass') && "border-accent ring-2 ring-accent/50 animate-pulse-accent-glow",
                 isDisabled && "opacity-50 pointer-events-none"
             )}
             style={{ willChange: 'border-color, box-shadow' }}
@@ -238,9 +247,9 @@ export function ThereminPad({
                          <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <div className="flex items-center space-x-1 h-8">
+                                    <div className="flex items-center space-x-1 h-8 px-2 rounded-md hover:bg-accent/10">
                                         <Switch id="latch-mode" checked={isLatchOn} onCheckedChange={onLatchToggle} />
-                                        <Label htmlFor="latch-mode" className="flex items-center gap-1 text-xs"><Anchor className="w-3 h-3" /> Latch</Label>
+                                        <Label htmlFor="latch-mode" className="flex items-center gap-1 text-xs cursor-pointer"><Anchor className="w-3 h-3" /> Latch</Label>
                                     </div>
                                 </TooltipTrigger>
                                 <TooltipContent hidden={isMobile}>
@@ -260,9 +269,10 @@ export function ThereminPad({
                     onPointerMove={handlePointerMove}
                     onPointerUp={handlePointerUp}
                     onPointerLeave={handlePointerUp}
+                    onPointerCancel={handlePointerUp}
                     style={{
                         backgroundColor: 'hsl(var(--muted) / 0.2)',
-                        backgroundImage: `linear-gradient(to top, transparent 30%, hsl(var(--primary) / 0.2))`,
+                        backgroundImage: `linear-gradient(to top, transparent 30%, ${color}20)`,
                     }}
                 >
                     <div className="absolute inset-0 flex items-center justify-center text-5xl md:text-7xl font-bold text-foreground/10 pointer-events-none uppercase tracking-widest text-center">

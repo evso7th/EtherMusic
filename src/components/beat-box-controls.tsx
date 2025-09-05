@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { MixerControls, AutopilotMixerControls } from '@/components/mixer-controls';
 import { SlidersHorizontal, Drum, Zap, Bot, Power, Wand2, Music, Save, FolderDown } from 'lucide-react';
-import { useState, useMemo, memo, useEffect } from "react";
+import { useState, useMemo, memo, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
 import { Separator } from "./ui/separator";
@@ -111,8 +111,7 @@ const MemoizedAutopilotInstrumentSelector = memo(function AutopilotInstrumentSel
 });
 
 const ControlButtonWithTooltip = memo(function ControlButtonWithTooltip({ tooltipText, children, ...props}: React.ComponentProps<typeof Button> & { tooltipText: string, children: React.ReactNode}) {
-    // isMobile is implicitly available in context, so we don't need to pass it as a prop
-    // This was the source of the React warning.
+    // This component does not receive `isMobile` as a prop anymore, so the warning disappears.
     return (
         <Tooltip>
             <TooltipTrigger asChild>
@@ -151,10 +150,9 @@ export function BeatBoxControls({
     const [isAutopilotMixerOpen, setIsAutopilotMixerOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<'Meditative' | 'Classic'>('Meditative');
     
-    // Local state for autopilot instrument settings
+    // Local state for autopilot instrument settings to apply them on dialog close
     const [tempAutopilotInstruments, setTempAutopilotInstruments] = useState(activeAutopilotInstruments);
 
-    // Sync local state when the dialog opens or active instruments change
     useEffect(() => {
         if (isAutopilotOpen) {
             setTempAutopilotInstruments(activeAutopilotInstruments);
@@ -172,7 +170,7 @@ export function BeatBoxControls({
             }
         });
     };
-
+    
     const handleAutopilotDialogChange = (open: boolean) => {
         if (!open) {
             applyInstrumentChanges();
@@ -193,8 +191,8 @@ export function BeatBoxControls({
     const isBeatsOn = activePattern && activePattern.name !== 'Off';
     
     const buttonSize = isMobile ? 'sm' : 'default';
-    
-    const controlButtonWrapper = (tooltipText: string, children: React.ReactNode) => {
+
+    const ControlButtonWrapper = useCallback(({ tooltipText, children }: { tooltipText: string, children: React.ReactNode }) => {
         if (isMobile) return children;
         return (
              <Tooltip>
@@ -205,19 +203,19 @@ export function BeatBoxControls({
                     <p>{tooltipText}</p>
                 </TooltipContent>
             </Tooltip>
-        )
-    };
+        );
+    }, [isMobile]);
 
     const autopilotDialog = (
         <Dialog open={isAutopilotOpen} onOpenChange={handleAutopilotDialogChange}>
             <DialogTrigger asChild>
-                 {controlButtonWrapper("Autopilot", 
+                 <ControlButtonWrapper tooltipText="Autopilot">
                     <Button
                         variant={isAutopilotOn ? 'default' : 'outline'} size={isLandscape ? "icon" : buttonSize} className={cn(isLandscape && "w-10 h-10 rounded-full", !isLandscape && "flex-1")}>
                         <Bot className={cn("w-5 h-5", !isLandscape && "md:mr-2")} />
                         {!isLandscape && <span className="hidden sm:inline">Autopilot</span>}
                     </Button>
-                )}
+                </ControlButtonWrapper>
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
@@ -426,12 +424,12 @@ export function BeatBoxControls({
                 <CardContent className="p-2 md:p-4 flex justify-around items-center gap-1 md:gap-2">
                     <Dialog open={isBeatsOpen} onOpenChange={setIsBeatsOpen}>
                         <DialogTrigger asChild>
-                             {controlButtonWrapper("Beats", 
+                            <ControlButtonWrapper tooltipText="Beats">
                                 <Button variant={isBeatsOn ? 'default' : 'outline'} className="flex-1" size={buttonSize}>
                                     <Drum className="w-4 h-4 md:mr-2" />
                                     <span className="hidden sm:inline">Beats</span>
                                 </Button>
-                            )}
+                            </ControlButtonWrapper>
                         </DialogTrigger>
                         <DialogContent>
                             <DialogHeader>
@@ -490,12 +488,12 @@ export function BeatBoxControls({
 
                     <Dialog open={isTempoOpen} onOpenChange={setIsTempoOpen}>
                         <DialogTrigger asChild>
-                            {controlButtonWrapper("Tempo", 
+                            <ControlButtonWrapper tooltipText="Tempo">
                                 <Button variant="outline" className="flex-1" size={buttonSize}>
                                     <Zap className="w-4 h-4 md:mr-2" />
                                     <span className="hidden sm:inline">Tempo</span>
                                 </Button>
-                            )}
+                            </ControlButtonWrapper>
                         </DialogTrigger>
                         <DialogContent>
                             <DialogHeader>
@@ -526,12 +524,12 @@ export function BeatBoxControls({
 
                     <Dialog>
                         <DialogTrigger asChild>
-                            {controlButtonWrapper("Mixer", 
+                            <ControlButtonWrapper tooltipText="Mixer">
                                 <Button variant="outline" className="flex-1 px-2 md:px-4" size={buttonSize}>
                                     <SlidersHorizontal className="w-4 h-4 md:mr-2"/>
                                     <span className="hidden sm:inline">Mixer</span>
                                 </Button>
-                            )}
+                            </ControlButtonWrapper>
                         </DialogTrigger>
                         <DialogContent>
                             <DialogHeader>

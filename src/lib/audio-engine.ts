@@ -1,14 +1,39 @@
+// src/lib/audio-engine.ts
 
 import * as Tone from 'tone';
 import type { Instrument, MusicKey, MusicScale } from '@/app/page';
-import { DrumMachine } from './drum-machine';
-import type { OrbManager } from './orb-manager';
-import type { NoteEvent, WorkerAutopilotPart, NoteUpdateEvent } from './autopilot-worker';
+import { OrbManager } from './orb-manager';
+import type { AutopilotPart, NoteEvent, NoteUpdateEvent } from './autopilot-worker';
 
-// This new AudioEngine will be much simpler.
-// Its primary job is to manage the AudioContext, load the worklets,
-// and route messages to them.
+type Volumes = { 
+    melody: number; 
+    manualBass: number;
+    latch: number; 
+    drums: number; 
+    autopilot: number;
+    accompaniment: number;
+    autopilotBass: number;
+    effects: number;
+};
 
+type Effects = {
+    melody: { reverb: number, delay: number };
+    manualBass: { reverb: number, delay: number };
+    latch: { reverb: number, delay: number };
+    drums: { reverb: number, delay: number };
+    autopilot: { reverb: number, delay: number };
+    accompaniment: { reverb: number, delay: number };
+    autopilotBass: { reverb: number, delay: number };
+    effects: { reverb: number, delay: number };
+};
+
+type PartName = 'melody' | 'manualBass' | 'latch' | 'drums' | AutopilotPart;
+
+/**
+ * A modern, worklet-based audio engine for EtherMusic.
+ * This engine acts as a central dispatcher and mixer.
+ * It does not generate sound itself but manages and communicates with AudioWorkletNodes.
+ */
 export class AudioEngine {
     public isInitialized = false;
     private context!: Tone.Context;
@@ -16,16 +41,17 @@ export class AudioEngine {
     private mediaRecorder: MediaRecorder | null = null;
     private recordedChunks: Blob[] = [];
 
-    // Nodes for our new architecture
-    private thereminNode!: AudioWorkletNode;
-    private bassNode!: AudioWorkletNode;
-    private drumNode!: AudioWorkletNode;
-    private masterChannel!: Tone.Channel;
+    // Audio Nodes
+    private masterOut!: GainNode;
+    private effectInput!: GainNode;
+    private nodes = new Map<PartName, { worklet: AudioWorkletNode, gain: GainNode }>();
     private fx!: { reverb: Tone.Reverb, delay: Tone.FeedbackDelay };
-
-    constructor() {
-        // Initialization is deferred to an async method
-    }
+    
+    // Drum-specific properties
+    private drumSamples: Record<string, AudioBuffer> = {};
+    private isDrumSamplesLoaded = false;
+    
+    constructor() {}
 
     public async initialize() {
         if (this.isInitialized) return;
@@ -33,137 +59,251 @@ export class AudioEngine {
         await Tone.start();
         this.context = Tone.getContext();
         
-        // Create a master channel for effects
-        this.masterChannel = new Tone.Channel(-6).toDestination();
+        console.log('AudioContext started. Loading worklets and samples...');
+
+        this.masterOut = this.context.createGain();
+        this.effectInput = this.context.createGain();
+        
         this.fx = {
-            reverb: new Tone.Reverb({ decay: 4, wet: 0.5 }),
-            delay: new Tone.FeedbackDelay("8n", 0.25)
+            reverb: new Tone.Reverb({ decay: 4, wet: 0.5 }).toDestination(),
+            delay: new Tone.FeedbackDelay("8n", 0.25).toDestination()
         };
-        this.masterChannel.chain(this.fx.reverb, this.fx.delay, Tone.Destination);
+        
+        // Main dry signal path
+        this.masterOut.connect(this.context.destination);
+        // Effects send path
+        this.effectInput.connect(this.fx.reverb);
+        this.effectInput.connect(this.fx.delay);
+        
+        await this.loadDrumSamples();
+        
+        await this.context.audioWorklet.addModule('/worklets/poly-synth-processor.js');
+        await this.context.audioWorklet.addModule('/worklets/drum-processor.js');
 
-        console.log('AudioContext started. Loading worklets...');
+        this.createWorkletNode('melody');
+        this.createWorkletNode('manualBass');
+        this.createWorkletNode('latch');
+        
+        // Autopilot nodes will be created on demand
+        this.createWorkletNode('autopilot');
+        this.createWorkletNode('accompaniment');
+        this.createWorkletNode('autopilotBass');
+        this.createWorkletNode('effects');
 
-        try {
-            await this.context.audioWorklet.addModule('/worklets/theremin-processor.js');
-            await this.context.audioWorklet.addModule('/worklets/drum-processor.js');
-            
-            this.thereminNode = new AudioWorkletNode(this.context.rawContext, 'theremin-processor');
-            this.bassNode = new AudioWorkletNode(this.context.rawContext, 'theremin-processor'); // Can reuse the same processor
-            this.drumNode = new AudioWorkletNode(this.context.rawContext, 'drum-processor');
-
-            this.thereminNode.connect(this.masterChannel);
-            this.bassNode.connect(this.masterChannel);
-            this.drumNode.connect(this.masterChannel);
-
-            console.log('Worklets loaded and connected.');
-
-        } catch (e) {
-            console.error("Error loading AudioWorklets:", e);
-            // Here you could inform the user that their browser might not support AudioWorklets
-            alert("Failed to load audio engine. Your browser might not support the necessary Web Audio features.");
-            return;
-        }
-
+        // Create drum machine node
+        this.createDrumNode();
+        
         Tone.Transport.set({ bpm: 90, swing: 0, timeSignature: 4 });
         this.isInitialized = true;
         console.log('AudioEngine initialized with Worklets.');
     }
     
-    // --- Simplified Control Methods ---
+    private createWorkletNode(part: PartName) {
+        if (this.nodes.has(part)) return;
+
+        const gainNode = this.context.createGain();
+        gainNode.connect(this.masterOut);
+        gainNode.connect(this.effectInput);
+
+        const workletNode = new AudioWorkletNode(this.context.rawContext, 'poly-synth-processor');
+        workletNode.connect(gainNode);
+
+        this.nodes.set(part, { worklet: workletNode, gain: gainNode });
+        console.log(`Created worklet node for: ${part}`);
+    }
+
+    private async loadDrumSamples() {
+        const sampleNames = ['kick_hard', 'kick_soft', 'kick_echo', 'kick', 'snare_hard', 'snare_soft', 'snare_verb', 'snare', 'snare_press', 'hat', 'hat_closed', 'hat_open'];
+        const promises = sampleNames.map(async name => {
+            const response = await fetch(`/assets/drums/${name}.wav`);
+            const arrayBuffer = await response.arrayBuffer();
+            this.drumSamples[name] = await this.context.decodeAudioData(arrayBuffer);
+        });
+        await Promise.all(promises);
+        this.isDrumSamplesLoaded = true;
+        console.log('All drum samples loaded.');
+    }
+
+    private createDrumNode() {
+        if (this.nodes.has('drums') || !this.isDrumSamplesLoaded) return;
+        
+        const gainNode = this.context.createGain();
+        gainNode.connect(this.masterOut);
+        gainNode.connect(this.effectInput);
+
+        // We need to transfer the sample data to the worklet.
+        // It must be in a format that can be handled by the structured clone algorithm.
+        const transferableSamples: Record<string, ArrayBuffer> = {};
+        for(const [name, audioBuffer] of Object.entries(this.drumSamples)) {
+            // For simplicity, we send the raw Float32Array data for one channel.
+            transferableSamples[name] = audioBuffer.getChannelData(0).buffer;
+        }
+
+        const workletNode = new AudioWorkletNode(this.context.rawContext, 'drum-processor', {
+            processorOptions: { samples: transferableSamples }
+        });
+        workletNode.connect(gainNode);
+
+        this.nodes.set('drums', { worklet: workletNode, gain: gainNode });
+        console.log('Created worklet node for: drums');
+    }
 
     public setOrbManager(orbManager: OrbManager) {
         this.orbManager = orbManager;
     }
-    
-    // --- Theremin Pad Interaction ---
-    public startNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}) {
-        const node = type === 'melody' ? this.thereminNode : this.bassNode;
-        node.port.postMessage({ type: 'noteOn', frequency: freq, volume: vol, pointerId });
-        this.orbManager?.addOrb(pointerId, type, pos.x, pos.y);
+
+    // --- Note Control ---
+    public startNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: { x: number, y: number }) {
+        const part = type === 'bass' ? 'manualBass' : type;
+        const node = this.nodes.get(part)?.worklet;
+        node?.port.postMessage({ type: 'noteOn', pointerId, frequency: freq, volume: vol });
+
+        if (this.nodes.get('latch')?.worklet && this.isBassLatchOn) {
+            this.nodes.get('latch')?.worklet.port.postMessage({ type: 'noteOn', pointerId, frequency: freq, volume: vol });
+        }
+        
+        if (this.isBassLatchOn && type ==='bass') {
+             this.orbManager?.addOrb(pointerId, 'latch', pos.x, pos.y);
+        } else {
+             this.orbManager?.addOrb(pointerId, type, pos.x, pos.y);
+        }
     }
-    
-    public updateNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: {x: number, y: number}) {
-        const node = type === 'melody' ? this.thereminNode : this.bassNode;
-        node.port.postMessage({ type: 'noteUpdate', frequency: freq, volume: vol, pointerId });
+
+    public updateNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: { x: number, y: number }) {
+        const part = type === 'bass' ? 'manualBass' : type;
+        const node = this.nodes.get(part)?.worklet;
+        node?.port.postMessage({ type: 'noteUpdate', pointerId, frequency: freq, volume: vol });
         this.orbManager?.updateOrb(pointerId, pos.x, pos.y);
     }
-    
+
     public stopNote(type: 'melody' | 'bass', pointerId: number) {
-        const node = type === 'melody' ? this.thereminNode : this.bassNode;
-        node.port.postMessage({ type: 'noteOff', pointerId });
+        const part = type === 'bass' ? 'manualBass' : type;
+        const node = this.nodes.get(part)?.worklet;
+        node?.port.postMessage({ type: 'noteOff', pointerId });
         this.orbManager?.removeOrb(pointerId);
     }
-
-    public setHarmony(key: MusicKey, scale: MusicScale) {
-        // The harmonization logic will now live inside the worklet.
-        // We just need to send the new settings.
-        const message = { type: 'setHarmony', key, scale };
-        this.thereminNode.port.postMessage(message);
-        this.bassNode.port.postMessage(message);
-        // We'll need to send this to the autopilot worker too.
+    
+    public setBassLatch(isOn: boolean) {
+        this.nodes.get('manualBass')?.worklet.port.postMessage({ type: 'latch', isOn });
+        this.nodes.get('latch')?.worklet.port.postMessage({ type: 'latch', isOn });
+        if (!isOn) {
+            this.orbManager.removeAllOrbs('latch');
+        }
     }
-
-    // --- Drum Machine ---
-    public setBeatPattern(patternName: string) {
-        this.drumNode.port.postMessage({ type: 'setPattern', patternName });
+    
+    private get isBassLatchOn(): boolean {
+        // This is a bit of a hack. A better way would be to have state sync.
+        // For now, we assume if the latch node exists, its mode is being managed.
+        return !!this.nodes.get('latch');
     }
 
     // --- Autopilot ---
-    public playWorkerNote(note: NoteEvent) {
-        // This will need a new Autopilot worklet node.
-        // For now, we'll leave this blank.
-        console.log("Received note from Autopilot worker:", note);
+    public playWorkerNotesBatch(notes: NoteEvent[]) {
+        if (!this.isInitialized) return;
+        notes.forEach(note => {
+            const nodeInfo = this.nodes.get(note.part);
+            if (nodeInfo) {
+                nodeInfo.worklet.port.postMessage({
+                    type: 'noteOn',
+                    pointerId: note.id ?? Math.random(), // Autopilot notes don't have a pointer
+                    frequency: note.freq,
+                    volume: note.vel,
+                    // We don't pass time, as the worklet doesn't use Tone.Transport scheduling
+                });
+                // Note: The autopilot worker is responsible for sending noteOff messages
+                // or we can implement a duration in the worklet itself.
+                // For simplicity, we'll assume the worklet handles note duration.
+            }
+        });
     }
 
-    public playWorkerNotesBatch(notes: NoteEvent[]) {
-        // This will also be handled by a new worklet.
-         notes.forEach(note => this.playWorkerNote(note));
+    public updateWorkerNote(note: NoteUpdateEvent) {
+        if (!this.isInitialized) return;
+        const nodeInfo = this.nodes.get(note.part);
+        if (nodeInfo && note.id) {
+             nodeInfo.worklet.port.postMessage({
+                type: 'noteUpdate',
+                pointerId: note.id,
+                frequency: note.freq,
+                // Autopilot doesn't control volume via updates, only freq slides for now
+            });
+        }
+    }
+
+    public setHarmony(key: MusicKey, scale: MusicScale) {
+        const message = { type: 'setHarmony', key, scale };
+        this.nodes.get('melody')?.worklet.port.postMessage(message);
+        this.nodes.get('manualBass')?.worklet.port.postMessage(message);
+        this.nodes.get('latch')?.worklet.port.postMessage(message);
+        this.nodes.get('autopilot')?.worklet.port.postMessage(message);
+        this.nodes.get('accompaniment')?.worklet.port.postMessage(message);
+        this.nodes.get('autopilotBass')?.worklet.port.postMessage(message);
     }
     
-    public updateWorkerNote(note: NoteUpdateEvent) {
-        // To be implemented with autopilot worklet
+    public setMelodyInstrument(instrument: Instrument) {
+        this.nodes.get('melody')?.worklet.port.postMessage({ type: 'setInstrument', instrument });
+    }
+    
+    public setBassInstrument(instrument: Instrument) {
+        this.nodes.get('manualBass')?.worklet.port.postMessage({ type: 'setInstrument', instrument });
+        this.nodes.get('latch')?.worklet.port.postMessage({ type: 'setInstrument', instrument });
     }
 
+    public setAutopilotInstrument(part: AutopilotPart, instrument: Instrument) {
+        this.nodes.get(part)?.worklet.port.postMessage({ type: 'setInstrument', instrument });
+    }
 
     // --- Global Controls ---
     public setTempo(bpm: number) {
         if (this.isInitialized) {
             Tone.Transport.bpm.value = bpm;
-            // We might also need to inform the worklets if they have time-sensitive calculations
-            this.drumNode.port.postMessage({ type: 'setTempo', bpm });
+            this.nodes.get('drums')?.worklet.port.postMessage({ type: 'setTempo', value: bpm });
+        }
+    }
+
+    public setBeatPattern(patternName: string) {
+        if (this.isInitialized) {
+            this.nodes.get('drums')?.worklet.port.postMessage({ type: 'setPattern', value: patternName });
         }
     }
     
-    public setVolumes(volumes: Record<string, number>) {
+    public setVolumes(volumes: Volumes) {
         if (!this.isInitialized) return;
-        // This part can remain similar, controlling the output channels.
-        // We'll need to adjust the channel setup.
-        this.masterChannel.volume.value = volumes.melody; // Example, needs refinement
-    }
-
-    public setEffects(effects: Record<string, any>) {
-        if (!this.isInitialized) return;
-        this.fx.reverb.wet.value = Tone.dbToGain(effects.melody.reverb);
-        this.fx.delay.wet.value = Tone.dbToGain(effects.melody.delay);
+        const rampTime = this.context.currentTime + 0.05;
+        this.nodes.get('melody')?.gain.gain.linearRampToValueAtTime(Tone.dbToGain(volumes.melody), rampTime);
+        this.nodes.get('manualBass')?.gain.gain.linearRampToValueAtTime(Tone.dbToGain(volumes.manualBass), rampTime);
+        this.nodes.get('latch')?.gain.gain.linearRampToValueAtTime(Tone.dbToGain(volumes.latch), rampTime);
+        this.nodes.get('drums')?.gain.gain.linearRampToValueAtTime(Tone.dbToGain(volumes.drums), rampTime);
+        this.nodes.get('autopilot')?.gain.gain.linearRampToValueAtTime(Tone.dbToGain(volumes.autopilot), rampTime);
+        this.nodes.get('accompaniment')?.gain.gain.linearRampToValueAtTime(Tone.dbToGain(volumes.accompaniment), rampTime);
+        this.nodes.get('autopilotBass')?.gain.gain.linearRampToValueAtTime(Tone.dbToGain(volumes.autopilotBass), rampTime);
+        this.effectInput.gain.linearRampToValueAtTime(Tone.dbToGain(volumes.effects), rampTime);
     }
     
-    public setBassLatch(isOn: boolean) {
-        this.bassNode.port.postMessage({ type: 'latch', isOn });
+    public setEffects(effects: Effects) {
+         if (!this.isInitialized) return;
+        const rampTime = this.context.currentTime + 0.05;
+
+        // This is a simplified approach. A true per-instrument effect send would require
+        // a separate gain node for each instrument's send channel. For now, we'll
+        // just use the melody's effect settings as the global effect settings.
+        this.fx.reverb.wet.linearRampToValueAtTime(Tone.dbToGain(effects.melody.reverb), rampTime);
+        this.fx.delay.wet.linearRampToValueAtTime(Tone.dbToGain(effects.melody.delay), rampTime);
     }
     
     public stopAllSounds() {
-        this.thereminNode.port.postMessage({ type: 'allNotesOff' });
-        this.bassNode.port.postMessage({ type: 'allNotesOff' });
-        this.drumNode.port.postMessage({ type: 'stop' });
+        this.nodes.forEach(node => {
+            node.worklet.port.postMessage({ type: 'allNotesOff' });
+        });
         this.orbManager?.removeAllOrbs();
     }
     
-    // --- Recording (can remain as is for now) ---
+    // --- Recording ---
     public startRecording() {
         if (!this.isInitialized || this.mediaRecorder?.state === 'recording') return;
         
         const dest = this.context.createMediaStreamDestination();
-        Tone.getDestination().connect(dest);
+        this.masterOut.connect(dest); // Connect the master output to the recorder
         
         this.mediaRecorder = new MediaRecorder(dest.stream, { mimeType: 'audio/webm' });
         this.recordedChunks = [];
@@ -199,5 +339,3 @@ export class AudioEngine {
         }
     }
 }
-
-    

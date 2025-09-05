@@ -22,12 +22,10 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
 import type { NoteEvent, WorkerResponse, AutopilotPart as WorkerAutopilotPart, NoteUpdateEvent } from '@/lib/autopilot-worker';
 import { CookieConsent } from '@/components/cookie-consent';
-
 
 function getCookie(name: string): string | null {
     if (typeof document === 'undefined') return null;
@@ -48,8 +46,6 @@ function setCookie(name: string, value: string, days: number) {
     document.cookie = name + "=" + (value || "")  + expires + "; path=/; SameSite=Lax";
 }
 
-
-
 const defaultVolumes = { melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, accompaniment: -14, autopilotBass: -9, effects: -6 };
 const defaultEffects = {
     melody: { reverb: -Infinity, delay: -60 },
@@ -63,7 +59,7 @@ const defaultEffects = {
 };
 
 function loadSettings() {
-    if (getCookie("ethermusic_consent") !== 'true') {
+    if (typeof window === 'undefined' || getCookie("ethermusic_consent") !== 'true') {
         return { volumes: defaultVolumes, effects: defaultEffects };
     }
     try {
@@ -73,7 +69,6 @@ function loadSettings() {
         const volumes = savedVolumes ? JSON.parse(savedVolumes) : defaultVolumes;
         const effects = savedEffects ? JSON.parse(savedEffects) : defaultEffects;
         
-        // Basic validation
         if (typeof volumes.melody !== 'number') return { volumes: defaultVolumes, effects: defaultEffects };
 
         return { volumes, effects };
@@ -84,7 +79,7 @@ function loadSettings() {
 }
 
 function saveSettings(volumes: any, effects: any) {
-    if (getCookie("ethermusic_consent") !== 'true') {
+    if (typeof window === 'undefined' || getCookie("ethermusic_consent") !== 'true') {
         return;
     }
     try {
@@ -150,71 +145,68 @@ export default function Home() {
         bass: 'ebass',
         effects: 'autopilot_effect_star'
     });
-    const [volumes, setVolumes] = useState(defaultVolumes);
-    const [effects, setEffects] = useState(defaultEffects);
+    const [volumes, setVolumes] = useState(() => loadSettings().volumes);
+    const [effects, setEffects] = useState(() => loadSettings().effects);
     
     // --- Engine Ref ---
     const audioEngine = useRef<AudioEngine>();
     const autopilotWorker = useRef<Worker>();
     const orbManager = useRef<OrbManager>();
     const backgroundAudioRef = useRef<HTMLAudioElement>(null);
-
-    const initialSettings = useRef(loadSettings());
     
     // --- Engine Initialization ---
     useEffect(() => {
         setIsClient(true);
-        setVolumes(initialSettings.current.volumes);
-        setEffects(initialSettings.current.effects);
     }, []);
 
     const initializeAudio = useCallback(async () => {
-        if (isReady) return;
+        if (isReady || !isAppStarted) return;
         
         try {
-            const mainEngine = new AudioEngine();
-            await mainEngine.initialize();
-            audioEngine.current = mainEngine;
-            setIsPlaying(Tone.Transport.state === 'started');
-            
+            console.log("Initializing audio resources...");
             const om = new OrbManager();
             orbManager.current = om;
+
+            const mainEngine = new AudioEngine();
+            await mainEngine.initialize();
             mainEngine.setOrbManager(om);
+            audioEngine.current = mainEngine;
 
             const worker = new Worker(new URL('../lib/autopilot-worker.ts', import.meta.url));
             worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
+                const engine = audioEngine.current;
+                if (!engine) return;
+
                 if (e.data.type === 'playNote' && e.data.note) {
-                    audioEngine.current?.playWorkerNote(e.data.note);
+                    engine.playWorkerNotesBatch([e.data.note]);
                 } else if (e.data.type === 'updateNote' && e.data.note) {
-                    audioEngine.current?.updateWorkerNote(e.data.note);
+                    engine.updateWorkerNote(e.data.note);
                 } else if (e.data.type === 'playNotesBatch' && e.data.notes) {
-                    audioEngine.current?.playWorkerNotesBatch(e.data.notes);
+                    engine.playWorkerNotesBatch(e.data.notes);
                 }
             };
             autopilotWorker.current = worker;
             
-            mainEngine.setTempo(tempos[2].bpm);
-            mainEngine.setVolumes(initialSettings.current.volumes);
-            mainEngine.setEffects(initialSettings.current.effects);
-            mainEngine.setMelodyInstrument('theremin');
-            mainEngine.setBassInstrument('synth');
-            mainEngine.setAutopilotInstrument('melody', 'synth');
-            mainEngine.setAutopilotInstrument('accompaniment', 'mellotron');
-            mainEngine.setAutopilotInstrument('bass', 'ebass');
-            mainEngine.setAutopilotInstrument('effects', 'autopilot_effect_star');
-
-            mainEngine.setHarmony('G', 'Major');
+            // Set initial state from React to the audio engine and worker
+            mainEngine.setTempo(activeTempo.bpm);
+            mainEngine.setVolumes(volumes);
+            mainEngine.setEffects(effects);
+            mainEngine.setMelodyInstrument(melodyInstrument);
+            mainEngine.setBassInstrument(bassInstrument);
+            Object.entries(autopilotPartInstruments).forEach(([part, instrument]) => {
+                mainEngine.setAutopilotInstrument(part as WorkerAutopilotPart, instrument);
+            });
+            mainEngine.setHarmony(musicKey, musicScale);
             
-            worker.postMessage({ type: 'setHarmony', key: 'G', scale: 'Major' });
-            worker.postMessage({ type: 'setTempo', bpm: tempos[2].bpm });
+            worker.postMessage({ type: 'setHarmony', key: musicKey, scale: musicScale });
+            worker.postMessage({ type: 'setTempo', bpm: activeTempo.bpm });
             
             Tone.Transport.scheduleRepeat((time) => {
                 autopilotWorker.current?.postMessage({ type: 'tick', time });
             }, '16n');
 
             setIsReady(true);
-            const initialPattern = beatPatterns.find(p => p.name === 'Off')!;
-            setActivePattern(initialPattern);
+            setIsPlaying(Tone.Transport.state === 'started');
             console.log('Audio engines and worker initialized and ready.');
         } catch(e) {
             console.error("Failed to initialize audio engines:", e);
@@ -224,8 +216,7 @@ export default function Home() {
                 variant: "destructive"
             });
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isReady, toast]);
+    }, [isReady, isAppStarted, toast, activeTempo.bpm, volumes, effects, melodyInstrument, bassInstrument, autopilotPartInstruments, musicKey, musicScale]);
     
     // --- UI Event Handlers ---
     
@@ -246,10 +237,15 @@ export default function Home() {
     const handleAutopilotToggle = useCallback((isOn: boolean) => {
         setIsAutopilotOn(isOn);
         autopilotWorker.current?.postMessage({ type: isOn ? 'start' : 'stop' });
-        if (isOn && Tone.Transport.state !== 'started') {
-            handlePlay();
+        // If autopilot has its own drums, manage the manual drums
+        if (isOn) {
+            const offPattern = beatPatterns.find(p => p.name === 'Off')!;
+            handlePatternChange(offPattern); 
+            if (Tone.Transport.state !== 'started') {
+                handlePlay();
+            }
         }
-    }, [handlePlay]);
+    }, [handlePlay, handlePatternChange]);
 
     const handleTempoChange = useCallback((tempo: Tempo) => {
         setActiveTempo(tempo);
@@ -355,9 +351,15 @@ export default function Home() {
             } catch (err) { console.error("Error fullscreening:", err); }
         }
         setIsAppStarted(true);
-        initializeAudio();
-    }, [isMobile, initializeAudio]);
+    }, [isMobile]);
     
+    // Effect to run initialization once app is started
+    useEffect(() => {
+        if(isAppStarted && !isReady) {
+            initializeAudio();
+        }
+    }, [isAppStarted, isReady, initializeAudio]);
+
     const handleStartScreenInteraction = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
         if ((e.target as HTMLElement).closest('button')) return;
         if (backgroundAudioRef.current && backgroundAudioRef.current.paused) {
@@ -392,9 +394,9 @@ export default function Home() {
                     </Button>
                 </div>
                  <footer className="z-10 text-xs text-white/50 pb-4 text-center">
-                    <p>Powered by theremin technology</p>
+                    <p>Powered by Web Audio API</p>
                     <p>&copy; 2025, EVS</p>
-                    <p className="mt-2">v.1.1</p>
+                    <p className="mt-2">v.2.0 "Maestro"</p>
                 </footer>
                 <CookieConsent />
             </div>
@@ -424,11 +426,6 @@ export default function Home() {
                      <div className="portrait:block landscape:hidden">
                         {isMobile ? (
                             <Dialog>
-                                <DialogTrigger asChild>
-                                    <button>
-                                        <Image src="/assets/images/icon.png" alt="EtherMusic Icon" width={30} height={30} />
-                                    </button>
-                                </DialogTrigger>
                                 <DialogContent>
                                     <DialogHeader>
                                         <DialogTitle>What is This?</DialogTitle>
@@ -473,6 +470,7 @@ export default function Home() {
                             activeInstrument={bassInstrument}
                             onInstrumentChange={handleBassInstrumentChange}
                             isPolyphonic
+                            orbManager={orbManager.current}
                         />
                         <MemoizedThereminPad
                             onInteraction={handleThereminInteraction}
@@ -489,6 +487,7 @@ export default function Home() {
                             activeScale={musicScale}
                             onScaleChange={(s) => handleHarmonyChange(musicKey, s)}
                             isPolyphonic
+                            orbManager={orbManager.current}
                         />
                     </div>
                     <div className="flex-shrink-0 portrait:block landscape:hidden">
@@ -524,7 +523,7 @@ export default function Home() {
                         initialVolumes={volumes}
                         onVolumeChange={handleVolumeChange}
                         initialEffects={effects}
-                        onEffectChange={handleEffectChange}
+                        onEffectChange={onEffectChange}
                         isAutopilotOn={isAutopilotOn}
                         onAutopilotToggle={handleAutopilotToggle}
                         autopilotInstruments={autopilotInstruments}

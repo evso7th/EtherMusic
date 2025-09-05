@@ -58,7 +58,14 @@ export function PlaybackControls({
     
     const handleExit = () => {
         if (typeof window !== "undefined") {
-            window.close();
+            try {
+                // This will close the window if it was opened by a script.
+                window.close();
+                // As a fallback for browser tabs that can't be closed by script:
+                window.location.href = "about:blank";
+            } catch (e) {
+                console.error("Could not close window:", e)
+            }
         }
     };
 

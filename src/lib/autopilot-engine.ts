@@ -1,3 +1,3 @@
-// This file is intentionally left blank as it is no longer used in the simplified architecture.
-// All communication is handled directly between page.tsx and the worker.
+// This file is obsolete in the new AudioWorklet architecture.
+// Its logic will be split between the new autopilot worker and the main AudioEngine.
 export {};
