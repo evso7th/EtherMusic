@@ -16,23 +16,30 @@ export function useAudioEngine() {
     const [isReady, setIsReady] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
 
-    const audioEngine = useRef<AudioEngine>();
-    const autopilotWorker = useRef<Worker>();
-    const orbManager = useRef<OrbManager>();
+    const audioEngine = useRef<AudioEngine | null>(null);
+    const autopilotWorker = useRef<Worker | null>(null);
+    const orbManager = useRef<OrbManager | null>(null);
 
-    const initialize = useCallback(async () => {
-        if (audioEngine.current) return;
+    const startApp = useCallback(async () => {
+        if (isAppStarted) return;
+
+        const audio = new Audio('/assets/sounds/transition.webm');
+        audio.play().catch(e => console.error("Error playing transition sound:", e));
+        
+        setIsAppStarted(true);
 
         try {
-            console.log("Initializing audio resources...");
-            // Must be created after a user gesture
-            await Tone.start(); 
-            const toneContext = Tone.getContext();
-
+            console.log("Initializing audio resources after user gesture...");
+            await Tone.start();
+            const context = new AudioContext();
+            
+            // Set the context for Tone.Transport
+            Tone.setContext(context);
+            
             const om = new OrbManager();
             orbManager.current = om;
 
-            const mainEngine = new AudioEngine(toneContext);
+            const mainEngine = new AudioEngine(context);
             await mainEngine.initialize();
             mainEngine.setOrbManager(om);
             audioEngine.current = mainEngine;
@@ -69,24 +76,8 @@ export function useAudioEngine() {
                 variant: "destructive"
             });
         }
-    }, [toast]);
 
-    const startApp = useCallback(async (isMobile: boolean) => {
-        // This must be called from a user gesture to initialize audio.
-        const audio = new Audio('/assets/sounds/transition.webm');
-        audio.play().catch(e => console.error("Error playing transition sound:", e));
-        
-        if (isMobile) {
-            try {
-                if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen();
-                else if ((document.documentElement as any).webkitRequestFullscreen) await (document.documentElement as any).webkitRequestFullscreen();
-            } catch (err) { console.error("Error fullscreening:", err); }
-        }
-
-        setIsAppStarted(true);
-        await initialize();
-
-    }, [initialize]);
+    }, [isAppStarted, toast]);
 
 
     const play = useCallback(() => {

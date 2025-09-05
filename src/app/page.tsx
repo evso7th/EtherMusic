@@ -157,8 +157,8 @@ export default function Home() {
     }, [isReady, setVolumes, volumes]);
 
     const handleStartApp = useCallback(() => {
-        startApp(isMobile);
-    }, [startApp, isMobile]);
+        startApp();
+    }, [startApp]);
 
     const handleStop = useCallback(() => {
         stop();
@@ -334,7 +334,7 @@ export default function Home() {
                             activeInstrument={bassInstrument}
                             onInstrumentChange={handleBassInstrumentChange}
                             isPolyphonic
-                            orbManager={orbManager}
+                            orbManager={orbManager ?? undefined}
                         />
                         <MemoizedThereminPad
                             onInteraction={handleThereminInteraction}
@@ -351,7 +351,7 @@ export default function Home() {
                             activeScale={musicScale}
                             onScaleChange={(s) => handleHarmonyChange(musicKey, s)}
                             isPolyphonic
-                            orbManager={orbManager}
+                            orbManager={orbManager ?? undefined}
                         />
                     </div>
                     <div className="flex-shrink-0 portrait:block landscape:hidden">
@@ -397,5 +397,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
