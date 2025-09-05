@@ -326,7 +326,7 @@ export default function Home() {
                         <MemoizedThereminPad
                             onInteraction={handleThereminInteraction}
                             type="bass"
-                            frequencyRange={[43.65, 261.63]}
+                            frequencyRange={[65.41, 246.94]}
                             color="hsl(var(--accent))"
                             isLatchOn={isBassLatchOn}
                             onLatchToggle={handleLatchToggle}
@@ -339,7 +339,7 @@ export default function Home() {
                         <MemoizedThereminPad
                             onInteraction={handleThereminInteraction}
                             type="melody"
-                            frequencyRange={[110, 880]}
+                            frequencyRange={[130.81, 493.88]}
                             color="hsl(var(--primary))"
                             instruments={instruments.filter(i => i !== 'ebass')}
                             activeInstrument={melodyInstrument}
