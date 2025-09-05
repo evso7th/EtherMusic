@@ -147,14 +147,19 @@ export default function Home() {
         effects: 'autopilot_effect_star'
     });
     const [volumes, setLocalVolumes] = useState(() => loadSettings().volumes);
+    
+    // --- Frequency Ranges ---
+    const bassFrequencyRange: [number, number] = [65.41, 246.94]; // C2 to B3
+    const melodyFrequencyRange: [number, number] = [130.81, 493.88]; // C3 to B4
 
     useEffect(() => {
         setIsClient(true);
-        // Set initial volumes in the engine after it's ready
         if (isReady) {
             setVolumes(volumes);
+            console.log("Bass Frequency Range:", bassFrequencyRange);
+            console.log("Melody Frequency Range:", melodyFrequencyRange);
         }
-    }, [isReady, setVolumes, volumes]);
+    }, [isReady, setVolumes, volumes, bassFrequencyRange, melodyFrequencyRange]);
 
     const handleStartApp = useCallback(() => {
         startApp();
@@ -326,7 +331,7 @@ export default function Home() {
                         <MemoizedThereminPad
                             onInteraction={handleThereminInteraction}
                             type="bass"
-                            frequencyRange={[65.41, 246.94]}
+                            frequencyRange={bassFrequencyRange}
                             color="hsl(var(--accent))"
                             isLatchOn={isBassLatchOn}
                             onLatchToggle={handleLatchToggle}
@@ -339,7 +344,7 @@ export default function Home() {
                         <MemoizedThereminPad
                             onInteraction={handleThereminInteraction}
                             type="melody"
-                            frequencyRange={[130.81, 493.88]}
+                            frequencyRange={melodyFrequencyRange}
                             color="hsl(var(--primary))"
                             instruments={instruments.filter(i => i !== 'ebass')}
                             activeInstrument={melodyInstrument}
@@ -397,3 +402,4 @@ export default function Home() {
         </div>
     );
 }
+

@@ -16,7 +16,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 interface PlaybackControlsProps {
     isPlaying: boolean;
@@ -28,8 +27,7 @@ interface PlaybackControlsProps {
     isReady: boolean;
 }
 
-const ControlButton = ({ tooltip, children, ...props }: { tooltip: string, children: React.ReactNode } & React.ComponentProps<typeof Button>) => {
-    const isMobile = useIsMobile();
+const ControlButton = ({ tooltip, children, isMobile, ...props }: { tooltip: string, children: React.ReactNode, isMobile: boolean } & React.ComponentProps<typeof Button>) => {
     if (isMobile) {
         return <Button {...props}>{children}</Button>;
     }
@@ -55,6 +53,13 @@ export function PlaybackControls({
     onStop,
     isReady 
 }: PlaybackControlsProps) {
+    const [isMobile, setIsMobile] = React.useState(false);
+    React.useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
     
     const handleExit = () => {
         if (typeof window !== "undefined") {
@@ -79,10 +84,11 @@ export function PlaybackControls({
                 className="w-10 h-10 rounded-full" 
                 aria-label={isPlaying ? "Pause" : "Play"} 
                 disabled={!isReady}
+                isMobile={isMobile}
              >
                 {isPlaying ? <Pause className="w-5 h-5 md:w-6 md:h-6" /> : <Play className="w-5 h-5 md:w-6 md:h-6" />}
             </ControlButton>
-             <ControlButton tooltip="Stop" onClick={onStop} size="icon" variant="outline" className="w-10 h-10 rounded-full" aria-label="Stop" disabled={!isReady}>
+             <ControlButton tooltip="Stop" onClick={onStop} size="icon" variant="outline" className="w-10 h-10 rounded-full" aria-label="Stop" disabled={!isReady} isMobile={isMobile}>
                 <StopCircle className="w-5 h-5 md:w-6 md:h-6" />
             </ControlButton>
             <ControlButton
@@ -96,6 +102,7 @@ export function PlaybackControls({
                 )}
                 aria-label={isRecording ? "Stop Recording" : "Record"} 
                 disabled={!isReady}
+                isMobile={isMobile}
             >
                  <Circle className="w-5 h-5 md:w-6 md:h-6" />
             </ControlButton>
@@ -133,3 +140,4 @@ export function PlaybackControls({
         </TooltipProvider>
     );
 }
+

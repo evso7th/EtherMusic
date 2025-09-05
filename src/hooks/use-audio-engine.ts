@@ -31,31 +31,30 @@ export function useAudioEngine() {
         try {
             console.log("Initializing audio resources after user gesture...");
             await Tone.start();
-            const context = new AudioContext();
             
-            // Set the context for Tone.Transport
+            const context = new AudioContext();
             Tone.setContext(context);
             
             const om = new OrbManager();
             orbManager.current = om;
 
-            const mainEngine = new AudioEngine(context);
-            await mainEngine.initialize();
-            mainEngine.setOrbManager(om);
-            audioEngine.current = mainEngine;
+            const engine = new AudioEngine(context);
+            await engine.initialize();
+            engine.setOrbManager(om);
+            audioEngine.current = engine;
 
             const worker = new Worker(new URL('../lib/autopilot-worker.ts', import.meta.url));
             
             worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
-                const engine = audioEngine.current;
-                if (!engine) return;
+                const currentEngine = audioEngine.current;
+                if (!currentEngine) return;
 
                 if (e.data.type === 'playNote' && e.data.note) {
-                    engine.playWorkerNotesBatch([e.data.note]);
+                    currentEngine.playWorkerNotesBatch([e.data.note]);
                 } else if (e.data.type === 'updateNote' && e.data.note) {
-                    engine.updateWorkerNote(e.data.note);
+                    currentEngine.updateWorkerNote(e.data.note);
                 } else if (e.data.type === 'playNotesBatch' && e.data.notes) {
-                    engine.playWorkerNotesBatch(e.data.notes);
+                    currentEngine.playWorkerNotesBatch(e.data.notes);
                 }
             };
             autopilotWorker.current = worker;
@@ -76,9 +75,7 @@ export function useAudioEngine() {
                 variant: "destructive"
             });
         }
-
     }, [isAppStarted, toast]);
-
 
     const play = useCallback(() => {
         if (!isReady) return;
@@ -98,7 +95,6 @@ export function useAudioEngine() {
         setIsPlaying(false);
         audioEngine.current.stopAllSounds();
     }, []);
-
 
     const setTempo = useCallback((tempo: Tempo) => {
         audioEngine.current?.setTempo(tempo.bpm);
@@ -164,7 +160,6 @@ export function useAudioEngine() {
         autopilotWorker.current?.postMessage({ type: 'stop' });
     }, []);
 
-
     return {
         isAppStarted,
         isReady,
@@ -190,3 +185,4 @@ export function useAudioEngine() {
         orbManager: orbManager.current
     };
 }
+
