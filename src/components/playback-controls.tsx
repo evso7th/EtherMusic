@@ -1,6 +1,7 @@
 
 "use client";
 
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Circle, StopCircle, Power, Play, Pause } from 'lucide-react';
 import { cn } from "@/lib/utils";
@@ -16,6 +17,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface PlaybackControlsProps {
     isPlaying: boolean;
@@ -53,13 +55,7 @@ export function PlaybackControls({
     onStop,
     isReady 
 }: PlaybackControlsProps) {
-    const [isMobile, setIsMobile] = React.useState(false);
-    React.useEffect(() => {
-        const checkMobile = () => setIsMobile(window.innerWidth < 768);
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
-    }, []);
+    const isMobile = useIsMobile();
     
     const handleExit = () => {
         if (typeof window !== "undefined") {
@@ -140,4 +136,3 @@ export function PlaybackControls({
         </TooltipProvider>
     );
 }
-
