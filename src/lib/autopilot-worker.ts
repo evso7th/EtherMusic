@@ -38,27 +38,29 @@ export type WorkerResponse =
 
 
 // --- UTILITIES ---
-const C4 = 261.63;
-const ALL_NOTES: Record<MusicKey, number> = {
+const C4_FREQ = 261.63;
+export const ALL_NOTES: Record<MusicKey, number> = {
     'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5,
     'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11
 };
 
-const SCALES: Record<MusicScale, number[]> = {
+export const SCALES: Record<MusicScale, number[]> = {
     'Major': [0, 2, 4, 5, 7, 9, 11],
     'Minor': [0, 2, 3, 5, 7, 8, 10],
     'Major Pentatonic': [0, 2, 4, 7, 9],
     'Minor Pentatonic': [0, 3, 5, 7, 10]
 };
 
-function getScaleFrequencies(baseFreq: number, scale: number[], octaves: number[]): number[] {
+export function getScaleFrequencies(baseMidiNote: number, scaleSteps: number[], octaves: number[]): number[] {
     const freqs: number[] = [];
     octaves.forEach(octave => {
-        scale.forEach(interval => {
-            freqs.push(baseFreq * Math.pow(2, octave + interval / 12));
+        scaleSteps.forEach(interval => {
+            const midiNote = baseMidiNote + (octave * 12) + interval;
+            const freq = Math.pow(2, (midiNote - 69) / 12) * 440;
+            freqs.push(freq);
         });
     });
-    return freqs;
+    return freqs.sort((a,b) => a-b);
 }
 
 // --- WORKER STATE ---
@@ -90,14 +92,14 @@ let state = {
 };
 
 function updateScaleFrequencies() {
-    const baseNote = ALL_NOTES[state.currentKey];
-    const baseFreq = C4 * Math.pow(2, (baseNote - 9) / 12);
+    const baseMidiNote = 60 + ALL_NOTES[state.currentKey]; // C4 is MIDI 60
     const scale = SCALES[state.currentScale];
 
-    state.scaleFrequencies.melody = getScaleFrequencies(baseFreq, scale, [0, 1]);
-    state.scaleFrequencies.accompaniment = getScaleFrequencies(baseFreq, scale, [-1, 0, 1]);
-    state.scaleFrequencies.bass = getScaleFrequencies(baseFreq, scale, [-2, -1]);
+    state.scaleFrequencies.melody = getScaleFrequencies(baseMidiNote, scale, [0, 1]);
+    state.scaleFrequencies.accompaniment = getScaleFrequencies(baseMidiNote, scale, [-1, 0, 1]);
+    state.scaleFrequencies.bass = getScaleFrequencies(baseMidiNote, scale, [-2, -1]);
 }
+
 
 // Initialize scales on load
 updateScaleFrequencies();

@@ -21,7 +21,7 @@ import { OrbManager } from '@/lib/orb-manager';
 interface ThereminPadProps {
     type: 'melody' | 'bass';
     onInteraction: (type: 'melody' | 'bass', params: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => void;
-    frequencyRange: [number, number];
+    allowedFrequencies: number[];
     color: string;
     isPolyphonic?: boolean;
     isDisabled?: boolean;
@@ -47,7 +47,7 @@ const padTitles = {
 export function ThereminPad({ 
     type, 
     onInteraction, 
-    frequencyRange, 
+    allowedFrequencies, 
     color,
     isPolyphonic = false,
     isDisabled = false,
@@ -78,7 +78,7 @@ export function ThereminPad({
     }, [isLatchOn, orbManager, type]);
 
     const calculateInteraction = useCallback((event: PointerEvent<HTMLDivElement>) => {
-        if (!padRef.current) return null;
+        if (!padRef.current || !allowedFrequencies || allowedFrequencies.length === 0) return null;
         const rect = padRef.current.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
@@ -86,16 +86,14 @@ export function ThereminPad({
         const normalizedX = Math.min(Math.max(x / rect.width, 0), 1);
         const normalizedY = Math.min(Math.max(y / rect.height, 0), 1);
 
-        const [minFreq, maxFreq] = frequencyRange;
-        const logMin = Math.log(minFreq);
-        const logMax = Math.log(maxFreq);
-        const frequency = Math.exp(logMin + (logMax - logMin) * normalizedX);
+        const index = Math.floor(normalizedX * allowedFrequencies.length);
+        const frequency = allowedFrequencies[Math.min(index, allowedFrequencies.length - 1)];
         
         // Volume is inverted: top is loud (0), bottom is quiet (1)
         const volume = 1 - normalizedY;
         
         return { x, y, frequency, volume, pointerId: event.pointerId };
-    }, [frequencyRange]);
+    }, [allowedFrequencies]);
     
 
     const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {

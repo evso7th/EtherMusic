@@ -18,6 +18,7 @@ import { useAudioEngine } from '@/hooks/use-audio-engine';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SleepTimer } from '@/components/sleep-timer';
 import { useAutopilot } from '@/hooks/use-autopilot';
+import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/autopilot-worker';
 
 
 function getCookie(name: string): string | null {
@@ -158,21 +159,31 @@ export default function Home() {
     const [bassInstrument, setBassInstrument] = useState<Instrument>('synth');
     const [musicKey, setMusicKey] = useState<MusicKey>('G');
     const [musicScale, setMusicScale] = useState<MusicScale>('Major');
+    const [allowedFrequencies, setAllowedFrequencies] = useState<{melody: number[], bass: number[]}>({melody: [], bass: []});
+    
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
     const [isAutopilotOn, setIsAutopilotOn] = useState(false);
     const [autopilotPartInstruments, setAutopilotPartInstruments] = useState<Record<WorkerAutopilotPart, Instrument>>(defaultAutopilotInstruments);
     const [volumes, setLocalVolumes] = useState(() => loadSettings().volumes);
 
-    const bassFrequencyRange: [number, number] = [65.41, 246.94]; // C2 to B3
-    const melodyFrequencyRange: [number, number] = [130.81, 493.88]; // C3 to B4
+
+    useEffect(() => {
+        const baseMelodyNote = 60 + ALL_NOTES[musicKey]; // C4 is MIDI 60
+        const baseBassNote = 48 + ALL_NOTES[musicKey]; // C3 is MIDI 48
+        const scaleSteps = SCALES[musicScale];
+
+        const melodyFreqs = getScaleFrequencies(baseMelodyNote, scaleSteps, [0, 1]);
+        const bassFreqs = getScaleFrequencies(baseBassNote, scaleSteps, [0, 1]);
+
+        setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
+
+    }, [musicKey, musicScale]);
 
     useEffect(() => {
         if (isReady) {
             setVolumes(volumes);
-            console.log("Bass Frequency Range:", bassFrequencyRange);
-            console.log("Melody Frequency Range:", melodyFrequencyRange);
         }
-    }, [isReady, setVolumes, volumes, bassFrequencyRange, melodyFrequencyRange]);
+    }, [isReady, setVolumes, volumes]);
     
     const { activeStyle, savePreset, loadPreset, setActiveStyle } = useAutopilot(
         autopilotStyles[0],
@@ -349,7 +360,7 @@ export default function Home() {
                         <MemoizedThereminPad
                             onInteraction={handleThereminInteraction}
                             type="bass"
-                            frequencyRange={bassFrequencyRange}
+                            allowedFrequencies={allowedFrequencies.bass}
                             color="hsl(var(--accent))"
                             isLatchOn={isBassLatchOn}
                             onLatchToggle={handleLatchToggle}
@@ -362,7 +373,7 @@ export default function Home() {
                         <MemoizedThereminPad
                             onInteraction={handleThereminInteraction}
                             type="melody"
-                            frequencyRange={melodyFrequencyRange}
+                            allowedFrequencies={allowedFrequencies.melody}
                             color="hsl(var(--primary))"
                             instruments={instruments.filter(i => i !== 'ebass')}
                             activeInstrument={melodyInstrument}
