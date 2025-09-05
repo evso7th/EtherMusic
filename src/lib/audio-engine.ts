@@ -1,4 +1,3 @@
-
 // src/lib/audio-engine.ts
 
 import * as Tone from 'tone';
@@ -37,7 +36,7 @@ export class AudioEngine {
     private recordedChunks: Blob[] = [];
 
     // Audio Nodes
-    private masterOut!: GainNode;
+    public masterOut!: GainNode;
     private nodes = new Map<PartName, { worklet: AudioWorkletNode, gain: GainNode }>();
     private volumes: Volumes;
     
@@ -127,13 +126,10 @@ export class AudioEngine {
     }
 
     private async loadDrumSamples() {
-        const sampleNames: string[] = [
-            // Empty for now to avoid 404 errors during development.
-            // User will provide the correct sample names later.
-            // 'kick_hard', 'kick_soft', 'kick_echo', 'kick',
-            // 'snare_hard', 'snare_soft', 'snare_verb', 'snare', 'snare_press',
-            // 'hat', 'hat_closed', 'hat_open'
-        ];
+        // This list is now empty as requested, to prevent 404 errors.
+        // The user will provide the samples.
+        const sampleNames: string[] = [];
+        
         const promises = sampleNames.map(async name => {
             try {
                 const response = await fetch(`/assets/drums/${name}.wav`);
@@ -243,6 +239,7 @@ export class AudioEngine {
                     pointerId: autopilotPointerId, 
                     frequency: note.freq,
                     volume: note.vel,
+                    duration: note.dur,
                 });
             }
         });

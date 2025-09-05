@@ -24,24 +24,34 @@ function setCookie(name: string, value: string, days: number) {
     document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=Lax";
 }
 
-export function CookieConsent() {
+interface CookieConsentProps {
+    onConsentChange: (hasConsent: boolean) => void;
+}
+
+export function CookieConsent({ onConsentChange }: CookieConsentProps) {
     const [showConsent, setShowConsent] = useState(false);
 
     useEffect(() => {
-        // Run only on client
-        if (getCookie("ethermusic_consent") === null) {
-            setShowConsent(true);
+        if (typeof window !== 'undefined') {
+            const consent = getCookie("ethermusic_consent");
+            if (consent === null) {
+                setShowConsent(true);
+            } else {
+                onConsentChange(consent === 'true');
+            }
         }
-    }, []);
+    }, [onConsentChange]);
 
     const acceptCookie = () => {
         setShowConsent(false);
         setCookie("ethermusic_consent", "true", 365);
+        onConsentChange(true);
     };
 
     const declineCookie = () => {
         setShowConsent(false);
         setCookie("ethermusic_consent", "false", 365);
+        onConsentChange(false);
     };
 
     if (!showConsent) {

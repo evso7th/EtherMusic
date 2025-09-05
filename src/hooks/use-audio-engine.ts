@@ -15,6 +15,8 @@ export function useAudioEngine() {
     const [isAppStarted, setIsAppStarted] = useState(false);
     const [isReady, setIsReady] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [sleepTimerId, setSleepTimerId] = useState<NodeJS.Timeout | null>(null);
+
 
     const audioEngine = useRef<AudioEngine | null>(null);
     const autopilotWorker = useRef<Worker | null>(null);
@@ -32,7 +34,9 @@ export function useAudioEngine() {
             console.log("Initializing audio resources after user gesture...");
             await Tone.start();
             
+            // Create a native AudioContext *after* the user gesture
             const context = new AudioContext();
+            // Set Tone.js to use this new context
             Tone.setContext(context);
             
             const om = new OrbManager();
@@ -109,6 +113,10 @@ export function useAudioEngine() {
         audioEngine.current?.setHarmony(key, scale);
         autopilotWorker.current?.postMessage({ type: 'setHarmony', key, scale });
     }, []);
+    
+    const setDensity = useCallback((density: number) => {
+        autopilotWorker.current?.postMessage({ type: 'setDensity', density });
+    }, []);
 
     const setMelodyInstrument = useCallback((instrument: Instrument) => {
         audioEngine.current?.setMelodyInstrument(instrument);
@@ -137,6 +145,27 @@ export function useAudioEngine() {
     const stopRecording = useCallback(() => {
         audioEngine.current?.stopRecording();
     }, []);
+
+    const setSleepTimer = useCallback((durationMinutes: number | null) => {
+        if (sleepTimerId) {
+            clearTimeout(sleepTimerId);
+            setSleepTimerId(null);
+        }
+        if (durationMinutes !== null) {
+            const id = setTimeout(() => {
+                audioEngine.current?.masterOut.gain.linearRampToValueAtTime(0, Tone.now() + 5);
+                setTimeout(() => {
+                    stop();
+                    audioEngine.current?.masterOut.gain.setValueAtTime(1, Tone.now());
+                }, 5500);
+            }, durationMinutes * 60 * 1000);
+            setSleepTimerId(id);
+        } else {
+            // Cancel timer
+            audioEngine.current?.masterOut.gain.cancelScheduledValues(Tone.now());
+            audioEngine.current?.masterOut.gain.setValueAtTime(1, Tone.now());
+        }
+    }, [sleepTimerId, stop]);
     
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isReady || !audioEngine.current) return;
@@ -172,6 +201,7 @@ export function useAudioEngine() {
         setTempo,
         setVolumes,
         setHarmony,
+        setDensity,
         setMelodyInstrument,
         setBassInstrument,
         setAutopilotInstrument,
@@ -182,7 +212,7 @@ export function useAudioEngine() {
         handleThereminInteraction,
         startAutopilot,
         stopAutopilot,
+        setSleepTimer,
         orbManager: orbManager.current
     };
 }
-

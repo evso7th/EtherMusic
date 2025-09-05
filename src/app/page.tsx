@@ -1,11 +1,10 @@
 
 "use client";
 
-import { useState, useEffect, useRef, useCallback, memo } from 'react';
-import Image from 'next/image';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { Button } from "@/components/ui/button";
 import { ThereminPad } from '@/components/theremin-pad';
-import { BeatBoxControls, type Tempo } from '@/components/beat-box-controls';
+import { BeatBoxControls, type Tempo, autopilotStyles, type AutopilotStyle } from '@/components/beat-box-controls';
 import { useToast } from "@/hooks/use-toast";
 import { OrbitalAnimation } from '@/components/orbital-animation';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -17,6 +16,9 @@ import type { AutopilotPart as WorkerAutopilotPart } from '@/lib/autopilot-worke
 import { CookieConsent } from '@/components/cookie-consent';
 import { useAudioEngine } from '@/hooks/use-audio-engine';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { SleepTimer } from '@/components/sleep-timer';
+import { useAutopilot } from '@/hooks/use-autopilot';
+
 
 function getCookie(name: string): string | null {
     if (typeof document === 'undefined') return null;
@@ -38,16 +40,25 @@ function setCookie(name: string, value: string, days: number) {
 }
 
 const defaultVolumes = { melody: -6, manualBass: -6, latch: -15, drums: -9, autopilot: -10, accompaniment: -14, autopilotBass: -9, effects: -6 };
+const defaultAutopilotInstruments: Record<WorkerAutopilotPart, Instrument> = {
+    melody: 'synth',
+    accompaniment: 'mellotron',
+    bass: 'ebass',
+    effects: 'autopilot_effect_star'
+};
 
 function loadSettings() {
-    if (typeof window === 'undefined' || getCookie("ethermusic_consent") !== 'true') {
+    if (typeof window === 'undefined') {
+        return { volumes: defaultVolumes };
+    }
+    const consent = getCookie("ethermusic_consent") === 'true';
+    if (!consent) {
         return { volumes: defaultVolumes };
     }
     try {
         const savedVolumes = getCookie("ethermusic_volumes");
         const volumes = savedVolumes ? JSON.parse(savedVolumes) : defaultVolumes;
         
-        // Basic validation
         if (typeof volumes.melody !== 'number' || Object.keys(volumes).length !== Object.keys(defaultVolumes).length) {
             return { volumes: defaultVolumes };
         }
@@ -105,6 +116,14 @@ export default function Home() {
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [isClient, setIsClient] = useState(false);
+    const [cookieConsent, setCookieConsent] = useState(false);
+    
+    useEffect(() => {
+      setIsClient(true);
+      if (typeof window !== 'undefined') {
+        setCookieConsent(getCookie("ethermusic_consent") === 'true');
+      }
+    }, []);
     
     const {
         isAppStarted,
@@ -117,6 +136,7 @@ export default function Home() {
         setTempo,
         setVolumes,
         setHarmony,
+        setDensity,
         setMelodyInstrument: setEngineMelodyInstrument,
         setBassInstrument: setEngineBassInstrument,
         setAutopilotInstrument,
@@ -127,10 +147,10 @@ export default function Home() {
         handleThereminInteraction,
         startAutopilot,
         stopAutopilot,
+        setSleepTimer,
         orbManager
     } = useAudioEngine();
     
-    // --- UI State ---
     const [isRecording, setIsRecording] = useState(false);
     const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
     const [activePattern, setActivePattern] = useState<(typeof beatPatterns)[number]>(beatPatterns.find(p => p.name === 'Off')!);
@@ -140,26 +160,25 @@ export default function Home() {
     const [musicScale, setMusicScale] = useState<MusicScale>('Major');
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
     const [isAutopilotOn, setIsAutopilotOn] = useState(false);
-    const [autopilotPartInstruments, setAutopilotPartInstruments] = useState<Record<WorkerAutopilotPart, Instrument>>({
-        melody: 'synth',
-        accompaniment: 'mellotron',
-        bass: 'ebass',
-        effects: 'autopilot_effect_star'
-    });
+    const [autopilotPartInstruments, setAutopilotPartInstruments] = useState<Record<WorkerAutopilotPart, Instrument>>(defaultAutopilotInstruments);
     const [volumes, setLocalVolumes] = useState(() => loadSettings().volumes);
-    
-    // --- Frequency Ranges ---
+
     const bassFrequencyRange: [number, number] = [65.41, 246.94]; // C2 to B3
     const melodyFrequencyRange: [number, number] = [130.81, 493.88]; // C3 to B4
 
     useEffect(() => {
-        setIsClient(true);
         if (isReady) {
             setVolumes(volumes);
             console.log("Bass Frequency Range:", bassFrequencyRange);
             console.log("Melody Frequency Range:", melodyFrequencyRange);
         }
     }, [isReady, setVolumes, volumes, bassFrequencyRange, melodyFrequencyRange]);
+    
+    const { activeStyle, savePreset, loadPreset, setActiveStyle } = useAutopilot(
+        autopilotStyles[0],
+        autopilotPartInstruments,
+        cookieConsent
+    );
 
     const handleStartApp = useCallback(() => {
         startApp();
@@ -199,8 +218,10 @@ export default function Home() {
     const handleVolumeChange = useCallback((newVolumes: any) => {
         setLocalVolumes(newVolumes);
         setVolumes(newVolumes);
-        saveSettings(newVolumes);
-    }, [setVolumes]);
+        if (cookieConsent) {
+            saveSettings(newVolumes);
+        }
+    }, [setVolumes, cookieConsent]);
 
     const handleHarmonyChange = useCallback((key: MusicKey, scale: MusicScale) => {
         setMusicKey(key);
@@ -219,12 +240,10 @@ export default function Home() {
     }, [setEngineBassInstrument]);
     
     const handleAutopilotInstrumentChange = useCallback((part: WorkerAutopilotPart, instrument: Instrument) => {
-        setAutopilotPartInstruments(prev => {
-            const newInstruments = { ...prev, [part]: instrument };
-            setAutopilotInstrument(part, instrument);
-            return newInstruments;
-        });
-    }, [setAutopilotInstrument]);
+        const newInstruments = { ...autopilotPartInstruments, [part]: instrument };
+        setAutopilotPartInstruments(newInstruments);
+        setAutopilotInstrument(part, instrument);
+    }, [setAutopilotInstrument, autopilotPartInstruments]);
     
     const handleLatchToggle = useCallback((isOn: boolean) => {
         setIsBassLatchOn(isOn);
@@ -235,7 +254,6 @@ export default function Home() {
         setIsAutopilotOn(isOn);
         if (isOn) {
             startAutopilot();
-            // Turn off manual drums
             const offPattern = beatPatterns.find(p => p.name === 'Off')!;
             handlePatternChange(offPattern); 
             if (!isPlaying) {
@@ -245,7 +263,6 @@ export default function Home() {
             stopAutopilot();
         }
     }, [isPlaying, play, startAutopilot, stopAutopilot, handlePatternChange]);
-    
 
     if (!isClient) {
         return <Preloader />;
@@ -275,7 +292,7 @@ export default function Home() {
                     <p>&copy; 2025, EVS</p>
                     <p className="mt-2">v.2.0 "Maestro"</p>
                 </footer>
-                <CookieConsent />
+                <CookieConsent onConsentChange={setCookieConsent} />
             </div>
         )
     }
@@ -323,6 +340,7 @@ export default function Home() {
                             onStop={handleStop}
                             isReady={isReady}
                         />
+                         <SleepTimer onTimerSet={setSleepTimer} />
                     </div>
                 </header>
 
@@ -379,7 +397,7 @@ export default function Home() {
                     </div>
                 </main>
 
-                <div className="portrait:hidden landscape:flex landscape:flex-col landscape:items-center landscape:justify-center landscape:w-16 landscape:gap-2">
+                <div className="portrait:hidden landscape:flex landscape:flex-col landscape:items-center justify-between landscape:w-16 landscape:gap-2 landscape:py-4">
                      <BeatBoxControls
                         patterns={beatPatterns}
                         activePattern={activePattern}

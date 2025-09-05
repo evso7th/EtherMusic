@@ -29,6 +29,8 @@ import { ScrollArea } from "./ui/scroll-area";
 import type { AutopilotPart } from "@/lib/autopilot-worker";
 import type { Instrument } from "@/app/page";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
+import { useAutopilot } from "@/hooks/use-autopilot";
+
 
 type BeatPattern = {
     name: string;
@@ -39,6 +41,16 @@ export type Tempo = {
     name: string;
     bpm: number;
 };
+
+export type AutopilotStyle = {
+  name: 'Evolve';
+  description: string;
+}
+
+export const autopilotStyles: AutopilotStyle[] = [
+    { name: 'Evolve', description: 'Continuously evolving ambient soundscape.' },
+]
+
 
 type Volumes = { 
     melody: number; 
@@ -98,7 +110,6 @@ const MemoizedAutopilotInstrumentSelector = memo(function AutopilotInstrumentSel
 });
 
 const ControlButtonWithTooltip = memo(function ControlButtonWithTooltip({ tooltipText, children, ...props}: React.ComponentProps<typeof Button> & { tooltipText: string, children: React.ReactNode}) {
-    // This component does not receive `isMobile` as a prop anymore, so the warning disappears.
     return (
         <Tooltip>
             <TooltipTrigger asChild>
@@ -178,7 +189,7 @@ export function BeatBoxControls({
     const buttonSize = isMobile ? 'sm' : 'default';
 
     const ControlButtonWrapper = useCallback(({ tooltipText, children }: { tooltipText: string, children: React.ReactNode }) => {
-        if (isMobile) return children;
+        if (isMobile) return <>{children}</>;
         return (
              <Tooltip>
                 <TooltipTrigger asChild>
@@ -212,6 +223,26 @@ export function BeatBoxControls({
                             <Switch id="autopilot-switch" checked={isAutopilotOn} onCheckedChange={onAutopilotToggle} />
                             <Label htmlFor="autopilot-switch">Autopilot On/Off</Label>
                         </div>
+
+                         <div className="space-y-2">
+                            <Label>Style</Label>
+                             <Select defaultValue="Evolve">
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select style" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {autopilotStyles.map(style => (
+                                        <SelectItem key={style.name} value={style.name}>
+                                            <div className="flex flex-col">
+                                                <span>{style.name}</span>
+                                                <span className="text-xs text-muted-foreground">{style.description}</span>
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
 
                         <Separator />
 
