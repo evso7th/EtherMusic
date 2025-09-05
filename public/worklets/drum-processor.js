@@ -1,164 +1,182 @@
-// public/worklets/drum-processor.js
+
+const patterns = {
+    // Meditative Patterns
+    'Air': {
+        'kick': '1n',
+        'hat_closed': null,
+        'snare': null,
+        'hat_open': '0:2:2'
+    },
+    'Earth': {
+        'kick_hard': ['0:0', '0:2:2'],
+        'snare_soft': null,
+        'hat': ['0:0:2', '0:1:0', '0:1:2', '0:2:0', '0:3:0', '0:3:2']
+    },
+    'Water': {
+        'kick_soft': '2n',
+        'hat': '8n',
+        'snare_verb': '0:1:0'
+    },
+    'Tibet': {
+        'kick_echo': '1n',
+        'hat': null,
+        'snare_verb': ['0:1:2', '0:3:2']
+    },
+    'Space': {
+        'kick': '1n',
+        'snare': '0:2',
+        'hat_open': '8t'
+    },
+
+    // Classic Patterns
+    'Toccata': {
+        'kick_hard': '4n',
+        'snare_hard': '0:2',
+        'hat_closed': '8n'
+    },
+    'Promenade': {
+        'kick': '2n',
+        'snare_press': ['0:1', '0:3'],
+        'hat': '4n'
+    },
+    'Nocturne': {
+        'kick_soft': ['0:0', '0:2:2'],
+        'snare_soft': '0:2',
+        'hat': '16n'
+    },
+    'Scherzo': {
+        'kick': '4n',
+        'snare': ['0:1:2', '0:3:2'],
+        'hat_open': '8n'
+    },
+    'Aria': {
+        'kick_echo': '1m',
+        'snare_verb': '0:2',
+        'hat_open': ['0:0:2', '0:2:2']
+    },
+
+    'Off': {},
+};
+
 
 class DrumProcessor extends AudioWorkletProcessor {
     constructor(options) {
-        super(options);
+        super();
         this.samples = {};
-        this.patterns = this.getPatterns();
-        this.activePattern = [];
+        this.pattern = {};
         this.bpm = 120;
-        this.step = 0;
-        this.lastTickTime = currentTime;
-        this.isPlaying = false;
+        this.interval = null;
+        this.tick = 0;
+        this.sampleRate = options.processorOptions.sampleRate || 44100;
         
-        // Convert transferable ArrayBuffers back to Float32Arrays
-        if (options.processorOptions && options.processorOptions.samples) {
-            for (const [name, data] of Object.entries(options.processorOptions.samples)) {
-                this.samples[name] = new Float32Array(data.buffer);
-            }
-        }
-        
-        this.port.onmessage = (e) => this.handleMessage(e.data);
+        this.port.onmessage = this.handleMessage.bind(this);
     }
-    
-    getPatterns() {
-        return {
-             'Off': [],
-            'Air': [
-                { time: '0:0:0', instrument: 'kick_soft' },
-                { time: '0:2:0', instrument: 'kick_soft' },
-            ],
-            'Earth': [
-                { time: '0:0:0', instrument: 'kick' },
-                { time: '0:1:0', instrument: 'hat_closed' },
-                { time: '0:1:2', instrument: 'hat_closed' },
-                { time: '0:2:0', instrument: 'kick' },
-                { time: '0:2:2', instrument: 'snare_soft' },
-                { time: '0:3:0', instrument: 'hat_closed' },
-                { time: '0:3:2', instrument: 'hat_closed' },
-            ],
-            'Water': [
-                { time: '0:0:0', instrument: 'kick_echo' },
-                { time: '0:0:3', instrument: 'hat' },
-                { time: '0:1:2', instrument: 'hat' },
-                { time: '0:2:1', instrument: 'hat' },
-                { time: '0:3:0', instrument: 'hat' },
-                { time: '0:3:3', instrument: 'snare_verb' },
-            ],
-            'Tibet': [
-                { time: '0:0:0', instrument: 'kick' },
-                { time: '0:1:0', instrument: 'snare_press' },
-                { time: '0:2:0', instrument: 'kick_hard' },
-                { time: '0:3:0', instrument: 'snare_press' },
-                { time: '0:3:2', instrument: 'hat_open' },
-            ],
-            'Space': [
-                 { time: '0:0:0', instrument: 'kick_echo' },
-                 { time: '0:2:0', instrument: 'kick_echo' },
-            ],
-            'Toccata': [
-                { time: '0:0:0', instrument: 'kick_hard' },
-                { time: '0:0:2', instrument: 'hat_closed' },
-                { time: '0:1:0', instrument: 'snare_hard' },
-                { time: '0:1:2', instrument: 'hat_closed' },
-                { time: '0:2:0', instrument: 'kick_hard' },
-                { time: '0:2:2', instrument: 'hat_closed' },
-                { time: '0:3:0', instrument: 'snare_hard' },
-                { time: '0:3:2', instrument: 'hat_closed' },
-            ],
-             'Promenade': [
-                { time: '0:0:0', instrument: 'kick' },
-                { time: '0:1:0', instrument: 'hat_closed' },
-                { time: '0:2:0', instrument: 'snare_soft' },
-                { time: '0:3:0', instrument: 'hat_closed' },
-            ],
-             'Nocturne': [
-                { time: '0:0:0', instrument: 'kick_soft' },
-                { time: '0:1:0', instrument: 'snare_press' },
-                { time: '0:2:0', instrument: 'kick_soft' },
-                { time: '0:3:0', instrument: 'snare_press' },
-            ],
-             'Scherzo': [
-                { time: '0:0:0', instrument: 'kick' },
-                { time: '0:0:2', instrument: 'hat' },
-                { time: '0:1:0', instrument: 'snare' },
-                { time: '0:1:2', instrument: 'hat' },
-                { time: '0:2:0', instrument: 'kick' },
-                { time: '0:2:2', instrument: 'hat' },
-                { time: '0:3:0', instrument: 'snare' },
-                { time: '0:3:2', instrument: 'hat_open' },
-            ],
-            'Aria': [
-                { time: '0:0', instrument: 'kick_soft' },
-                { time: '0:1', instrument: 'hat' },
-                { time: '0:2', instrument: 'kick_soft' },
-                { time: '0:2:2', instrument: 'snare_soft' },
-                { time: '0:3', instrument: 'hat' },
-            ],
-        };
-    }
-    
-    handleMessage(message) {
-        if (message.type === 'setPattern') {
-            this.activePattern = this.patterns[message.value] || [];
-            this.step = 0;
-            this.isPlaying = message.value !== 'Off';
-            this.lastTickTime = currentTime;
-        } else if (message.type === 'setTempo') {
-            this.bpm = message.value;
-        } else if (message.type === 'allNotesOff') {
-            this.isPlaying = false;
+
+    handleMessage(event) {
+        const { type, value, samples } = event.data;
+        if (type === 'loadSamples') {
+            this.samples = samples;
+        } else if (type === 'setPattern') {
+            this.setPattern(value);
+        } else if (type === 'setTempo') {
+            this.setTempo(value);
+        } else if (type === 'allNotesOff') {
+            this.stop();
         }
     }
 
-    process(inputs, outputs, parameters) {
-        if (!this.isPlaying) return true;
+    setPattern(patternName) {
+        this.stop();
+        if (patternName && patterns[patternName] && patternName !== 'Off') {
+            this.pattern = this.parsePattern(patterns[patternName]);
+            this.start();
+        }
+    }
+    
+    setTempo(bpm) {
+        this.bpm = bpm;
+        if (this.interval !== null) {
+            this.stop();
+            this.start();
+        }
+    }
 
-        const output = outputs[0];
-        const bufferSize = output[0].length;
-        const secondsPerBeat = 60.0 / this.bpm;
-        const secondsPerStep = secondsPerBeat / 4; // 16th notes
-        
-        let timeElapsed = (currentTime - this.lastTickTime);
+    parsePattern(patternData) {
+        const parsed = {};
+        // 16 steps for a 4/4 measure in 16th notes
+        for (let i = 0; i < 16; i++) {
+            parsed[i] = [];
+        }
 
-        for (let i = 0; i < bufferSize; i++) {
-            const frameTime = currentTime + i / sampleRate;
+        for (const [instrument, timings] of Object.entries(patternData)) {
+            if (!timings) continue;
+
+            const addNote = (time) => {
+                const step = Math.round(time.split(':').reduce((acc, t) => (acc * 4) + parseInt(t, 10), 0));
+                if (step >= 0 && step < 16) {
+                    parsed[step].push(instrument);
+                }
+            };
             
-            if (timeElapsed >= secondsPerStep) {
-                timeElapsed -= secondsPerStep;
-                this.step = (this.step + 1) % 16;
+            const timeToSteps = (unit) => {
+                if (unit.endsWith('n')) return 16 / parseInt(unit, 10);
+                if (unit.endsWith('t')) return (16 / (parseInt(unit, 10) / 1.5));
+                if (unit.endsWith('m')) return 16 * parseInt(unit, 10);
+                return 0;
+            }
 
-                for (const note of this.activePattern) {
-                    const [bar, beat, sixteenth] = note.time.split(':').map(Number);
-                    const noteStep = (beat * 4) + (sixteenth || 0);
-
-                    if (this.step === noteStep) {
-                        this.playSample(note.instrument, output, i);
+            if (typeof timings === 'string') {
+                 if (timings.includes(':')) {
+                    addNote(timings);
+                } else {
+                    // It's an interval like '4n'
+                    const interval = timeToSteps(timings);
+                    if (interval > 0) {
+                        for(let i = 0; i < 16; i += interval) {
+                             if (i < 16) parsed[i].push(instrument);
+                        }
                     }
                 }
+            } else if (Array.isArray(timings)) {
+                timings.forEach(time => addNote(time));
             }
         }
-
-        this.lastTickTime += bufferSize / sampleRate;
-
-        // Keep the worklet alive
-        return true;
+        return parsed;
     }
 
-    playSample(instrumentName, output, frameOffset) {
-        const sample = this.samples[instrumentName];
-        if (!sample) return;
-
-        // Simple playback, no volume control for now
-        const leftChannel = output[0];
-        const rightChannel = output[1];
-
-        for (let i = 0; i < sample.length; i++) {
-            if (frameOffset + i < leftChannel.length) {
-                leftChannel[frameOffset + i] += sample[i];
-                rightChannel[frameOffset + i] += sample[i];
-            }
+    start() {
+        this.stop();
+        this.tick = 0;
+        const tickDuration = 60 / this.bpm / 4; // Duration of a 16th note
+        this.interval = setInterval(() => this.scheduleTick(), tickDuration * 1000);
+    }
+    
+    stop() {
+        if (this.interval) {
+            clearInterval(this.interval);
+            this.interval = null;
         }
+        this.tick = 0;
+    }
+
+    scheduleTick() {
+        const step = this.tick % 16;
+        const instrumentsToPlay = this.pattern[step];
+
+        if (instrumentsToPlay && instrumentsToPlay.length > 0) {
+            const time = currentTime;
+            this.port.postMessage({ type: 'playSamples', instruments: instrumentsToPlay, time });
+        }
+
+        this.tick++;
+    }
+
+    process(inputs, outputs) {
+        // This processor only sends messages, it doesn't process audio itself.
+        // It acts as the "brain" for the drum machine.
+        // The actual sample playback will be handled by the main thread creating AudioBufferSourceNodes.
+        // However, we need to keep the worklet alive.
+        return true;
     }
 }
 

@@ -1,326 +1,365 @@
-// public/worklets/poly-synth-processor.js
 
-const MAX_VOICES = 16;
+// A polyphonic synthesizer processor using AudioWorklet
+// Manages multiple voice instances to play chords or multiple notes.
 
-// A simple quantizer to snap frequencies to a musical scale
-class Quantizer {
-    constructor() {
-        this.scaleFrequencies = [];
+const MAX_VOICES = 8; // Max concurrent notes
+
+// --- Music Theory / Math Helpers ---
+const NOTES = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };
+const SCALES = {
+    'Major': [0, 2, 4, 5, 7, 9, 11],
+    'Minor': [0, 2, 3, 5, 7, 8, 10],
+    'Major Pentatonic': [0, 2, 4, 7, 9],
+    'Minor Pentatonic': [0, 3, 5, 7, 10],
+};
+const ROOT_NOTE_MIDI = 60; // C4
+
+function midiToFreq(midi) {
+    return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+function freqToMidi(freq) {
+    return 69 + 12 * Math.log2(freq / 440);
+}
+
+function getScaleFrequencies(baseMidi, scaleIntervals, octaves = 3, startOctave = -1) {
+    const freqs = [];
+    for (let o = 0; o < octaves; o++) {
+        for (const interval of scaleIntervals) {
+            const midi = baseMidi + (startOctave + o) * 12 + interval;
+            freqs.push(midiToFreq(midi));
+        }
     }
+    return freqs.sort((a, b) => a - b);
+}
 
-    setHarmony(key, scale) {
-        // This is a simplified version. A real implementation would be more complex.
-        const notes = { 'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5, 'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11 };
-        const scales = {
-            'Major': [0, 2, 4, 5, 7, 9, 11],
-            'Minor': [0, 2, 3, 5, 7, 8, 10],
-            'Major Pentatonic': [0, 2, 4, 7, 9],
-            'Minor Pentatonic': [0, 3, 5, 7, 10],
+function quantizeFrequency(freq, scaleFreqs) {
+    if (!scaleFreqs || scaleFreqs.length === 0) {
+        return freq;
+    }
+    // Find the closest frequency in the scale
+    return scaleFreqs.reduce((prev, curr) => 
+        (Math.abs(curr - freq) < Math.abs(prev - freq) ? curr : prev)
+    );
+}
+
+
+// --- Voice Class ---
+// Represents a single sound-producing unit (oscillator + envelope)
+class Voice {
+    constructor(sampleRate) {
+        this.sampleRate = sampleRate;
+        this.isActive = false;
+        this.pointerId = -1;
+
+        // Oscillator
+        this.phase = 0;
+        this.frequency = 440;
+        this.waveType = 'sine'; // 'sine', 'square', 'sawtooth', 'triangle'
+        
+        // Envelope
+        this.envelope = {
+            attack: 0.01,
+            decay: 0.1,
+            sustain: 0.9,
+            release: 0.5,
+            level: 0,
+            state: 'idle', // idle, attack, decay, sustain, release
         };
-        const rootNote = notes[key];
-        const scaleIntervals = scales[scale];
-        this.scaleFrequencies = [];
-        for (let octave = 2; octave < 7; octave++) {
-            for (const interval of scaleIntervals) {
-                const noteNumber = rootNote + interval + (octave * 12);
-                this.scaleFrequencies.push(440 * Math.pow(2, (noteNumber - 69) / 12));
-            }
-        }
+        
+        // Filter
+        this.filter = {
+            lpf: { cutoff: 20000, resonance: 1, state: 0 },
+            hpf: { cutoff: 20, resonance: 1, state: 0 },
+        };
+        this.filterType = 'none'; // 'none', 'lowpass', 'highpass'
+
+        // Glide/Portamento
+        this.glideTime = 0;
+        this.targetFrequency = 440;
+        
+        // Vibrato
+        this.vibrato = {
+            rate: 5, // Hz
+            depth: 3, // Semitones
+            phase: 0,
+        };
     }
 
-    quantize(frequency) {
-        if (this.scaleFrequencies.length === 0) return frequency;
-        let closestFreq = this.scaleFrequencies[0];
-        let minDiff = Infinity;
-        for (const scaleFreq of this.scaleFrequencies) {
-            const diff = Math.abs(frequency - scaleFreq);
-            if (diff < minDiff) {
-                minDiff = diff;
-                closestFreq = scaleFreq;
-            }
+    start(pointerId, frequency, volume) {
+        this.pointerId = pointerId;
+        this.frequency = frequency;
+        this.targetFrequency = frequency;
+        this.envelope.level = 0;
+        this.envelope.state = 'attack';
+        this.envelope.targetGain = volume;
+        this.isActive = true;
+    }
+
+    update(frequency, volume) {
+        if (this.glideTime > 0) {
+            this.targetFrequency = frequency;
+        } else {
+            this.frequency = frequency;
+            this.targetFrequency = frequency;
         }
-        return closestFreq;
+        this.envelope.targetGain = volume;
+    }
+
+    release() {
+        this.envelope.state = 'release';
+    }
+
+    // Process one sample
+    process() {
+        if (!this.isActive) return 0;
+        
+        // --- Envelope ---
+        const { attack, decay, sustain, release } = this.envelope;
+        const sampleRate = this.sampleRate;
+
+        switch (this.envelope.state) {
+            case 'attack':
+                this.envelope.level += 1.0 / (attack * sampleRate);
+                if (this.envelope.level >= 1.0) {
+                    this.envelope.level = 1.0;
+                    this.envelope.state = 'decay';
+                }
+                break;
+            case 'decay':
+                 this.envelope.level -= (1.0 - sustain) / (decay * sampleRate);
+                 if (this.envelope.level <= sustain) {
+                     this.envelope.level = sustain;
+                     this.envelope.state = 'sustain';
+                 }
+                 break;
+            case 'sustain':
+                // Sustain level can be modulated by volume
+                this.envelope.level = sustain * this.envelope.targetGain;
+                break;
+            case 'release':
+                this.envelope.level -= this.envelope.level / (release * sampleRate);
+                if (this.envelope.level <= 0.0001) {
+                    this.isActive = false;
+                }
+                break;
+        }
+        
+        // --- Glide ---
+        if (this.glideTime > 0 && this.frequency !== this.targetFrequency) {
+            const glideFactor = 1.0 / (this.glideTime * sampleRate);
+            this.frequency += (this.targetFrequency - this.frequency) * glideFactor;
+        }
+
+        // --- Oscillator ---
+        let sample = 0;
+        const phaseIncrement = (2 * Math.PI * this.frequency) / sampleRate;
+        this.phase += phaseIncrement;
+        if (this.phase > 2 * Math.PI) this.phase -= 2 * Math.PI;
+
+        switch(this.waveType) {
+            case 'sine':
+                sample = Math.sin(this.phase);
+                break;
+            case 'square':
+                sample = Math.sign(Math.sin(this.phase));
+                break;
+            case 'sawtooth':
+                sample = (this.phase / Math.PI) - 1;
+                break;
+            case 'triangle':
+                sample = Math.abs((this.phase / Math.PI) - 1) * 2 - 1;
+                break;
+        }
+        
+        // --- Filter (Simple LPF for now) ---
+        if (this.filterType === 'lowpass') {
+             const cutoff = this.filter.lpf.cutoff / (sampleRate / 2);
+             this.filter.lpf.state += cutoff * (sample - this.filter.lpf.state);
+             sample = this.filter.lpf.state;
+        }
+        
+        return sample * this.envelope.level;
     }
 }
 
 
+// --- Main Processor ---
 class PolySynthProcessor extends AudioWorkletProcessor {
-    constructor() {
+    constructor(options) {
         super();
-        this.voices = [];
-        this.quantizer = new Quantizer();
-        this.instrument = 'synth';
+        const polyphony = options?.processorOptions?.polyphony ?? MAX_VOICES;
+        this.voices = Array.from({ length: polyphony }, () => new Voice(sampleRate));
+        this.activeVoices = new Map(); // pointerId -> voiceIndex
         this.isLatchOn = false;
+        
+        this.scaleFrequencies = [];
+        this.musicKey = 'G';
+        this.musicScale = 'Major';
+        this.updateHarmony();
 
-        for (let i = 0; i < MAX_VOICES; i++) {
-            this.voices.push({
-                isActive: false,
-                pointerId: -1,
-                phase: 0,
-                frequency: 440,
-                targetFrequency: 440,
-                gain: 0,
-                targetGain: 0,
-                attack: 0.01,
-                release: 0.5,
-                glideActive: false,
-                glideProgress: 0,
-                glideTime: 0.2,
-                vibratoEnabled: false,
-                vibratoRate: 5,
-                vibratoDepth: 2,
-                filterState: 0,
-                type: 'sine',
-            });
-        }
-
-        this.port.onmessage = (event) => this.handleMessage(event.data);
+        this.port.onmessage = this.handleMessage.bind(this);
     }
 
-    handleMessage(message) {
-        const { type, pointerId, frequency, volume, key, scale, instrument, isOn, notes, options } = message;
-
-        if (type === 'noteOn') {
-            this.noteOn(pointerId, frequency, volume, options);
-        } else if (type === 'noteUpdate') {
-            this.noteUpdate(pointerId, frequency, volume);
-        } else if (type === 'noteOff') {
-            this.noteOff(pointerId);
-        } else if (type === 'setHarmony') {
-            this.quantizer.setHarmony(key, scale);
-        } else if (type === 'setInstrument') {
-            this.setInstrument(instrument);
-        } else if (type === 'allNotesOff') {
-            this.allNotesOff();
-        } else if (type === 'latch') {
-            this.isLatchOn = isOn;
-            if (!isOn) {
+    handleMessage(event) {
+        const { type, ...data } = event.data;
+        switch (type) {
+            case 'noteOn':
+                this.noteOn(data.pointerId, data.frequency, data.volume);
+                break;
+            case 'noteUpdate':
+                this.noteUpdate(data.pointerId, data.frequency, data.volume);
+                break;
+            case 'noteOff':
+                this.noteOff(data.pointerId);
+                break;
+            case 'allNotesOff':
                 this.allNotesOff();
-            }
-        } else if (type === 'noteSlide') { // Portamento
-            this.portamento(notes[0], notes[1], options?.glideTime);
-        } else if (type === 'glissando') {
-            this.glissando(notes[0], notes[1], options?.duration);
+                break;
+            case 'setInstrument':
+                this.setInstrument(data.instrument);
+                break;
+            case 'setHarmony':
+                this.musicKey = data.key;
+                this.musicScale = data.scale;
+                this.updateHarmony();
+                break;
+            case 'latch':
+                this.isLatchOn = data.isOn;
+                if (!this.isLatchOn) {
+                    this.allNotesOff();
+                }
+                break;
         }
     }
 
     setInstrument(instrument) {
-        this.instrument = instrument;
+        const waveTypeMap = {
+            'synth': 'sawtooth',
+            'organ': 'triangle',
+            'theremin': 'sine',
+            'ebass': 'square',
+            'E-Bells': 'sine',
+            'mellotron': 'sawtooth',
+            'G-Drops': 'triangle',
+            'autopilot_effect_star': 'sine',
+            'autopilot_effect_meteor': 'sawtooth',
+            'autopilot_effect_bell': 'sine',
+            'autopilot_effect_chimes': 'triangle'
+        };
+
+        const filterTypeMap = {
+            'synth': 'lowpass',
+            'ebass': 'lowpass'
+        };
+
+        const glideMap = {
+            'theremin': 0.05
+        }
+        
+        const releaseMap = {
+            'G-Drops': 1.5,
+            'E-Bells': 2.0,
+            'mellotron': 1.0,
+            'autopilot_effect_star': 2.0,
+            'autopilot_effect_meteor': 1.0,
+            'autopilot_effect_bell': 3.0,
+            'autopilot_effect_chimes': 4.0
+        }
+
         this.voices.forEach(voice => {
-            switch (instrument) {
-                case 'synth':
-                    voice.type = 'sawtooth'; voice.attack = 0.01; voice.release = 0.5;
-                    break;
-                case 'organ':
-                    voice.type = 'triangle'; voice.attack = 0.05; voice.release = 0.2;
-                    break;
-                case 'theremin':
-                    voice.type = 'sine'; voice.attack = 0.1; voice.release = 1.0;
-                    break;
-                // Add other instruments
-                default:
-                    voice.type = 'sine'; voice.attack = 0.01; voice.release = 0.5;
-            }
+            voice.waveType = waveTypeMap[instrument] || 'sine';
+            voice.filterType = filterTypeMap[instrument] || 'none';
+            voice.glideTime = glideMap[instrument] || 0;
+            voice.envelope.release = releaseMap[instrument] || 0.5;
         });
     }
 
-    findVoice(pointerId) {
-        return this.voices.find(v => v.pointerId === pointerId && v.isActive);
-    }
-
-    getInactiveVoice() {
-        return this.voices.find(v => !v.isActive);
-    }
-
-    noteOn(pointerId, frequency, volume, options = {}) {
-        if (this.isLatchOn) {
-            const existingVoice = this.findVoice(pointerId);
-            if (existingVoice) {
-                this.noteOff(pointerId);
-                return;
-            }
-        }
-
-        let voice = this.isLatchOn ? null : this.findVoice(pointerId);
-        if (!voice) {
-            voice = this.getInactiveVoice();
-        }
-
-        if (voice) {
-            voice.isActive = true;
-            voice.pointerId = pointerId;
-            voice.frequency = this.quantizer.quantize(frequency);
-            voice.targetFrequency = voice.frequency;
-            voice.targetGain = volume;
-            voice.gain = 0; // Start gain from 0 for attack
-            voice.phase = 0;
-            voice.glideActive = false;
-            
-            // Handle options
-            voice.vibratoEnabled = !!options.vibrato;
-            voice.vibratoRate = options.vibratoRate || 5;
-            voice.vibratoDepth = options.vibratoDepth || 2;
-        }
+    updateHarmony() {
+        const baseMidi = NOTES[this.musicKey];
+        const intervals = SCALES[this.musicScale];
+        this.scaleFrequencies = getScaleFrequencies(baseMidi, intervals, 5, -2);
     }
     
-    noteUpdate(pointerId, frequency, volume) {
-        const voice = this.findVoice(pointerId);
-        if (voice) {
-            voice.targetFrequency = this.quantizer.quantize(frequency);
-            voice.glideActive = true;
-            voice.glideProgress = 0;
-            if(volume !== undefined) {
-                 voice.targetGain = volume;
+    findFreeVoice() {
+        // Find the first inactive voice
+        for (let i = 0; i < this.voices.length; i++) {
+            if (!this.voices[i].isActive) {
+                return { voice: this.voices[i], index: i };
             }
+        }
+        // If all are active, steal the oldest one (simple strategy)
+        return { voice: this.voices[0], index: 0 }; 
+    }
+
+    noteOn(pointerId, frequency, volume) {
+        if (this.isLatchOn) {
+             // In latch mode, a new note might turn off an existing one at the same pitch
+            const quantizedFreq = quantizeFrequency(frequency, this.scaleFrequencies);
+            for(const [pid, voiceIndex] of this.activeVoices.entries()) {
+                if (this.voices[voiceIndex].frequency === quantizedFreq) {
+                    this.noteOff(pid);
+                    return; // Toggle off, don't start a new note.
+                }
+            }
+        }
+        
+        // If we already have a note for this pointer, just update it.
+        // This handles cases like sliding a finger into the pad.
+        if (this.activeVoices.has(pointerId)) {
+            this.noteUpdate(pointerId, frequency, volume);
+            return;
+        }
+
+        const { voice, index } = this.findFreeVoice();
+        if (voice) {
+            const quantizedFreq = quantizeFrequency(frequency, this.scaleFrequencies);
+            voice.start(pointerId, quantizedFreq, volume);
+            this.activeVoices.set(pointerId, index);
+        }
+    }
+
+    noteUpdate(pointerId, frequency, volume) {
+        const voiceIndex = this.activeVoices.get(pointerId);
+        if (voiceIndex !== undefined) {
+            const voice = this.voices[voiceIndex];
+            const quantizedFreq = quantizeFrequency(frequency, this.scaleFrequencies);
+            voice.update(quantizedFreq, volume);
         }
     }
 
     noteOff(pointerId) {
-        const voice = this.findVoice(pointerId);
-        if (voice) {
-            voice.targetGain = 0; // Start release phase
+        const voiceIndex = this.activeVoices.get(pointerId);
+        if (voiceIndex !== undefined) {
+            this.voices[voiceIndex].release();
+            this.activeVoices.delete(pointerId);
         }
     }
     
     allNotesOff() {
-        this.voices.forEach(voice => {
-            voice.targetGain = 0;
-        });
-    }
-
-    portamento(fromMidi, toMidi, glideTime = 0.2) {
-        const fromFreq = this.midiToFreq(fromMidi);
-        const toFreq = this.midiToFreq(toMidi);
-
-        let voice = this.getInactiveVoice();
-        if (voice) {
-            voice.isActive = true;
-            voice.pointerId = fromMidi; // Use MIDI note as a temporary ID
-            voice.frequency = fromFreq;
-            voice.targetFrequency = toFreq;
-            voice.targetGain = 0.7;
-            voice.gain = 0.7; // Start at full volume
-            voice.phase = 0;
-            voice.glideActive = true;
-            voice.glideProgress = 0;
-            voice.glideTime = glideTime;
-            
-            // Deactivate after glide + release
-            setTimeout(() => {
-                voice.targetGain = 0;
-            }, (glideTime + voice.release) * 1000);
-        }
-    }
-    
-    glissando(startMidi, endMidi, duration) {
-        const steps = Math.abs(endMidi - startMidi);
-        if (steps === 0) return;
-        const stepTime = duration / steps;
-        const direction = Math.sign(endMidi - startMidi);
-
-        let currentMidi = startMidi;
-        const intervalId = setInterval(() => {
-            if (currentMidi === endMidi) {
-                clearInterval(intervalId);
-                return;
-            }
-            const freq = this.midiToFreq(currentMidi);
-            let voice = this.getInactiveVoice();
-            if (voice) {
-                voice.isActive = true;
-                voice.pointerId = -Date.now(); // Unique ID for transient notes
-                voice.frequency = freq;
-                voice.targetFrequency = freq;
-                voice.gain = 0;
-                voice.targetGain = 0.5;
-                voice.release = stepTime * 1.5; // Let it ring a bit
-                
-                // Trigger release
-                 setTimeout(() => {
-                    if (voice) voice.targetGain = 0;
-                }, stepTime * 1000);
-            }
-            currentMidi += direction;
-        }, stepTime * 1000);
-    }
-    
-    semitonesToRatio(semitones) {
-        return Math.pow(2, semitones / 12);
-    }
-    
-    midiToFreq(midi) {
-        return 440 * Math.pow(2, (midi - 69) / 12);
+        this.voices.forEach(voice => voice.release());
+        this.activeVoices.clear();
     }
 
     process(inputs, outputs, parameters) {
         const output = outputs[0];
-        const bufferSize = output[0].length;
+        const channelCount = output.length;
 
-        for (let i = 0; i < bufferSize; i++) {
-            let mixedSample = 0;
-
+        for (let i = 0; i < output[0].length; i++) {
+            let sample = 0;
             for (const voice of this.voices) {
-                if (!voice.isActive && voice.gain <= 0.001) continue;
-
-                // --- Envelope ---
-                if (voice.gain < voice.targetGain) {
-                    voice.gain += (1 / (voice.attack * sampleRate)); // Attack
-                    if (voice.gain > voice.targetGain) voice.gain = voice.targetGain;
-                } else if (voice.gain > voice.targetGain) {
-                    voice.gain -= (1 / (voice.release * sampleRate)); // Release
-                    if (voice.gain < 0) voice.gain = 0;
-                }
-                
-                if (voice.gain === 0) {
-                    voice.isActive = false;
-                    continue;
-                }
-
-                // --- Glide (Portamento) ---
-                if (voice.glideActive && voice.frequency !== voice.targetFrequency) {
-                    const glideFactor = 1 / (sampleRate * voice.glideTime);
-                    voice.frequency += (voice.targetFrequency - voice.frequency) * glideFactor * 10; // *10 to make it faster
-                    if (Math.abs(voice.frequency - voice.targetFrequency) < 0.1) {
-                        voice.frequency = voice.targetFrequency;
-                        voice.glideActive = false;
-                    }
-                }
-
-                // --- Vibrato LFO ---
-                let vibratoOffset = 1.0;
-                if (voice.vibratoEnabled) {
-                    const vibratoPhaseIncrement = (2 * Math.PI * voice.vibratoRate) / sampleRate;
-                    vibratoOffset = 1.0 + (Math.sin(this.currentTime * 2 * Math.PI * voice.vibratoRate) * voice.vibratoDepth) / 100;
-                }
-
-                // --- Oscillator ---
-                const phaseIncrement = (voice.frequency * vibratoOffset) / sampleRate;
-                voice.phase += phaseIncrement;
-                if (voice.phase > 1) voice.phase -= 1;
-                
-                let sample = 0;
-                const p = voice.phase * 2 * Math.PI;
-                if (voice.type === 'sine') {
-                    sample = Math.sin(p);
-                } else if (voice.type === 'sawtooth') {
-                    sample = (voice.phase * 2) - 1;
-                } else if (voice.type === 'square') {
-                    sample = voice.phase < 0.5 ? 1 : -1;
-                } else if (voice.type === 'triangle') {
-                    sample = 1 - 4 * Math.abs(Math.round(voice.phase - 0.25) - (voice.phase - 0.25));
-                }
-
-                // --- Low-pass Filter (simple) ---
-                voice.filterState += (sample - voice.filterState) * 0.25; 
-                sample = voice.filterState;
-
-                mixedSample += sample * voice.gain * voice.gain; // Apply gain squared for perceptual loudness
+                sample += voice.process();
             }
-            
-            output[0][i] = mixedSample * 0.5; // Mixdown with some headroom
-            output[1][i] = mixedSample * 0.5; // Copy to right channel
+
+            // Simple limiter to prevent clipping
+            sample = Math.tanh(sample);
+
+            for (let channel = 0; channel < channelCount; channel++) {
+                output[channel][i] = sample / this.voices.length; // Mixdown
+            }
         }
         
+        // Keep the processor alive
         return true;
     }
 }
