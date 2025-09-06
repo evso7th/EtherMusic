@@ -148,13 +148,13 @@ export default function Home() {
 
 
     useEffect(() => {
-        const baseMelodyNote = 48 + ALL_NOTES[musicKey]; // C3 is MIDI 48 + G = 55
-        const baseBassNote = 36 + ALL_NOTES[musicKey];   // C2 is MIDI 36 + G = 43
+        const baseMelodyNote = 48 + ALL_NOTES[musicKey]; // C3 is MIDI 48 + key offset
+        const baseBassNote = 36 + ALL_NOTES[musicKey];   // C2 is MIDI 36 + key offset
 
         const scaleSteps = SCALES[musicScale];
 
-        const melodyFreqs = getScaleFrequencies(baseMelodyNote, scaleSteps, [0, 1]);
-        const bassFreqs = getScaleFrequencies(baseBassNote, scaleSteps, [-1, 0]);
+        const melodyFreqs = getScaleFrequencies(baseMelodyNote, scaleSteps, [0, 1]); // This generates 2 octaves
+        const bassFreqs = getScaleFrequencies(baseBassNote, scaleSteps, [-1, 0]); // This generates 2 octaves
 
         setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
 
