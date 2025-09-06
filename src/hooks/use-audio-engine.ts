@@ -105,6 +105,7 @@ export function useAudioEngine() {
     const setBassLatch = useCallback((isOn: boolean) => {
         isBassLatchOnRef.current = isOn;
         audioEngine.current?.setBassLatch(isOn);
+        console.log(`[useAudioEngine] Latch mode set to: ${isOn}`);
     }, []);
 
     const startRecording = useCallback(() => {
@@ -131,13 +132,14 @@ export function useAudioEngine() {
     }, [sleepTimerId]);
     
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
+        console.log('[useAudioEngine] Interaction:', { type, state, isBassLatchOn: isBassLatchOnRef.current });
         if (!isReady || !audioEngine.current) return;
 
         if (type === 'bass' && isBassLatchOnRef.current) {
-            if (state === 'down') {
+            // In latch mode, we only care about the 'down' event to toggle a note.
+            if (state === 'down' && data) {
+                // We pass 'down' to the engine, which will handle the toggle logic.
                 audioEngine.current.handleThereminInteraction(type, data, 'down');
-                 // Simulate tap for latch mode by immediately sending an 'up' event
-                audioEngine.current.handleThereminInteraction(type, null, 'up');
             }
         } else {
              audioEngine.current.handleThereminInteraction(type, data, state);

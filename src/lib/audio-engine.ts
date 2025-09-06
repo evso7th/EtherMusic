@@ -157,19 +157,23 @@ export class AudioEngine {
     }
 
     private positionToId(x: number, y: number): number {
-        const roundedX = Math.round(x / 10);
-        const roundedY = Math.round(y / 10);
+        // Quantize position to a grid to make it easier to tap the same spot
+        const roundedX = Math.floor(x / 30);
+        const roundedY = Math.floor(y / 30);
         return roundedX * 1000 + roundedY;
     }
 
     public handleThereminInteraction(type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') {
         if (!this.isInitialized || !this.context) return;
+        
+        console.log(`[AudioEngine] handleThereminInteraction: type=${type}, state=${state}`, data);
+
 
         if (type === 'bass' && this.isBassLatchOn) {
             if (state === 'down' && data) {
-                const id = this.positionToId(data.x, data.y);
-                const result = this.latchEngine.toggleNote(id, data.frequency, data.volume);
-                this.processLatchResult(result);
+                 const id = this.positionToId(data.x, data.y);
+                 const result = this.latchEngine.toggleNote(id, data.frequency, data.volume);
+                 this.processLatchResult(result, data);
             }
             return;
         }
@@ -196,43 +200,35 @@ export class AudioEngine {
         }
     }
 
-     private processLatchResult(result: LatchToggleResult) {
+     private processLatchResult(result: LatchToggleResult, originalEventData: { x: number, y: number }) {
         const latchNode = this.nodes.get('latch')?.worklet;
         if (!latchNode) return;
-    
-        // If a note was removed to make space, turn it off first.
-        if (result.noteOff) {
-            latchNode.port.postMessage({ type: 'noteOff', id: result.noteOff.id });
-             if (result.noteToAnimateRemove) {
-                this.orbManager.removeOrb(result.noteToAnimateRemove.id);
-            }
-        }
-    
-        // If a new note was added, turn it on.
-        if (result.noteOn) {
-            latchNode.port.postMessage({ type: 'noteOn', note: result.noteOn });
-             if (result.noteToAnimateAdd) {
-                const padEl = document.getElementById('theremin-pad-bass');
-                if (padEl) {
-                    const rect = padEl.getBoundingClientRect();
-                    // This is an approximation since we don't have the original x/y.
-                    // It's good enough for visual representation.
-                    const x = (result.noteOn.id / 1000) / (rect.width / 10) * rect.width;
-                    const y = (result.noteOn.id % 1000) / (rect.height / 10) * rect.height;
-                    this.orbManager.addOrb(result.noteToAnimateAdd.id, 'latch', x, y);
-                }
-            }
-        }
 
-        // If a note was removed by tapping on it, handle its animation.
-        if (result.action === 'removed' && result.noteToAnimateRemove) {
+        console.log('[AudioEngine] processLatchResult:', result);
+    
+        if (result.noteOff) {
+            console.log('[AudioEngine] Sending noteOff to latch worklet:', result.noteOff);
+            latchNode.port.postMessage({ type: 'noteOff', id: result.noteOff.id });
+        }
+        if (result.noteToAnimateRemove) {
+             console.log('[AudioEngine] Removing orb for latch note', result.noteToAnimateRemove.id);
             this.orbManager.removeOrb(result.noteToAnimateRemove.id);
+        }
+        
+        if (result.noteOn) {
+            console.log('[AudioEngine] Sending noteOn to latch worklet:', result.noteOn);
+            latchNode.port.postMessage({ type: 'noteOn', note: result.noteOn });
+        }
+        if (result.noteToAnimateAdd) {
+            console.log('[AudioEngine] Adding orb for latch note', result.noteToAnimateAdd.id);
+            this.orbManager.addOrb(result.noteToAnimateAdd.id, 'latch', originalEventData.x, originalEventData.y);
         }
     }
     
     public setBassLatch(isOn: boolean) {
         this.isBassLatchOn = isOn;
         if (!isOn) {
+            console.log('[AudioEngine] Latch turned off, clearing all notes.');
             const notesToTurnOff = this.latchEngine.clear();
             const latchNode = this.nodes.get('latch')?.worklet;
             if (latchNode) {

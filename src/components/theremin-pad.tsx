@@ -98,24 +98,33 @@ export function ThereminPad({
 
     const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (isDisabled) return;
+        
+        if (type === 'bass' && isLatchOn) {
+            console.log('[ThereminPad] Latch mode tap DOWN.');
+        }
+
         const interactionData = calculateInteraction(event);
         if (!interactionData) return;
 
         (event.target as HTMLElement).setPointerCapture(event.pointerId);
         onInteraction(type, interactionData, 'down');
-    }, [calculateInteraction, isDisabled, onInteraction, type]);
+    }, [calculateInteraction, isDisabled, onInteraction, type, isLatchOn]);
 
     const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
-        if (isDisabled || !(event.buttons > 0)) return;
+        if (isDisabled || !(event.buttons > 0) || (type === 'bass' && isLatchOn)) return;
         
         const interactionData = calculateInteraction(event);
         if (interactionData) {
             onInteraction(type, interactionData, 'move');
         }
-    }, [calculateInteraction, isDisabled, onInteraction, type]);
+    }, [calculateInteraction, isDisabled, onInteraction, type, isLatchOn]);
 
     const handlePointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (isDisabled) return;
+
+        if (type === 'bass' && isLatchOn) {
+             console.log('[ThereminPad] Latch mode tap UP.');
+        }
         
         const interactionData = calculateInteraction(event);
         onInteraction(type, interactionData, 'up');
@@ -123,7 +132,7 @@ export function ThereminPad({
         if ((event.target as HTMLElement).hasPointerCapture(event.pointerId)) {
             (event.target as HTMLElement).releasePointerCapture(event.pointerId);
         }
-    }, [calculateInteraction, isDisabled, onInteraction, type]);
+    }, [calculateInteraction, isDisabled, onInteraction, type, isLatchOn]);
     
      const renderSettingsControls = () => {
         if (!musicKeys && !musicScales) return null;
