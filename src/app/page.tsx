@@ -148,12 +148,12 @@ export default function Home() {
 
 
     useEffect(() => {
-        const baseMelodyNote = 60 + ALL_NOTES[musicKey]; // C4 is MIDI 60
-        const baseBassNote = 48 + ALL_NOTES[musicKey]; // C3 is MIDI 48
+        const baseMelodyNote = 48 + ALL_NOTES[musicKey]; // C3 is MIDI 48
+        const baseBassNote = 36 + ALL_NOTES[musicKey];   // C2 is MIDI 36
         const scaleSteps = SCALES[musicScale];
 
         const melodyFreqs = getScaleFrequencies(baseMelodyNote, scaleSteps, [0, 1]);
-        const bassFreqs = getScaleFrequencies(baseBassNote, scaleSteps, [-2, -1]);
+        const bassFreqs = getScaleFrequencies(baseBassNote, scaleSteps, [-1, 0]);
 
         setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
 
@@ -316,7 +316,7 @@ export default function Home() {
                             type="bass"
                             allowedFrequencies={allowedFrequencies.bass}
                             color="hsl(var(--accent))"
-                            isLatchOn={isBassLatchOn}
+                            isLatchOn={isLatchOn}
                             onLatchToggle={handleLatchToggle}
                             instruments={instruments.filter(i => i !== 'theremin' && i !== 'G-Drops' && !i.includes('effect'))}
                             activeInstrument={bassInstrument}
@@ -375,3 +375,4 @@ export default function Home() {
         </div>
     );
 }
+    
