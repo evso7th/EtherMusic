@@ -98,35 +98,34 @@ export function ThereminPad({
 
     const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (isDisabled) return;
+        (event.target as HTMLElement).setPointerCapture(event.pointerId);
         
-        const interactionData = calculateInteraction(event);
-        if (!interactionData) return;
+        console.log(`[ThereminPad] Latch mode tap DOWN.`);
 
-        if (type === 'bass' && isLatchOn) {
-            onInteraction(type, interactionData, 'down');
-        } else {
-            (event.target as HTMLElement).setPointerCapture(event.pointerId);
+        const interactionData = calculateInteraction(event);
+        if (interactionData) {
             onInteraction(type, interactionData, 'down');
         }
-
-    }, [calculateInteraction, isDisabled, onInteraction, type, isLatchOn]);
+    }, [calculateInteraction, isDisabled, onInteraction, type]);
 
     const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
-        if (isDisabled || !(event.buttons > 0) || (isLatchOn && type === 'bass')) return;
+        if (isDisabled || !(event.buttons > 0)) return;
         
         const interactionData = calculateInteraction(event);
         if (interactionData) {
             onInteraction(type, interactionData, 'move');
         }
-    }, [calculateInteraction, isDisabled, onInteraction, type, isLatchOn]);
+    }, [calculateInteraction, isDisabled, onInteraction, type]);
 
     const handlePointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (isDisabled) return;
-
-        const interactionData = calculateInteraction(event);
-        if (type === 'bass' && isLatchOn) {
-            onInteraction(type, interactionData, 'up');
+        
+        console.log(`[ThereminPad] Pointer UP.`);
+        
+        if (isLatchOn && type === 'bass') {
+             console.log("[ThereminPad] Latch mode tap UP (ignored).");
         } else {
+             const interactionData = calculateInteraction(event);
              onInteraction(type, interactionData, 'up');
         }
         
@@ -295,4 +294,3 @@ export function ThereminPad({
     );
 }
 
-    

@@ -146,7 +146,26 @@ export default function Home() {
     const [activeBassInstrument, setActiveBassInstrument] = useState<BassInstrument>(defaultBassInstrument);
     
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
-    const [volumes, setLocalVolumes] = useState<Volumes>(() => loadSettings().volumes);
+    const [volumes, setLocalVolumes] = useState<Volumes>(() => {
+        if (typeof window === 'undefined') {
+            return defaultVolumes;
+        }
+        const consent = getCookie("ethermusic_consent") === 'true';
+        if (!consent) {
+            return defaultVolumes;
+        }
+        try {
+            const savedVolumes = getCookie("ethermusic_volumes");
+            const loadedVolumes = savedVolumes ? JSON.parse(savedVolumes) : defaultVolumes;
+            if (typeof loadedVolumes.melody !== 'number' || Object.keys(loadedVolumes).length < Object.keys(defaultVolumes).length) {
+                return {...defaultVolumes, ...loadedVolumes};
+            }
+            return loadedVolumes;
+        } catch (e) {
+            console.error("Failed to load settings from cookies", e);
+            return defaultVolumes;
+        }
+    });
 
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         let newKey = musicKey;
@@ -167,7 +186,7 @@ export default function Home() {
         const baseBassNote = 24 + ALL_NOTES[currentKey];   // C1 for bass start
     
         const melodyFreqs = getScaleFrequencies(baseMelodyNote, SCALES[currentScale], [0, 1]);
-        const bassFreqs = getScaleFrequencies(baseBassNote, SCALES[currentScale], [0, 1]);
+        const bassFreqs = getScaleFrequencies(baseBassNote, SCALES[currentScale], [1, 2]);
     
         setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
     }, [musicKey, musicScale]);
@@ -393,3 +412,4 @@ export default function Home() {
 }
 
     
+
