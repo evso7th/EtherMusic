@@ -98,13 +98,15 @@ export function ThereminPad({
 
     const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (isDisabled) return;
-
+    
         const interactionData = calculateInteraction(event);
         if (!interactionData) return;
-
+    
         if (type === 'bass' && isLatchOn) {
-            // For latch mode, a single pointer down event acts as a "tap"
+            console.log('[ThereminPad] Latch mode tap DOWN.');
             onInteraction(type, interactionData, 'down');
+            // Immediately simulate an "up" to make it a tap
+            onInteraction(type, null, 'up'); 
         } else {
              (event.target as HTMLElement).setPointerCapture(event.pointerId);
              onInteraction(type, interactionData, 'down');
@@ -123,9 +125,12 @@ export function ThereminPad({
     const handlePointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (isDisabled) return;
         
-        // Latch mode for bass is handled on pointer down, so we ignore pointer up
-        if (type === 'bass' && isLatchOn) return;
-
+        // Latch mode for bass is handled entirely on pointer down, so we ignore pointer up events for it
+        if (type === 'bass' && isLatchOn) {
+             console.log('[ThereminPad] Latch mode tap UP (ignored).');
+            return;
+        }
+        
         const interactionData = calculateInteraction(event);
         onInteraction(type, interactionData, 'up');
         

@@ -130,6 +130,7 @@ export function useAudioEngine() {
     }, [sleepTimerId]);
     
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
+        console.log(`[useAudioEngine] Interaction: type=${type}, state=${state}`);
         if (!isReady || !audioEngine.current) return;
         audioEngine.current.handleThereminInteraction(type, data, state);
     }, [isReady]);
