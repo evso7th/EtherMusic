@@ -17,7 +17,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
-import { OrbManager } from '@/lib/orb-manager';
+import type { OrbManager } from '@/lib/orb-manager';
 
 interface ThereminPadProps {
     type: 'melody' | 'bass';
@@ -229,7 +229,7 @@ export function ThereminPad({
         <Card 
             className={cn(
                 "flex flex-col h-full bg-card/50 border-2 border-transparent transition-all duration-300",
-                (isLatchOn && type === 'bass') && "border-accent ring-2 ring-accent/50 animate-pulse-accent-glow",
+                (isLatchOn && type === 'bass') && "border-accent ring-2 ring-accent/50",
                 isDisabled && "opacity-50 pointer-events-none"
             )}
             style={{ willChange: 'border-color, box-shadow' }}
@@ -286,5 +286,3 @@ export function ThereminPad({
         </Card>
     );
 }
-
-    

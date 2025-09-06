@@ -1,16 +1,8 @@
-
 // src/lib/audio-engine.ts
 
 import * as Tone from 'tone';
-import type { Instrument, MusicKey, MusicScale } from '@/types';
+import type { Instrument, MusicKey, MusicScale, Volumes } from '@/types';
 import { OrbManager } from './orb-manager';
-
-type Volumes = { 
-    melody: number; 
-    manualBass: number;
-    latch: number; 
-    drums: number; 
-};
 
 type PartName = 'melody' | 'manualBass' | 'latch' | 'drums';
 
@@ -26,7 +18,7 @@ function dbToGain(db: number) {
  */
 export class AudioEngine {
     public isInitialized = false;
-    private context: AudioContext;
+    private context!: AudioContext;
     public orbManager!: OrbManager;
     private mediaRecorder: MediaRecorder | null = null;
     private recordedChunks: Blob[] = [];
@@ -37,12 +29,7 @@ export class AudioEngine {
     private volumes: Volumes;
     private isBassLatchOn: boolean = false;
     
-    // Drum-specific properties
-    private drumSamples: Record<string, AudioBuffer> = {};
-    private isDrumSamplesLoaded = false;
-    
-    constructor(audioContext: AudioContext) {
-        this.context = audioContext;
+    constructor() {
         this.volumes = { melody: -6, manualBass: -6, latch: -15, drums: -9 };
     }
     
@@ -54,7 +41,9 @@ export class AudioEngine {
         if (this.isInitialized) return;
         
         console.log('AudioContext started. Loading worklets and samples...');
-
+        
+        this.context = Tone.getContext().rawContext as AudioContext;
+        
         this.masterOut = this.context.createGain();
         this.masterOut.connect(this.context.destination);
         
@@ -83,18 +72,20 @@ export class AudioEngine {
             document.body.removeChild(a);
         };
 
-        await this.loadDrumSamples();
-        
-        await this.context.audioWorklet.addModule('/worklets/poly-synth-processor.js');
-        await this.context.audioWorklet.addModule('/worklets/drum-processor.js');
+        try {
+            await this.context.audioWorklet.addModule('/worklets/theremin-processor.js');
 
-        // Create all synth nodes
-        this.createWorkletNode('melody', 'poly-synth-processor');
-        this.createWorkletNode('manualBass', 'poly-synth-processor');
-        this.createWorkletNode('latch', 'poly-synth-processor');
+            this.createWorkletNode('melody', 'theremin-processor');
+            this.createWorkletNode('manualBass', 'theremin-processor');
+            this.createWorkletNode('latch', 'theremin-processor');
 
-        // Create drum node
-        this.createDrumNode();
+            // Default instrument types
+            this.setMelodyInstrument('theremin');
+            this.setBassInstrument('synth');
+        } catch (e) {
+            console.error("Failed to add AudioWorklet module", e);
+            throw new Error("Could not load core audio components. Please try refreshing the page.");
+        }
         
         Tone.Transport.set({ bpm: 90, swing: 0, timeSignature: 4 });
         this.isInitialized = true;
@@ -109,59 +100,18 @@ export class AudioEngine {
 
         const workletNode = new AudioWorkletNode(this.context, processorName, {
             processorOptions: {
-                polyphony: (part === 'melody' || part === 'manualBass' || part === 'latch') ? 3 : 8
-            }
+                sampleRate: this.context.sampleRate,
+                polyphony: (part === 'melody' || part === 'manualBass' || part === 'latch') ? 4 : 8
+            },
+            numberOfInputs: 0,
+            numberOfOutputs: 1,
+            outputChannelCount: [2]
         });
         workletNode.connect(gainNode);
 
         this.nodes.set(part, { worklet: workletNode, gain: gainNode });
         console.log(`Created worklet node for: ${part}`);
     }
-
-    private async loadDrumSamples() {
-        const sampleNames: string[] = [];
-        
-        const promises = sampleNames.map(async name => {
-            try {
-                const response = await fetch(`/assets/drums/${name}.wav`);
-                if (!response.ok) throw new Error(`Sample ${name} not found`);
-                const arrayBuffer = await response.arrayBuffer();
-                const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
-                this.drumSamples[name] = audioBuffer;
-            } catch (error) {
-                console.warn(`Could not load drum sample: ${name}.wav`, error);
-            }
-        });
-        await Promise.all(promises);
-        this.isDrumSamplesLoaded = true;
-        console.log('Finished attempting to load drum samples.');
-    }
-
-    private createDrumNode() {
-        if (this.nodes.has('drums')) return;
-        
-        const gainNode = this.context.createGain();
-        gainNode.connect(this.masterOut);
-        
-        const transferableSamples: { [key: string]: Float32Array } = {};
-        for(const [name, audioBuffer] of Object.entries(this.drumSamples)) {
-             transferableSamples[name] = audioBuffer.getChannelData(0);
-        }
-        
-        const workletNode = new AudioWorkletNode(this.context, 'drum-processor', {
-            processorOptions: { sampleRate: this.context.sampleRate }
-        });
-        
-        if (Object.keys(transferableSamples).length > 0) {
-            workletNode.port.postMessage({ type: 'loadSamples', samples: transferableSamples });
-        }
-
-        workletNode.connect(gainNode);
-
-        this.nodes.set('drums', { worklet: workletNode, gain: gainNode });
-        console.log('Created worklet node for: drums');
-    }
-
 
     public setOrbManager(orbManager: OrbManager) {
         this.orbManager = orbManager;
@@ -199,7 +149,8 @@ export class AudioEngine {
         if (!node) return;
 
         if (type === 'bass' && this.isBassLatchOn) {
-            // For latch mode, don't stop the note on pointer up, it's stopped by a subsequent click
+            // For latch mode, a click on an orb stops the note, which is handled as a 'noteOn' with the same freq.
+            // The worklet will interpret this as a toggle.
         } else {
              node.port.postMessage({ type: 'noteOff', pointerId });
         }
@@ -217,15 +168,6 @@ export class AudioEngine {
         }
     }
 
-    public setHarmony(key: MusicKey, scale: MusicScale) {
-        const message = { type: 'setHarmony', key, scale };
-        this.nodes.forEach((nodeInfo, partName) => {
-            if (partName !== 'drums') {
-                nodeInfo.worklet.port.postMessage(message);
-            }
-        });
-    }
-    
     public setMelodyInstrument(instrument: Instrument) {
         this.nodes.get('melody')?.worklet.port.postMessage({ type: 'setInstrument', instrument });
     }
@@ -239,14 +181,11 @@ export class AudioEngine {
     public setTempo(bpm: number) {
         if (this.isInitialized) {
             Tone.Transport.bpm.value = bpm;
-            this.nodes.get('drums')?.worklet.port.postMessage({ type: 'setTempo', value: bpm });
         }
     }
 
     public setBeatPattern(patternName: string) {
-        if (this.isInitialized) {
-            this.nodes.get('drums')?.worklet.port.postMessage({ type: 'setPattern', value: patternName });
-        }
+        // This functionality is currently not implemented with the new worklet-based engine
     }
     
     public setVolumes(newVolumes: Volumes) {
@@ -257,7 +196,6 @@ export class AudioEngine {
         this.nodes.get('melody')?.gain.gain.linearRampToValueAtTime(dbToGain(this.volumes.melody), rampTime);
         this.nodes.get('manualBass')?.gain.gain.linearRampToValueAtTime(dbToGain(this.volumes.manualBass), rampTime);
         this.nodes.get('latch')?.gain.gain.linearRampToValueAtTime(dbToGain(this.volumes.latch), rampTime);
-        this.nodes.get('drums')?.gain.gain.linearRampToValueAtTime(dbToGain(this.volumes.drums), rampTime);
     }
     
     public stopAllSounds() {

@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
 import type { Instrument, MusicKey, MusicScale, Volumes } from '@/types';
+import { useWorker } from './use-worker'; // Assuming this hook is now created.
 
 export function useAudioEngine() {
     const { toast } = useToast();
@@ -18,6 +19,10 @@ export function useAudioEngine() {
 
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
+    
+    // Note: The autopilot worker is removed, but the structure to use a worker is kept.
+    // If a drum machine worker were added, it would follow a similar pattern.
+    // const autopilotWorker = useWorker('/workers/autopilot-worker.js'); // This would be the pattern
 
     const startApp = useCallback(async () => {
         if (isAppStarted) return;
@@ -31,17 +36,16 @@ export function useAudioEngine() {
             console.log("Initializing audio resources after user gesture...");
             await Tone.start();
             
-            const context = new AudioContext();
-            Tone.setContext(context);
+            // AudioEngine now creates its own context.
+            const engine = new AudioEngine();
+            await engine.initialize();
             
             const om = new OrbManager();
             orbManager.current = om;
-
-            const engine = new AudioEngine(context);
-            await engine.initialize();
             engine.setOrbManager(om);
-            audioEngine.current = engine;
 
+            audioEngine.current = engine;
+            
             setIsReady(true);
             setIsPlaying(Tone.Transport.state === 'started');
             console.log('AudioEngine initialized and ready.');
@@ -81,10 +85,6 @@ export function useAudioEngine() {
 
     const setVolumes = useCallback((volumes: Volumes) => {
         audioEngine.current?.setVolumes(volumes);
-    }, []);
-
-    const setHarmony = useCallback((key: MusicKey, scale: MusicScale) => {
-        audioEngine.current?.setHarmony(key, scale);
     }, []);
     
     const setMelodyInstrument = useCallback((instrument: Instrument) => {
@@ -151,6 +151,9 @@ export function useAudioEngine() {
             engine.stopNote(type, data.pointerId);
         }
     }, [isReady]);
+    
+    // The setHarmony function is removed as it's no longer needed by the audio engine directly.
+    // The harmony logic is now fully contained within page.tsx
 
     return {
         isAppStarted,
@@ -163,7 +166,6 @@ export function useAudioEngine() {
         stop,
         setTempo,
         setVolumes,
-        setHarmony,
         setMelodyInstrument,
         setBassInstrument,
         setBeatPattern,
