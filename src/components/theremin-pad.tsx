@@ -98,38 +98,24 @@ export function ThereminPad({
 
     const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (isDisabled) return;
-    
         const interactionData = calculateInteraction(event);
         if (!interactionData) return;
-    
-        if (type === 'bass' && isLatchOn) {
-            console.log('[ThereminPad] Latch mode tap DOWN.');
-            onInteraction(type, interactionData, 'down');
-            // Immediately simulate an "up" to make it a tap
-            onInteraction(type, null, 'up'); 
-        } else {
-             (event.target as HTMLElement).setPointerCapture(event.pointerId);
-             onInteraction(type, interactionData, 'down');
-        }
-    }, [calculateInteraction, onInteraction, type, isDisabled, isLatchOn]);
+
+        (event.target as HTMLElement).setPointerCapture(event.pointerId);
+        onInteraction(type, interactionData, 'down');
+    }, [calculateInteraction, isDisabled, onInteraction, type]);
 
     const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
-        if (isDisabled || !(event.buttons > 0) || (type === 'bass' && isLatchOn)) return;
+        if (isDisabled || !(event.buttons > 0)) return;
         
         const interactionData = calculateInteraction(event);
         if (interactionData) {
             onInteraction(type, interactionData, 'move');
         }
-    }, [calculateInteraction, onInteraction, type, isDisabled, isLatchOn]);
+    }, [calculateInteraction, isDisabled, onInteraction, type]);
 
     const handlePointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (isDisabled) return;
-        
-        // Latch mode for bass is handled entirely on pointer down, so we ignore pointer up events for it
-        if (type === 'bass' && isLatchOn) {
-             console.log('[ThereminPad] Latch mode tap UP (ignored).');
-            return;
-        }
         
         const interactionData = calculateInteraction(event);
         onInteraction(type, interactionData, 'up');
@@ -137,7 +123,7 @@ export function ThereminPad({
         if ((event.target as HTMLElement).hasPointerCapture(event.pointerId)) {
             (event.target as HTMLElement).releasePointerCapture(event.pointerId);
         }
-    }, [onInteraction, type, calculateInteraction, isDisabled, isLatchOn]);
+    }, [calculateInteraction, isDisabled, onInteraction, type]);
     
      const renderSettingsControls = () => {
         if (!musicKeys && !musicScales) return null;

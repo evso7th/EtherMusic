@@ -17,6 +17,7 @@ export function useAudioEngine() {
 
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
+    const isBassLatchOnRef = useRef(false);
     
     const initializeAudioEngine = useCallback(async () => {
         try {
@@ -58,7 +59,6 @@ export function useAudioEngine() {
     }, [isAppStarted, initializeAudioEngine]);
 
     useEffect(() => {
-      // This effect ensures the audio context is resumed on any user gesture if it wasn't already.
       const resumeAudio = async () => {
         if (audioEngine.current && audioEngine.current.isInitialized && audioEngine.current.masterOut.context.state === 'suspended') {
           await audioEngine.current.masterOut.context.resume();
@@ -103,6 +103,7 @@ export function useAudioEngine() {
     }, []);
     
     const setBassLatch = useCallback((isOn: boolean) => {
+        isBassLatchOnRef.current = isOn;
         audioEngine.current?.setBassLatch(isOn);
     }, []);
 
@@ -130,9 +131,17 @@ export function useAudioEngine() {
     }, [sleepTimerId]);
     
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
-        console.log(`[useAudioEngine] Interaction: type=${type}, state=${state}`);
         if (!isReady || !audioEngine.current) return;
-        audioEngine.current.handleThereminInteraction(type, data, state);
+
+        if (type === 'bass' && isBassLatchOnRef.current) {
+            if (state === 'down') {
+                audioEngine.current.handleThereminInteraction(type, data, 'down');
+                 // Simulate tap for latch mode by immediately sending an 'up' event
+                audioEngine.current.handleThereminInteraction(type, null, 'up');
+            }
+        } else {
+             audioEngine.current.handleThereminInteraction(type, data, state);
+        }
     }, [isReady]);
 
     return {
