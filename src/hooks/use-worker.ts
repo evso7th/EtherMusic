@@ -3,15 +3,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 
-// This hook is currently not used but is kept for potential future use.
 export function useWorker(workerPath: string) {
-    const [worker, setWorker] = useState<Worker | null>(null);
     const workerRef = useRef<Worker | null>(null);
+    const [worker, setWorker] = useState<Worker | null>(null);
 
     useEffect(() => {
-        // This check ensures the code runs only in the browser.
         if (typeof window !== 'undefined' && !workerRef.current) {
-            // We pass the public path directly to the Worker constructor.
+            // The public path is passed directly to the Worker constructor.
             // The browser will resolve this relative to the document's origin.
             const newWorker = new Worker(workerPath);
             workerRef.current = newWorker;

@@ -41,6 +41,7 @@ function setCookie(name: string, value: string, days: number) {
 
 const defaultVolumes: Volumes = { melody: -6, manualBass: -6, latch: -15, drums: -9 };
 
+
 function loadSettings() {
     if (typeof window === 'undefined') {
         return { volumes: defaultVolumes };
@@ -56,7 +57,7 @@ function loadSettings() {
         if (typeof volumes.melody !== 'number' || Object.keys(volumes).length !== Object.keys(defaultVolumes).length) {
             return { volumes: defaultVolumes };
         }
-
+        
         return { volumes };
     } catch (e) {
         console.error("Failed to load settings from cookies", e);
@@ -83,7 +84,7 @@ export const tempos: Tempo[] = [
     { name: 'Allegretto', bpm: 130 },
 ];
 
-export const instruments: Instrument[] = ['synth', 'organ', 'theremin', 'E-Bells', 'mellotron', 'G-Drops', 'ebass'];
+export const instruments: Instrument[] = ['synth', 'organ', 'theremin', 'E-Bells', 'mellotron', 'G-Drops', 'ebass', 'effects'];
 
 const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
 const MemoizedThereminPad = memo(ThereminPad);
@@ -130,7 +131,7 @@ export default function Home() {
         stopRecording,
         handleThereminInteraction,
         setSleepTimer,
-        orbManager
+        orbManager,
     } = useAudioEngine();
     
     const [isRecording, setIsRecording] = useState(false);
@@ -139,14 +140,13 @@ export default function Home() {
     const [melodyInstrument, setLocalMelodyInstrument] = useState<Instrument>('theremin');
     const [bassInstrument, setLocalBassInstrument] = useState<Instrument>('synth');
     const [musicKey, setMusicKey] = useState<MusicKey>('G');
-    const [musicScale, setMusicScale] = useState<MusicScale>('Major');
+    const [musicScale, setMusicScale] = useState<MusicScale>('Minor');
     const [allowedFrequencies, setAllowedFrequencies] = useState<{melody: number[], bass: number[]}>({melody: [], bass: []});
     
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
     const [volumes, setLocalVolumes] = useState<Volumes>(() => loadSettings().volumes);
 
-
-    const handleHarmonyChange = (keyOrScale: MusicKey | MusicScale) => {
+    const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         let newKey = musicKey;
         let newScale = musicScale;
     
@@ -157,19 +157,20 @@ export default function Home() {
             newScale = keyOrScale as MusicScale;
             setMusicScale(newScale);
         }
+        
+        const currentKey = Object.keys(ALL_NOTES).includes(keyOrScale) ? keyOrScale as MusicKey : newKey;
+        const currentScale = Object.keys(SCALES).includes(keyOrScale) ? keyOrScale as MusicScale : newScale;
+
+        const baseMelodyNote = 48 + ALL_NOTES[currentKey]; // C4 for melody start
+        const baseBassNote = 24 + ALL_NOTES[currentKey];   // C1 for bass start
     
-        const baseMelodyNote = 48 + ALL_NOTES[newKey]; // C3 for melody start
-        const baseBassNote = 36 + ALL_NOTES[newKey];   // C2 for bass start
-        const scaleSteps = SCALES[newScale];
-    
-        const melodyFreqs = getScaleFrequencies(baseMelodyNote, scaleSteps, [0, 1]);
-        const bassFreqs = getScaleFrequencies(baseBassNote, scaleSteps, [-1, 0]);
+        const melodyFreqs = getScaleFrequencies(baseMelodyNote, SCALES[currentScale], [0, 1]);
+        const bassFreqs = getScaleFrequencies(baseBassNote, SCALES[currentScale], [0, 1]);
     
         setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
-    };
+    }, [musicKey, musicScale]);
 
     useEffect(() => {
-        // Initial calculation
         handleHarmonyChange(musicKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -216,8 +217,9 @@ export default function Home() {
     }, [setTempo]);
 
     const handleVolumeChange = useCallback((newVolumes: Volumes) => {
-        setLocalVolumes(newVolumes);
+       setLocalVolumes(newVolumes);
         setVolumes(newVolumes);
+
         if (cookieConsent) {
             saveSettings(newVolumes);
         }
@@ -262,8 +264,8 @@ export default function Home() {
                     </Button>
                 </div>
                  <footer className="z-10 text-xs text-white/50 pb-4 text-center">
-                    <p>Powered by Web Audio API</p>
-                    <p>&copy; 2025, EVS</p>
+                    <p>Powered by Web Audio API & Tone.js</p>
+                    <p>&copy; 2024, EVS</p>
                     <p className="mt-2">v.2.0 "Maestro"</p>
                 </footer>
                 <CookieConsent onConsentChange={setCookieConsent} />
@@ -327,7 +329,7 @@ export default function Home() {
                             color="hsl(var(--accent))"
                             isLatchOn={isBassLatchOn}
                             onLatchToggle={handleLatchToggle}
-                            instruments={instruments.filter(i => i !== 'theremin' && i !== 'G-Drops' && !i.includes('effect'))}
+                            instruments={instruments.filter(i => i !== 'theremin' && i !== 'G-Drops' && !i.includes('effects'))}
                             activeInstrument={bassInstrument}
                             onInstrumentChange={handleBassInstrumentChange}
                             isPolyphonic

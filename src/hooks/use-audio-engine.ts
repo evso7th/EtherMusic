@@ -6,7 +6,7 @@ import * as Tone from 'tone';
 import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
-import type { Volumes } from '@/types';
+import type { Volumes, Instrument } from '@/types';
 
 export function useAudioEngine() {
     const { toast } = useToast();
@@ -37,9 +37,8 @@ export function useAudioEngine() {
 
             if (!audioEngine.current) {
                 audioEngine.current = new AudioEngine(orbManager.current);
+                await audioEngine.current.initialize();
             }
-            
-            await audioEngine.current.initialize();
             
             setIsReady(true);
             setIsPlaying(Tone.Transport.state === 'started');
@@ -60,6 +59,7 @@ export function useAudioEngine() {
         if (Tone.Transport.state !== 'started') {
             Tone.Transport.start();
         }
+        audioEngine.current.play();
         setIsPlaying(true);
     }, [isReady]);
 
@@ -82,6 +82,14 @@ export function useAudioEngine() {
 
     const setVolumes = useCallback((volumes: Volumes) => {
         audioEngine.current?.setVolumes(volumes);
+    }, []);
+
+    const setMelodyInstrument = useCallback((instrument: Instrument) => {
+        // This is now a no-op as the instrument is baked into the worklet
+    }, []);
+
+    const setBassInstrument = useCallback((instrument: Instrument) => {
+        // This is now a no-op as the instrument is baked into the worklet
     }, []);
     
     const setBeatPattern = useCallback((patternName: string) => {
@@ -108,7 +116,7 @@ export function useAudioEngine() {
         if (durationMinutes !== null) {
             const id = setTimeout(() => {
                 if (audioEngine.current?.masterOut) {
-                    audioEngine.current.masterOut.gain.linearRampTo(0, 5);
+                    audioEngine.current.masterOut.gain.linearRampTo(0, 5, Tone.now());
                 }
                 setTimeout(() => {
                     stop();
@@ -136,10 +144,18 @@ export function useAudioEngine() {
         }
     }, [isReady]);
 
+    useEffect(() => {
+        if (audioEngine.current && isPlaying) {
+            audioEngine.current.play();
+        }
+    }, [isPlaying]);
+
+
     return {
         isAppStarted,
         isReady,
         isPlaying,
+        audioEngine,
         orbManager: orbManager.current,
         startApp,
         play,
@@ -147,6 +163,8 @@ export function useAudioEngine() {
         stop,
         setTempo,
         setVolumes,
+        setMelodyInstrument,
+        setBassInstrument,
         setBeatPattern,
         setBassLatch,
         startRecording,
