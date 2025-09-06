@@ -35,6 +35,7 @@ export class AudioEngine {
     public masterOut!: GainNode;
     private nodes = new Map<PartName, { worklet: AudioWorkletNode, gain: GainNode }>();
     private volumes: Volumes;
+    private isBassLatchOn: boolean = false;
     
     // Drum-specific properties
     private drumSamples: Record<string, AudioBuffer> = {};
@@ -208,7 +209,6 @@ export class AudioEngine {
         }
     }
     
-    private isBassLatchOn: boolean = false;
     public setBassLatch(isOn: boolean) {
         this.isBassLatchOn = isOn;
         if (!isOn) {

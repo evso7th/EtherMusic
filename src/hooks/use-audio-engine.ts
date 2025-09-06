@@ -6,7 +6,7 @@ import * as Tone from 'tone';
 import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
-import type { Instrument, MusicKey, MusicScale, Tempo, Volumes } from '@/types';
+import type { Instrument, MusicKey, MusicScale, Volumes } from '@/types';
 
 export function useAudioEngine() {
     const { toast } = useToast();
