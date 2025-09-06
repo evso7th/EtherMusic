@@ -1,3 +1,4 @@
+
 // src/lib/audio-engine.ts
 
 import * as Tone from 'tone';
@@ -13,7 +14,7 @@ function dbToGain(db: number) {
 
 export class AudioEngine {
     public isInitialized = false;
-    private context: AudioContext | null = null;
+    private context: AudioContext;
     public orbManager: OrbManager;
     private mediaRecorder: MediaRecorder | null = null;
     private recordedChunks: Blob[] = [];
@@ -30,7 +31,8 @@ export class AudioEngine {
     
     private activePointers = new Map<number, { type: 'melody' | 'bass', part: PartName }>();
 
-    constructor(orbManager: OrbManager) {
+    constructor(toneContext: Tone.Context, orbManager: OrbManager) {
+        this.context = toneContext.rawContext;
         this.orbManager = orbManager;
     }
     
@@ -42,18 +44,11 @@ export class AudioEngine {
         if (this.isInitialized) {
             return;
         }
-        if (Tone.context.state !== 'running') {
-            console.warn('AudioContext not running. Cannot initialize AudioEngine.');
-            // Attempting to start again, just in case.
-            await Tone.start();
-            if (Tone.context.state !== 'running') {
-                throw new Error("Could not start AudioContext.");
-            }
+        if (this.context.state !== 'running') {
+            throw new Error("AudioContext is not running. Cannot initialize AudioEngine.");
         }
         
         console.log('Initializing AudioEngine...');
-        this.context = Tone.getContext().rawContext;
-        console.log('AudioContext is ready.');
         
         this.masterOut = new Tone.Gain(1).toDestination();
         
@@ -124,6 +119,11 @@ export class AudioEngine {
         this.nodes.set(part, { worklet: workletNode, gain: gainNode });
         console.log(`Created worklet node for: ${part}`);
     }
+    
+    public play() {
+        if (!this.isInitialized) return;
+        this.nodes.get('drums')?.worklet.port.postMessage({type: 'start'});
+    }
 
     public startNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, padInfo: { x: number, y: number, width: number, height: number}) {
         if (!this.isInitialized) return;
@@ -173,7 +173,10 @@ export class AudioEngine {
              node.port.postMessage({ type: 'noteOff', id: pointerId });
         }
         
-        this.orbManager?.removeOrb(pointerId);
+        // Do not remove orb if it's a latch that is being turned off
+        if (activePointer.part !== 'latch') {
+            this.orbManager?.removeOrb(pointerId);
+        }
         this.activePointers.delete(pointerId);
     }
     
@@ -193,6 +196,7 @@ export class AudioEngine {
     public setTempo(bpm: number) {
         if (!this.isInitialized) return;
         Tone.Transport.bpm.value = bpm;
+        this.nodes.get('drums')?.worklet.port.postMessage({type: 'setTempo', bpm});
     }
     
     public setVolumes(newVolumes: Volumes) {
@@ -201,13 +205,12 @@ export class AudioEngine {
         const rampTime = this.context.currentTime + 0.05;
 
         Object.entries(newVolumes).forEach(([part, db]) => {
-            const node = this.nodes.get(part as PartName);
-            if (node) {
-                node.gain.gain.linearRampToValueAtTime(dbToGain(db), rampTime);
+            const nodeInfo = this.nodes.get(part as PartName);
+            if (nodeInfo && part !== 'drums') {
+                nodeInfo.gain.gain.linearRampToValueAtTime(dbToGain(db), rampTime);
             }
         });
         
-        // Drums volume is managed internally by the worklet
         this.nodes.get('drums')?.worklet.port.postMessage({type: 'setVolume', volume: dbToGain(newVolumes.drums) });
     }
     

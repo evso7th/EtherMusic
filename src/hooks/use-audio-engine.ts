@@ -19,7 +19,6 @@ export function useAudioEngine() {
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
 
-
     const startApp = useCallback(async () => {
         if (isAppStarted) return;
         
@@ -36,7 +35,9 @@ export function useAudioEngine() {
             }
 
             if (!audioEngine.current) {
-                audioEngine.current = new AudioEngine(orbManager.current);
+                // Ensure Tone.context is available before creating AudioEngine
+                const context = Tone.getContext();
+                audioEngine.current = new AudioEngine(context, orbManager.current);
                 await audioEngine.current.initialize();
             }
             
@@ -82,14 +83,6 @@ export function useAudioEngine() {
 
     const setVolumes = useCallback((volumes: Volumes) => {
         audioEngine.current?.setVolumes(volumes);
-    }, []);
-
-    const setMelodyInstrument = useCallback((instrument: Instrument) => {
-        // This is now a no-op as the instrument is baked into the worklet
-    }, []);
-
-    const setBassInstrument = useCallback((instrument: Instrument) => {
-        // This is now a no-op as the instrument is baked into the worklet
     }, []);
     
     const setBeatPattern = useCallback((patternName: string) => {
@@ -150,12 +143,10 @@ export function useAudioEngine() {
         }
     }, [isPlaying]);
 
-
     return {
         isAppStarted,
         isReady,
         isPlaying,
-        audioEngine,
         orbManager: orbManager.current,
         startApp,
         play,
@@ -163,8 +154,6 @@ export function useAudioEngine() {
         stop,
         setTempo,
         setVolumes,
-        setMelodyInstrument,
-        setBassInstrument,
         setBeatPattern,
         setBassLatch,
         startRecording,
