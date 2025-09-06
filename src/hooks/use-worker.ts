@@ -8,8 +8,11 @@ export function useWorker(workerPath: string) {
     const workerRef = useRef<Worker | null>(null);
 
     useEffect(() => {
+        // This check ensures the code runs only in the browser.
         if (typeof window !== 'undefined' && !workerRef.current) {
-            const newWorker = new Worker(new URL(workerPath, import.meta.url));
+            // We pass the public path directly to the Worker constructor.
+            // The browser will resolve this relative to the document's origin.
+            const newWorker = new Worker(workerPath);
             workerRef.current = newWorker;
             setWorker(newWorker);
         }
