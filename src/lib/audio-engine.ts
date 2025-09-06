@@ -1,26 +1,24 @@
 
 // src/lib/audio-engine.ts
-
-import * as Tone from 'tone';
-import type { Instrument, Volumes } from '@/types';
+import type { Volumes } from '@/types';
 import { OrbManager } from './orb-manager';
 
 type PartName = 'melody' | 'manualBass' | 'latch' | 'drums';
 
 function dbToGain(db: number) {
     if (db <= -48) return 0;
-    return Math.pow(10, db / 20);
+    return 10 ** (db / 20);
 }
 
 export class AudioEngine {
     public isInitialized = false;
-    private context: AudioContext;
+    private context: AudioContext | null = null;
     public orbManager: OrbManager;
     private mediaRecorder: MediaRecorder | null = null;
     private recordedChunks: Blob[] = [];
 
-    public masterOut: Tone.Gain | null = null;
-    private nodes = new Map<PartName, { worklet: AudioWorkletNode, gain: Tone.Gain }>();
+    public masterOut: GainNode | null = null;
+    private nodes = new Map<PartName, { worklet: AudioWorkletNode, gain: GainNode }>();
     private volumes: Volumes = { 
         melody: -6, 
         manualBass: -6, 
@@ -31,9 +29,15 @@ export class AudioEngine {
     
     private activePointers = new Map<number, { type: 'melody' | 'bass', part: PartName }>();
 
-    constructor(toneContext: Tone.Context, orbManager: OrbManager) {
-        this.context = toneContext.rawContext;
+    private _isPlaying = false;
+    private animationFrameId: number | null = null;
+
+    constructor(orbManager: OrbManager) {
         this.orbManager = orbManager;
+    }
+
+    public get isPlaying(): boolean {
+        return this._isPlaying;
     }
     
     public getVolumes(): Volumes {
@@ -41,16 +45,26 @@ export class AudioEngine {
     }
 
     public async initialize() {
-        if (this.isInitialized) {
+        if (this.isInitialized || typeof window === 'undefined') {
             return;
         }
-        if (this.context.state !== 'running') {
-            throw new Error("AudioContext is not running. Cannot initialize AudioEngine.");
+
+        try {
+            this.context = new (window.AudioContext || (window as any).webkitAudioContext)();
+            
+            // Resume context on first user gesture, if needed
+            if (this.context.state === 'suspended') {
+                 await this.context.resume();
+            }
+             console.log("AudioContext started.");
+
+        } catch (e) {
+            console.error("Failed to create AudioContext", e);
+            throw new Error("Web Audio API is not supported in this browser.");
         }
         
-        console.log('Initializing AudioEngine...');
-        
-        this.masterOut = new Tone.Gain(1).toDestination();
+        this.masterOut = this.context.createGain();
+        this.masterOut.connect(this.context.destination);
         
         const mediaStreamDest = this.context.createMediaStreamDestination();
         this.masterOut.connect(mediaStreamDest);
@@ -93,17 +107,17 @@ export class AudioEngine {
         this.createWorkletNode('drums', 'drum-processor');
 
         this.setVolumes(this.volumes);
-        
-        Tone.Transport.set({ bpm: 90, swing: 0, timeSignature: 4 });
+        this.setTempo(90);
         
         this.isInitialized = true;
         console.log('AudioEngine initialized with native Web Audio API nodes.');
     }
     
     private createWorkletNode(part: PartName, processorName: string) {
-        if (this.nodes.has(part) || !this.context || !this.masterOut) return;
+        if (!this.context || !this.masterOut) return;
         
-        const gainNode = new Tone.Gain(0).connect(this.masterOut);
+        const gainNode = this.context.createGain();
+        gainNode.connect(this.masterOut);
 
         const workletNode = new AudioWorkletNode(this.context, processorName, {
             processorOptions: {
@@ -114,19 +128,50 @@ export class AudioEngine {
             numberOfOutputs: 1,
             outputChannelCount: [1]
         });
-        workletNode.connect(gainNode.get());
+        workletNode.connect(gainNode);
 
         this.nodes.set(part, { worklet: workletNode, gain: gainNode });
         console.log(`Created worklet node for: ${part}`);
     }
+
+    private tick() {
+        if (!this._isPlaying) return;
+        // The drum processor now self-schedules based on tempo
+        // We could add other timed events here if needed.
+        this.animationFrameId = requestAnimationFrame(() => this.tick());
+    }
     
     public play() {
-        if (!this.isInitialized) return;
+        if (!this.isInitialized || this._isPlaying || !this.context) return;
+        
+        if (this.context.state === 'suspended') {
+            this.context.resume();
+        }
+
+        this._isPlaying = true;
         this.nodes.get('drums')?.worklet.port.postMessage({type: 'start'});
+        if (this.animationFrameId === null) {
+            this.tick();
+        }
     }
 
-    public startNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, padInfo: { x: number, y: number, width: number, height: number}) {
-        if (!this.isInitialized) return;
+    public pause() {
+        if (!this.isInitialized || !this._isPlaying) return;
+        this._isPlaying = false;
+        this.nodes.get('drums')?.worklet.port.postMessage({type: 'stop'});
+        if (this.animationFrameId !== null) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
+    }
+
+    public stop() {
+        this.pause();
+        this.stopAllSounds();
+    }
+
+    public startNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, padInfo: { x: number, y: number }) {
+        if (!this.isInitialized || !this.context) return;
         
         const partName = type === 'bass' && this.isBassLatchOn ? 'latch' : (type === 'bass' ? 'manualBass' : type);
         const node = this.nodes.get(partName)?.worklet;
@@ -140,7 +185,8 @@ export class AudioEngine {
             note: {
                 id: pointerId,
                 frequency: freq,
-                volume: vol
+                volume: vol,
+                time: this.context.currentTime
             }
         });
         
@@ -148,8 +194,8 @@ export class AudioEngine {
         this.orbManager?.addOrb(pointerId, orbType, padInfo.x, padInfo.y);
     }
 
-    public updateNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, padInfo: { x: number, y: number, width: number, height: number}) {
-        if (!this.isInitialized) return;
+    public updateNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, padInfo: { x: number, y: number }) {
+        if (!this.isInitialized || !this.context) return;
         
         const activePointer = this.activePointers.get(pointerId);
         if (!activePointer) return;
@@ -173,7 +219,6 @@ export class AudioEngine {
              node.port.postMessage({ type: 'noteOff', id: pointerId });
         }
         
-        // Do not remove orb if it's a latch that is being turned off
         if (activePointer.part !== 'latch') {
             this.orbManager?.removeOrb(pointerId);
         }
@@ -195,23 +240,25 @@ export class AudioEngine {
     
     public setTempo(bpm: number) {
         if (!this.isInitialized) return;
-        Tone.Transport.bpm.value = bpm;
         this.nodes.get('drums')?.worklet.port.postMessage({type: 'setTempo', bpm});
     }
     
     public setVolumes(newVolumes: Volumes) {
-        if (!this.isInitialized || !this.context) return;
+        if (!this.isInitialized || !this.context || !this.masterOut) return;
         this.volumes = newVolumes;
         const rampTime = this.context.currentTime + 0.05;
 
         Object.entries(newVolumes).forEach(([part, db]) => {
             const nodeInfo = this.nodes.get(part as PartName);
-            if (nodeInfo && part !== 'drums') {
-                nodeInfo.gain.gain.linearRampToValueAtTime(dbToGain(db), rampTime);
+            const gainValue = dbToGain(db);
+            if (nodeInfo) {
+                if (part === 'drums') {
+                    nodeInfo.worklet.port.postMessage({type: 'setVolume', volume: gainValue });
+                } else {
+                    nodeInfo.gain.gain.linearRampToValueAtTime(gainValue, rampTime);
+                }
             }
         });
-        
-        this.nodes.get('drums')?.worklet.port.postMessage({type: 'setVolume', volume: dbToGain(newVolumes.drums) });
     }
     
     public stopAllSounds() {
@@ -224,7 +271,6 @@ export class AudioEngine {
     
     public startRecording() {
         if (!this.mediaRecorder || this.mediaRecorder.state === 'recording') return;
-        
         this.recordedChunks = [];
         this.mediaRecorder.start();
         console.log("Recording started.");
@@ -234,5 +280,17 @@ export class AudioEngine {
         if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
             this.mediaRecorder.stop();
         }
+    }
+
+    public fadeOutAndStop(durationSeconds: number) {
+        if (!this.masterOut || !this.context) return;
+        this.masterOut.gain.linearRampToValueAtTime(0, this.context.currentTime + durationSeconds);
+        setTimeout(() => {
+            this.stop();
+            // Restore volume for next play
+            if (this.masterOut) {
+                this.masterOut.gain.setValueAtTime(1, this.context.currentTime);
+            }
+        }, (durationSeconds + 0.5) * 1000);
     }
 }

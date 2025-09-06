@@ -91,7 +91,7 @@ export function ThereminPad({
         const frequency = allowedFrequencies[Math.min(index, allowedFrequencies.length - 1)];
         
         // Volume is inverted: top is loud (0), bottom is quiet (1)
-        const volume = 1 - normalizedY;
+        const volume = Math.pow(1 - normalizedY, 2); // Make it more sensitive at the top
         
         return { x, y, frequency, volume, pointerId: event.pointerId };
     }, [allowedFrequencies]);
@@ -143,11 +143,10 @@ export function ThereminPad({
                     <SheetTrigger asChild>{triggerButton}</SheetTrigger>
                 </TooltipTrigger>
                 <TooltipContent>
-                    <p>Instrument & Harmony Settings</p>
+                    <p>Harmony Settings</p>
                 </TooltipContent>
             </Tooltip>
         );
-
 
         return (
             <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
@@ -158,25 +157,8 @@ export function ThereminPad({
                     </SheetHeader>
                      <ScrollArea className="h-[85vh]">
                         <div className="py-4 pr-4 space-y-6">
-                            {instruments && activeInstrument && onInstrumentChange && (
-                                <div className="space-y-2">
-                                    <Label>Instrument</Label>
-                                    <Select value={activeInstrument} onValueChange={onInstrumentChange}>
-                                        <SelectTrigger className="capitalize">
-                                            <SelectValue placeholder="Instrument" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {instruments.map(inst => (
-                                                <SelectItem key={inst} value={inst} className="capitalize">{inst.replace(/_/g, ' ')}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            )}
-                            
                             {type === 'melody' && (
                                 <>
-                                    <Separator />
                                     {musicKeys && activeKey && onKeyChange && (
                                         <div className="space-y-2">
                                             <Label>Music Key</Label>
@@ -206,7 +188,7 @@ export function ThereminPad({
                                  </>
                             )}
                             
-                             <Separator />
+                            <Separator />
 
                             <Button 
                                 onClick={() => setIsSettingsOpen(false)} 
@@ -236,7 +218,7 @@ export function ThereminPad({
         >
             <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between p-2">
                 <div className="text-xs text-muted-foreground capitalize pl-2">
-                    {activeInstrument?.replace(/_/g, ' ')}
+                   {type === 'melody' ? 'Theremin' : 'Bass Synth'}
                 </div>
                 <div className="flex items-center gap-2">
                      <TooltipProvider>

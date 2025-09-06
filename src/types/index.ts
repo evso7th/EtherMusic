@@ -3,6 +3,8 @@ export type MusicKey = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' |
 
 export type MusicScale = 'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentatonic';
 
+// This type is kept for potential future use but is not currently used for instrument selection
+// since the synthesis is handled by a single type of worklet.
 export type Instrument = 'synth' | 'organ' | 'theremin' | 'E-Bells' | 'mellotron' | 'G-Drops' | 'ebass';
 
 export type Tempo = {

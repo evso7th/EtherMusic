@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import * as Tone from 'tone';
 import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
@@ -27,22 +26,17 @@ export function useAudioEngine() {
         audio.play().catch(e => console.error("Error playing transition sound:", e));
         
         try {
-            await Tone.start();
-            console.log("AudioContext started by user gesture.");
-            
             if (!orbManager.current) {
                 orbManager.current = new OrbManager();
             }
 
             if (!audioEngine.current) {
-                // Ensure Tone.context is available before creating AudioEngine
-                const context = Tone.getContext();
-                audioEngine.current = new AudioEngine(context, orbManager.current);
+                audioEngine.current = new AudioEngine(orbManager.current);
                 await audioEngine.current.initialize();
             }
             
             setIsReady(true);
-            setIsPlaying(Tone.Transport.state === 'started');
+            setIsPlaying(audioEngine.current.isPlaying);
             console.log('AudioEngine initialized and ready.');
 
         } catch(e) {
@@ -57,24 +51,20 @@ export function useAudioEngine() {
 
     const play = useCallback(() => {
         if (!isReady || !audioEngine.current) return;
-        if (Tone.Transport.state !== 'started') {
-            Tone.Transport.start();
-        }
         audioEngine.current.play();
         setIsPlaying(true);
     }, [isReady]);
 
     const pause = useCallback(() => {
-        if (!isReady) return;
-        Tone.Transport.pause();
+        if (!isReady || !audioEngine.current) return;
+        audioEngine.current.pause();
         setIsPlaying(false);
     }, [isReady]);
 
     const stop = useCallback(() => {
         if (!audioEngine.current) return;
-        Tone.Transport.stop();
+        audioEngine.current.stop();
         setIsPlaying(false);
-        audioEngine.current.stopAllSounds();
     }, []);
 
     const setTempo = useCallback((bpm: number) => {
@@ -108,16 +98,13 @@ export function useAudioEngine() {
         }
         if (durationMinutes !== null) {
             const id = setTimeout(() => {
-                if (audioEngine.current?.masterOut) {
-                    audioEngine.current.masterOut.gain.linearRampTo(0, 5, Tone.now());
+                if (audioEngine.current) {
+                    audioEngine.current.fadeOutAndStop(5);
                 }
-                setTimeout(() => {
-                    stop();
-                }, 5500);
             }, durationMinutes * 60 * 1000);
             setSleepTimerId(id);
         }
-    }, [sleepTimerId, stop]);
+    }, [sleepTimerId]);
     
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isReady || !audioEngine.current) return;
@@ -126,22 +113,14 @@ export function useAudioEngine() {
         const padElement = document.getElementById(`theremin-pad-${type}`);
         if (!padElement) return;
 
-        const rect = padElement.getBoundingClientRect();
-        
         if (state === 'down' && data) {
-            engine.startNote(type, data.pointerId, data.frequency, data.volume, {x: data.x, y: data.y, width: rect.width, height: rect.height});
+            engine.startNote(type, data.pointerId, data.frequency, data.volume, {x: data.x, y: data.y});
         } else if (state === 'move' && data) {
-            engine.updateNote(type, data.pointerId, data.frequency, data.volume, {x: data.x, y: data.y, width: rect.width, height: rect.height});
+            engine.updateNote(type, data.pointerId, data.frequency, data.volume, {x: data.x, y: data.y});
         } else if (state === 'up' && data) {
             engine.stopNote(type, data.pointerId);
         }
     }, [isReady]);
-
-    useEffect(() => {
-        if (audioEngine.current && isPlaying) {
-            audioEngine.current.play();
-        }
-    }, [isPlaying]);
 
     return {
         isAppStarted,
@@ -154,6 +133,8 @@ export function useAudioEngine() {
         stop,
         setTempo,
         setVolumes,
+        setMelodyInstrument: () => {}, // Kept for compatibility, does nothing
+        setBassInstrument: () => {}, // Kept for compatibility, does nothing
         setBeatPattern,
         setBassLatch,
         startRecording,

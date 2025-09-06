@@ -17,7 +17,7 @@ import { useAudioEngine } from '@/hooks/use-audio-engine';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SleepTimer } from '@/components/sleep-timer';
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
-import type { Instrument, MusicKey, MusicScale, Tempo, Volumes } from '@/types';
+import type { MusicKey, MusicScale, Tempo, Volumes } from '@/types';
 
 
 function getCookie(name: string): string | null {
@@ -84,8 +84,6 @@ export const tempos: Tempo[] = [
     { name: 'Allegretto', bpm: 130 },
 ];
 
-export const instruments: Instrument[] = ['synth', 'organ', 'theremin', 'E-Bells', 'mellotron', 'G-Drops', 'ebass', 'effects'];
-
 const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
 const MemoizedThereminPad = memo(ThereminPad);
 
@@ -123,8 +121,6 @@ export default function Home() {
         stop,
         setTempo,
         setVolumes,
-        setMelodyInstrument,
-        setBassInstrument,
         setBeatPattern,
         setBassLatch,
         startRecording,
@@ -137,8 +133,6 @@ export default function Home() {
     const [isRecording, setIsRecording] = useState(false);
     const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
     const [activePattern, setActivePattern] = useState<(typeof beatPatterns)[number]>(beatPatterns.find(p => p.name === 'Off')!);
-    const [melodyInstrument, setLocalMelodyInstrument] = useState<Instrument>('theremin');
-    const [bassInstrument, setLocalBassInstrument] = useState<Instrument>('synth');
     const [musicKey, setMusicKey] = useState<MusicKey>('G');
     const [musicScale, setMusicScale] = useState<MusicScale>('Minor');
     const [allowedFrequencies, setAllowedFrequencies] = useState<{melody: number[], bass: number[]}>({melody: [], bass: []});
@@ -161,7 +155,7 @@ export default function Home() {
         const currentKey = Object.keys(ALL_NOTES).includes(keyOrScale) ? keyOrScale as MusicKey : newKey;
         const currentScale = Object.keys(SCALES).includes(keyOrScale) ? keyOrScale as MusicScale : newScale;
 
-        const baseMelodyNote = 48 + ALL_NOTES[currentKey]; // C4 for melody start
+        const baseMelodyNote = 48 + ALL_NOTES[currentKey]; // C3 for melody start
         const baseBassNote = 24 + ALL_NOTES[currentKey];   // C1 for bass start
     
         const melodyFreqs = getScaleFrequencies(baseMelodyNote, SCALES[currentScale], [0, 1]);
@@ -225,16 +219,6 @@ export default function Home() {
         }
     }, [setVolumes, cookieConsent]);
 
-    const handleMelodyInstrumentChange = useCallback((instrument: Instrument) => {
-        setLocalMelodyInstrument(instrument);
-        setMelodyInstrument(instrument);
-    }, [setMelodyInstrument]);
-
-    const handleBassInstrumentChange = useCallback((instrument: Instrument) => {
-        setLocalBassInstrument(instrument);
-        setBassInstrument(instrument);
-    }, [setBassInstrument]);
-    
     const handleLatchToggle = useCallback((isOn: boolean) => {
         setIsBassLatchOn(isOn);
         setBassLatch(isOn);
@@ -264,7 +248,7 @@ export default function Home() {
                     </Button>
                 </div>
                  <footer className="z-10 text-xs text-white/50 pb-4 text-center">
-                    <p>Powered by Web Audio API & Tone.js</p>
+                    <p>Powered by Web Audio API</p>
                     <p>&copy; 2024, EVS</p>
                     <p className="mt-2">v.2.0 "Maestro"</p>
                 </footer>
@@ -327,11 +311,8 @@ export default function Home() {
                             type="bass"
                             allowedFrequencies={allowedFrequencies.bass}
                             color="hsl(var(--accent))"
-                            isLatchOn={isBassLatchOn}
+                            isLatchOn={isLatchOn}
                             onLatchToggle={handleLatchToggle}
-                            instruments={instruments.filter(i => i !== 'theremin' && i !== 'G-Drops' && !i.includes('effects'))}
-                            activeInstrument={bassInstrument}
-                            onInstrumentChange={handleBassInstrumentChange}
                             isPolyphonic
                             orbManager={orbManager}
                         />
@@ -341,9 +322,6 @@ export default function Home() {
                             allowedFrequencies={allowedFrequencies.melody}
                             color="hsl(var(--primary))"
                             isLatchOn={false}
-                            instruments={instruments.filter(i => i !== 'ebass')}
-                            activeInstrument={melodyInstrument}
-                            onInstrumentChange={handleMelodyInstrumentChange}
                             musicKeys={Object.keys(ALL_NOTES) as MusicKey[]}
                             activeKey={musicKey}
                             onKeyChange={handleHarmonyChange}
