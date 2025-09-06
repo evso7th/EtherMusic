@@ -1,48 +1,57 @@
 // src/lib/audio-engine.ts
 
 import * as Tone from 'tone';
-import type { Instrument, MusicKey, MusicScale, Volumes } from '@/types';
+import type { Instrument, MusicKey, MusicScale, Volumes, AutopilotPart, AutopilotSettings } from '@/types';
 import { OrbManager } from './orb-manager';
 
-type PartName = 'melody' | 'manualBass' | 'latch' | 'drums';
+type PartName = 'melody' | 'manualBass' | 'latch' | 'autopilot' | 'accompaniment' | 'autopilotBass' | 'effects' | 'drums';
 
-// Helper to convert dB to gain
 function dbToGain(db: number) {
     return Math.pow(10, db / 20);
 }
 
-/**
- * A modern, worklet-based audio engine for EtherMusic.
- * This engine acts as a central dispatcher and mixer.
- * It uses native Web Audio API nodes for mixing and routing.
- */
 export class AudioEngine {
     public isInitialized = false;
     private context!: AudioContext;
-    public orbManager!: OrbManager;
+    public orbManager: OrbManager;
     private mediaRecorder: MediaRecorder | null = null;
     private recordedChunks: Blob[] = [];
 
-    // Audio Nodes
     public masterOut!: GainNode;
     private nodes = new Map<PartName, { worklet: AudioWorkletNode, gain: GainNode }>();
     private volumes: Volumes;
     private isBassLatchOn: boolean = false;
-    
-    constructor() {
-        this.volumes = { melody: -6, manualBass: -6, latch: -15, drums: -9 };
+    private autopilotWorker: Worker | null = null;
+    private tickLoop: Tone.Loop | null = null;
+
+    private activeAutopilotParts: AutopilotPart[] = [];
+    private autopilotInstruments: { [key in AutopilotPart]?: Instrument } = {};
+
+    constructor(orbManager: OrbManager) {
+        this.orbManager = orbManager;
+        this.volumes = { 
+            melody: -9, 
+            manualBass: -9, 
+            latch: -18, 
+            drums: -12,
+            autopilot: -15,
+            accompaniment: -18,
+            autopilotBass: -12,
+            effects: -18,
+        };
     }
     
     public getVolumes(): Volumes {
         return {...this.volumes};
     }
 
-    public async initialize() {
+    public async initialize(worker: Worker) {
         if (this.isInitialized) return;
         
         console.log('AudioContext started. Loading worklets and samples...');
         
         this.context = Tone.getContext().rawContext as AudioContext;
+        this.autopilotWorker = worker;
         
         this.masterOut = this.context.createGain();
         this.masterOut.connect(this.context.destination);
@@ -74,26 +83,40 @@ export class AudioEngine {
 
         try {
             await this.context.audioWorklet.addModule('/worklets/theremin-processor.js');
-
+            await this.context.audioWorklet.addModule('/worklets/drum-processor.js');
+            
             this.createWorkletNode('melody', 'theremin-processor');
             this.createWorkletNode('manualBass', 'theremin-processor');
             this.createWorkletNode('latch', 'theremin-processor');
+            this.createWorkletNode('autopilot', 'theremin-processor');
+            this.createWorkletNode('accompaniment', 'theremin-processor');
+            this.createWorkletNode('autopilotBass', 'theremin-processor');
+            this.createWorkletNode('effects', 'theremin-processor');
+            this.createWorkletNode('drums', 'drum-processor');
 
-            // Default instrument types
-            this.setMelodyInstrument('theremin');
-            this.setBassInstrument('synth');
+            this.setVolumes(this.volumes);
+
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
             throw new Error("Could not load core audio components. Please try refreshing the page.");
         }
         
+        if (this.autopilotWorker) {
+            this.autopilotWorker.onmessage = this.handleWorkerMessage.bind(this);
+        }
+
         Tone.Transport.set({ bpm: 90, swing: 0, timeSignature: 4 });
+        
+        this.tickLoop = new Tone.Loop(time => {
+            this.autopilotWorker?.postMessage({ type: 'tick', time });
+        }, '16n').start(0);
+
         this.isInitialized = true;
         console.log('AudioEngine initialized with native Web Audio API nodes.');
     }
     
     private createWorkletNode(part: PartName, processorName: string) {
-        if (this.nodes.has(part)) return;
+        if (this.nodes.has(part) || !this.context) return;
 
         const gainNode = this.context.createGain();
         gainNode.connect(this.masterOut);
@@ -113,46 +136,96 @@ export class AudioEngine {
         console.log(`Created worklet node for: ${part}`);
     }
 
-    public setOrbManager(orbManager: OrbManager) {
-        this.orbManager = orbManager;
+    private handleWorkerMessage(event: MessageEvent) {
+        const { type, payload } = event.data;
+        if (type === 'notes') {
+            const { part, notes, time } = payload;
+            const node = this.nodes.get(part as PartName)?.worklet;
+            if (node) {
+                node.port.postMessage({ type: 'playNotes', notes, time });
+            }
+        }
+    }
+    
+    public setAutopilotState(isPlaying: boolean) {
+        this.autopilotWorker?.postMessage({ type: 'transportState', isPlaying });
     }
 
-    // --- Note Control ---
-    public startNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: { x: number, y: number }) {
-        const part = type === 'bass' && this.isBassLatchOn ? 'latch' : (type === 'bass' ? 'manualBass' : type);
-        const node = this.nodes.get(part)?.worklet;
-        
+    public updateAutopilot(settings: AutopilotSettings) {
+        this.activeAutopilotParts = settings.parts;
+        this.autopilotInstruments = settings.instruments;
+        this.autopilotWorker?.postMessage({ type: 'updateSettings', settings });
+    }
+
+    public setAutopilot(isOn: boolean) {
+        this.autopilotWorker?.postMessage({ type: isOn ? 'start' : 'stop' });
+    }
+
+    public saveAutopilotPreset(style: string) {
+        this.autopilotWorker?.postMessage({ type: 'savePreset', payload: { style } });
+    }
+    
+    public loadAutopilotPreset(style: string) {
+        return new Promise<any>((resolve) => {
+            if (!this.autopilotWorker) return resolve(null);
+            
+            const handlePreset = (event: MessageEvent) => {
+                if (event.data.type === 'presetLoaded') {
+                    this.autopilotWorker?.removeEventListener('message', handlePreset);
+                    resolve(event.data.payload);
+                }
+            };
+            this.autopilotWorker.addEventListener('message', handlePreset);
+            this.autopilotWorker.postMessage({ type: 'loadPreset', payload: { style } });
+        });
+    }
+
+    public startNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, padInfo: { x: number, y: number, width: number, height: number}) {
+        const partName = type === 'bass' && this.isBassLatchOn ? 'latch' : (type === 'bass' ? 'manualBass' : type);
+        const node = this.nodes.get(partName)?.worklet;
+
         if (!node) return;
-        
-        const message = { type: 'noteOn', pointerId, frequency: freq, volume: vol };
-        node.port.postMessage(message);
 
+        node.port.postMessage({
+            type: 'noteOn',
+            note: {
+                id: pointerId,
+                frequency: freq,
+                volume: vol
+            }
+        });
+        
         const orbType = this.isBassLatchOn && type === 'bass' ? 'latch' : type;
-        this.orbManager?.addOrb(pointerId, orbType, pos.x, pos.y);
+        this.orbManager?.addOrb(pointerId, orbType, padInfo.x, padInfo.y);
     }
 
-    public updateNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, pos: { x: number, y: number }) {
-        const part = type === 'bass' && this.isBassLatchOn ? 'latch' : (type === 'bass' ? 'manualBass' : type);
-        const node = this.nodes.get(part)?.worklet;
-        
-        if (!node || (type === 'bass' && this.isBassLatchOn)) return;
-
-        const message = { type: 'noteUpdate', pointerId, frequency: freq, volume: vol };
-        node.port.postMessage(message);
-        this.orbManager?.updateOrb(pointerId, pos.x, pos.y);
+    public updateNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, padInfo: { x: number, y: number, width: number, height: number}) {
+        const partName = type === 'bass' && this.isBassLatchOn ? 'latch' : 'manualBass';
+        if (type === 'melody') {
+            const node = this.nodes.get('melody')?.worklet;
+            if(node) {
+                node.port.postMessage({ type: 'noteUpdate', note: { id: pointerId, frequency: freq, volume: vol } });
+                this.orbManager?.updateOrb(pointerId, padInfo.x, padInfo.y);
+            }
+        } else if (type === 'bass' && !this.isBassLatchOn) {
+            const node = this.nodes.get('manualBass')?.worklet;
+             if(node) {
+                node.port.postMessage({ type: 'noteUpdate', note: { id: pointerId, frequency: freq, volume: vol } });
+                this.orbManager?.updateOrb(pointerId, padInfo.x, padInfo.y);
+            }
+        }
     }
 
     public stopNote(type: 'melody' | 'bass', pointerId: number) {
-        const part = type === 'bass' && this.isBassLatchOn ? 'latch' : (type === 'bass' ? 'manualBass' : type);
-        const node = this.nodes.get(part)?.worklet;
+        const partName = type === 'bass' && this.isBassLatchOn ? 'latch' : 'manualBass';
+        const node = type === 'melody' ? this.nodes.get('melody')?.worklet : this.nodes.get(partName)?.worklet;
 
         if (!node) return;
-
+        
         if (type === 'bass' && this.isBassLatchOn) {
-            // For latch mode, a click on an orb stops the note, which is handled as a 'noteOn' with the same freq.
-            // The worklet will interpret this as a toggle.
+            // Latch mode toggles notes, it does not use noteOff
         } else {
-             node.port.postMessage({ type: 'noteOff', pointerId });
+             node.port.postMessage({ type: 'noteOff', id: pointerId });
         }
         
         if (!(type === 'bass' && this.isBassLatchOn)) {
@@ -168,24 +241,12 @@ export class AudioEngine {
         }
     }
 
-    public setMelodyInstrument(instrument: Instrument) {
-        this.nodes.get('melody')?.worklet.port.postMessage({ type: 'setInstrument', instrument });
-    }
-    
-    public setBassInstrument(instrument: Instrument) {
-        this.nodes.get('manualBass')?.worklet.port.postMessage({ type: 'setInstrument', instrument });
-        this.nodes.get('latch')?.worklet.port.postMessage({ type: 'setInstrument', instrument });
-    }
-
-    // --- Global Controls ---
-    public setTempo(bpm: number) {
-        if (this.isInitialized) {
-            Tone.Transport.bpm.value = bpm;
-        }
+    public setHarmony(key: MusicKey, scale: MusicScale) {
+        this.autopilotWorker?.postMessage({ type: 'setHarmony', payload: { key, scale } });
     }
 
     public setBeatPattern(patternName: string) {
-        // This functionality is currently not implemented with the new worklet-based engine
+        this.nodes.get('drums')?.worklet.port.postMessage({type: 'setPattern', pattern: patternName});
     }
     
     public setVolumes(newVolumes: Volumes) {
@@ -193,9 +254,14 @@ export class AudioEngine {
         this.volumes = newVolumes;
         const rampTime = this.context.currentTime + 0.05;
 
-        this.nodes.get('melody')?.gain.gain.linearRampToValueAtTime(dbToGain(this.volumes.melody), rampTime);
-        this.nodes.get('manualBass')?.gain.gain.linearRampToValueAtTime(dbToGain(this.volumes.manualBass), rampTime);
-        this.nodes.get('latch')?.gain.gain.linearRampToValueAtTime(dbToGain(this.volumes.latch), rampTime);
+        Object.entries(newVolumes).forEach(([part, db]) => {
+            const node = this.nodes.get(part as PartName);
+            if (node) {
+                node.gain.gain.linearRampToValueAtTime(dbToGain(db), rampTime);
+            }
+        });
+        
+        this.nodes.get('drums')?.worklet.port.postMessage({type: 'setVolume', volume: newVolumes.drums});
     }
     
     public stopAllSounds() {
@@ -204,9 +270,9 @@ export class AudioEngine {
             node.worklet.port.postMessage({ type: 'allNotesOff' });
         });
         this.orbManager?.removeAllOrbs();
+        this.autopilotWorker?.postMessage({ type: 'stop' });
     }
     
-    // --- Recording ---
     public startRecording() {
         if (!this.mediaRecorder || this.mediaRecorder.state === 'recording') return;
         

@@ -6,8 +6,8 @@ import * as Tone from 'tone';
 import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
-import type { Instrument, MusicKey, MusicScale, Volumes } from '@/types';
-import { useWorker } from './use-worker'; // Assuming this hook is now created.
+import type { Volumes } from '@/types';
+import { useWorker } from './use-worker';
 
 export function useAudioEngine() {
     const { toast } = useToast();
@@ -18,14 +18,17 @@ export function useAudioEngine() {
     const [sleepTimerId, setSleepTimerId] = useState<NodeJS.Timeout | null>(null);
 
     const audioEngine = useRef<AudioEngine | null>(null);
-    const orbManager = useRef<OrbManager | null>(null);
-    
-    // Note: The autopilot worker is removed, but the structure to use a worker is kept.
-    // If a drum machine worker were added, it would follow a similar pattern.
-    // const autopilotWorker = useWorker('/workers/autopilot-worker.js'); // This would be the pattern
+    const worker = useWorker('/workers/autopilot-worker.js'); // This is now safe
+
+    useEffect(() => {
+        if (!audioEngine.current) {
+            const om = new OrbManager();
+            audioEngine.current = new AudioEngine(om);
+        }
+    }, []);
 
     const startApp = useCallback(async () => {
-        if (isAppStarted) return;
+        if (isAppStarted || !audioEngine.current) return;
 
         const audio = new Audio('/assets/sounds/transition.webm');
         audio.play().catch(e => console.error("Error playing transition sound:", e));
@@ -36,15 +39,7 @@ export function useAudioEngine() {
             console.log("Initializing audio resources after user gesture...");
             await Tone.start();
             
-            // AudioEngine now creates its own context.
-            const engine = new AudioEngine();
-            await engine.initialize();
-            
-            const om = new OrbManager();
-            orbManager.current = om;
-            engine.setOrbManager(om);
-
-            audioEngine.current = engine;
+            await audioEngine.current.initialize(worker!);
             
             setIsReady(true);
             setIsPlaying(Tone.Transport.state === 'started');
@@ -58,18 +53,20 @@ export function useAudioEngine() {
                 variant: "destructive"
             });
         }
-    }, [isAppStarted, toast]);
+    }, [isAppStarted, toast, worker]);
 
     const play = useCallback(() => {
         if (!isReady) return;
         Tone.Transport.start();
         setIsPlaying(true);
+        audioEngine.current?.setAutopilotState(true);
     }, [isReady]);
 
     const pause = useCallback(() => {
         if (!isReady) return;
         Tone.Transport.pause();
         setIsPlaying(false);
+        audioEngine.current?.setAutopilotState(false);
     }, [isReady]);
 
     const stop = useCallback(() => {
@@ -87,14 +84,6 @@ export function useAudioEngine() {
         audioEngine.current?.setVolumes(volumes);
     }, []);
     
-    const setMelodyInstrument = useCallback((instrument: Instrument) => {
-        audioEngine.current?.setMelodyInstrument(instrument);
-    }, []);
-
-    const setBassInstrument = useCallback((instrument: Instrument) => {
-        audioEngine.current?.setBassInstrument(instrument);
-    }, []);
-    
     const setBeatPattern = useCallback((patternName: string) => {
         audioEngine.current?.setBeatPattern(patternName);
     }, []);
@@ -102,6 +91,23 @@ export function useAudioEngine() {
     const setBassLatch = useCallback((isOn: boolean) => {
         audioEngine.current?.setBassLatch(isOn);
     }, []);
+    
+    const handleAutopilotChange = useCallback((settings: any) => {
+        audioEngine.current?.updateAutopilot(settings);
+    }, []);
+    
+    const handleAutopilotToggle = useCallback((isOn: boolean) => {
+        audioEngine.current?.setAutopilot(isOn);
+    }, []);
+
+    const saveAutopilotPreset = useCallback((style: string) => {
+        audioEngine.current?.saveAutopilotPreset(style);
+    }, []);
+
+    const loadAutopilotPreset = useCallback((style: string) => {
+        return audioEngine.current?.loadAutopilotPreset(style);
+    }, []);
+
 
     const startRecording = useCallback(() => {
         audioEngine.current?.startRecording();
@@ -142,18 +148,24 @@ export function useAudioEngine() {
         if (!isReady || !audioEngine.current) return;
         
         const engine = audioEngine.current;
+        const padElement = document.getElementById(`theremin-pad-${type}`);
+        if (!padElement) return;
+
+        const rect = padElement.getBoundingClientRect();
         
         if (state === 'down' && data) {
-            engine.startNote(type, data.pointerId, data.frequency, data.volume, {x: data.x, y: data.y});
+            engine.startNote(type, data.pointerId, data.frequency, data.volume, {x: data.x, y: data.y, width: rect.width, height: rect.height});
         } else if (state === 'move' && data) {
-            engine.updateNote(type, data.pointerId, data.frequency, data.volume, {x: data.x, y: data.y});
+            engine.updateNote(type, data.pointerId, data.frequency, data.volume, {x: data.x, y: data.y, width: rect.width, height: rect.height});
         } else if (state === 'up' && data) {
             engine.stopNote(type, data.pointerId);
         }
     }, [isReady]);
+
+    const handleHarmonyChange = useCallback((key: MusicKey, scale: MusicScale) => {
+        audioEngine.current?.setHarmony(key, scale);
+    }, []);
     
-    // The setHarmony function is removed as it's no longer needed by the audio engine directly.
-    // The harmony logic is now fully contained within page.tsx
 
     return {
         isAppStarted,
@@ -166,14 +178,17 @@ export function useAudioEngine() {
         stop,
         setTempo,
         setVolumes,
-        setMelodyInstrument,
-        setBassInstrument,
         setBeatPattern,
         setBassLatch,
+        handleAutopilotChange,
+        handleAutopilotToggle,
+        saveAutopilotPreset,
+        loadAutopilotPreset,
         startRecording,
         stopRecording,
         handleThereminInteraction,
+        handleHarmonyChange,
         setSleepTimer,
-        orbManager: orbManager.current
+        orbManager: audioEngine.current?.orbManager
     };
 }
