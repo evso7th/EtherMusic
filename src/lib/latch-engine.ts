@@ -1,3 +1,4 @@
+
 import type { Note } from '@/types';
 
 const MAX_LATCH_NOTES = 4;

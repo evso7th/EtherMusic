@@ -99,17 +99,17 @@ export function ThereminPad({
     const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (isDisabled) return;
         
-        console.log(`[ThereminPad] Latch mode tap DOWN.`);
-
+        console.log(`[ThereminPad] ${isLatchOn && type === 'bass' ? 'Latch mode tap' : 'Standard'} DOWN.`);
         const interactionData = calculateInteraction(event);
         if (!interactionData) return;
 
         (event.target as HTMLElement).setPointerCapture(event.pointerId);
         onInteraction(type, interactionData, 'down');
-    }, [calculateInteraction, isDisabled, onInteraction, type]);
+    }, [calculateInteraction, isDisabled, onInteraction, type, isLatchOn]);
 
     const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
-        if (isDisabled || !(event.buttons > 0) || (type === 'bass' && isLatchOn)) return;
+        // Latch mode does not care about pointer move
+        if (isDisabled || !(event.buttons > 0) || (isLatchOn && type === 'bass')) return;
         
         const interactionData = calculateInteraction(event);
         if (interactionData) {
@@ -120,14 +120,14 @@ export function ThereminPad({
     const handlePointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (isDisabled) return;
 
-        if (type === 'bass' && isLatchOn) {
-             console.log(`[ThereminPad] Latch mode tap UP.`);
+        // Latch mode handles its logic on 'down', so we ignore 'up' to prevent double-firing
+        if (isLatchOn && type === 'bass') {
+            console.log(`[ThereminPad] Latch mode tap UP (ignored by pad).`);
         } else {
              console.log(`[ThereminPad] Pointer UP.`);
+             const interactionData = calculateInteraction(event);
+             onInteraction(type, interactionData, 'up');
         }
-        
-        const interactionData = calculateInteraction(event);
-        onInteraction(type, interactionData, 'up');
         
         if ((event.target as HTMLElement).hasPointerCapture(event.pointerId)) {
             (event.target as HTMLElement).releasePointerCapture(event.pointerId);

@@ -169,12 +169,12 @@ export class AudioEngine {
         console.log(`[AudioEngine] handleThereminInteraction: type=${type}, state=${state}, data:`, data);
 
         if (type === 'bass' && this.isBassLatchOn) {
-            // In latch mode, we only care about the combined down/up event from the hook.
             if (state === 'down' && data) {
                  const id = this.positionToId(data.x, data.y);
                  const result = this.latchEngine.toggleNote(id, data.frequency, data.volume);
                  this.processLatchResult(result, data);
             }
+            // In latch mode, we ignore 'move' and 'up' events for the bass pad.
             return;
         }
         
