@@ -99,16 +99,14 @@ export function ThereminPad({
     const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (isDisabled) return;
         
-        if (type === 'bass' && isLatchOn) {
-            console.log('[ThereminPad] Latch mode tap DOWN.');
-        }
+        console.log(`[ThereminPad] Latch mode tap DOWN.`);
 
         const interactionData = calculateInteraction(event);
         if (!interactionData) return;
 
         (event.target as HTMLElement).setPointerCapture(event.pointerId);
         onInteraction(type, interactionData, 'down');
-    }, [calculateInteraction, isDisabled, onInteraction, type, isLatchOn]);
+    }, [calculateInteraction, isDisabled, onInteraction, type]);
 
     const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (isDisabled || !(event.buttons > 0) || (type === 'bass' && isLatchOn)) return;
@@ -123,7 +121,9 @@ export function ThereminPad({
         if (isDisabled) return;
 
         if (type === 'bass' && isLatchOn) {
-             console.log('[ThereminPad] Latch mode tap UP.');
+             console.log(`[ThereminPad] Latch mode tap UP.`);
+        } else {
+             console.log(`[ThereminPad] Pointer UP.`);
         }
         
         const interactionData = calculateInteraction(event);

@@ -136,10 +136,11 @@ export function useAudioEngine() {
         if (!isReady || !audioEngine.current) return;
 
         if (type === 'bass' && isBassLatchOnRef.current) {
-            // In latch mode, we only care about the 'down' event to toggle a note.
-            if (state === 'down' && data) {
-                // We pass 'down' to the engine, which will handle the toggle logic.
+            if (data) {
+                // In latch mode, we only care about the 'down' event to toggle a note.
+                // The 'up' event is simulated immediately after to create a 'tap' behavior.
                 audioEngine.current.handleThereminInteraction(type, data, 'down');
+                audioEngine.current.handleThereminInteraction(type, data, 'up');
             }
         } else {
              audioEngine.current.handleThereminInteraction(type, data, state);

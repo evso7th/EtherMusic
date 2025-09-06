@@ -166,10 +166,10 @@ export class AudioEngine {
     public handleThereminInteraction(type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') {
         if (!this.isInitialized || !this.context) return;
         
-        console.log(`[AudioEngine] handleThereminInteraction: type=${type}, state=${state}`, data);
-
+        console.log(`[AudioEngine] handleThereminInteraction: type=${type}, state=${state}, data:`, data);
 
         if (type === 'bass' && this.isBassLatchOn) {
+            // In latch mode, we only care about the combined down/up event from the hook.
             if (state === 'down' && data) {
                  const id = this.positionToId(data.x, data.y);
                  const result = this.latchEngine.toggleNote(id, data.frequency, data.volume);
@@ -232,8 +232,10 @@ export class AudioEngine {
             const notesToTurnOff = this.latchEngine.clear();
             const latchNode = this.nodes.get('latch')?.worklet;
             if (latchNode) {
-                latchNode.port.postMessage({ type: 'allNotesOff' });
-                notesToTurnOff.forEach(note => this.orbManager.removeOrb(note.id));
+                notesToTurnOff.forEach(note => {
+                    latchNode.port.postMessage({ type: 'noteOff', id: note.id });
+                    this.orbManager.removeOrb(note.id);
+                });
             }
         }
     }
