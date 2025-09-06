@@ -2,8 +2,8 @@
 import type { Volumes, Note, Instrument, BassInstrument } from '@/types';
 import { OrbManager } from './orb-manager';
 import { LatchEngine, type LatchToggleResult } from './latch-engine';
-import { melodyPresets } from './melody-presets';
-import { bassPresets } from './bass-presets';
+import { melodyInstruments } from './melody-presets';
+import { bassInstruments } from './bass-presets';
 
 type PartName = 'melody' | 'manualBass' | 'latch' | 'drums';
 
@@ -158,11 +158,10 @@ export class AudioEngine {
     }
 
     public handleThereminInteraction(type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') {
-        console.log(`[AudioEngine] handleThereminInteraction: type=${type}, state=${state}, isLatchOn=${this.isBassLatchOn}`);
-        if (!this.isInitialized || !this.context || !data) return;
+        if (!this.isInitialized || !this.context) return;
 
         if (type === 'bass' && this.isBassLatchOn) {
-            if (state === 'down') { // Only react on 'down' for latch mode taps
+            if (state === 'down' && data) { // Only react on 'down' for latch mode taps
                  const result = this.latchEngine.toggleNote(data);
                  this.processLatchResult(result, data);
             }
@@ -170,6 +169,8 @@ export class AudioEngine {
             return;
         }
         
+        if (!data) return;
+
         const partName = type === 'bass' ? 'manualBass' : type;
         const node = this.nodes.get(partName)?.worklet;
         if (!node) return;
@@ -195,24 +196,18 @@ export class AudioEngine {
      private processLatchResult(result: LatchToggleResult, originalEventData: { x: number, y: number }) {
         const latchNode = this.nodes.get('latch')?.worklet;
         if (!latchNode) return;
-
-        console.log('[AudioEngine] processLatchResult:', result);
     
         if (result.noteOff) {
-            console.log('[AudioEngine] Sending noteOff to latch worklet:', result.noteOff);
             latchNode.port.postMessage({ type: 'noteOff', id: result.noteOff.id });
         }
         if (result.noteToAnimateRemove) {
-             console.log('[AudioEngine] Removing orb for latch note', result.noteToAnimateRemove.id);
             this.orbManager.removeOrb(result.noteToAnimateRemove.id);
         }
         
         if (result.noteOn) {
-            console.log('[AudioEngine] Sending noteOn to latch worklet:', result.noteOn);
             latchNode.port.postMessage({ type: 'noteOn', note: result.noteOn });
         }
         if (result.noteToAnimateAdd) {
-            console.log('[AudioEngine] Adding orb for latch note', result.noteToAnimateAdd.id);
             this.orbManager.addOrb(result.noteToAnimateAdd.id, 'latch', originalEventData.x, originalEventData.y);
         }
     }
@@ -220,7 +215,6 @@ export class AudioEngine {
     public setBassLatch(isOn: boolean) {
         this.isBassLatchOn = isOn;
         if (!isOn) {
-            console.log('[AudioEngine] Latch turned off, clearing all notes.');
             const notesToTurnOff = this.latchEngine.clear();
             const latchNode = this.nodes.get('latch')?.worklet;
             if (latchNode) {
@@ -305,5 +299,3 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
-
-    
