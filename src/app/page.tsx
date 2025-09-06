@@ -155,7 +155,7 @@ export default function Home() {
         const currentKey = Object.keys(ALL_NOTES).includes(keyOrScale) ? keyOrScale as MusicKey : newKey;
         const currentScale = Object.keys(SCALES).includes(keyOrScale) ? keyOrScale as MusicScale : newScale;
 
-        const baseMelodyNote = 48 + ALL_NOTES[currentKey]; // C3 for melody start
+        const baseMelodyNote = 36 + ALL_NOTES[currentKey]; // C2 for melody start
         const baseBassNote = 24 + ALL_NOTES[currentKey];   // C1 for bass start
     
         const melodyFreqs = getScaleFrequencies(baseMelodyNote, SCALES[currentScale], [0, 1]);
@@ -311,7 +311,7 @@ export default function Home() {
                             type="bass"
                             allowedFrequencies={allowedFrequencies.bass}
                             color="hsl(var(--accent))"
-                            isLatchOn={isLatchOn}
+                            isLatchOn={isBassLatchOn}
                             onLatchToggle={handleLatchToggle}
                             isPolyphonic
                             orbManager={orbManager}
