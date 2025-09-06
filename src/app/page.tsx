@@ -10,7 +10,7 @@ import { OrbitalAnimation } from '@/components/orbital-animation';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PlaybackControls } from '@/components/playback-controls';
 import { ArrowRight } from 'lucide-react';
-import { HelpGuide } from '@/components/help-guide';
+import { HelpGuide } from "@/components/help-guide";
 import { beatPatterns } from '@/lib/drum-machine';
 import { CookieConsent } from '@/components/cookie-consent';
 import { useAudioEngine } from '@/hooks/use-audio-engine';
@@ -64,7 +64,7 @@ function loadSettings() {
     }
 }
 
-function saveSettings(volumes: any) {
+function saveSettings(volumes: Volumes) {
     if (typeof window === 'undefined' || getCookie("ethermusic_consent") !== 'true') {
         return;
     }
@@ -143,21 +143,36 @@ export default function Home() {
     const [allowedFrequencies, setAllowedFrequencies] = useState<{melody: number[], bass: number[]}>({melody: [], bass: []});
     
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
-    const [volumes, setLocalVolumes] = useState(() => loadSettings().volumes);
+    const [volumes, setLocalVolumes] = useState<Volumes>(() => loadSettings().volumes);
 
 
-    useEffect(() => {
-        const baseMelodyNote = 48 + ALL_NOTES[musicKey]; // C3 + key offset for melody
-        const baseBassNote = 36 + ALL_NOTES[musicKey];   // C2 + key offset for bass
-
-        const scaleSteps = SCALES[musicScale];
-
+    const handleHarmonyChange = (keyOrScale: MusicKey | MusicScale) => {
+        let newKey = musicKey;
+        let newScale = musicScale;
+    
+        if (Object.keys(ALL_NOTES).includes(keyOrScale)) {
+            newKey = keyOrScale as MusicKey;
+            setMusicKey(newKey);
+        } else if (Object.keys(SCALES).includes(keyOrScale)) {
+            newScale = keyOrScale as MusicScale;
+            setMusicScale(newScale);
+        }
+    
+        const baseMelodyNote = 48 + ALL_NOTES[newKey]; // C3 for melody start
+        const baseBassNote = 36 + ALL_NOTES[newKey];   // C2 for bass start
+        const scaleSteps = SCALES[newScale];
+    
         const melodyFreqs = getScaleFrequencies(baseMelodyNote, scaleSteps, [0, 1]);
         const bassFreqs = getScaleFrequencies(baseBassNote, scaleSteps, [-1, 0]);
-
+    
         setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
+    };
 
-    }, [musicKey, musicScale]);
+    useEffect(() => {
+        // Initial calculation
+        handleHarmonyChange(musicKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     useEffect(() => {
         if (isReady) {
@@ -200,7 +215,7 @@ export default function Home() {
         setTempo(tempo.bpm);
     }, [setTempo]);
 
-    const handleVolumeChange = useCallback((newVolumes: any) => {
+    const handleVolumeChange = useCallback((newVolumes: Volumes) => {
         setLocalVolumes(newVolumes);
         setVolumes(newVolumes);
         if (cookieConsent) {
@@ -316,7 +331,7 @@ export default function Home() {
                             activeInstrument={bassInstrument}
                             onInstrumentChange={handleBassInstrumentChange}
                             isPolyphonic
-                            orbManager={orbManager ?? undefined}
+                            orbManager={orbManager}
                         />
                         <MemoizedThereminPad
                             onInteraction={handleThereminInteraction}
@@ -329,12 +344,12 @@ export default function Home() {
                             onInstrumentChange={handleMelodyInstrumentChange}
                             musicKeys={Object.keys(ALL_NOTES) as MusicKey[]}
                             activeKey={musicKey}
-                            onKeyChange={(k) => handleHarmonyChange(musicKey, k)}
+                            onKeyChange={handleHarmonyChange}
                             musicScales={Object.keys(SCALES) as MusicScale[]}
                             activeScale={musicScale}
-                            onScaleChange={(s) => handleHarmonyChange(musicKey, s)}
+                            onScaleChange={handleHarmonyChange}
                             isPolyphonic
-                            orbManager={orbManager ?? undefined}
+                            orbManager={orbManager}
                         />
                     </div>
                     <div className="flex-shrink-0 portrait:block landscape:hidden">

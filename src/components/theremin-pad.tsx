@@ -37,7 +37,7 @@ interface ThereminPadProps {
     onScaleChange?: (scale: MusicScale) => void;
     isLatchOn?: boolean;
     onLatchToggle?: (checked: boolean) => void;
-    orbManager?: OrbManager;
+    orbManager?: OrbManager | null;
 }
 
 const padTitles = {
@@ -116,14 +116,14 @@ export function ThereminPad({
     }, [calculateInteraction, onInteraction, type, isDisabled, isLatchOn]);
 
     const handlePointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
-        if (isDisabled || (type === 'bass' && isLatchOn)) return;
+        if (isDisabled) return;
         const interactionData = calculateInteraction(event);
         onInteraction(type, interactionData, 'up');
         
         if ((event.target as HTMLElement).hasPointerCapture(event.pointerId)) {
             (event.target as HTMLElement).releasePointerCapture(event.pointerId);
         }
-    }, [onInteraction, type, calculateInteraction, isDisabled, isLatchOn]);
+    }, [onInteraction, type, calculateInteraction, isDisabled]);
     
      const renderSettingsControls = () => {
         const triggerButton = (

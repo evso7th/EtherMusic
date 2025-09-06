@@ -6,8 +6,7 @@ import * as Tone from 'tone';
 import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
-import type { Volumes } from '@/types';
-import { useWorker } from './use-worker';
+import type { Instrument, Volumes } from '@/types';
 
 export function useAudioEngine() {
     const { toast } = useToast();
@@ -18,10 +17,9 @@ export function useAudioEngine() {
     const [sleepTimerId, setSleepTimerId] = useState<NodeJS.Timeout | null>(null);
 
     const audioEngine = useRef<AudioEngine | null>(null);
-    const worker = useWorker('/workers/autopilot-worker.js'); // This is now safe
 
     useEffect(() => {
-        if (!audioEngine.current) {
+        if (typeof window !== 'undefined' && !audioEngine.current) {
             const om = new OrbManager();
             audioEngine.current = new AudioEngine(om);
         }
@@ -36,10 +34,10 @@ export function useAudioEngine() {
         setIsAppStarted(true);
 
         try {
-            console.log("Initializing audio resources after user gesture...");
             await Tone.start();
+            console.log("AudioContext started by user gesture.");
             
-            await audioEngine.current.initialize(worker!);
+            await audioEngine.current.initialize();
             
             setIsReady(true);
             setIsPlaying(Tone.Transport.state === 'started');
@@ -53,20 +51,20 @@ export function useAudioEngine() {
                 variant: "destructive"
             });
         }
-    }, [isAppStarted, toast, worker]);
+    }, [isAppStarted, toast]);
 
     const play = useCallback(() => {
         if (!isReady) return;
-        Tone.Transport.start();
+        if (Tone.Transport.state !== 'started') {
+            Tone.Transport.start();
+        }
         setIsPlaying(true);
-        audioEngine.current?.setAutopilotState(true);
     }, [isReady]);
 
     const pause = useCallback(() => {
         if (!isReady) return;
         Tone.Transport.pause();
         setIsPlaying(false);
-        audioEngine.current?.setAutopilotState(false);
     }, [isReady]);
 
     const stop = useCallback(() => {
@@ -91,23 +89,6 @@ export function useAudioEngine() {
     const setBassLatch = useCallback((isOn: boolean) => {
         audioEngine.current?.setBassLatch(isOn);
     }, []);
-    
-    const handleAutopilotChange = useCallback((settings: any) => {
-        audioEngine.current?.updateAutopilot(settings);
-    }, []);
-    
-    const handleAutopilotToggle = useCallback((isOn: boolean) => {
-        audioEngine.current?.setAutopilot(isOn);
-    }, []);
-
-    const saveAutopilotPreset = useCallback((style: string) => {
-        audioEngine.current?.saveAutopilotPreset(style);
-    }, []);
-
-    const loadAutopilotPreset = useCallback((style: string) => {
-        return audioEngine.current?.loadAutopilotPreset(style);
-    }, []);
-
 
     const startRecording = useCallback(() => {
         audioEngine.current?.startRecording();
@@ -125,22 +106,13 @@ export function useAudioEngine() {
         if (durationMinutes !== null) {
             const id = setTimeout(() => {
                 if (audioEngine.current?.masterOut) {
-                    audioEngine.current.masterOut.gain.linearRampToValueAtTime(0, Tone.now() + 5);
+                    audioEngine.current.masterOut.gain.linearRampTo(0, 5);
                 }
                 setTimeout(() => {
                     stop();
-                    if(audioEngine.current?.masterOut) {
-                       audioEngine.current.masterOut.gain.setValueAtTime(1, Tone.now());
-                    }
                 }, 5500);
             }, durationMinutes * 60 * 1000);
             setSleepTimerId(id);
-        } else {
-            // Cancel timer
-            if(audioEngine.current?.masterOut) {
-                audioEngine.current.masterOut.gain.cancelScheduledValues(Tone.now());
-                audioEngine.current.masterOut.gain.setValueAtTime(1, Tone.now());
-            }
         }
     }, [sleepTimerId, stop]);
     
@@ -162,16 +134,20 @@ export function useAudioEngine() {
         }
     }, [isReady]);
 
-    const handleHarmonyChange = useCallback((key: MusicKey, scale: MusicScale) => {
-        audioEngine.current?.setHarmony(key, scale);
+    const setMelodyInstrument = useCallback((instrument: Instrument) => {
+        audioEngine.current?.setInstrument('melody', instrument);
     }, []);
-    
+
+    const setBassInstrument = useCallback((instrument: Instrument) => {
+        audioEngine.current?.setInstrument('manualBass', instrument);
+        audioEngine.current?.setInstrument('latch', instrument);
+    }, []);
 
     return {
         isAppStarted,
         isReady,
         isPlaying,
-        volumes: audioEngine.current?.getVolumes(),
+        orbManager: audioEngine.current?.orbManager,
         startApp,
         play,
         pause,
@@ -180,15 +156,11 @@ export function useAudioEngine() {
         setVolumes,
         setBeatPattern,
         setBassLatch,
-        handleAutopilotChange,
-        handleAutopilotToggle,
-        saveAutopilotPreset,
-        loadAutopilotPreset,
         startRecording,
         stopRecording,
         handleThereminInteraction,
-        handleHarmonyChange,
         setSleepTimer,
-        orbManager: audioEngine.current?.orbManager
+        setMelodyInstrument,
+        setBassInstrument,
     };
 }

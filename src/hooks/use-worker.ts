@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 
+// This hook is currently not used but is kept for potential future use.
 export function useWorker(workerPath: string) {
     const [worker, setWorker] = useState<Worker | null>(null);
     const workerRef = useRef<Worker | null>(null);
