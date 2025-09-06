@@ -11,7 +11,6 @@ import { Anchor, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Instrument, MusicKey, MusicScale } from '@/types';
-import { ALL_NOTES, SCALES } from '@/lib/music';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
@@ -99,12 +98,18 @@ export function ThereminPad({
 
     const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (isDisabled) return;
-        (event.target as HTMLElement).setPointerCapture(event.pointerId);
+
         const interactionData = calculateInteraction(event);
-        if (interactionData) {
+        if (!interactionData) return;
+
+        if (type === 'bass' && isLatchOn) {
+            // For latch mode, a single pointer down event acts as a "tap"
             onInteraction(type, interactionData, 'down');
+        } else {
+             (event.target as HTMLElement).setPointerCapture(event.pointerId);
+             onInteraction(type, interactionData, 'down');
         }
-    }, [calculateInteraction, onInteraction, type, isDisabled]);
+    }, [calculateInteraction, onInteraction, type, isDisabled, isLatchOn]);
 
     const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (isDisabled || !(event.buttons > 0) || (type === 'bass' && isLatchOn)) return;
@@ -117,15 +122,21 @@ export function ThereminPad({
 
     const handlePointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (isDisabled) return;
+        
+        // Latch mode for bass is handled on pointer down, so we ignore pointer up
+        if (type === 'bass' && isLatchOn) return;
+
         const interactionData = calculateInteraction(event);
         onInteraction(type, interactionData, 'up');
         
         if ((event.target as HTMLElement).hasPointerCapture(event.pointerId)) {
             (event.target as HTMLElement).releasePointerCapture(event.pointerId);
         }
-    }, [onInteraction, type, calculateInteraction, isDisabled]);
+    }, [onInteraction, type, calculateInteraction, isDisabled, isLatchOn]);
     
      const renderSettingsControls = () => {
+        if (!musicKeys && !musicScales) return null;
+
         const triggerButton = (
              <Button variant="outline" size="sm" className={cn("h-8 capitalize",
                     type === 'melody' ? "border-primary text-primary hover:bg-primary hover:text-primary-foreground" : "border-accent text-accent hover:bg-accent hover:text-accent-foreground"
@@ -162,7 +173,7 @@ export function ThereminPad({
                                     {musicKeys && activeKey && onKeyChange && (
                                         <div className="space-y-2">
                                             <Label>Music Key</Label>
-                                            <Select value={activeKey} onValueChange={onKeyChange}>
+                                            <Select value={activeKey} onValueChange={onKeyChange as (value: string) => void}>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Key" />
                                                 </SelectTrigger>
@@ -175,7 +186,7 @@ export function ThereminPad({
                                     {musicScales && activeScale && onScaleChange && (
                                         <div className="space-y-2">
                                             <Label>Music Scale</Label>
-                                            <Select value={activeScale} onValueChange={onScaleChange}>
+                                            <Select value={activeScale} onValueChange={onScaleChange as (value: string) => void}>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Scale" />
                                                 </SelectTrigger>

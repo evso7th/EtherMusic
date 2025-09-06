@@ -23,3 +23,9 @@ export type Volumes = {
     latch: number; 
     drums: number; 
 };
+
+export interface Note {
+    id: number;
+    frequency: number;
+    volume: number;
+}

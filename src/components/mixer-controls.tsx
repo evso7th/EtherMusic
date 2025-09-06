@@ -4,7 +4,7 @@
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Music, Waves, Drum, Anchor } from 'lucide-react';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { Volumes } from '@/types';
 
 const InstrumentControls = ({
@@ -24,6 +24,7 @@ const InstrumentControls = ({
         <div className="flex items-center gap-2">
             <Icon className="w-5 h-5 text-primary flex-shrink-0" />
             <Label className="text-sm font-medium flex-1 truncate">{label}</Label>
+            <span className="text-xs text-muted-foreground w-10 text-right">{volume.toFixed(0)} dB</span>
         </div>
         <div className="flex items-center gap-4 pl-7">
             <Slider
@@ -43,12 +44,17 @@ export function MixerControls({ initialVolumes, onVolumeChange }: { initialVolum
     
     const [volumes, setVolumes] = useState(initialVolumes);
 
+    useEffect(() => {
+        setVolumes(initialVolumes);
+    }, [initialVolumes]);
+
     const handleVolumeChange = useCallback((instrument: keyof Volumes, value: number) => {
         setVolumes(prev => ({ ...prev, [instrument]: value }));
     }, []);
     
     const handleVolumeCommit = useCallback((instrument: keyof Volumes, value: number) => {
         const newVolumes = { ...volumes, [instrument]: value };
+        setVolumes(newVolumes);
         onVolumeChange(newVolumes);
     }, [volumes, onVolumeChange]);
 

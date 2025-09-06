@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
@@ -17,14 +17,8 @@ export function useAudioEngine() {
 
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
-
-    const startApp = useCallback(async () => {
-        if (isAppStarted) return;
-        
-        setIsAppStarted(true);
-        const audio = new Audio('/assets/sounds/transition.webm');
-        audio.play().catch(e => console.error("Error playing transition sound:", e));
-        
+    
+    const initializeAudioEngine = useCallback(async () => {
         try {
             if (!orbManager.current) {
                 orbManager.current = new OrbManager();
@@ -51,7 +45,32 @@ export function useAudioEngine() {
                 variant: "destructive"
             });
         }
-    }, [isAppStarted, toast]);
+    }, [toast]);
+
+    const startApp = useCallback(async () => {
+        if (isAppStarted) return;
+        
+        setIsAppStarted(true);
+        const audio = new Audio('/assets/sounds/transition.webm');
+        audio.play().catch(e => console.error("Error playing transition sound:", e));
+        
+        await initializeAudioEngine();
+    }, [isAppStarted, initializeAudioEngine]);
+
+    useEffect(() => {
+      // This effect ensures the audio context is resumed on any user gesture if it wasn't already.
+      const resumeAudio = async () => {
+        if (audioEngine.current && audioEngine.current.isInitialized && audioEngine.current.masterOut.context.state === 'suspended') {
+          await audioEngine.current.masterOut.context.resume();
+        }
+      };
+      document.addEventListener('click', resumeAudio);
+      document.addEventListener('touchstart', resumeAudio);
+      return () => {
+        document.removeEventListener('click', resumeAudio);
+        document.removeEventListener('touchstart', resumeAudio);
+      };
+    }, []);
 
     const play = useCallback(() => {
         if (!isReady || !audioEngine.current) return;
@@ -112,16 +131,7 @@ export function useAudioEngine() {
     
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isReady || !audioEngine.current) return;
-        
-        const engine = audioEngine.current;
-        
-        if (state === 'down' && data) {
-            engine.startNote(type, data.pointerId, data.frequency, data.volume, {x: data.x, y: data.y});
-        } else if (state === 'move' && data) {
-            engine.updateNote(type, data.pointerId, data.frequency, data.volume, {x: data.x, y: data.y});
-        } else if (state === 'up' && data) {
-            engine.stopNote(type, data.pointerId);
-        }
+        audioEngine.current.handleThereminInteraction(type, data, state);
     }, [isReady]);
 
     return {

@@ -54,8 +54,9 @@ function loadSettings() {
         const savedVolumes = getCookie("ethermusic_volumes");
         const volumes = savedVolumes ? JSON.parse(savedVolumes) : defaultVolumes;
         
-        if (typeof volumes.melody !== 'number' || Object.keys(volumes).length !== Object.keys(defaultVolumes).length) {
-            return { volumes: defaultVolumes };
+        // A simple check to see if the loaded volumes object is valid
+        if (typeof volumes.melody !== 'number' || Object.keys(volumes).length < Object.keys(defaultVolumes).length) {
+            return { volumes: {...defaultVolumes, ...volumes} }; // Merge to add new keys
         }
         
         return { volumes };

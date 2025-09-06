@@ -1,6 +1,8 @@
 
-import type { Volumes } from '@/types';
+import type { Volumes, Note } from '@/types';
 import { OrbManager } from './orb-manager';
+import { LatchEngine, type LatchToggleResult } from './latch-engine';
+
 
 type PartName = 'melody' | 'manualBass' | 'latch' | 'drums';
 
@@ -25,8 +27,9 @@ export class AudioEngine {
         drums: -9
     };
     private isBassLatchOn: boolean = false;
+    private latchEngine = new LatchEngine();
     
-    private activePointers = new Map<number, { type: 'melody' | 'bass', part: PartName }>();
+    private activePointers = new Map<number, { type: 'melody' | 'bass' }>();
 
     private _isPlaying = false;
     private animationFrameId: number | null = null;
@@ -80,6 +83,7 @@ export class AudioEngine {
 
         try {
              await this.context.audioWorklet.addModule('/worklets/theremin-processor.js');
+             await this.context.audioWorklet.addModule('/worklets/latch-processor.js');
              await this.context.audioWorklet.addModule('/worklets/drum-processor.js');
              console.log('AudioWorklet modules loaded.');
         } catch (e) {
@@ -87,10 +91,10 @@ export class AudioEngine {
             throw new Error("Could not load core audio components. Please try refreshing the page.");
         }
         
-        this.createWorkletNode('melody', 'theremin-processor');
-        this.createWorkletNode('manualBass', 'theremin-processor');
-        this.createWorkletNode('latch', 'theremin-processor');
-        this.createWorkletNode('drums', 'drum-processor');
+        this.createWorkletNode('melody', 'theremin-processor', 4);
+        this.createWorkletNode('manualBass', 'theremin-processor', 4);
+        this.createWorkletNode('latch', 'latch-processor', 4);
+        this.createWorkletNode('drums', 'drum-processor', 8);
 
         this.setVolumes(this.volumes);
         this.setTempo(90);
@@ -99,7 +103,7 @@ export class AudioEngine {
         console.log('AudioEngine initialized with native Web Audio API nodes.');
     }
     
-    private createWorkletNode(part: PartName, processorName: string) {
+    private createWorkletNode(part: PartName, processorName: string, polyphony: number) {
         if (!this.context || !this.masterOut) return;
         
         const gainNode = this.context.createGain();
@@ -108,10 +112,8 @@ export class AudioEngine {
         const workletNode = new AudioWorkletNode(this.context, processorName, {
             processorOptions: {
                 sampleRate: this.context.sampleRate,
-                polyphony: (part === 'melody' || part === 'manualBass' || part === 'latch') ? 4 : 8
+                polyphony,
             },
-            numberOfInputs: 0,
-            numberOfOutputs: 1,
             outputChannelCount: [1]
         });
         workletNode.connect(gainNode);
@@ -154,66 +156,88 @@ export class AudioEngine {
         this.stopAllSounds();
     }
 
-    public startNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, padInfo: { x: number, y: number }) {
-        if (!this.isInitialized || !this.context) return;
-        
-        const partName = type === 'bass' && this.isBassLatchOn ? 'latch' : (type === 'bass' ? 'manualBass' : type);
-        const node = this.nodes.get(partName)?.worklet;
+    private positionToId(x: number, y: number): number {
+        const roundedX = Math.round(x / 10);
+        const roundedY = Math.round(y / 10);
+        return roundedX * 1000 + roundedY;
+    }
 
-        if (!node) return;
-        
-        this.activePointers.set(pointerId, { type, part: partName });
-        
-        node.port.postMessage({
-            type: 'noteOn',
-            note: {
-                id: pointerId,
-                frequency: freq,
-                volume: vol,
-                time: this.context.currentTime
+    public handleThereminInteraction(type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') {
+        if (!this.isInitialized || !this.context || !data) return;
+
+        if (type === 'bass' && this.isBassLatchOn) {
+            if (state === 'down') {
+                const id = this.positionToId(data.x, data.y);
+                const result = this.latchEngine.toggleNote(id, data.frequency, data.volume);
+                this.processLatchResult(result);
             }
-        });
-        
-        const orbType = this.isBassLatchOn && type === 'bass' ? 'latch' : type;
-        this.orbManager?.addOrb(pointerId, orbType, padInfo.x, padInfo.y);
-    }
+            // In latch mode, we don't process 'move' or 'up' for bass.
+            return;
+        }
 
-    public updateNote(type: 'melody' | 'bass', pointerId: number, freq: number, vol: number, padInfo: { x: number, y: number }) {
-        if (!this.isInitialized || !this.context) return;
-        
-        const activePointer = this.activePointers.get(pointerId);
-        if (!activePointer) return;
+        const partName = type === 'bass' ? 'manualBass' : type;
+        const node = this.nodes.get(partName)?.worklet;
+        if (!node) return;
 
-        const node = this.nodes.get(activePointer.part)?.worklet;
-        if(node) {
-            node.port.postMessage({ type: 'noteUpdate', note: { id: pointerId, frequency: freq, volume: vol } });
-            this.orbManager?.updateOrb(pointerId, padInfo.x, padInfo.y);
+        if (state === 'down') {
+            this.activePointers.set(data.pointerId, { type });
+            node.port.postMessage({ type: 'noteOn', note: { id: data.pointerId, frequency: data.frequency, volume: data.volume } });
+            this.orbManager.addOrb(data.pointerId, type, data.x, data.y);
+        } else if (state === 'move') {
+            if (this.activePointers.has(data.pointerId)) {
+                node.port.postMessage({ type: 'noteUpdate', note: { id: data.pointerId, frequency: data.frequency, volume: data.volume } });
+                this.orbManager.updateOrb(data.pointerId, data.x, data.y);
+            }
+        } else if (state === 'up') {
+            if (this.activePointers.has(data.pointerId)) {
+                node.port.postMessage({ type: 'noteOff', id: data.pointerId });
+                this.activePointers.delete(data.pointerId);
+                this.orbManager.removeOrb(data.pointerId);
+            }
         }
     }
 
-    public stopNote(type: 'melody' | 'bass', pointerId: number) {
-        if (!this.isInitialized) return;
-        
-        const activePointer = this.activePointers.get(pointerId);
-        if (!activePointer) return;
+    private processLatchResult(result: LatchToggleResult) {
+        const latchNode = this.nodes.get('latch')?.worklet;
+        if (!latchNode) return;
 
-        const node = this.nodes.get(activePointer.part)?.worklet;
+        if (result.noteOff) {
+            latchNode.port.postMessage({ type: 'noteOff', id: result.noteOff.id });
+            this.orbManager.removeOrb(result.noteOff.id);
+        }
 
-        if (node) {
-             node.port.postMessage({ type: 'noteOff', id: pointerId });
+        if (result.noteOn) {
+            latchNode.port.postMessage({ type: 'noteOn', note: result.noteOn });
+            // We need a way to get the pad position to the orb manager.
+            // LatchEngine doesn't know about x/y. Let's assume OrbManager handles it.
+            // A better way would be to pass padInfo into LatchEngine or handle orb creation outside.
+            // For now, let's let OrbManager handle it, assuming it got the info.
         }
-        
-        if (activePointer.part !== 'latch') {
-            this.orbManager?.removeOrb(pointerId);
+
+        if (result.noteToAnimate) {
+            const padEl = document.getElementById('theremin-pad-bass');
+            if(padEl) {
+                const rect = padEl.getBoundingClientRect();
+                const x = (Math.floor(result.noteToAnimate.id / 1000) * 10)
+                const y = ((result.noteToAnimate.id % 1000) * 10)
+                if (result.noteToAnimate.type === 'add') {
+                    this.orbManager.addOrb(result.noteToAnimate.id, 'latch', x, y);
+                } else {
+                    this.orbManager.removeOrb(result.noteToAnimate.id);
+                }
+            }
         }
-        this.activePointers.delete(pointerId);
     }
     
     public setBassLatch(isOn: boolean) {
         this.isBassLatchOn = isOn;
         if (!isOn) {
-            this.nodes.get('latch')?.worklet.port.postMessage({ type: 'allNotesOff' });
-            this.orbManager.removeAllOrbs('latch');
+            const notesToTurnOff = this.latchEngine.clear();
+            const latchNode = this.nodes.get('latch')?.worklet;
+            if (latchNode) {
+                latchNode.port.postMessage({ type: 'allNotesOff' });
+                notesToTurnOff.forEach(note => this.orbManager.removeOrb(note.id));
+            }
         }
     }
     
@@ -246,6 +270,7 @@ export class AudioEngine {
         this.nodes.forEach(node => {
             node.worklet.port.postMessage({ type: 'allNotesOff' });
         });
+        this.latchEngine.clear();
         this.orbManager?.removeAllOrbs();
     }
     
