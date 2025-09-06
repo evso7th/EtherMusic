@@ -1,11 +1,11 @@
 
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
-import type { Volumes, Instrument } from '@/types';
+import type { Volumes } from '@/types';
 
 export function useAudioEngine() {
     const { toast } = useToast();
@@ -31,7 +31,11 @@ export function useAudioEngine() {
             }
 
             if (!audioEngine.current) {
-                audioEngine.current = new AudioEngine(orbManager.current);
+                const context = new (window.AudioContext || (window as any).webkitAudioContext)();
+                if (context.state === 'suspended') {
+                    await context.resume();
+                }
+                audioEngine.current = new AudioEngine(context, orbManager.current);
                 await audioEngine.current.initialize();
             }
             
@@ -110,9 +114,7 @@ export function useAudioEngine() {
         if (!isReady || !audioEngine.current) return;
         
         const engine = audioEngine.current;
-        const padElement = document.getElementById(`theremin-pad-${type}`);
-        if (!padElement) return;
-
+        
         if (state === 'down' && data) {
             engine.startNote(type, data.pointerId, data.frequency, data.volume, {x: data.x, y: data.y});
         } else if (state === 'move' && data) {

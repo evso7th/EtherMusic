@@ -1,23 +1,22 @@
 
-// src/lib/audio-engine.ts
 import type { Volumes } from '@/types';
 import { OrbManager } from './orb-manager';
 
 type PartName = 'melody' | 'manualBass' | 'latch' | 'drums';
 
-function dbToGain(db: number) {
+function dbToGain(db: number): number {
     if (db <= -48) return 0;
-    return 10 ** (db / 20);
+    return Math.pow(10, db / 20);
 }
 
 export class AudioEngine {
     public isInitialized = false;
-    private context: AudioContext | null = null;
+    private context: AudioContext;
     public orbManager: OrbManager;
     private mediaRecorder: MediaRecorder | null = null;
     private recordedChunks: Blob[] = [];
 
-    public masterOut: GainNode | null = null;
+    public masterOut: GainNode;
     private nodes = new Map<PartName, { worklet: AudioWorkletNode, gain: GainNode }>();
     private volumes: Volumes = { 
         melody: -6, 
@@ -32,8 +31,11 @@ export class AudioEngine {
     private _isPlaying = false;
     private animationFrameId: number | null = null;
 
-    constructor(orbManager: OrbManager) {
+    constructor(context: AudioContext, orbManager: OrbManager) {
+        this.context = context;
         this.orbManager = orbManager;
+        this.masterOut = this.context.createGain();
+        this.masterOut.connect(this.context.destination);
     }
 
     public get isPlaying(): boolean {
@@ -45,35 +47,19 @@ export class AudioEngine {
     }
 
     public async initialize() {
-        if (this.isInitialized || typeof window === 'undefined') {
-            return;
-        }
+        if (this.isInitialized) return;
 
-        try {
-            this.context = new (window.AudioContext || (window as any).webkitAudioContext)();
-            
-            // Resume context on first user gesture, if needed
-            if (this.context.state === 'suspended') {
-                 await this.context.resume();
-            }
-             console.log("AudioContext started.");
-
-        } catch (e) {
-            console.error("Failed to create AudioContext", e);
-            throw new Error("Web Audio API is not supported in this browser.");
+        if (this.context.state === 'suspended') {
+             await this.context.resume();
         }
-        
-        this.masterOut = this.context.createGain();
-        this.masterOut.connect(this.context.destination);
-        
+        console.log("AudioContext is active.");
+
         const mediaStreamDest = this.context.createMediaStreamDestination();
         this.masterOut.connect(mediaStreamDest);
         this.mediaRecorder = new MediaRecorder(mediaStreamDest.stream, { mimeType: 'audio/webm' });
         
         this.mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0) {
-                this.recordedChunks.push(event.data);
-            }
+            if (event.data.size > 0) this.recordedChunks.push(event.data);
         };
         
         this.mediaRecorder.onstop = () => {
@@ -136,8 +122,6 @@ export class AudioEngine {
 
     private tick() {
         if (!this._isPlaying) return;
-        // The drum processor now self-schedules based on tempo
-        // We could add other timed events here if needed.
         this.animationFrameId = requestAnimationFrame(() => this.tick());
     }
     
@@ -179,7 +163,7 @@ export class AudioEngine {
         if (!node) return;
         
         this.activePointers.set(pointerId, { type, part: partName });
-
+        
         node.port.postMessage({
             type: 'noteOn',
             note: {
@@ -252,11 +236,7 @@ export class AudioEngine {
             const nodeInfo = this.nodes.get(part as PartName);
             const gainValue = dbToGain(db);
             if (nodeInfo) {
-                if (part === 'drums') {
-                    nodeInfo.worklet.port.postMessage({type: 'setVolume', volume: gainValue });
-                } else {
-                    nodeInfo.gain.gain.linearRampToValueAtTime(gainValue, rampTime);
-                }
+                nodeInfo.gain.gain.linearRampToValueAtTime(gainValue, rampTime);
             }
         });
     }
@@ -287,8 +267,7 @@ export class AudioEngine {
         this.masterOut.gain.linearRampToValueAtTime(0, this.context.currentTime + durationSeconds);
         setTimeout(() => {
             this.stop();
-            // Restore volume for next play
-            if (this.masterOut) {
+            if (this.masterOut && this.context) {
                 this.masterOut.gain.setValueAtTime(1, this.context.currentTime);
             }
         }, (durationSeconds + 0.5) * 1000);
