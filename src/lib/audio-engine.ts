@@ -1,4 +1,3 @@
-
 // src/lib/audio-engine.ts
 
 import * as Tone from 'tone';
@@ -21,19 +20,18 @@ export class AudioEngine {
 
     public masterOut: Tone.Gain | null = null;
     private nodes = new Map<PartName, { worklet: AudioWorkletNode, gain: Tone.Gain }>();
-    private volumes: Volumes;
+    private volumes: Volumes = { 
+        melody: -6, 
+        manualBass: -6, 
+        latch: -15, 
+        drums: -9
+    };
     private isBassLatchOn: boolean = false;
     
     private activePointers = new Map<number, { type: 'melody' | 'bass', part: PartName }>();
 
     constructor(orbManager: OrbManager) {
         this.orbManager = orbManager;
-        this.volumes = { 
-            melody: -6, 
-            manualBass: -6, 
-            latch: -15, 
-            drums: -9
-        };
     }
     
     public getVolumes(): Volumes {
@@ -41,9 +39,16 @@ export class AudioEngine {
     }
 
     public async initialize() {
-        if (this.isInitialized || Tone.context.state !== 'running') {
-            console.warn('AudioContext not running. Cannot initialize AudioEngine.');
+        if (this.isInitialized) {
             return;
+        }
+        if (Tone.context.state !== 'running') {
+            console.warn('AudioContext not running. Cannot initialize AudioEngine.');
+            // Attempting to start again, just in case.
+            await Tone.start();
+            if (Tone.context.state !== 'running') {
+                throw new Error("Could not start AudioContext.");
+            }
         }
         
         console.log('Initializing AudioEngine...');
@@ -75,26 +80,24 @@ export class AudioEngine {
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
+            this.recordedChunks = [];
         };
 
         try {
-            await Promise.all([
-                this.context.audioWorklet.addModule('/worklets/theremin-processor.js'),
-                this.context.audioWorklet.addModule('/worklets/drum-processor.js')
-            ]);
-            console.log('AudioWorklet modules loaded.');
-            
-            this.createWorkletNode('melody', 'theremin-processor');
-            this.createWorkletNode('manualBass', 'theremin-processor');
-            this.createWorkletNode('latch', 'theremin-processor');
-            this.createWorkletNode('drums', 'drum-processor');
-
-            this.setVolumes(this.volumes);
-
+             await this.context.audioWorklet.addModule('/worklets/theremin-processor.js');
+             await this.context.audioWorklet.addModule('/worklets/drum-processor.js');
+             console.log('AudioWorklet modules loaded.');
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
             throw new Error("Could not load core audio components. Please try refreshing the page.");
         }
+        
+        this.createWorkletNode('melody', 'theremin-processor');
+        this.createWorkletNode('manualBass', 'theremin-processor');
+        this.createWorkletNode('latch', 'theremin-processor');
+        this.createWorkletNode('drums', 'drum-processor');
+
+        this.setVolumes(this.volumes);
         
         Tone.Transport.set({ bpm: 90, swing: 0, timeSignature: 4 });
         
@@ -182,14 +185,6 @@ export class AudioEngine {
         }
     }
     
-    public setInstrument(part: PartName, instrument: Instrument) {
-        if (!this.isInitialized) return;
-        const node = this.nodes.get(part)?.worklet;
-        if (node) {
-            node.port.postMessage({ type: 'setInstrument', instrument });
-        }
-    }
-
     public setBeatPattern(patternName: string) {
         if (!this.isInitialized) return;
         this.nodes.get('drums')?.worklet.port.postMessage({type: 'setPattern', pattern: patternName});

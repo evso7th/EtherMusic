@@ -6,7 +6,7 @@ import * as Tone from 'tone';
 import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
-import type { Instrument, Volumes } from '@/types';
+import type { Volumes } from '@/types';
 
 export function useAudioEngine() {
     const { toast } = useToast();
@@ -17,25 +17,27 @@ export function useAudioEngine() {
     const [sleepTimerId, setSleepTimerId] = useState<NodeJS.Timeout | null>(null);
 
     const audioEngine = useRef<AudioEngine | null>(null);
+    const orbManager = useRef<OrbManager | null>(null);
 
-    useEffect(() => {
-        if (typeof window !== 'undefined' && !audioEngine.current) {
-            const om = new OrbManager();
-            audioEngine.current = new AudioEngine(om);
-        }
-    }, []);
 
     const startApp = useCallback(async () => {
-        if (isAppStarted || !audioEngine.current) return;
-
+        if (isAppStarted) return;
+        
+        setIsAppStarted(true);
         const audio = new Audio('/assets/sounds/transition.webm');
         audio.play().catch(e => console.error("Error playing transition sound:", e));
         
-        setIsAppStarted(true);
-
         try {
             await Tone.start();
             console.log("AudioContext started by user gesture.");
+            
+            if (!orbManager.current) {
+                orbManager.current = new OrbManager();
+            }
+
+            if (!audioEngine.current) {
+                audioEngine.current = new AudioEngine(orbManager.current);
+            }
             
             await audioEngine.current.initialize();
             
@@ -54,7 +56,7 @@ export function useAudioEngine() {
     }, [isAppStarted, toast]);
 
     const play = useCallback(() => {
-        if (!isReady) return;
+        if (!isReady || !audioEngine.current) return;
         if (Tone.Transport.state !== 'started') {
             Tone.Transport.start();
         }
@@ -134,20 +136,11 @@ export function useAudioEngine() {
         }
     }, [isReady]);
 
-    const setMelodyInstrument = useCallback((instrument: Instrument) => {
-        audioEngine.current?.setInstrument('melody', instrument);
-    }, []);
-
-    const setBassInstrument = useCallback((instrument: Instrument) => {
-        audioEngine.current?.setInstrument('manualBass', instrument);
-        audioEngine.current?.setInstrument('latch', instrument);
-    }, []);
-
     return {
         isAppStarted,
         isReady,
         isPlaying,
-        orbManager: audioEngine.current?.orbManager,
+        orbManager: orbManager.current,
         startApp,
         play,
         pause,
@@ -160,7 +153,5 @@ export function useAudioEngine() {
         stopRecording,
         handleThereminInteraction,
         setSleepTimer,
-        setMelodyInstrument,
-        setBassInstrument,
     };
 }
