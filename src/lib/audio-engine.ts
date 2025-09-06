@@ -1,8 +1,9 @@
 
-import type { Volumes, Note } from '@/types';
+import type { Volumes, Note, Instrument, BassInstrument } from '@/types';
 import { OrbManager } from './orb-manager';
 import { LatchEngine, type LatchToggleResult } from './latch-engine';
-
+import { melodyPresets } from './melody-presets';
+import { bassPresets } from './bass-presets';
 
 type PartName = 'melody' | 'manualBass' | 'latch' | 'drums';
 
@@ -100,7 +101,7 @@ export class AudioEngine {
         this.setTempo(90);
         
         this.isInitialized = true;
-        console.log('AudioEngine initialized with native Web Audio API nodes.');
+        console.log('AudioEngine initialized and ready.');
     }
     
     private createWorkletNode(part: PartName, processorName: string, polyphony: number) {
@@ -156,25 +157,16 @@ export class AudioEngine {
         this.stopAllSounds();
     }
 
-    private positionToId(x: number, y: number): number {
-        // Quantize position to a grid to make it easier to tap the same spot
-        const roundedX = Math.floor(x / 30);
-        const roundedY = Math.floor(y / 30);
-        return roundedX * 1000 + roundedY;
-    }
-
     public handleThereminInteraction(type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') {
-        if (!this.isInitialized || !this.context) return;
-        
-        console.log(`[AudioEngine] handleThereminInteraction: type=${type}, state=${state}, data:`, data);
+        console.log(`[AudioEngine] handleThereminInteraction: type=${type}, state=${state}, isLatchOn=${this.isBassLatchOn}`);
+        if (!this.isInitialized || !this.context || !data) return;
 
         if (type === 'bass' && this.isBassLatchOn) {
-            if (state === 'down' && data) {
-                 const id = this.positionToId(data.x, data.y);
-                 const result = this.latchEngine.toggleNote(id, data.frequency, data.volume);
+            if (state === 'down') { // Only react on 'down' for latch mode taps
+                 const result = this.latchEngine.toggleNote(data);
                  this.processLatchResult(result, data);
             }
-            // In latch mode, we ignore 'move' and 'up' events for the bass pad.
+            // Ignore 'move' and 'up' in latch mode as it's a tap-based interaction.
             return;
         }
         
@@ -182,17 +174,17 @@ export class AudioEngine {
         const node = this.nodes.get(partName)?.worklet;
         if (!node) return;
 
-        if (state === 'down' && data) {
+        if (state === 'down') {
             this.activePointers.set(data.pointerId, { type });
             node.port.postMessage({ type: 'noteOn', note: { id: data.pointerId, frequency: data.frequency, volume: data.volume } });
             this.orbManager.addOrb(data.pointerId, type, data.x, data.y);
-        } else if (state === 'move' && data) {
+        } else if (state === 'move') {
             if (this.activePointers.has(data.pointerId)) {
                 node.port.postMessage({ type: 'noteUpdate', note: { id: data.pointerId, frequency: data.frequency, volume: data.volume } });
                 this.orbManager.updateOrb(data.pointerId, data.x, data.y);
             }
         } else if (state === 'up') {
-            if (data && this.activePointers.has(data.pointerId)) {
+            if (this.activePointers.has(data.pointerId)) {
                 node.port.postMessage({ type: 'noteOff', id: data.pointerId });
                 this.activePointers.delete(data.pointerId);
                 this.orbManager.removeOrb(data.pointerId);
@@ -237,6 +229,21 @@ export class AudioEngine {
                     this.orbManager.removeOrb(note.id);
                 });
             }
+        }
+    }
+
+    public setMelodyInstrument(instrumentName: Instrument) {
+        const preset = melodyInstruments.find(p => p.id === instrumentName);
+        if (preset) {
+            this.nodes.get('melody')?.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
+        }
+    }
+    
+    public setBassInstrument(instrumentName: BassInstrument) {
+        const preset = bassInstruments.find(p => p.id === instrumentName);
+        if (preset) {
+            this.nodes.get('manualBass')?.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
+            this.nodes.get('latch')?.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
         }
     }
     
@@ -298,3 +305,5 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
+
+    

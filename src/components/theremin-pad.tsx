@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Anchor, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { Instrument, MusicKey, MusicScale } from '@/types';
+import type { MusicKey, MusicScale, Instrument, BassInstrument, InstrumentPreset, BassInstrumentPreset } from '@/types';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
@@ -25,9 +25,9 @@ interface ThereminPadProps {
     color: string;
     isPolyphonic?: boolean;
     isDisabled?: boolean;
-    instruments?: Instrument[];
-    activeInstrument?: Instrument;
-    onInstrumentChange?: (instrument: Instrument) => void;
+    instruments?: readonly InstrumentPreset[] | readonly BassInstrumentPreset[];
+    activeInstrument?: Instrument | BassInstrument;
+    onInstrumentChange?: (instrument: any) => void;
     musicKeys?: MusicKey[];
     activeKey?: MusicKey;
     onKeyChange?: (key: MusicKey) => void;
@@ -99,16 +99,19 @@ export function ThereminPad({
     const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (isDisabled) return;
         
-        console.log(`[ThereminPad] ${isLatchOn && type === 'bass' ? 'Latch mode tap' : 'Standard'} DOWN.`);
         const interactionData = calculateInteraction(event);
         if (!interactionData) return;
 
-        (event.target as HTMLElement).setPointerCapture(event.pointerId);
-        onInteraction(type, interactionData, 'down');
+        if (type === 'bass' && isLatchOn) {
+            onInteraction(type, interactionData, 'down');
+        } else {
+            (event.target as HTMLElement).setPointerCapture(event.pointerId);
+            onInteraction(type, interactionData, 'down');
+        }
+
     }, [calculateInteraction, isDisabled, onInteraction, type, isLatchOn]);
 
     const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
-        // Latch mode does not care about pointer move
         if (isDisabled || !(event.buttons > 0) || (isLatchOn && type === 'bass')) return;
         
         const interactionData = calculateInteraction(event);
@@ -120,12 +123,10 @@ export function ThereminPad({
     const handlePointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (isDisabled) return;
 
-        // Latch mode handles its logic on 'down', so we ignore 'up' to prevent double-firing
-        if (isLatchOn && type === 'bass') {
-            console.log(`[ThereminPad] Latch mode tap UP (ignored by pad).`);
+        const interactionData = calculateInteraction(event);
+        if (type === 'bass' && isLatchOn) {
+            onInteraction(type, interactionData, 'up');
         } else {
-             console.log(`[ThereminPad] Pointer UP.`);
-             const interactionData = calculateInteraction(event);
              onInteraction(type, interactionData, 'up');
         }
         
@@ -135,8 +136,6 @@ export function ThereminPad({
     }, [calculateInteraction, isDisabled, onInteraction, type, isLatchOn]);
     
      const renderSettingsControls = () => {
-        if (!musicKeys && !musicScales) return null;
-
         const triggerButton = (
              <Button variant="outline" size="sm" className={cn("h-8 capitalize",
                     type === 'melody' ? "border-primary text-primary hover:bg-primary hover:text-primary-foreground" : "border-accent text-accent hover:bg-accent hover:text-accent-foreground"
@@ -154,7 +153,7 @@ export function ThereminPad({
                     <SheetTrigger asChild>{triggerButton}</SheetTrigger>
                 </TooltipTrigger>
                 <TooltipContent>
-                    <p>Harmony Settings</p>
+                    <p>{type === 'melody' ? 'Melody Settings' : 'Bass Settings'}</p>
                 </TooltipContent>
             </Tooltip>
         );
@@ -168,6 +167,22 @@ export function ThereminPad({
                     </SheetHeader>
                      <ScrollArea className="h-[85vh]">
                         <div className="py-4 pr-4 space-y-6">
+                            {instruments && activeInstrument && onInstrumentChange && (
+                                <div className="space-y-2">
+                                    <Label>Instrument</Label>
+                                    <Select value={activeInstrument} onValueChange={onInstrumentChange}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Instrument" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {instruments.map(i => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+
+                            {(musicKeys || musicScales) && <Separator />}
+
                             {type === 'melody' && (
                                 <>
                                     {musicKeys && activeKey && onKeyChange && (
@@ -279,3 +294,5 @@ export function ThereminPad({
         </Card>
     );
 }
+
+    

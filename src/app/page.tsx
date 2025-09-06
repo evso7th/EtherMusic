@@ -17,7 +17,9 @@ import { useAudioEngine } from '@/hooks/use-audio-engine';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SleepTimer } from '@/components/sleep-timer';
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
-import type { MusicKey, MusicScale, Tempo, Volumes } from '@/types';
+import { melodyInstruments, defaultMelodyInstrument } from '@/lib/melody-presets';
+import { bassInstruments, defaultBassInstrument } from '@/lib/bass-presets';
+import type { MusicKey, MusicScale, Tempo, Volumes, Instrument, BassInstrument } from '@/types';
 
 
 function getCookie(name: string): string | null {
@@ -128,6 +130,8 @@ export default function Home() {
         stopRecording,
         handleThereminInteraction,
         setSleepTimer,
+        setMelodyInstrument,
+        setBassInstrument,
         orbManager,
     } = useAudioEngine();
     
@@ -137,6 +141,9 @@ export default function Home() {
     const [musicKey, setMusicKey] = useState<MusicKey>('G');
     const [musicScale, setMusicScale] = useState<MusicScale>('Minor');
     const [allowedFrequencies, setAllowedFrequencies] = useState<{melody: number[], bass: number[]}>({melody: [], bass: []});
+    
+    const [activeMelodyInstrument, setActiveMelodyInstrument] = useState<Instrument>(defaultMelodyInstrument);
+    const [activeBassInstrument, setActiveBassInstrument] = useState<BassInstrument>(defaultBassInstrument);
     
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
     const [volumes, setLocalVolumes] = useState<Volumes>(() => loadSettings().volumes);
@@ -173,8 +180,10 @@ export default function Home() {
     useEffect(() => {
         if (isReady) {
             setVolumes(volumes);
+            setMelodyInstrument(activeMelodyInstrument);
+            setBassInstrument(activeBassInstrument);
         }
-    }, [isReady, setVolumes, volumes]);
+    }, [isReady, setVolumes, volumes, setMelodyInstrument, activeMelodyInstrument, setBassInstrument, activeBassInstrument]);
     
     const handleStartApp = useCallback(() => {
         startApp();
@@ -224,6 +233,16 @@ export default function Home() {
         setIsBassLatchOn(isOn);
         setBassLatch(isOn);
     }, [setBassLatch]);
+    
+    const handleMelodyInstrumentChange = useCallback((instrumentName: Instrument) => {
+        setActiveMelodyInstrument(instrumentName);
+        setMelodyInstrument(instrumentName);
+    }, [setMelodyInstrument]);
+
+    const handleBassInstrumentChange = useCallback((instrumentName: BassInstrument) => {
+        setActiveBassInstrument(instrumentName);
+        setBassInstrument(instrumentName);
+    }, [setBassInstrument]);
     
     if (!isClient) {
         return <Preloader />;
@@ -308,18 +327,21 @@ export default function Home() {
                  <main className="flex-grow flex flex-col gap-2 overflow-hidden">
                      <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-2 landscape:grid-cols-2 landscape:gap-1">
                         <MemoizedThereminPad
-                            onInteraction={handleThereminInteraction}
                             type="bass"
+                            onInteraction={handleThereminInteraction}
                             allowedFrequencies={allowedFrequencies.bass}
                             color="hsl(var(--accent))"
                             isLatchOn={isBassLatchOn}
                             onLatchToggle={handleLatchToggle}
                             isPolyphonic
+                            instruments={bassInstruments}
+                            activeInstrument={activeBassInstrument}
+                            onInstrumentChange={handleBassInstrumentChange}
                             orbManager={orbManager}
                         />
                         <MemoizedThereminPad
-                            onInteraction={handleThereminInteraction}
                             type="melody"
+                            onInteraction={handleThereminInteraction}
                             allowedFrequencies={allowedFrequencies.melody}
                             color="hsl(var(--primary))"
                             isLatchOn={false}
@@ -329,6 +351,9 @@ export default function Home() {
                             musicScales={Object.keys(SCALES) as MusicScale[]}
                             activeScale={musicScale}
                             onScaleChange={handleHarmonyChange}
+                            instruments={melodyInstruments}
+                            activeInstrument={activeMelodyInstrument}
+                            onInstrumentChange={handleMelodyInstrumentChange}
                             isPolyphonic
                             orbManager={orbManager}
                         />
@@ -366,3 +391,5 @@ export default function Home() {
         </div>
     );
 }
+
+    

@@ -5,7 +5,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
-import type { Volumes } from '@/types';
+import type { Volumes, Instrument, BassInstrument } from '@/types';
 
 export function useAudioEngine() {
     const { toast } = useToast();
@@ -105,7 +105,6 @@ export function useAudioEngine() {
     const setBassLatch = useCallback((isOn: boolean) => {
         isBassLatchOnRef.current = isOn;
         audioEngine.current?.setBassLatch(isOn);
-        console.log(`[useAudioEngine] Latch mode set to: ${isOn}`);
     }, []);
 
     const startRecording = useCallback(() => {
@@ -132,13 +131,18 @@ export function useAudioEngine() {
     }, [sleepTimerId]);
     
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
-        console.log(`[useAudioEngine] Interaction:`, { type, state, isBassLatchOn: isBassLatchOnRef.current });
         if (!isReady || !audioEngine.current) return;
-
-        // The audio engine now handles the latch "tap" logic internally.
-        // We just pass the events through.
+        
         audioEngine.current.handleThereminInteraction(type, data, state);
     }, [isReady]);
+
+    const setMelodyInstrument = useCallback((instrumentName: Instrument) => {
+        audioEngine.current?.setMelodyInstrument(instrumentName);
+    }, []);
+    
+    const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
+        audioEngine.current?.setBassInstrument(instrumentName);
+    }, []);
 
 
     return {
@@ -152,8 +156,8 @@ export function useAudioEngine() {
         stop,
         setTempo,
         setVolumes,
-        setMelodyInstrument: () => {}, // Kept for compatibility, does nothing
-        setBassInstrument: () => {}, // Kept for compatibility, does nothing
+        setMelodyInstrument,
+        setBassInstrument,
         setBeatPattern,
         setBassLatch,
         startRecording,
@@ -162,3 +166,5 @@ export function useAudioEngine() {
         setSleepTimer,
     };
 }
+
+    
