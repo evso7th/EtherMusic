@@ -171,7 +171,6 @@ export class AudioEngine {
                 const result = this.latchEngine.toggleNote(id, data.frequency, data.volume);
                 this.processLatchResult(result);
             }
-            // In latch mode, we don't process 'move' or 'up' for bass.
             return;
         }
 
@@ -208,16 +207,11 @@ export class AudioEngine {
 
         if (result.noteOn) {
             latchNode.port.postMessage({ type: 'noteOn', note: result.noteOn });
-            // We need a way to get the pad position to the orb manager.
-            // LatchEngine doesn't know about x/y. Let's assume OrbManager handles it.
-            // A better way would be to pass padInfo into LatchEngine or handle orb creation outside.
-            // For now, let's let OrbManager handle it, assuming it got the info.
         }
 
         if (result.noteToAnimate) {
             const padEl = document.getElementById('theremin-pad-bass');
             if(padEl) {
-                const rect = padEl.getBoundingClientRect();
                 const x = (Math.floor(result.noteToAnimate.id / 1000) * 10)
                 const y = ((result.noteToAnimate.id % 1000) * 10)
                 if (result.noteToAnimate.type === 'add') {

@@ -1,0 +1,133 @@
+# AuraGroove Instrument Preset Cookbook
+
+This document details all the synthesizer presets used in the application.
+
+---
+## Bass Presets
+Source: `src/lib/bass-presets.ts`
+---
+
+### 1. classicBass
+- **Description:** Чёткий, ритмичный, как настоящая бас-гитара
+- **Color:** #8B4513 (Dark Brown)
+- **Layer 1:**
+  - **Oscillator Wave:** sawtooth
+  - **Attack:** 0.01s
+  - **Release:** 0.3s
+- **Effects:**
+  - **Filter Cutoff:** 400 Hz
+  - **Filter Q:** 0.7
+  - **Distortion:** 0.05
+
+### 2. glideBass
+- **Description:** Плавный, как скольжение по струне
+- **Color:** #4169E1 (Royal Blue)
+- **Layer 1:**
+  - **Oscillator Wave:** triangle
+  - **Attack:** 0.05s
+  - **Release:** 1.5s
+  - **Portamento:** 0.03s
+- **Effects:**
+  - **Filter Cutoff:** 300 Hz
+  - **Filter Q:** 0.5
+
+### 3. ambientDrone
+- **Description:** Тёмный, плотный, как вибрация под землёй
+- **Color:** #1A0033 (Deep Purple)
+- **Layer 1:**
+  - **Oscillator Wave:** sine
+  - **Attack:** 0.2s
+  - **Release:** 3.0s
+  - **Portamento:** 0.08s
+- **Effects:**
+  - **Filter Cutoff:** 120 Hz
+  - **Filter Q:** 1.2
+
+### 4. resonantGliss
+- **Description:** Резонирующий, с "пением", идеален для глиссандо
+- **Color:** #8B008B (Dark Magenta)
+- **Layer 1:**
+  - **Oscillator Wave:** sawtooth
+  - **Attack:** 0.02s
+  - **Release:** 1.0s
+  - **Portamento:** 0.06s
+- **Effects:**
+  - **Filter Cutoff:** 500 Hz
+  - **Filter Q:** 1.4
+  - **Distortion:** 0.1
+
+### 5. hypnoticDrone
+- **Description:** Вибрация земли со стерео-движением
+- **Color:** #483D8B (Dark Slate Blue)
+- **Layer 1:**
+  - **Oscillator Wave:** sine
+  - **Attack:** 0.2s
+  - **Release:** 3.0s
+- **Layer 2:**
+  - **Oscillator Wave:** triangle
+  - **Attack:** 0.1s
+  - **Release:** 2.0s
+- **Effects:**
+  - **Filter Cutoff:** 150 Hz
+  - **Stagger:** 0.015s (15ms delay between layers)
+
+### 6. livingRiff
+- **Description:** Живой, дышащий рифф с характером
+- **Color:** #FF4500 (Orange Red)
+- **Layer 1:**
+  - **Oscillator Wave:** sine
+  - **Attack:** 0.01s
+  - **Release:** 1.0s
+- **Layer 2:**
+  - **Oscillator Wave:** sawtooth
+  - **Attack:** 0.05s
+  - **Release:** 1.5s
+- **Effects:**
+  - **Filter Cutoff:** 350 Hz
+  - **Distortion:** 0.1
+  - **Stagger:** 0.005s (5ms delay between layers)
+
+---
+## Melody & Accompaniment Presets
+Source: `src/lib/presets.ts`
+---
+
+### 1. organ
+- **Oscillator Wave:** triangle (approximates a sine + light triangle)
+- **Attack:** 0.2s
+- **Release:** 1.0s
+- **Portamento:** 0s
+- **Filter Cutoff:** 600 Hz
+- **Filter Q:** 0.7
+
+### 2. mellotron
+- **Oscillator Wave:** fatsine (simulates detuned/chorus effect)
+- **Attack:** 0.3s
+- **Release:** 1.5s
+- **Portamento:** 0.01s (for pitch wobble)
+- **Filter Cutoff:** 500 Hz
+- **Filter Q:** 0.5
+
+### 3. synth
+- **Oscillator Wave:** triangle (approximates triangle + sine base)
+- **Attack:** 0.15s
+- **Release:** 1.0s
+- **Portamento:** 0.03s
+- **Filter Cutoff:** 700 Hz
+- **Filter Q:** 1.0
+
+### 4. theremin
+- **Oscillator Wave:** sine
+- **Attack:** 0.3s
+- **Release:** 1.5s
+- **Portamento:** 0.08s (for glide effect)
+- **Filter Cutoff:** 600 Hz
+- **Filter Q:** 0.6
+
+### 5. portamento (Legacy Bass Preset)
+- **Oscillator Wave:** triangle
+- **Attack:** 0.1s
+- **Release:** 2.0s (mobile) / 4.0s (desktop)
+- **Portamento:** 0.05s
+- **Filter Cutoff:** 1000 Hz
+- **Filter Q:** 1.0
