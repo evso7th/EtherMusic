@@ -41,7 +41,13 @@ function setCookie(name: string, value: string, days: number) {
     document.cookie = name + "=" + (value || "")  + expires + "; path=/; SameSite=Lax";
 }
 
-const defaultVolumes: Volumes = { melody: -6, manualBass: -6, latch: -15, drums: -9 };
+const defaultVolumes: Volumes = { 
+    melody: { gain: -6, reverbSend: -48 },
+    manualBass: { gain: -6, reverbSend: -48 },
+    latch: { gain: -15, reverbSend: -48 },
+    drums: { gain: -9, reverbSend: -48 },
+    reverbReturn: -12,
+};
 
 
 function loadSettings() {
@@ -56,9 +62,9 @@ function loadSettings() {
         const savedVolumes = getCookie("ethermusic_volumes");
         const volumes = savedVolumes ? JSON.parse(savedVolumes) : defaultVolumes;
         
-        // A simple check to see if the loaded volumes object is valid
-        if (typeof volumes.melody !== 'number' || Object.keys(volumes).length < Object.keys(defaultVolumes).length) {
-            return { volumes: {...defaultVolumes, ...volumes} }; // Merge to add new keys
+        // A simple check to see if the loaded volumes object is valid and has the new structure
+        if (!volumes.melody || typeof volumes.melody.gain !== 'number') {
+            return { volumes: defaultVolumes }; 
         }
         
         return { volumes };
@@ -106,11 +112,16 @@ export default function Home() {
     const [isClient, setIsClient] = useState(false);
     const [cookieConsent, setCookieConsent] = useState(false);
     
+    const [volumes, setLocalVolumes] = useState<Volumes>(loadSettings().volumes);
+
     useEffect(() => {
       setIsClient(true);
       if (typeof window !== 'undefined') {
         const consent = getCookie("ethermusic_consent") === 'true';
         setCookieConsent(consent);
+        if (consent) {
+            setLocalVolumes(loadSettings().volumes);
+        }
       }
     }, []);
     
@@ -146,26 +157,6 @@ export default function Home() {
     const [activeBassInstrument, setActiveBassInstrument] = useState<BassInstrument>(defaultBassInstrument);
     
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
-    const [volumes, setLocalVolumes] = useState<Volumes>(() => {
-        if (typeof window === 'undefined') {
-            return defaultVolumes;
-        }
-        const consent = getCookie("ethermusic_consent") === 'true';
-        if (!consent) {
-            return defaultVolumes;
-        }
-        try {
-            const savedVolumes = getCookie("ethermusic_volumes");
-            const loadedVolumes = savedVolumes ? JSON.parse(savedVolumes) : defaultVolumes;
-            if (typeof loadedVolumes.melody !== 'number' || Object.keys(loadedVolumes).length < Object.keys(defaultVolumes).length) {
-                return {...defaultVolumes, ...loadedVolumes};
-            }
-            return loadedVolumes;
-        } catch (e) {
-            console.error("Failed to load settings from cookies", e);
-            return defaultVolumes;
-        }
-    });
 
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         let newKey = musicKey;
@@ -291,7 +282,14 @@ export default function Home() {
                     <p>&copy; 2024, EVS</p>
                     <p className="mt-2">v.2.0 "Maestro"</p>
                 </footer>
-                <CookieConsent onConsentChange={setCookieConsent} />
+                <CookieConsent onConsentChange={(consent) => {
+                    setCookieConsent(consent);
+                    if (consent) {
+                        setLocalVolumes(loadSettings().volumes);
+                    } else {
+                        setLocalVolumes(defaultVolumes);
+                    }
+                }} />
             </div>
         )
     }
@@ -385,7 +383,7 @@ export default function Home() {
                             tempos={tempos}
                             activeTempo={activeTempo}
                             onTempoChange={handleTempoChange}
-                            initialVolumes={volumes}
+                            volumes={volumes}
                             onVolumeChange={handleVolumeChange}
                             isMobile={isMobile}
                         />
@@ -400,7 +398,7 @@ export default function Home() {
                         tempos={tempos}
                         activeTempo={activeTempo}
                         onTempoChange={handleTempoChange}
-                        initialVolumes={volumes}
+                        volumes={volumes}
                         onVolumeChange={handleVolumeChange}
                         isMobile={isMobile}
                         isLandscape={true}
@@ -410,6 +408,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
-

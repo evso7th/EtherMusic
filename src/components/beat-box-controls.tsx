@@ -25,7 +25,7 @@ interface BeatBoxControlsProps {
     tempos: Tempo[];
     activeTempo: Tempo;
     onTempoChange: (tempo: Tempo) => void;
-    initialVolumes: Volumes;
+    volumes: Volumes;
     onVolumeChange: (volumes: Volumes) => void;
     isMobile: boolean;
     isLandscape?: boolean;
@@ -52,7 +52,7 @@ export function BeatBoxControls({
     tempos,
     activeTempo,
     onTempoChange,
-    initialVolumes,
+    volumes,
     onVolumeChange,
     isMobile,
     isLandscape = false,
@@ -198,7 +198,7 @@ export function BeatBoxControls({
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="pr-4 py-4">
                                     <MixerControls 
-                                        initialVolumes={initialVolumes} 
+                                        volumes={volumes} 
                                         onVolumeChange={onVolumeChange}
                                         isMobile={isMobile}
                                     />
@@ -331,7 +331,7 @@ export function BeatBoxControls({
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="pr-4 py-4">
                                     <MixerControls 
-                                        initialVolumes={initialVolumes} 
+                                        volumes={volumes} 
                                         onVolumeChange={onVolumeChange}
                                         isMobile={isMobile}
                                     />

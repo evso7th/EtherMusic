@@ -3,11 +3,13 @@
 
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
-import { Music, Waves, Drum, Anchor } from 'lucide-react';
+import { Music, Waves, Drum, Anchor, Blend } from 'lucide-react';
 import { useState, useCallback, useEffect } from 'react';
-import type { Volumes } from '@/types';
+import type { Volumes, ChannelVolumes } from '@/types';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "./ui/separator";
 
-const InstrumentControls = ({
+const VolumeControl = ({
     label,
     icon: Icon,
     volume,
@@ -39,8 +41,39 @@ const InstrumentControls = ({
     </div>
 );
 
+const ReverbSendControl = ({
+    label,
+    icon: Icon,
+    level,
+    onLevelChange,
+    onLevelCommit,
+}: {
+    label: string,
+    icon: React.ElementType,
+    level: number,
+    onLevelChange: (v: number) => void,
+    onLevelCommit: (v: number) => void,
+}) => (
+     <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+            <Icon className="w-5 h-5 text-accent flex-shrink-0" />
+            <Label className="text-sm font-medium flex-1 truncate">{label}</Label>
+            <span className="text-xs text-muted-foreground w-10 text-right">{level.toFixed(0)} dB</span>
+        </div>
+        <div className="flex items-center gap-4 pl-7">
+            <Slider
+                min={-48}
+                max={6}
+                step={1}
+                value={[level]}
+                onValueChange={(v) => onLevelChange(v[0])}
+                onValueCommit={(v) => onLevelCommit(v[0])}
+            />
+        </div>
+    </div>
+);
 
-export function MixerControls({ initialVolumes, onVolumeChange }: { initialVolumes: Volumes, onVolumeChange: (volumes: Volumes) => void, isMobile: boolean }) {
+export function MixerControls({ volumes: initialVolumes, onVolumeChange }: { volumes: Volumes, onVolumeChange: (volumes: Volumes) => void, isMobile: boolean }) {
     
     const [volumes, setVolumes] = useState(initialVolumes);
 
@@ -48,52 +81,123 @@ export function MixerControls({ initialVolumes, onVolumeChange }: { initialVolum
         setVolumes(initialVolumes);
     }, [initialVolumes]);
 
-    const handleVolumeChange = useCallback((instrument: keyof Volumes, value: number) => {
-        setVolumes(prev => ({ ...prev, [instrument]: value }));
+    const handleGainChange = useCallback((instrument: keyof Omit<Volumes, 'reverbReturn'>, value: number) => {
+        setVolumes(prev => ({
+            ...prev,
+            [instrument]: { ...prev[instrument], gain: value }
+        }));
     }, []);
     
-    const handleVolumeCommit = useCallback((instrument: keyof Volumes, value: number) => {
-        const newVolumes = { ...volumes, [instrument]: value };
+    const handleGainCommit = useCallback((instrument: keyof Omit<Volumes, 'reverbReturn'>, value: number) => {
+        const newVolumes = {
+            ...volumes,
+            [instrument]: { ...volumes[instrument], gain: value }
+        };
+        setVolumes(newVolumes);
+        onVolumeChange(newVolumes);
+    }, [volumes, onVolumeChange]);
+    
+    const handleReverbSendChange = useCallback((instrument: keyof Omit<Volumes, 'reverbReturn'>, value: number) => {
+        setVolumes(prev => ({
+            ...prev,
+            [instrument]: { ...prev[instrument], reverbSend: value }
+        }));
+    }, []);
+
+    const handleReverbSendCommit = useCallback((instrument: keyof Omit<Volumes, 'reverbReturn'>, value: number) => {
+        const newVolumes = {
+            ...volumes,
+            [instrument]: { ...volumes[instrument], reverbSend: value }
+        };
         setVolumes(newVolumes);
         onVolumeChange(newVolumes);
     }, [volumes, onVolumeChange]);
 
+    const handleReverbReturnChange = useCallback((value: number) => {
+        setVolumes(prev => ({ ...prev, reverbReturn: value }));
+    }, []);
+
+     const handleReverbReturnCommit = useCallback((value: number) => {
+        const newVolumes = { ...volumes, reverbReturn: value };
+        setVolumes(newVolumes);
+        onVolumeChange(newVolumes);
+    }, [volumes, onVolumeChange]);
+
+
     return (
-        <div className="p-1 space-y-4">
-            <div className="space-y-4">
-                <InstrumentControls 
+        <Tabs defaultValue="volumes" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="volumes">Volumes</TabsTrigger>
+                <TabsTrigger value="effects">Effects</TabsTrigger>
+            </TabsList>
+            <TabsContent value="volumes" className="p-1 space-y-4">
+                 <VolumeControl 
                     label="Melody"
                     icon={Music}
-                    volume={volumes.melody}
-                    onVolumeChange={(v) => handleVolumeChange('melody', v)}
-                    onVolumeCommit={(v) => handleVolumeCommit('melody', v)}
+                    volume={volumes.melody.gain}
+                    onVolumeChange={(v) => handleGainChange('melody', v)}
+                    onVolumeCommit={(v) => handleGainCommit('melody', v)}
                 />
-                <InstrumentControls 
+                <VolumeControl 
                     label="Bass"
                     icon={Waves}
-                    volume={volumes.manualBass}
-                    onVolumeChange={(v) => handleVolumeChange('manualBass', v)}
-                    onVolumeCommit={(v) => handleVolumeCommit('manualBass', v)}
+                    volume={volumes.manualBass.gain}
+                    onVolumeChange={(v) => handleGainChange('manualBass', v)}
+                    onVolumeCommit={(v) => handleGainCommit('manualBass', v)}
                 />
-                <InstrumentControls 
+                <VolumeControl 
                     label="Latch"
                     icon={Anchor}
-                    volume={volumes.latch}
-                    onVolumeChange={(v) => handleVolumeChange('latch', v)}
-                    onVolumeCommit={(v) => handleVolumeCommit('latch', v)}
+                    volume={volumes.latch.gain}
+                    onVolumeChange={(v) => handleGainChange('latch', v)}
+                    onVolumeCommit={(v) => handleGainCommit('latch', v)}
                 />
-                <InstrumentControls 
+                <VolumeControl 
                     label="Drums"
                     icon={Drum}
-                    volume={volumes.drums}
-                    onVolumeChange={(v) => handleVolumeChange('drums', v)}
-                    onVolumeCommit={(v) => handleVolumeCommit('drums', v)}
+                    volume={volumes.drums.gain}
+                    onVolumeChange={(v) => handleGainChange('drums', v)}
+                    onVolumeCommit={(v) => handleGainCommit('drums', v)}
                 />
-            </div>
-        </div>
+            </TabsContent>
+            <TabsContent value="effects" className="p-1 space-y-4">
+                 <VolumeControl 
+                    label="Reverb Mix"
+                    icon={Blend}
+                    volume={volumes.reverbReturn}
+                    onVolumeChange={handleReverbReturnChange}
+                    onVolumeCommit={handleReverbReturnCommit}
+                />
+                <Separator className="my-4" />
+                 <ReverbSendControl 
+                    label="Melody Send"
+                    icon={Music}
+                    level={volumes.melody.reverbSend}
+                    onLevelChange={(v) => handleReverbSendChange('melody', v)}
+                    onLevelCommit={(v) => handleReverbSendCommit('melody', v)}
+                />
+                 <ReverbSendControl 
+                    label="Bass Send"
+                    icon={Waves}
+                    level={volumes.manualBass.reverbSend}
+                    onLevelChange={(v) => handleReverbSendChange('manualBass', v)}
+                    onLevelCommit={(v) => handleReverbSendCommit('manualBass', v)}
+                />
+                 <ReverbSendControl 
+                    label="Latch Send"
+                    icon={Anchor}
+                    level={volumes.latch.reverbSend}
+                    onLevelChange={(v) => handleReverbSendChange('latch', v)}
+                    onLevelCommit={(v) => handleReverbSendCommit('latch', v)}
+                />
+                 <ReverbSendControl 
+                    label="Drums Send"
+                    icon={Drum}
+                    level={volumes.drums.reverbSend}
+                    onLevelChange={(v) => handleReverbSendChange('drums', v)}
+                    onLevelCommit={(v) => handleReverbSendCommit('drums', v)}
+                />
+            </TabsContent>
+        </Tabs>
     );
-}
-
-export function AutopilotMixerControls() {
-    return null;
 }

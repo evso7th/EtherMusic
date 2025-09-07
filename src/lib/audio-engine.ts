@@ -22,10 +22,11 @@ export class AudioEngine {
     public masterOut: GainNode;
     private nodes = new Map<PartName, { worklet: AudioWorkletNode, gain: GainNode }>();
     private volumes: Volumes = { 
-        melody: -6, 
-        manualBass: -6, 
-        latch: -15, 
-        drums: -9
+        melody: { gain: -6, reverbSend: -48 },
+        manualBass: { gain: -6, reverbSend: -48 },
+        latch: { gain: -15, reverbSend: -48 },
+        drums: { gain: -9, reverbSend: -48 },
+        reverbReturn: -12,
     };
     private isBassLatchOn: boolean = false;
     private latchEngine = new LatchEngine();
@@ -271,15 +272,21 @@ export class AudioEngine {
     }
     
     public setVolumes(newVolumes: Volumes) {
-        if (!this.isInitialized || !this.context || !this.masterOut) return;
+        if (!this.isInitialized || !this.context) return;
         this.volumes = newVolumes;
         const rampTime = this.context.currentTime + 0.05;
 
-        Object.entries(newVolumes).forEach(([part, db]) => {
-            const nodeInfo = this.nodes.get(part as PartName);
-            const gainValue = dbToGain(db);
-            if (nodeInfo) {
-                nodeInfo.gain.gain.linearRampToValueAtTime(gainValue, rampTime);
+        (Object.keys(newVolumes) as Array<keyof Volumes>).forEach((part) => {
+            if (part === 'reverbReturn') {
+                // handle reverb return gain later
+            } else {
+                 const partName = part as PartName;
+                 const nodeInfo = this.nodes.get(partName);
+                 if (nodeInfo) {
+                    const gainValue = dbToGain(newVolumes[partName].gain);
+                    nodeInfo.gain.gain.linearRampToValueAtTime(gainValue, rampTime);
+                    // We will handle reverbSend later when the reverb worklet is created
+                 }
             }
         });
     }
@@ -318,4 +325,3 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
-

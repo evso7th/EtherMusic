@@ -58,17 +58,23 @@ export type BeatPattern = {
     type: 'Meditative' | 'Classic' | 'System';
 };
 
-export type Volumes = { 
-    melody: number; 
-    manualBass: number;
-    latch: number; 
-    drums: number; 
-};
+// New structured volume type
+export interface ChannelVolumes {
+  gain: number;
+  reverbSend: number;
+}
+
+export interface Volumes {
+  melody: ChannelVolumes;
+  manualBass: ChannelVolumes;
+  latch: ChannelVolumes;
+  drums: ChannelVolumes;
+  reverbReturn: number;
+}
+
 
 export interface Note {
     id: number;
     frequency: number;
     volume: number;
 }
-
-    
