@@ -107,7 +107,6 @@ export function useAudioEngine() {
     const setBassLatch = useCallback((isOn: boolean) => {
         isBassLatchOnRef.current = isOn;
         audioEngine.current?.setBassLatch(isOn);
-        console.log(`[useAudioEngine] Latch mode set to: ${isOn}`);
     }, []);
 
     const startRecording = useCallback(() => {
@@ -136,14 +135,8 @@ export function useAudioEngine() {
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isReady || !audioEngine.current) return;
         
-        if (type === 'bass' && isBassLatchOnRef.current) {
-            if (state === 'down' && data) { 
-                 audioEngine.current.handleThereminInteraction(type, data, 'down');
-            }
-            return;
-        }
-        
         audioEngine.current.handleThereminInteraction(type, data, state);
+
     }, [isReady]);
 
     const setMelodyInstrument = useCallback((instrumentName: Instrument) => {
@@ -163,7 +156,7 @@ export function useAudioEngine() {
         startApp,
         play,
         pause,
-stop,
+        stop,
         setTempo,
         setVolumes,
         setMelodyInstrument,
@@ -176,3 +169,5 @@ stop,
         setSleepTimer,
     };
 }
+
+    

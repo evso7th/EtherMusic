@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { SlidersHorizontal, Drum, Zap, Power } from 'lucide-react';
+import { SlidersHorizontal, Drum, Zap } from 'lucide-react';
 import { useState, useMemo, memo, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
@@ -26,7 +26,7 @@ interface BeatBoxControlsProps {
     activeTempo: Tempo;
     onTempoChange: (tempo: Tempo) => void;
     volumes: Volumes;
-    onVolumeChange: (volumes: Volumes) => void;
+    onMixerChange: (volumes: Omit<Volumes, 'melody' | 'manualBass'>) => void;
     isMobile: boolean;
     isLandscape?: boolean;
 }
@@ -53,7 +53,7 @@ export function BeatBoxControls({
     activeTempo,
     onTempoChange,
     volumes,
-    onVolumeChange,
+    onMixerChange,
     isMobile,
     isLandscape = false,
 }: BeatBoxControlsProps) {
@@ -199,8 +199,7 @@ export function BeatBoxControls({
                                 <div className="pr-4 py-4">
                                     <MixerControls 
                                         volumes={volumes} 
-                                        onVolumeChange={onVolumeChange}
-                                        isMobile={isMobile}
+                                        onVolumeChange={onMixerChange}
                                     />
                                 </div>
                             </ScrollArea>
@@ -332,8 +331,7 @@ export function BeatBoxControls({
                                 <div className="pr-4 py-4">
                                     <MixerControls 
                                         volumes={volumes} 
-                                        onVolumeChange={onVolumeChange}
-                                        isMobile={isMobile}
+                                        onVolumeChange={onMixerChange}
                                     />
                                 </div>
                             </ScrollArea>
@@ -346,3 +344,5 @@ export function BeatBoxControls({
         </TooltipProvider>
     );
 }
+
+    

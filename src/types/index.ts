@@ -23,6 +23,7 @@ export interface InstrumentPresetParams {
         type: BiquadFilterType;
     };
     portamento?: number;
+    reverbSend?: number; // Optional reverb send level
 }
 
 export interface BassInstrumentPresetParams extends InstrumentPresetParams {
@@ -78,3 +79,5 @@ export interface Note {
     frequency: number;
     volume: number;
 }
+
+    

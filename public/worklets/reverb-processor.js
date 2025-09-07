@@ -1,20 +1,19 @@
-// This file is a placeholder for the reverb effect worklet.
-// The full implementation will follow once the UI and architecture are approved.
-// For now, it will act as a pass-through node.
 
+// This is a placeholder. The actual reverb implementation will be added later.
 class ReverbProcessor extends AudioWorkletProcessor {
-  constructor(options) {
-    super(options);
-    // In the future, we will initialize DelayNode, BiquadFilterNode, etc. here.
+  constructor() {
+    super();
+    // We can't create AudioNodes here, so we will handle the reverb logic in the process method
+    // or receive them via postMessage if needed. For now, it's a pass-through.
   }
 
   process(inputs, outputs, parameters) {
     const input = inputs[0];
     const output = outputs[0];
 
-    // Simple pass-through for now
+    // For now, just pass the input to the output without processing
     for (let channel = 0; channel < input.length; channel++) {
-      if(input[channel]) {
+      if (input[channel]) {
         output[channel].set(input[channel]);
       }
     }
@@ -24,3 +23,5 @@ class ReverbProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('reverb-processor', ReverbProcessor);
+
+    

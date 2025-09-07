@@ -20,9 +20,11 @@ export class AudioEngine {
     private recordedChunks: Blob[] = [];
 
     public masterOut: GainNode;
-    private nodes = new Map<PartName, { worklet: AudioWorkletNode, gain: GainNode }>();
+    private nodes = new Map<PartName, { worklet: AudioWorkletNode, gain: GainNode, reverbSend: GainNode }>();
+    private reverbReturn: GainNode;
+
     private volumes: Volumes = { 
-        melody: { gain: -6, reverbSend: -48 },
+        melody: { gain: -6, reverbSend: -24 },
         manualBass: { gain: -6, reverbSend: -48 },
         latch: { gain: -15, reverbSend: -48 },
         drums: { gain: -9, reverbSend: -48 },
@@ -41,6 +43,7 @@ export class AudioEngine {
         this.orbManager = orbManager;
         this.masterOut = this.context.createGain();
         this.masterOut.connect(this.context.destination);
+        this.reverbReturn = this.context.createGain();
     }
 
     public get isPlaying(): boolean {
@@ -87,16 +90,21 @@ export class AudioEngine {
              await this.context.audioWorklet.addModule('/worklets/theremin-processor.js');
              await this.context.audioWorklet.addModule('/worklets/latch-processor.js');
              await this.context.audioWorklet.addModule('/worklets/drum-processor.js');
+             await this.context.audioWorklet.addModule('/worklets/reverb-processor.js');
              console.log('AudioWorklet modules loaded.');
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
             throw new Error("Could not load core audio components. Please try refreshing the page.");
         }
         
-        this.createWorkletNode('melody', 'theremin-processor', 4);
-        this.createWorkletNode('manualBass', 'theremin-processor', 4);
-        this.createWorkletNode('latch', 'latch-processor', 4);
-        this.createWorkletNode('drums', 'drum-processor', 8);
+        const reverbBus = new AudioWorkletNode(this.context, 'reverb-processor');
+        this.reverbReturn.connect(this.masterOut);
+        reverbBus.connect(this.reverbReturn);
+        
+        this.createWorkletNode('melody', 'theremin-processor', 4, reverbBus);
+        this.createWorkletNode('manualBass', 'theremin-processor', 4, reverbBus);
+        this.createWorkletNode('latch', 'latch-processor', 4, reverbBus);
+        this.createWorkletNode('drums', 'drum-processor', 8, reverbBus);
 
         this.setVolumes(this.volumes);
         this.setTempo(90);
@@ -105,11 +113,14 @@ export class AudioEngine {
         console.log('AudioEngine initialized and ready.');
     }
     
-    private createWorkletNode(part: PartName, processorName: string, polyphony: number) {
+    private createWorkletNode(part: PartName, processorName: string, polyphony: number, reverbBus: AudioWorkletNode) {
         if (!this.context || !this.masterOut) return;
         
         const gainNode = this.context.createGain();
         gainNode.connect(this.masterOut);
+
+        const reverbSendNode = this.context.createGain();
+        reverbSendNode.connect(reverbBus);
 
         const workletNode = new AudioWorkletNode(this.context, processorName, {
             processorOptions: {
@@ -119,8 +130,9 @@ export class AudioEngine {
             outputChannelCount: [1]
         });
         workletNode.connect(gainNode);
+        workletNode.connect(reverbSendNode);
 
-        this.nodes.set(part, { worklet: workletNode, gain: gainNode });
+        this.nodes.set(part, { worklet: workletNode, gain: gainNode, reverbSend: reverbSendNode });
         console.log(`Created worklet node for: ${part}`);
     }
 
@@ -160,33 +172,30 @@ export class AudioEngine {
 
     public handleThereminInteraction(type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') {
         if (!this.isInitialized || !this.context) return;
+
+        const partName = type === 'bass' ? (this.isBassLatchOn ? 'latch' : 'manualBass') : 'melody';
         
-        if (type === 'bass' && this.isBassLatchOn) {
+        if (partName === 'latch') {
             if (state === 'down' && data) { 
                  const result = this.latchEngine.toggleNote(data);
                  this.processLatchResult(result);
             }
-            // In latch mode, we only care about the 'down' event for toggling.
             return;
         }
-        
-        // This is for non-latch mode (melody and manual bass)
+
+        const node = this.nodes.get(partName)?.worklet;
+        if (!node) return;
+
         if (!data) {
-            // This can happen on pointer leave, just ensure sounds are off.
              this.activePointers.forEach((pointerInfo, pointerId) => {
                 if (pointerInfo.type === type) {
-                    const node = this.nodes.get(type === 'bass' ? 'manualBass' : type)?.worklet;
-                    node?.port.postMessage({ type: 'noteOff', id: pointerId });
+                    node.port.postMessage({ type: 'noteOff', id: pointerId });
                     this.orbManager.removeOrb(pointerId);
                     this.activePointers.delete(pointerId);
                 }
             });
             return;
         }
-
-        const partName = type === 'bass' ? 'manualBass' : type;
-        const node = this.nodes.get(partName)?.worklet;
-        if (!node) return;
 
         if (state === 'down') {
             this.activePointers.set(data.pointerId, { type });
@@ -210,30 +219,27 @@ export class AudioEngine {
         const latchNode = this.nodes.get('latch')?.worklet;
         if (!latchNode) return;
         
-        console.log('[AudioEngine] processLatchResult:', result);
-    
         if (result.noteOff) {
-            console.log('[AudioEngine] Sending noteOff to latch worklet:', result.noteOff);
             latchNode.port.postMessage({ type: 'noteOff', id: result.noteOff.id });
         }
         if (result.noteToAnimateRemove) {
-            console.log('[AudioEngine] Removing orb for latch note', result.noteToAnimateRemove.id);
             this.orbManager.removeOrb(result.noteToAnimateRemove.id);
         }
         
         if (result.noteOn) {
-            console.log('[AudioEngine] Sending noteOn to latch worklet:', result.noteOn);
             latchNode.port.postMessage({ type: 'noteOn', note: result.noteOn });
         }
         if (result.noteToAnimateAdd) {
-            console.log('[AudioEngine] Adding orb for latch note', result.noteToAnimateAdd.id);
             this.orbManager.addOrb(result.noteToAnimateAdd.id, 'latch', result.noteToAnimateAdd.x, result.noteToAnimateAdd.y);
         }
     }
     
     public setBassLatch(isOn: boolean) {
         this.isBassLatchOn = isOn;
-        console.log(`[AudioEngine] Latch turned ${isOn ? 'on' : 'off'}, clearing all notes.`);
+        // Stop manual bass notes when switching to latch
+        this.nodes.get('manualBass')?.worklet.port.postMessage({ type: 'allNotesOff' });
+        this.orbManager.removeAllOrbs('bass');
+        
         if (!isOn) {
             const notesToTurnOff = this.latchEngine.clear();
             const latchNode = this.nodes.get('latch')?.worklet;
@@ -278,14 +284,16 @@ export class AudioEngine {
 
         (Object.keys(newVolumes) as Array<keyof Volumes>).forEach((part) => {
             if (part === 'reverbReturn') {
-                // handle reverb return gain later
+                this.reverbReturn.gain.linearRampToValueAtTime(dbToGain(newVolumes.reverbReturn), rampTime);
             } else {
                  const partName = part as PartName;
                  const nodeInfo = this.nodes.get(partName);
                  if (nodeInfo) {
                     const gainValue = dbToGain(newVolumes[partName].gain);
                     nodeInfo.gain.gain.linearRampToValueAtTime(gainValue, rampTime);
-                    // We will handle reverbSend later when the reverb worklet is created
+                    
+                    const reverbSendValue = dbToGain(newVolumes[partName].reverbSend);
+                    nodeInfo.reverbSend.gain.linearRampToValueAtTime(reverbSendValue, rampTime);
                  }
             }
         });
@@ -325,3 +333,5 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
+
+    

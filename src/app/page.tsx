@@ -19,7 +19,7 @@ import { SleepTimer } from '@/components/sleep-timer';
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
 import { melodyInstruments, defaultMelodyInstrument } from '@/lib/melody-presets';
 import { bassInstruments, defaultBassInstrument } from '@/lib/bass-presets';
-import type { MusicKey, MusicScale, Tempo, Volumes, Instrument, BassInstrument } from '@/types';
+import type { MusicKey, MusicScale, Tempo, Volumes, Instrument, BassInstrument, ChannelVolumes } from '@/types';
 
 
 function getCookie(name: string): string | null {
@@ -42,7 +42,7 @@ function setCookie(name: string, value: string, days: number) {
 }
 
 const defaultVolumes: Volumes = { 
-    melody: { gain: -6, reverbSend: -48 },
+    melody: { gain: -6, reverbSend: -24 },
     manualBass: { gain: -6, reverbSend: -48 },
     latch: { gain: -15, reverbSend: -48 },
     drums: { gain: -9, reverbSend: -48 },
@@ -63,7 +63,7 @@ function loadSettings() {
         const volumes = savedVolumes ? JSON.parse(savedVolumes) : defaultVolumes;
         
         // A simple check to see if the loaded volumes object is valid and has the new structure
-        if (!volumes.melody || typeof volumes.melody.gain !== 'number') {
+        if (!volumes.melody || typeof volumes.melody.gain !== 'number' || typeof volumes.melody.reverbSend !== 'number') {
             return { volumes: defaultVolumes }; 
         }
         
@@ -112,18 +112,23 @@ export default function Home() {
     const [isClient, setIsClient] = useState(false);
     const [cookieConsent, setCookieConsent] = useState(false);
     
-    const [volumes, setLocalVolumes] = useState<Volumes>(loadSettings().volumes);
+    const [volumes, setLocalVolumes] = useState<Volumes>(defaultVolumes);
 
     useEffect(() => {
       setIsClient(true);
       if (typeof window !== 'undefined') {
         const consent = getCookie("ethermusic_consent") === 'true';
         setCookieConsent(consent);
-        if (consent) {
-            setLocalVolumes(loadSettings().volumes);
-        }
       }
     }, []);
+
+    useEffect(() => {
+        if (cookieConsent) {
+            setLocalVolumes(loadSettings().volumes);
+        } else {
+            setLocalVolumes(defaultVolumes);
+        }
+    }, [cookieConsent]);
     
     const {
         isAppStarted,
@@ -187,6 +192,32 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    const updateVolumes = useCallback((newVolumes: Volumes) => {
+        setLocalVolumes(newVolumes);
+        setVolumes(newVolumes);
+        if (cookieConsent) {
+            saveSettings(newVolumes);
+        }
+    }, [setVolumes, cookieConsent]);
+
+    const handleChannelVolumeChange = useCallback((channel: keyof Omit<Volumes, 'reverbReturn'>, newChannelVolumes: ChannelVolumes) => {
+        const newVolumes = {
+            ...volumes,
+            [channel]: newChannelVolumes
+        };
+        updateVolumes(newVolumes);
+    }, [volumes, updateVolumes]);
+    
+    const handleMixerChange = useCallback((mixerVolumes: Omit<Volumes, 'melody' | 'manualBass'>) => {
+        const newVolumes: Volumes = {
+            ...volumes,
+            latch: mixerVolumes.latch,
+            drums: mixerVolumes.drums,
+            reverbReturn: mixerVolumes.reverbReturn,
+        };
+        updateVolumes(newVolumes);
+    }, [volumes, updateVolumes]);
+
     useEffect(() => {
         if (isReady) {
             setVolumes(volumes);
@@ -229,15 +260,6 @@ export default function Home() {
         setActiveTempo(tempo);
         setTempo(tempo.bpm);
     }, [setTempo]);
-
-    const handleVolumeChange = useCallback((newVolumes: Volumes) => {
-       setLocalVolumes(newVolumes);
-        setVolumes(newVolumes);
-
-        if (cookieConsent) {
-            saveSettings(newVolumes);
-        }
-    }, [setVolumes, cookieConsent]);
 
     const handleLatchToggle = useCallback((isOn: boolean) => {
         setIsBassLatchOn(isOn);
@@ -284,11 +306,6 @@ export default function Home() {
                 </footer>
                 <CookieConsent onConsentChange={(consent) => {
                     setCookieConsent(consent);
-                    if (consent) {
-                        setLocalVolumes(loadSettings().volumes);
-                    } else {
-                        setLocalVolumes(defaultVolumes);
-                    }
                 }} />
             </div>
         )
@@ -355,6 +372,8 @@ export default function Home() {
                             activeInstrument={activeBassInstrument}
                             onInstrumentChange={handleBassInstrumentChange}
                             orbManager={orbManager}
+                            channelVolumes={volumes.manualBass}
+                            onChannelVolumeChange={(v) => handleChannelVolumeChange('manualBass', v)}
                         />
                         <MemoizedThereminPad
                             type="melody"
@@ -373,6 +392,8 @@ export default function Home() {
                             onInstrumentChange={handleMelodyInstrumentChange}
                             isPolyphonic
                             orbManager={orbManager}
+                            channelVolumes={volumes.melody}
+                            onChannelVolumeChange={(v) => handleChannelVolumeChange('melody', v)}
                         />
                     </div>
                     <div className="flex-shrink-0 portrait:block landscape:hidden">
@@ -384,7 +405,7 @@ export default function Home() {
                             activeTempo={activeTempo}
                             onTempoChange={handleTempoChange}
                             volumes={volumes}
-                            onVolumeChange={handleVolumeChange}
+                            onMixerChange={handleMixerChange}
                             isMobile={isMobile}
                         />
                     </div>
@@ -399,7 +420,7 @@ export default function Home() {
                         activeTempo={activeTempo}
                         onTempoChange={handleTempoChange}
                         volumes={volumes}
-                        onVolumeChange={handleVolumeChange}
+                        onMixerChange={handleMixerChange}
                         isMobile={isMobile}
                         isLandscape={true}
                     />
@@ -408,3 +429,5 @@ export default function Home() {
         </div>
     );
 }
+
+    

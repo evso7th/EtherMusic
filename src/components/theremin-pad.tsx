@@ -7,16 +7,17 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Anchor, SlidersHorizontal } from 'lucide-react';
+import { Anchor, SlidersHorizontal, Blend, Waves, Music } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { MusicKey, MusicScale, Instrument, BassInstrument, InstrumentPreset, BassInstrumentPreset } from '@/types';
+import type { MusicKey, MusicScale, Instrument, BassInstrument, InstrumentPreset, BassInstrumentPreset, ChannelVolumes } from '@/types';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import type { OrbManager } from '@/lib/orb-manager';
+import { Slider } from './ui/slider';
 
 interface ThereminPadProps {
     type: 'melody' | 'bass';
@@ -37,12 +38,79 @@ interface ThereminPadProps {
     isLatchOn?: boolean;
     onLatchToggle?: (checked: boolean) => void;
     orbManager?: OrbManager | null;
+    channelVolumes: ChannelVolumes;
+    onChannelVolumeChange: (volumes: ChannelVolumes) => void;
 }
 
 const padTitles = {
     melody: "Melody Pad",
     bass: "Bass Pad"
 }
+
+const VolumeControl = ({
+    label,
+    icon: Icon,
+    volume,
+    onVolumeChange,
+    onVolumeCommit,
+}: {
+    label: string,
+    icon: React.ElementType,
+    volume: number,
+    onVolumeChange: (v: number) => void,
+    onVolumeCommit: (v: number) => void,
+}) => (
+    <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+            <Icon className="w-5 h-5 text-primary flex-shrink-0" />
+            <Label className="text-sm font-medium flex-1 truncate">{label}</Label>
+            <span className="text-xs text-muted-foreground w-10 text-right">{volume.toFixed(0)} dB</span>
+        </div>
+        <div className="flex items-center gap-4 pl-7">
+            <Slider
+                min={-48}
+                max={6}
+                step={1}
+                value={[volume]}
+                onValueChange={(v) => onVolumeChange(v[0])}
+                onValueCommit={(v) => onVolumeCommit(v[0])}
+            />
+        </div>
+    </div>
+);
+
+const ReverbSendControl = ({
+    label,
+    icon: Icon,
+    level,
+    onLevelChange,
+    onLevelCommit,
+}: {
+    label: string,
+    icon: React.ElementType,
+    level: number,
+    onLevelChange: (v: number) => void,
+    onLevelCommit: (v: number) => void,
+}) => (
+     <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+            <Icon className="w-5 h-5 text-accent flex-shrink-0" />
+            <Label className="text-sm font-medium flex-1 truncate">{label}</Label>
+            <span className="text-xs text-muted-foreground w-10 text-right">{level.toFixed(0)} dB</span>
+        </div>
+        <div className="flex items-center gap-4 pl-7">
+            <Slider
+                min={-48}
+                max={6}
+                step={1}
+                value={[level]}
+                onValueChange={(v) => onLevelChange(v[0])}
+                onValueCommit={(v) => onLevelCommit(v[0])}
+            />
+        </div>
+    </div>
+);
+
 
 export function ThereminPad({ 
     type, 
@@ -63,11 +131,29 @@ export function ThereminPad({
     isLatchOn,
     onLatchToggle,
     orbManager,
+    channelVolumes,
+    onChannelVolumeChange
 }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const isMobile = useIsMobile();
     
+    const [localVolumes, setLocalVolumes] = useState(channelVolumes);
+
+    useEffect(() => {
+        setLocalVolumes(channelVolumes);
+    }, [channelVolumes]);
+
+    const handleGainChange = (gain: number) => {
+        setLocalVolumes(prev => ({...prev, gain}));
+    };
+    const handleReverbSendChange = (reverbSend: number) => {
+        setLocalVolumes(prev => ({...prev, reverbSend}));
+    };
+    const handleCommit = () => {
+        onChannelVolumeChange(localVolumes);
+    };
+
     // Manage orbs for latch mode
     useEffect(() => {
         if (type === 'bass' && orbManager) {
@@ -156,6 +242,8 @@ export function ThereminPad({
                 </TooltipContent>
             </Tooltip>
         );
+        
+        const PartIcon = type === 'melody' ? Music : Waves;
 
         return (
             <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
@@ -213,6 +301,24 @@ export function ThereminPad({
                                  </>
                             )}
                             
+                            <Separator />
+                            <div className="space-y-4">
+                                <VolumeControl
+                                    label="Volume"
+                                    icon={PartIcon}
+                                    volume={localVolumes.gain}
+                                    onVolumeChange={handleGainChange}
+                                    onVolumeCommit={handleCommit}
+                                />
+                                <ReverbSendControl
+                                    label="Reverb Send"
+                                    icon={Blend}
+                                    level={localVolumes.reverbSend}
+                                    onLevelChange={handleReverbSendChange}
+                                    onLevelCommit={handleCommit}
+                                />
+                            </div>
+
                             <Separator />
 
                             <Button 
@@ -293,4 +399,3 @@ export function ThereminPad({
         </Card>
     );
 }
-
