@@ -12,6 +12,10 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
             filter: { Q: 0.7, frequency: 400, type: 'lowpass', gain: 0 },
             reverbSend: -48,
             distortion: 10,
+            layers: [
+                { type: 'square', freqMult: 0.5, level: 0.5, detune: -10 },
+                { type: 'sine', freqMult: 1, level: 0.8, detune: 10 }
+            ],
         }
     },
     {
@@ -25,6 +29,9 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
             portamento: 0.03,
             reverbSend: -36,
             distortion: 0,
+            layers: [
+                { type: 'sine', freqMult: 1, level: 0.7, detune: 5 }
+            ]
         }
     },
     {
@@ -38,6 +45,10 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
             portamento: 0.08,
             reverbSend: -24,
             distortion: 0,
+            layers: [
+                { type: 'sine', freqMult: 0.5, level: 0.9, detune: -5 },
+                { type: 'triangle', freqMult: 2, level: 0.3, detune: 5 }
+            ]
         }
     },
     {
@@ -47,10 +58,13 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
         params: {
             oscillator: { type: 'sawtooth' },
             envelope: { attack: 0.02, decay: 0.2, sustain: 0.7, release: 1.0 },
-            filter: { Q: 1.4, frequency: 500, type: 'lowpass', gain: 0 },
+            filter: { Q: 2.5, frequency: 600, type: 'lowpass', gain: 0 },
             portamento: 0.06,
             reverbSend: -18,
             distortion: 20,
+            layers: [
+                { type: 'triangle', freqMult: 1, level: 0.5, detune: 7 }
+            ]
         }
     },
     {
