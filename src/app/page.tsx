@@ -20,6 +20,7 @@ import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
 import { melodyInstruments, defaultMelodyInstrument } from '@/lib/melody-presets';
 import { bassInstruments, defaultBassInstrument } from '@/lib/bass-presets';
 import type { MusicKey, MusicScale, Tempo, Volumes, Instrument, BassInstrument, ChannelVolumes } from '@/types';
+import { cn } from '@/lib/utils';
 
 
 function getCookie(name: string): string | null {
@@ -431,6 +432,8 @@ export default function Home() {
         </div>
     );
 }
+
+    
 
     
 
