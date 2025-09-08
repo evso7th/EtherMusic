@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Volumes, Instrument, BassInstrument, CompressorSettings, InstrumentPreset, BassInstrumentPreset, ChannelVolumes, AutopilotSettings, AutopilotWorkerResponse, AutopilotWorkerMessage, SynthNote } from '@/types';
+import type { Volumes, Instrument, BassInstrument, CompressorSettings, InstrumentPreset, BassInstrumentPreset, ChannelVolumes, SynthNote, WorkerMessage } from '@/types';
 import { OrbManager } from './orb-manager';
 import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
@@ -28,7 +28,7 @@ function createDistortionCurve(amount: number): Float32Array {
     return curve;
 }
 
-type SynthPartName = 'melody' | 'manualBass' | 'latch' | 'autopilotMelody' | 'autopilotAccompaniment' | 'autopilotBass';
+type SynthPartName = 'melody' | 'manualBass' | 'latch';
 
 
 export class AudioEngine {
@@ -49,8 +49,6 @@ export class AudioEngine {
     private drumWorklet: AudioWorkletNode | null = null;
     private drumGain: GainNode | null = null;
     private drumReverbSend: GainNode | null = null;
-    
-    private autopilotWorker: Worker | null = null;
 
     private nodes = new Map<SynthPartName, { 
         worklet: AudioWorkletNode, 
@@ -58,18 +56,13 @@ export class AudioEngine {
         reverbSend: GainNode,
         distortion: WaveShaperNode,
     }>();
-    
-    private autopilotSettings: AutopilotSettings | null = null;
-    
+        
     private volumes: Volumes = { 
         melody: { gain: 0, reverbSend: -18, distortion: 0 },
         manualBass: { gain: -3, reverbSend: -48, distortion: 0 },
         latch: { gain: -9, reverbSend: -48, distortion: 0 },
         drums: { gain: -9, reverbSend: -48, distortion: 0 },
         reverbReturn: -12,
-        autopilotMelody: { gain: -6, reverbSend: -18, distortion: 0 },
-        autopilotAccompaniment: { gain: -9, reverbSend: -12, distortion: 0 },
-        autopilotBass: { gain: -9, reverbSend: -24, distortion: 0 },
         compressor: {
             enabled: true,
             threshold: -24,
@@ -85,12 +78,7 @@ export class AudioEngine {
     private nextNoteId = 0;
 
     private _isPlaying = false;
-    private mainLoop: NodeJS.Timeout | null = null;
     private tempo = 90;
-    private current16thNote = 0;
-    private nextNoteTime = 0.0;
-    private lookahead = 25.0; // How frequently to call scheduling function (in milliseconds)
-    private scheduleAheadTime = 0.1; // How far ahead to schedule audio (sec)
 
     constructor(context: AudioContext, orbManager: OrbManager) {
         this.context = context;
@@ -123,10 +111,6 @@ export class AudioEngine {
     
     public getVolumes(): Volumes {
         return {...this.volumes};
-    }
-
-    public getAutopilotSettings(): AutopilotSettings | null {
-        return this.autopilotSettings;
     }
     
     public async initialize() {
@@ -165,8 +149,6 @@ export class AudioEngine {
                 this.context.audioWorklet.addModule('/workers/synth-processor.js'),
                 this.context.audioWorklet.addModule('/workers/drum-processor.js'),
              ]);
-             this.autopilotWorker = new Worker(new URL('../lib/workers/autopilot.worker.js', import.meta.url));
-             this.autopilotWorker.onmessage = this.handleAutopilotMessage.bind(this);
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
             throw new Error("Could not load core audio components. Please try refreshing the page.");
@@ -177,66 +159,11 @@ export class AudioEngine {
         this.createSynthChannel('melody', 10);
         this.createSynthChannel('manualBass', 4);
         this.createSynthChannel('latch', 4);
-        this.createSynthChannel('autopilotMelody', 10);
-        this.createSynthChannel('autopilotAccompaniment', 10);
-        this.createSynthChannel('autopilotBass', 4);
         this.createDrumChannel();
 
         this.setVolumes(this.volumes);
         
         this.isInitialized = true;
-    }
-    
-    private scheduler() {
-        while (this.nextNoteTime < this.context.currentTime + this.scheduleAheadTime ) {
-            const message: AutopilotWorkerMessage = {
-                type: 'tick',
-                time: this.nextNoteTime,
-                beatNumber: this.current16thNote,
-            };
-            this.autopilotWorker?.postMessage(message);
-            
-            const secondsPerBeat = 60.0 / this.tempo;
-            this.nextNoteTime += 0.25 * secondsPerBeat; // Advance by a 16th note
-    
-            this.current16thNote = (this.current16thNote + 1) % 16;
-        }
-    }
-
-    private handleAutopilotMessage(event: MessageEvent<AutopilotWorkerResponse>) {
-        const { type, score, time } = event.data;
-        if (type === 'score') {
-           this.scheduleAutopilotScore(score, time);
-        }
-    }
-    
-    private scheduleAutopilotScore(score: any, time: number) {
-        if (!this.isInitialized) return;
-        score.bass?.forEach((note: any) => this.playAutopilotNote('autopilotBass', note, time));
-        score.accompaniment?.forEach((note: any) => this.playAutopilotNote('autopilotAccompaniment', note, time));
-        score.melody?.forEach((note: any) => this.playAutopilotNote('autopilotMelody', note, time));
-        score.sparkle?.forEach((note: any) => this.playAutopilotNote('melody', note, time, true));
-    }
-    
-    private playAutopilotNote(part: SynthPartName, note: any, time: number, isSparkle = false) {
-        const nodeInfo = this.nodes.get(part);
-        if (nodeInfo) {
-            const noteId = this.nextNoteId++;
-            const volume = isSparkle ? (note.volume * 0.5) : note.volume;
-            nodeInfo.worklet.port.postMessage({
-                type: 'noteOn',
-                note: {
-                    id: noteId,
-                    frequency: note.frequency,
-                    volume: volume,
-                    duration: note.duration,
-                    time: time + note.time,
-                }
-            });
-            if (isSparkle) {
-                this.orbManager.addTempOrb(note.x, note.y, 'melody');
-            }
-        }
     }
 
     private createSynthChannel(part: SynthPartName, polyphony: number) {
@@ -306,29 +233,13 @@ export class AudioEngine {
         }
 
         this._isPlaying = true;
-        this.nextNoteTime = this.context.currentTime;
-        this.current16thNote = 0;
-
         this.drumWorklet?.port.postMessage({type: 'start', bpm: this.tempo, startTime: this.context.currentTime });
-        this.autopilotWorker?.postMessage({ type: 'start' } as AutopilotWorkerMessage);
-
-        if (this.mainLoop === null) {
-            this.scheduler(); 
-            this.mainLoop = setInterval(() => this.scheduler(), this.lookahead);
-        }
     }
 
     public pause() {
         if (!this.isInitialized || !this._isPlaying) return;
         this._isPlaying = false;
-
         this.drumWorklet?.port.postMessage({type: 'stop'});
-        this.autopilotWorker?.postMessage({ type: 'stop' } as AutopilotWorkerMessage);
-        
-        if (this.mainLoop !== null) {
-            clearInterval(this.mainLoop);
-            this.mainLoop = null;
-        }
     }
 
     public stop() {
@@ -337,7 +248,7 @@ export class AudioEngine {
     }
     
     public handleThereminInteraction(type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') {
-        if (!this.isInitialized || !this.context) return;
+        if (!this.isInitialized) return;
         
         const partName = type === 'bass' ? (this.isBassLatchOn ? 'latch' : 'manualBass') : 'melody';
         
@@ -358,19 +269,22 @@ export class AudioEngine {
             const noteId = this.nextNoteId++;
             this.activePointers.set(pointerId, { type, noteId });
             const note: SynthNote = { id: noteId, frequency: data.frequency, volume: data.volume };
-            nodeInfo.worklet.port.postMessage({ type: 'noteOn', note });
+            const message: WorkerMessage = { type: 'noteOn', note };
+            nodeInfo.worklet.port.postMessage(message);
             this.orbManager.addOrb(pointerId, type, data.x, data.y);
         } else if (state === 'move' && data) {
             const activePointer = this.activePointers.get(pointerId);
             if (activePointer) {
                  const note: SynthNote = { id: activePointer.noteId, frequency: data.frequency, volume: data.volume };
-                 nodeInfo.worklet.port.postMessage({ type: 'noteUpdate', note });
+                 const message: WorkerMessage = { type: 'noteUpdate', note };
+                 nodeInfo.worklet.port.postMessage(message);
                  this.orbManager.updateOrb(pointerId, data.x, data.y);
             }
         } else if (state === 'up') {
             const activePointer = this.activePointers.get(pointerId);
             if (activePointer) {
-                nodeInfo.worklet.port.postMessage({ type: 'noteOff', id: activePointer.noteId });
+                const message: WorkerMessage = { type: 'noteOff', id: activePointer.noteId };
+                nodeInfo.worklet.port.postMessage(message);
                 this.activePointers.delete(pointerId);
                 this.orbManager.removeOrb(pointerId);
             } else { 
@@ -378,7 +292,8 @@ export class AudioEngine {
                     if (pInfo.type === type) {
                         const nodeToStop = this.nodes.get(partName);
                         if (nodeToStop) {
-                            nodeToStop.worklet.port.postMessage({ type: 'noteOff', id: pInfo.noteId });
+                            const message: WorkerMessage = { type: 'noteOff', id: pInfo.noteId };
+                            nodeToStop.worklet.port.postMessage(message);
                         }
                         this.orbManager.removeOrb(pId);
                         this.activePointers.delete(pId);
@@ -427,7 +342,8 @@ export class AudioEngine {
     public setMelodyInstrument(instrumentName: Instrument) {
         const preset = melodyInstruments.find(p => p.id === instrumentName);
         if (preset && this.nodes.has('melody')) {
-            this.nodes.get('melody')?.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
+            const message: WorkerMessage = { type: 'setPreset', preset: preset.params };
+            this.nodes.get('melody')?.worklet.port.postMessage(message);
         }
     }
     
@@ -435,8 +351,9 @@ export class AudioEngine {
         const preset = bassInstruments.find(p => p.id === instrumentName);
         if (preset) {
             const bassPresetParams = preset.params;
-            this.nodes.get('manualBass')?.worklet.port.postMessage({ type: 'setPreset', preset: bassPresetParams });
-            this.nodes.get('latch')?.worklet.port.postMessage({ type: 'setPreset', preset: bassPresetParams });
+            const message: WorkerMessage = { type: 'setPreset', preset: bassPresetParams };
+            this.nodes.get('manualBass')?.worklet.port.postMessage(message);
+            this.nodes.get('latch')?.worklet.port.postMessage(message);
             
             // Also update the volume settings associated with the preset
             const newVolumes = { ...this.volumes };
@@ -456,7 +373,6 @@ export class AudioEngine {
     public setTempo(newTempo: number) {
         this.tempo = newTempo;
         this.drumWorklet?.port.postMessage({type: 'setBpm', bpm: this.tempo });
-        this.autopilotWorker?.postMessage({ type: 'setBpm', bpm: this.tempo } as AutopilotWorkerMessage);
     }
     
     private applyVolume(partName: keyof Volumes, volumes: ChannelVolumes) {
@@ -484,10 +400,7 @@ export class AudioEngine {
         this.applyVolume('manualBass', newVolumes.manualBass);
         this.applyVolume('latch', newVolumes.latch);
         this.applyVolume('drums', newVolumes.drums);
-        if (newVolumes.autopilotMelody) this.applyVolume('autopilotMelody', newVolumes.autopilotMelody);
-        if (newVolumes.autopilotAccompaniment) this.applyVolume('autopilotAccompaniment', newVolumes.autopilotAccompaniment);
-        if (newVolumes.autopilotBass) this.applyVolume('autopilotBass', newVolumes.autopilotBass);
-
+        
         this.reverbReturnGain.gain.linearRampToValueAtTime(dbToGain(this.volumes.reverbReturn), rampTime);
         this.setCompressorSettings(this.volumes.compressor);
     }
@@ -511,39 +424,6 @@ export class AudioEngine {
         }
     }
     
-    public setAutopilotSettings(settings: Partial<AutopilotSettings>) {
-        if (!this.autopilotWorker) return;
-        
-        const previousSettings = this.autopilotSettings ?? {};
-        this.autopilotSettings = { ...previousSettings, ...settings };
-
-        this.autopilotWorker.postMessage({ type: 'updateSettings', settings: this.autopilotSettings } as AutopilotWorkerMessage);
-
-        if (settings.instruments) {
-            const melodyPreset = melodyInstruments.find(p => p.id === settings.instruments?.melody)?.params;
-            if(melodyPreset) {
-                this.nodes.get('autopilotMelody')?.worklet.port.postMessage({ type: 'setPreset', preset: melodyPreset });
-            }
-
-            const accompanimentPreset = melodyInstruments.find(p => p.id === settings.instruments?.accompaniment)?.params;
-             if(accompanimentPreset) {
-                this.nodes.get('autopilotAccompaniment')?.worklet.port.postMessage({ type: 'setPreset', preset: accompanimentPreset });
-             }
-
-            const bassPreset = bassInstruments.find(p => p.id === settings.instruments?.bass)?.params;
-             if(bassPreset) {
-                this.nodes.get('autopilotBass')?.worklet.port.postMessage({ type: 'setPreset', preset: bassPreset });
-                
-                if (this.volumes.autopilotBass) {
-                    const newVolumes = {...this.volumes};
-                    newVolumes.autopilotBass.reverbSend = bassPreset.reverbSend;
-                    newVolumes.autopilotBass.distortion = bassPreset.distortion;
-                    this.setVolumes(newVolumes);
-                }
-             }
-        }
-    }
-
     public stopAllSounds() {
         if (!this.isInitialized) return;
         this.nodes.forEach((node) => {
@@ -583,3 +463,5 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
+
+    

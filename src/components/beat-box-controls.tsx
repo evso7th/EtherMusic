@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { SlidersHorizontal, Drum, Bot } from 'lucide-react';
+import { SlidersHorizontal, Drum } from 'lucide-react';
 import { useState, useMemo, useCallback, memo } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
@@ -14,9 +14,8 @@ import { Separator } from "./ui/separator";
 import { Switch } from "./ui/switch";
 import { ScrollArea } from "./ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
-import type { BeatPattern, Volumes, CompressorSettings, AutopilotSettings, AutopilotPreset } from '@/types';
+import type { BeatPattern, Volumes, CompressorSettings } from '@/types';
 import { MixerControls } from "./mixer-controls";
-import { AutopilotControls } from "./autopilot-controls";
 import { beatPatterns } from "@/lib/drum-machine";
 
 interface BeatBoxControlsProps {
@@ -29,9 +28,6 @@ interface BeatBoxControlsProps {
     setTempo: (tempo: number) => void;
     isMobile: boolean;
     isLandscape?: boolean;
-    autopilotSettings: AutopilotSettings;
-    onAutopilotSettingsChange: (settings: Partial<AutopilotSettings>) => void;
-    onAutopilotPresetLoad: (preset: AutopilotPreset) => void;
 }
 
 const ControlButtonWithTooltip = memo(function ControlButtonWithTooltip({ tooltipText, children, ...props}: React.ComponentProps<typeof Button> & { tooltipText: string, children: React.ReactNode}) {
@@ -60,9 +56,6 @@ export function BeatBoxControls({
     setTempo,
     isMobile,
     isLandscape = false,
-    autopilotSettings,
-    onAutopilotSettingsChange,
-    onAutopilotPresetLoad,
 }: BeatBoxControlsProps) {
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isMixerOpen, setIsMixerOpen] = useState(false);
@@ -178,23 +171,12 @@ export function BeatBoxControls({
                                         onCompressorChange={onCompressorChange}
                                         tempo={tempo}
                                         setTempo={setTempo}
-                                        isAutopilotMixer={false}
                                     />
                                 </div>
                             </ScrollArea>
                         </DialogContent>
                     </Dialog>
                     
-                    <AutopilotControls
-                        isMobile={isMobile}
-                        isLandscape={true}
-                        initialSettings={autopilotSettings}
-                        onSettingsChange={onAutopilotSettingsChange}
-                        volumes={volumes}
-                        onMixerChange={onMixerChange}
-                        onAutopilotPresetLoad={onAutopilotPresetLoad}
-                    />
-
                     <HelpGuide buttonVariant="outline" size="icon" className="w-10 h-10 rounded-full" showText={false}/>
                 </div>
             </TooltipProvider>
@@ -288,27 +270,17 @@ export function BeatBoxControls({
                                         onCompressorChange={onCompressorChange}
                                         tempo={tempo}
                                         setTempo={setTempo}
-                                        isAutopilotMixer={false}
                                     />
                                 </div>
                             </ScrollArea>
                         </DialogContent>
                     </Dialog>
                     
-                    <AutopilotControls
-                        isMobile={isMobile}
-                        isLandscape={false}
-                        initialSettings={autopilotSettings}
-                        onSettingsChange={onAutopilotSettingsChange}
-                        volumes={volumes}
-                        onMixerChange={onMixerChange}
-                        onAutopilotPresetLoad={onAutopilotPresetLoad}
-                    />
-
-
                     <HelpGuide buttonVariant="outline" buttonClassName="flex-1" size={buttonSize}/>
                 </CardContent>
             </Card>
         </TooltipProvider>
     );
 }
+
+    

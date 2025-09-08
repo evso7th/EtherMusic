@@ -23,29 +23,36 @@ import { Switch } from "./ui/switch";
 import { ScrollArea } from "./ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import type { AutopilotSettings, Instrument, BassInstrument, Volumes, AutopilotStyle, AutopilotPreset } from '@/types';
-import { melodyInstruments } from "@/lib/melody-presets";
-import { bassInstruments } from "@/lib/bass-presets";
+import type { Volumes } from '@/types';
 import { MixerControls } from './mixer-controls';
 
-const AUTOPILOT_STYLES: AutopilotStyle[] = ['Ambient', 'Sequence', 'Water', 'Air', 'Toccata', 'Promenade', 'Space'];
+// This component is currently not used, but is kept for potential future re-integration of Autopilot features.
+// To re-enable, you would need to:
+// 1. Restore the Autopilot-related types in `src/types/index.ts`.
+// 2. Restore the Autopilot worker and related logic in `src/lib/audio-engine.ts` and `use-audio-engine.ts`.
+// 3. Add the component back into `beat-box-controls.tsx`.
+// 4. Update state management in `page.tsx` to handle autopilot settings.
+
+const AUTOPILOT_STYLES: any[] = ['Ambient', 'Sequence', 'Water', 'Air', 'Toccata', 'Promenade', 'Space'];
+const melodyInstruments: any[] = [];
+const bassInstruments: any[] = [];
+
 
 interface AutopilotControlsProps {
     isMobile: boolean;
     isLandscape?: boolean;
-    onSettingsChange: (settings: Partial<AutopilotSettings>) => void;
-    initialSettings: AutopilotSettings;
+    onSettingsChange: (settings: any) => void;
+    initialSettings: any;
     volumes: Volumes;
     onMixerChange: (volumes: Partial<Volumes>) => void;
-    onAutopilotPresetLoad: (preset: AutopilotPreset) => void;
+    onAutopilotPresetLoad: (preset: any) => void;
 }
 
 const ControlButtonWithTooltip = memo(function ControlButtonWithTooltip({ tooltipText, children, ...props }: React.ComponentProps<typeof Button> & { tooltipText: string, children: React.ReactNode }) {
-    const { ...buttonProps } = props;
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <Button {...buttonProps}>{children}</Button>
+                <Button {...props}>{children}</Button>
             </TooltipTrigger>
             <TooltipContent>
                 <p>{tooltipText}</p>
@@ -65,18 +72,15 @@ export function AutopilotControls({
     onAutopilotPresetLoad,
 }: AutopilotControlsProps) {
     const [isOpen, setIsOpen] = useState(false);
-    const [settings, setSettings] = useState<AutopilotSettings>(initialSettings);
+    const [settings, setSettings] = useState(initialSettings);
     const { toast } = useToast();
 
     useEffect(() => {
         setSettings(initialSettings);
     }, [initialSettings]);
     
-    // This effect ensures that when the global autopilot settings are updated
-    // (e.g., by loading a preset), the local state of this component reflects that change.
     useEffect(() => {
         setSettings(prevSettings => {
-            // Only update if there's an actual change to avoid loops
             if (JSON.stringify(prevSettings) !== JSON.stringify(initialSettings)) {
                 return initialSettings;
             }
@@ -84,20 +88,18 @@ export function AutopilotControls({
         });
     }, [initialSettings]);
 
-    // This is for local slider updates to feel responsive
-    const handleLocalSettingsChange = (newSettings: Partial<AutopilotSettings>) => {
+    const handleLocalSettingsChange = (newSettings: any) => {
         setSettings(prev => ({ ...prev, ...newSettings }));
     };
 
-    // This is for committing the changes to the parent state
-    const handleGlobalSettingsChange = (newSettings: Partial<AutopilotSettings>) => {
+    const handleGlobalSettingsChange = (newSettings: any) => {
         onSettingsChange(newSettings);
     };
     
     const handleSavePreset = useCallback(() => {
         if (typeof window === 'undefined') return;
         const currentStyle = settings.style;
-        const preset: AutopilotPreset = {
+        const preset: any = {
             instruments: settings.instruments,
             volumes: {
                 melody: volumes.melody,
@@ -106,9 +108,6 @@ export function AutopilotControls({
                 drums: volumes.drums,
                 reverbReturn: volumes.reverbReturn,
                 compressor: volumes.compressor,
-                autopilotAccompaniment: volumes.autopilotAccompaniment,
-                autopilotBass: volumes.autopilotBass,
-                autopilotMelody: volumes.autopilotMelody,
             }
         };
 
@@ -146,8 +145,8 @@ export function AutopilotControls({
             const savedPresetString = localStorage.getItem(presetKey);
 
             if (savedPresetString) {
-                const preset: AutopilotPreset = JSON.parse(savedPresetString);
-                onAutopilotPresetLoad(preset); // Use the callback
+                const preset: any = JSON.parse(savedPresetString);
+                onAutopilotPresetLoad(preset);
                 toast({
                     title: "Preset Loaded",
                     description: `Settings for the "${currentStyle}" style have been restored.`,
@@ -239,7 +238,7 @@ export function AutopilotControls({
                                 <Label>Melody</Label>
                                 <Select 
                                     value={settings.instruments.melody} 
-                                    onValueChange={(v: Instrument) => handleGlobalSettingsChange({ instruments: { ...settings.instruments, melody: v } })}>
+                                    onValueChange={(v: any) => handleGlobalSettingsChange({ instruments: { ...settings.instruments, melody: v } })}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select Melody Instrument" />
                                     </SelectTrigger>
@@ -252,7 +251,7 @@ export function AutopilotControls({
                                 <Label>Accompaniment</Label>
                                 <Select 
                                     value={settings.instruments.accompaniment} 
-                                    onValueChange={(v: Instrument) => handleGlobalSettingsChange({ instruments: { ...settings.instruments, accompaniment: v } })}>
+                                    onValueChange={(v: any) => handleGlobalSettingsChange({ instruments: { ...settings.instruments, accompaniment: v } })}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select Accompaniment Instrument" />
                                     </SelectTrigger>
@@ -265,7 +264,7 @@ export function AutopilotControls({
                                 <Label>Bass</Label>
                                 <Select 
                                     value={settings.instruments.bass} 
-                                    onValueChange={(v: BassInstrument) => handleGlobalSettingsChange({ instruments: { ...settings.instruments, bass: v } })}>
+                                    onValueChange={(v: any) => handleGlobalSettingsChange({ instruments: { ...settings.instruments, bass: v } })}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select Bass Instrument" />
                                     </SelectTrigger>
@@ -312,11 +311,12 @@ export function AutopilotControls({
     const buttonSize = isMobile ? 'sm' : 'default';
 
     const ControlButton = ({ tooltipText, ...props }: Omit<React.ComponentProps<typeof Button>, 'tooltipText'> & { tooltipText: string }) => {
+        const { children, ...rest } = props;
         if (isMobile) {
-            return <Button {...props} />;
+            return <Button {...rest}>{children}</Button>;
         }
         return (
-            <ControlButtonWithTooltip tooltipText={tooltipText} {...props} />
+            <ControlButtonWithTooltip tooltipText={tooltipText} {...rest}>{children}</ControlButtonWithTooltip>
         );
     };
 
@@ -349,3 +349,5 @@ export function AutopilotControls({
         </TooltipProvider>
     );
 }
+
+    

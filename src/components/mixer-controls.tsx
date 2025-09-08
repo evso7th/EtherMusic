@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Waves, Drum, Anchor, Blend, AudioLines, Music, Clock, Bot } from 'lucide-react';
+import { Waves, Drum, Anchor, Blend, AudioLines, Music, Clock } from 'lucide-react';
 import { useState, useCallback, useEffect } from 'react';
 import type { Volumes, CompressorSettings, ChannelVolumes } from '@/types';
 import { cn } from "@/lib/utils";
@@ -99,7 +99,6 @@ export function MixerControls({
     onCompressorChange,
     tempo,
     setTempo,
-    isAutopilotMixer = false,
 }: { 
     volumes: Volumes, 
     onMixerChange: (newVolumes: Partial<Volumes>) => void,
@@ -158,7 +157,6 @@ export function MixerControls({
 
     return (
         <div className="space-y-6">
-            {!isAutopilotMixer && (
                 <>
                     <div className="space-y-4">
                         <VolumeControl 
@@ -206,34 +204,6 @@ export function MixerControls({
                         />
                     </div>
                 </>
-            )}
-
-             {isAutopilotMixer && localVolumes.autopilotMelody && localVolumes.autopilotAccompaniment && localVolumes.autopilotBass && (
-                <div className="space-y-4">
-                    <h3 className="text-lg font-semibold tracking-tight text-foreground">Autopilot Player Levels</h3>
-                     <VolumeControl 
-                        label="Melody"
-                        icon={Bot}
-                        volume={localVolumes.autopilotMelody.gain}
-                        onVolumeChange={(v) => handleChannelVolumeChange('autopilotMelody', 'gain', v)}
-                        onVolumeCommit={(v) => handleChannelVolumeCommit('autopilotMelody', 'gain', v)}
-                    />
-                     <VolumeControl 
-                        label="Accompaniment"
-                        icon={Bot}
-                        volume={localVolumes.autopilotAccompaniment.gain}
-                        onVolumeChange={(v) => handleChannelVolumeChange('autopilotAccompaniment', 'gain', v)}
-                        onVolumeCommit={(v) => handleChannelVolumeCommit('autopilotAccompaniment', 'gain', v)}
-                    />
-                     <VolumeControl 
-                        label="Bass"
-                        icon={Bot}
-                        volume={localVolumes.autopilotBass.gain}
-                        onVolumeChange={(v) => handleChannelVolumeChange('autopilotBass', 'gain', v)}
-                        onVolumeCommit={(v) => handleChannelVolumeCommit('autopilotBass', 'gain', v)}
-                    />
-                </div>
-            )}
             
             <Separator />
             
@@ -248,7 +218,6 @@ export function MixerControls({
                     min={-48} max={6} step={1} unit="dB"
                 />
                 
-                 {!isAutopilotMixer && (
                     <>
                         <EffectControl
                             label="Melody Reverb Send"
@@ -283,38 +252,9 @@ export function MixerControls({
                             min={0} max={100} step={1} unit="%"
                         />
                     </>
-                 )}
-                 {isAutopilotMixer && localVolumes.autopilotMelody && localVolumes.autopilotAccompaniment && localVolumes.autopilotBass && (
-                     <>
-                        <EffectControl
-                            label="AP Melody Reverb"
-                            icon={Bot}
-                            level={localVolumes.autopilotMelody.reverbSend}
-                            onLevelChange={(v) => handleChannelVolumeChange('autopilotMelody', 'reverbSend', v)}
-                            onLevelCommit={(v) => handleChannelVolumeCommit('autopilotMelody', 'reverbSend', v)}
-                            min={-48} max={0} step={1} unit="dB"
-                        />
-                         <EffectControl
-                            label="AP Accomp Reverb"
-                            icon={Bot}
-                            level={localVolumes.autopilotAccompaniment.reverbSend}
-                            onLevelChange={(v) => handleChannelVolumeChange('autopilotAccompaniment', 'reverbSend', v)}
-                            onLevelCommit={(v) => handleChannelVolumeCommit('autopilotAccompaniment', 'reverbSend', v)}
-                            min={-48} max={0} step={1} unit="dB"
-                        />
-                         <EffectControl
-                            label="AP Bass Reverb"
-                            icon={Bot}
-                            level={localVolumes.autopilotBass.reverbSend}
-                            onLevelChange={(v) => handleChannelVolumeChange('autopilotBass', 'reverbSend', v)}
-                            onLevelCommit={(v) => handleChannelVolumeCommit('autopilotBass', 'reverbSend', v)}
-                            min={-48} max={0} step={1} unit="dB"
-                        />
-                     </>
-                 )}
             </div>
 
-            {!isAutopilotMixer && (
+            
                 <>
                     <Separator />
                     <div className="space-y-4">
@@ -355,8 +295,8 @@ export function MixerControls({
                         </div>
                     </div>
                 </>
-            )}
-
         </div>
     );
 }
+
+    

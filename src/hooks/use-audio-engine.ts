@@ -5,8 +5,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
-import type { Volumes, Instrument, BassInstrument, CompressorSettings, AutopilotSettings } from '@/types';
-import { defaultAutopilotSettings } from '@/lib/autopilot';
+import type { Volumes, Instrument, BassInstrument, CompressorSettings } from '@/types';
 
 export function useAudioEngine() {
     const { toast } = useToast();
@@ -90,7 +89,7 @@ export function useAudioEngine() {
         audioEngine.current.stop();
         setIsPlaying(false);
     }, []);
-
+    
     const setVolumes = useCallback((volumes: Volumes) => {
         audioEngine.current?.setVolumes(volumes);
     }, []);
@@ -147,15 +146,12 @@ export function useAudioEngine() {
         audioEngine.current?.setCompressorSettings(compressorSettings);
     }, []);
     
-    const handleAutopilotSettingsChange = useCallback((settings: Partial<AutopilotSettings>) => {
-        audioEngine.current?.setAutopilotSettings(settings);
-    }, []);
-
 
     return {
         isAppStarted,
         isReady,
         isPlaying,
+        audioEngine: audioEngine.current,
         orbManager: orbManager.current,
         startApp,
         play,
@@ -172,7 +168,7 @@ export function useAudioEngine() {
         handleThereminInteraction,
         setSleepTimer,
         handleCompressorChange,
-        autopilotSettings: audioEngine.current?.getAutopilotSettings() ?? defaultAutopilotSettings,
-        setAutopilotSettings: handleAutopilotSettingsChange,
     };
 }
+
+    

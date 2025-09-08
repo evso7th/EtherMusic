@@ -6,14 +6,11 @@ export type MusicScale = 'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentato
 
 export type Instrument = 'synth' | 'organ' | 'theremin' | 'mellotron';
 export type BassInstrument = 'classicBass' | 'glideBass' | 'ambientDrone' | 'resonantGliss' | 'hypnoticDrone' | 'livingRiff';
-export type AutopilotStyle = 'Ambient' | 'Sequence' | 'Water' | 'Air' | 'Toccata' | 'Promenade' | 'Space';
-
 
 // These presets are sent to the AudioWorklet, so they must contain only serializable data.
 export interface BaseInstrumentParams {
     oscillator: {
         type: OscillatorType;
-        // Note: detune is handled per-layer in the new model
     };
     envelope: {
         attack: number;
@@ -93,27 +90,6 @@ export interface Volumes {
   drums: ChannelVolumes;
   reverbReturn: number; // in dB
   compressor: CompressorSettings;
-  autopilotMelody?: ChannelVolumes;
-  autopilotAccompaniment?: ChannelVolumes;
-  autopilotBass?: ChannelVolumes;
-}
-
-export interface AutopilotSettings {
-    enabled: boolean;
-    style: AutopilotStyle;
-    density: number; // 0 to 1
-    key: MusicKey;
-    scale: MusicScale;
-    instruments: {
-        melody: Instrument;
-        accompaniment: Instrument;
-        bass: BassInstrument;
-    }
-}
-
-export interface AutopilotPreset {
-    instruments: AutopilotSettings['instruments'];
-    volumes: Volumes;
 }
 
 export interface SynthNote {
@@ -140,22 +116,4 @@ export type DrumWorkerMessage =
 
 export type EnvelopeCurve = "linear" | "exponential";
 
-export type AutopilotWorkerMessage = 
-    | { type: 'start' }
-    | { type: 'stop' }
-    | { type: 'updateSettings', settings: Partial<AutopilotSettings> }
-    | { type: 'setBpm', bpm: number }
-    | { type: 'tick', time: number, beatNumber: number };
-
-export type AutopilotScore = {
-    melody: (SynthNote & { x: number, y: number })[];
-    accompaniment: SynthNote[];
-    bass: SynthNote[];
-    sparkle: (SynthNote & { x: number, y: number })[];
-};
-
-export type AutopilotWorkerResponse = {
-    type: 'score';
-    score: AutopilotScore;
-    time: number; // The audio context time for scheduling
-};
+    

@@ -19,8 +19,7 @@ import { SleepTimer } from '@/components/sleep-timer';
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
 import { melodyInstruments, defaultMelodyInstrument } from '@/lib/melody-presets';
 import { bassInstruments, defaultBassInstrument } from '@/lib/bass-presets';
-import { defaultAutopilotSettings } from '@/lib/autopilot';
-import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, ChannelVolumes, CompressorSettings, AutopilotSettings, AutopilotPreset } from '@/types';
+import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, ChannelVolumes, CompressorSettings } from '@/types';
 import { cn } from '@/lib/utils';
 
 
@@ -49,9 +48,6 @@ const defaultVolumes: Volumes = {
     latch: { gain: -9, reverbSend: -48, distortion: 0 },
     drums: { gain: -9, reverbSend: -48, distortion: 0 },
     reverbReturn: -12,
-    autopilotMelody: { gain: -6, reverbSend: -18, distortion: 0 },
-    autopilotAccompaniment: { gain: -9, reverbSend: -12, distortion: 0 },
-    autopilotBass: { gain: -9, reverbSend: -24, distortion: 0 },
     compressor: {
         enabled: true,
         threshold: -24,
@@ -61,12 +57,10 @@ const defaultVolumes: Volumes = {
     }
 };
 
-function loadSettings(): { volumes: Volumes, autopilotSettings: AutopilotSettings } {
+function loadSettings(): { volumes: Volumes } {
     const loadedVolumes = loadVolumes();
-    const loadedAutopilot = loadAutopilotSettings();
     return {
         volumes: loadedVolumes,
-        autopilotSettings: loadedAutopilot,
     };
 }
 
@@ -95,9 +89,6 @@ function loadVolumes(): Volumes {
             manualBass: ensureChannelSettings(volumes.manualBass, defaultVolumes.manualBass),
             latch: ensureChannelSettings(volumes.latch, defaultVolumes.latch),
             drums: ensureChannelSettings(volumes.drums, defaultVolumes.drums),
-            autopilotMelody: ensureChannelSettings(volumes.autopilotMelody, defaultVolumes.autopilotMelody!),
-            autopilotAccompaniment: ensureChannelSettings(volumes.autopilotAccompaniment, defaultVolumes.autopilotAccompaniment!),
-            autopilotBass: ensureChannelSettings(volumes.autopilotBass, defaultVolumes.autopilotBass!),
             compressor: { ...defaultVolumes.compressor, ...(volumes.compressor || {}) },
         };
         
@@ -109,28 +100,6 @@ function loadVolumes(): Volumes {
     }
 }
 
-function loadAutopilotSettings(): AutopilotSettings {
-     if (typeof window === 'undefined') return defaultAutopilotSettings;
-     const consent = getCookie("ethermusic_consent") === 'true';
-     if (!consent) return defaultAutopilotSettings;
-
-    try {
-        const savedSettings = getCookie("ethermusic_autopilot");
-        if (savedSettings) {
-            const parsed = JSON.parse(savedSettings);
-             // Basic validation
-            if(parsed.style && parsed.instruments) {
-                return { ...defaultAutopilotSettings, ...parsed };
-            }
-        }
-        return defaultAutopilotSettings;
-    } catch(e) {
-        console.error("Failed to load autopilot settings", e);
-        return defaultAutopilotSettings;
-    }
-}
-
-
 function saveVolumes(volumes: Volumes) {
     if (typeof window === 'undefined' || getCookie("ethermusic_consent") !== 'true') {
         return;
@@ -139,23 +108,6 @@ function saveVolumes(volumes: Volumes) {
         setCookie("ethermusic_volumes", JSON.stringify(volumes), 365);
     } catch (e) {
         console.error("Failed to save volume settings to cookies", e);
-    }
-}
-
-function saveAutopilotSettings(settings: AutopilotSettings) {
-    if (typeof window === 'undefined' || getCookie("ethermusic_consent") !== 'true') {
-        return;
-    }
-    try {
-         const settingsToSave = {
-            enabled: settings.enabled,
-            style: settings.style,
-            density: settings.density,
-            instruments: settings.instruments
-        };
-        setCookie("ethermusic_autopilot", JSON.stringify(settingsToSave), 365);
-    } catch(e) {
-        console.error("Failed to save autopilot settings", e);
     }
 }
 
@@ -180,12 +132,12 @@ export default function Home() {
     const [cookieConsent, setCookieConsent] = useState<boolean | undefined>(undefined);
     
     const [volumes, setVolumesState] = useState<Volumes>(defaultVolumes);
-    const [autopilotSettings, setAutopilotSettingsState] = useState<AutopilotSettings>(defaultAutopilotSettings);
 
     const {
         isAppStarted,
         isReady,
         isPlaying,
+        audioEngine,
         startApp,
         play,
         pause,
@@ -202,7 +154,6 @@ export default function Home() {
         setVolumes,
         setTempo,
         handleCompressorChange,
-        setAutopilotSettings,
     } = useAudioEngine();
     
     const [isRecording, setIsRecording] = useState(false);
@@ -220,18 +171,15 @@ export default function Home() {
     const onConsentChange = useCallback((consent: boolean) => {
         setCookieConsent(consent);
         if (consent) {
-            const { volumes, autopilotSettings } = loadSettings();
+            const { volumes } = loadSettings();
             setVolumesState(volumes);
-            setAutopilotSettingsState(autopilotSettings);
         } else {
             setVolumesState(defaultVolumes);
-            setAutopilotSettingsState(defaultAutopilotSettings);
             if (typeof document !== 'undefined') {
                 document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-                document.cookie = "ethermusic_autopilot=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-                // Also clear local storage for presets
+                // We don't have autopilot presets anymore, but keeping this in case it's needed later for other settings
                 Object.keys(localStorage).forEach(key => {
-                    if (key.startsWith('ethermusic_autopilot_')) {
+                    if (key.startsWith('ethermusic_')) {
                         localStorage.removeItem(key);
                     }
                 });
@@ -249,9 +197,8 @@ export default function Home() {
             setCookieConsent(undefined);
         }
        if (initialConsent) {
-            const { volumes, autopilotSettings } = loadSettings();
+            const { volumes } = loadSettings();
             setVolumesState(volumes);
-            setAutopilotSettingsState(autopilotSettings);
         }
     }, []);
 
@@ -291,15 +238,7 @@ export default function Home() {
         const melodyFreqs = getScaleFrequencies(currentKey, currentScale, [2, 3, 4]);
     
         setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
-        
-        if (isReady) {
-            setAutopilotSettings({
-                key: newKey,
-                scale: currentScale
-            });
-        }
-
-    }, [musicKey, musicScale, isReady, setAutopilotSettings]);
+    }, [musicKey, musicScale]);
 
     useEffect(() => {
         if (isReady) {
@@ -308,24 +247,15 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isReady]);
     
-    // Load settings from cookies/localstorage into the audio engine once it's ready.
+    // Load settings from cookies into the audio engine once it's ready.
     useEffect(() => {
         if(isReady && cookieConsent) {
-            const { volumes: loadedVolumes, autopilotSettings: loadedAutopilotSettings } = loadSettings();
-            
+            const { volumes: loadedVolumes } = loadSettings();
             // Set volumes for all channels
             updateVolumes(loadedVolumes);
-            
-            // Set autopilot settings
-            setAutopilotSettingsState(loadedAutopilotSettings);
-            setAutopilotSettings({
-                ...loadedAutopilotSettings,
-                key: musicKey,
-                scale: musicScale,
-            });
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isReady, cookieConsent, musicKey, musicScale]);
+    }, [isReady, cookieConsent]);
 
     const updateVolumes = useCallback((newVolumes: Volumes) => {
         setVolumesState(newVolumes);
@@ -334,15 +264,6 @@ export default function Home() {
             saveVolumes(newVolumes);
         }
     }, [setVolumes, cookieConsent]);
-
-    const handleAutopilotSettingsChange = useCallback((newSettings: Partial<AutopilotSettings>) => {
-        const updatedSettings = { ...autopilotSettings, ...newSettings };
-        setAutopilotSettingsState(updatedSettings);
-        setAutopilotSettings(updatedSettings);
-        if (cookieConsent) {
-            saveAutopilotSettings(updatedSettings);
-        }
-    }, [autopilotSettings, setAutopilotSettings, cookieConsent]);
     
     const handleMixerChange = useCallback((changedMixerVolumes: Partial<Volumes>) => {
         updateVolumes({ ...volumes, ...changedMixerVolumes });
@@ -399,16 +320,10 @@ export default function Home() {
         setBassInstrument(instrumentId);
     }, [setBassInstrument]);
     
-    const handleAutopilotPresetLoad = useCallback((preset: AutopilotPreset) => {
-        handleAutopilotSettingsChange({ instruments: preset.instruments });
-        updateVolumes({ ...volumes, ...preset.volumes });
-    }, [handleAutopilotSettingsChange, updateVolumes, volumes]);
-
-
     const handleThereminInteractionCallback = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isReady || !audioEngine) return;
         handleThereminInteraction(type, data, state);
-    }, [isReady, handleThereminInteraction]);
+    }, [isReady, audioEngine, handleThereminInteraction]);
 
     if (!isClient) {
         return <Preloader />;
@@ -544,9 +459,6 @@ export default function Home() {
                             isMobile={isMobile}
                             tempo={currentTempo}
                             setTempo={handleTempoChange}
-                            autopilotSettings={autopilotSettings}
-                            onAutopilotSettingsChange={handleAutopilotSettingsChange}
-                            onAutopilotPresetLoad={handleAutopilotPresetLoad}
                         />
                     </div>
                 </main>
@@ -562,12 +474,11 @@ export default function Home() {
                         isLandscape={true}
                         tempo={currentTempo}
                         setTempo={handleTempoChange}
-                        autopilotSettings={autopilotSettings}
-                        onAutopilotSettingsChange={handleAutopilotSettingsChange}
-                        onAutopilotPresetLoad={onAutopilotPresetLoad}
                     />
                 </div>
             </div>
         </div>
     );
 }
+
+    
