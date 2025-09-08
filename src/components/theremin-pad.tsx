@@ -39,7 +39,7 @@ interface ThereminPadProps {
     onLatchToggle?: (checked: boolean) => void;
     orbManager?: OrbManager | null;
     channelVolumes: ChannelVolumes;
-    onChannelVolumeChange: (channel: 'melody' | 'manualBass' | 'latch', newVolumes: Partial<ChannelVolumes>) => void;
+    onChannelVolumeChange: (channel: 'melody' | 'manualBass' | 'latch', newVolumes: Partial<Omit<ChannelVolumes, 'gain'>>) => void;
 }
 
 const padTitles = {
@@ -72,14 +72,14 @@ const EffectControl = ({
         <div className="flex items-center gap-2">
             <Icon className="w-5 h-5 text-accent flex-shrink-0" />
             <Label className="text-sm font-medium flex-1 truncate">{label}</Label>
-            <span className="text-xs text-muted-foreground w-12 text-right">{(level || 0).toFixed(0)}{unit}</span>
+            <span className="text-xs text-muted-foreground w-12 text-right">{(level ?? 0).toFixed(0)}{unit}</span>
         </div>
         <div className="flex items-center gap-4 pl-7">
             <Slider
                 min={min}
                 max={max}
                 step={step}
-                value={[level || 0]}
+                value={[level ?? 0]}
                 onValueChange={(v) => onLevelChange(v[0])}
                 onValueCommit={(v) => onLevelCommit(v[0])}
             />
@@ -120,10 +120,13 @@ export function ThereminPad({
         setLocalVolumes(channelVolumes);
     }, [channelVolumes]);
 
-    const handleChannelChange = (volumeType: keyof Omit<ChannelVolumes, 'gain'>, value: number) => {
-         const channelKey = type === 'bass' ? (isLatchOn ? 'latch' : 'manualBass') : type;
+    const handleChannelChange = useCallback((volumeType: keyof Omit<ChannelVolumes, 'gain'>, value: number) => {
+         const channelKey = type === 'bass' ? 'manualBass' : type; // Latch volume is separate
          onChannelVolumeChange(channelKey, { [volumeType]: value });
-    };
+         if (type === 'bass') {
+             onChannelVolumeChange('latch', { [volumeType]: value });
+         }
+    }, [onChannelVolumeChange, type]);
     
     const handleReverbChange = useCallback((value: number) => {
         setLocalVolumes(prev => ({...prev, reverbSend: value}));
@@ -162,8 +165,7 @@ export function ThereminPad({
         const index = Math.floor(normalizedX * allowedFrequencies.length);
         const frequency = allowedFrequencies[Math.min(index, allowedFrequencies.length - 1)];
         
-        // Volume is inverted: top is loud (0), bottom is quiet (1)
-        const volume = Math.pow(1 - normalizedY, 2); // Make it more sensitive at the top
+        const volume = Math.pow(1 - normalizedY, 2);
         
         return { x, y, frequency, volume, pointerId: event.pointerId };
     }, [allowedFrequencies]);
@@ -192,7 +194,6 @@ export function ThereminPad({
         if (isDisabled) return;
         
         if (isLatchOn && type === 'bass') {
-             // In latch mode, up event doesn't stop the note, it's handled by toggle
         } else {
              const interactionData = calculateInteraction(event);
              onInteraction(type, interactionData, 'up');
@@ -287,7 +288,7 @@ export function ThereminPad({
                                 <EffectControl
                                     label="Reverb Send"
                                     icon={Blend}
-                                    level={localVolumes.reverbSend ?? 0}
+                                    level={localVolumes.reverbSend}
                                     onLevelChange={handleReverbChange}
                                     onLevelCommit={handleReverbCommit}
                                     min={-48} max={6} step={1} unit="dB"
@@ -295,7 +296,7 @@ export function ThereminPad({
                                 <EffectControl
                                     label="Distortion"
                                     icon={Waves}
-                                    level={localVolumes.distortion ?? 0}
+                                    level={localVolumes.distortion}
                                     onLevelChange={handleDistortionChange}
                                     onLevelCommit={handleDistortionCommit}
                                     min={0} max={100} step={1} unit="%"
@@ -383,3 +384,5 @@ export function ThereminPad({
         </Card>
     );
 }
+
+    

@@ -147,26 +147,21 @@ export class AudioEngine {
     
         const gainNode = this.context.createGain();
 
-        // Distortion chain
         const distortionNode = new AudioWorkletNode(this.context, 'distortion-processor');
         
-        // Reverb send
         const reverbSendNode = this.context.createGain();
         reverbSendNode.connect(reverbBus);
     
-        // The main synth worklet
         const workletNode = new AudioWorkletNode(this.context, processorName, {
             processorOptions: { sampleRate: this.context.sampleRate, polyphony },
             outputChannelCount: [1]
         });
     
-        // Routing: Worklet -> Distortion -> Main Gain -> Pre-compressor Out & Reverb Send
         workletNode.connect(distortionNode);
         distortionNode.connect(gainNode);
         gainNode.connect(this.preCompressorOut); 
         gainNode.connect(reverbSendNode); 
 
-        // Store all nodes
         this.nodes.set(part, {
             worklet: workletNode,
             gain: gainNode,
@@ -292,19 +287,14 @@ export class AudioEngine {
     }
 
     public setMelodyInstrument(instrumentName: Instrument) {
+        console.log(`[TRACING] audio-engine.ts: setMelodyInstrument called with: ${instrumentName}`);
         const preset = melodyInstruments.find(p => p.id === instrumentName);
         if (preset && this.nodes.has('melody')) {
             const worklet = this.nodes.get('melody')?.worklet;
             if(worklet) {
+                console.log(`[TRACING] audio-engine.ts: Sending preset to melody worklet:`, preset.params);
                 worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
             }
-            
-            const channelVolumes: ChannelVolumes = {
-                gain: this.volumes.melody.gain,
-                reverbSend: preset.params.reverbSend ?? this.volumes.melody.reverbSend,
-                distortion: preset.params.distortion ?? this.volumes.melody.distortion,
-            };
-            this.setVolumes({ ...this.volumes, melody: channelVolumes });
         }
     }
     
@@ -314,23 +304,13 @@ export class AudioEngine {
             const manualBassNode = this.nodes.get('manualBass');
             const latchNode = this.nodes.get('latch');
             if (manualBassNode) {
+                 console.log(`[TRACING] audio-engine.ts: Sending preset to manualBass worklet:`, preset.params);
                 manualBassNode.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
             }
             if (latchNode) {
+                console.log(`[TRACING] audio-engine.ts: Sending preset to latch worklet:`, preset.params);
                 latchNode.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
             }
-            
-             const manualBassVolumes: ChannelVolumes = {
-                gain: this.volumes.manualBass.gain,
-                reverbSend: preset.params.reverbSend ?? this.volumes.manualBass.reverbSend,
-                distortion: preset.params.distortion ?? this.volumes.manualBass.distortion,
-            };
-             const latchVolumes: ChannelVolumes = {
-                gain: this.volumes.latch.gain, 
-                reverbSend: preset.params.reverbSend ?? this.volumes.latch.reverbSend,
-                distortion: preset.params.distortion ?? this.volumes.latch.distortion,
-            };
-            this.setVolumes({ ...this.volumes, manualBass: manualBassVolumes, latch: latchVolumes });
         }
     }
     
@@ -389,7 +369,6 @@ export class AudioEngine {
                     
                     const driveParam = nodeInfo.distortionNode.parameters.get('drive');
                     if (driveParam) {
-                        // Map 0-100 distortion to a more musical 1.0-50.0 drive range
                         const distortion = channelVols.distortion ?? 0;
                         const driveValue = 1.0 + (distortion / 100) * 49;
                         driveParam.linearRampToValueAtTime(driveValue, rampTime);

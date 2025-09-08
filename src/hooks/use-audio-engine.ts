@@ -5,7 +5,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
-import type { Volumes, Instrument, BassInstrument } from '@/types';
+import type { Volumes, Instrument, BassInstrument, ChannelVolumes } from '@/types';
 import { melodyInstruments } from '@/lib/melody-presets';
 import { bassInstruments } from '@/lib/bass-presets';
 
@@ -140,6 +140,7 @@ export function useAudioEngine() {
     }, [isReady]);
 
     const setMelodyInstrument = useCallback((instrumentName: Instrument) => {
+        console.log(`[TRACING] use-audio-engine: setMelodyInstrument called with: ${instrumentName}`);
         audioEngine.current?.setMelodyInstrument(instrumentName);
     }, []);
     
@@ -169,3 +170,5 @@ export function useAudioEngine() {
         setSleepTimer,
     };
 }
+
+    

@@ -25,12 +25,12 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
             reverbSend: -18,
             layers: [
                 {
-                    oscillator: { type: 'sine', detune: 1200 }, // 2nd Harmonic (Octave Up)
+                    oscillator: { type: 'sine', detune: 1200 }, // 1st Octave
                     envelope: { attack: 0.03, decay: 0.1, sustain: 0.9, release: 1.0 },
                     gain: 0.75,
                 },
                 {
-                    oscillator: { type: 'sine', detune: 2400 }, // 4th Harmonic (2 Octaves Up)
+                    oscillator: { type: 'sine', detune: 700 }, // Perfect 5th
                     envelope: { attack: 0.04, decay: 0.1, sustain: 0.9, release: 1.0 },
                     gain: 0.5, 
                 }
@@ -64,5 +64,7 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
 ];
 
 export const defaultMelodyInstrument: Instrument = 'synth';
+
+    
 
     

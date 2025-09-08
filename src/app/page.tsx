@@ -221,12 +221,19 @@ export default function Home() {
     }, [setVolumes, cookieConsent]);
     
     const handleChannelVolumeChange = useCallback((channel: keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'drums'>, newVolumes: Partial<ChannelVolumes>) => {
-        const newGlobalVolumes = {
-            ...volumes,
-            [channel]: { ...volumes[channel], ...newVolumes }
-        };
-        updateVolumes(newGlobalVolumes);
-    }, [volumes, updateVolumes]);
+        setVolumesState(prevVolumes => {
+            const updatedChannel = { ...prevVolumes[channel], ...newVolumes };
+            const finalVolumes = {
+                ...prevVolumes,
+                [channel]: updatedChannel
+            };
+            if (cookieConsent) {
+                saveSettings(finalVolumes);
+            }
+            setVolumes(finalVolumes);
+            return finalVolumes;
+        });
+    }, [setVolumes, cookieConsent]);
     
     const handleMixerChange = useCallback((changedMixerVolumes: Partial<Volumes>) => {
         const newVolumes: Volumes = { ...volumes, ...changedMixerVolumes };
@@ -285,14 +292,17 @@ export default function Home() {
     }, [setBassLatch]);
     
     const handleMelodyInstrumentChange = useCallback((instrumentName: Instrument) => {
+        console.log(`[TRACING] page.tsx: handleMelodyInstrumentChange called with: ${instrumentName}`);
         const preset = melodyInstruments.find(p => p.id === instrumentName);
+        console.log(`[TRACING] page.tsx: Found preset:`, preset);
         if(preset) {
             setActiveMelodyInstrument(instrumentName);
             setMelodyInstrument(instrumentName);
-            handleChannelVolumeChange('melody', { 
+            const newChannelVolumes: Partial<ChannelVolumes> = { 
                 reverbSend: preset.params.reverbSend,
                 distortion: preset.params.distortion 
-            });
+            };
+            handleChannelVolumeChange('melody', newChannelVolumes);
         }
     }, [setMelodyInstrument, handleChannelVolumeChange]);
 
@@ -438,7 +448,7 @@ export default function Home() {
                             activePattern={activePattern}
                             onPatternChange={handlePatternChange}
                             volumes={volumes}
-                            onMixerChange={handleMixerChange}
+                            handleMixerChange={handleMixerChange}
                             onCompressorChange={handleCompressorChange}
                             isMobile={isMobile}
                         />
@@ -451,7 +461,7 @@ export default function Home() {
                         activePattern={activePattern}
                         onPatternChange={handlePatternChange}
                         volumes={volumes}
-                        onMixerChange={handleMixerChange}
+                        handleMixerChange={handleMixerChange}
                         onCompressorChange={handleCompressorChange}
                         isMobile={isMobile}
                         isLandscape={true}
@@ -461,3 +471,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
