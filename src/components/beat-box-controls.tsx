@@ -14,7 +14,7 @@ import { Separator } from "./ui/separator";
 import { Switch } from "./ui/switch";
 import { ScrollArea } from "./ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
-import type { BeatPattern, Tempo, Volumes, CompressorSettings } from '@/types';
+import type { BeatPattern, Tempo, Volumes, CompressorSettings, ChannelVolumes } from '@/types';
 import { MixerControls } from "./mixer-controls";
 
 
@@ -26,8 +26,8 @@ interface BeatBoxControlsProps {
     activeTempo: Tempo;
     onTempoChange: (tempo: Tempo) => void;
     volumes: Volumes;
-    onMixerChange: (volumes: Partial<Omit<Volumes, 'compressor' | 'melody' | 'manualBass' | 'latch' | 'drums'>>) => void;
-    onChannelVolumeChange: (channel: 'melody' | 'manualBass' | 'latch' | 'drums', gain: number) => void;
+    onMixerChange: (volumes: Partial<Omit<Volumes, 'compressor'>>) => void;
+    onChannelVolumeChange: (channel: keyof Omit<Volumes, 'compressor' | 'reverbReturn'>, newVolumes: Partial<ChannelVolumes>) => void;
     onCompressorChange: (compressorSettings: CompressorSettings) => void;
     isMobile: boolean;
     isLandscape?: boolean;
@@ -337,7 +337,7 @@ export function BeatBoxControls({
                                     <MixerControls 
                                         volumes={volumes} 
                                         onMixerChange={onMixerChange}
-                                        onChannelVolumeChange={onChannelVolumeChange}
+                                        onChannelVolumeChange={(channel, newVolumes) => onChannelVolumeChange(channel, newVolumes)}
                                         onCompressorChange={onCompressorChange}
                                     />
                                 </div>
@@ -351,3 +351,5 @@ export function BeatBoxControls({
         </TooltipProvider>
     );
 }
+
+    

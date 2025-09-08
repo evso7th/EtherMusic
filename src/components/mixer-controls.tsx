@@ -61,7 +61,7 @@ export function MixerControls({
 }: { 
     volumes: Volumes, 
     onMixerChange: (volumes: Partial<Omit<Volumes, 'compressor' | 'melody' | 'manualBass' | 'latch' | 'drums'>>) => void,
-    onChannelVolumeChange: (channel: 'melody' | 'manualBass' | 'latch' | 'drums', gain: number) => void,
+    onChannelVolumeChange: (channel: keyof Omit<Volumes, 'compressor' | 'reverbReturn'>, newVolumes: Partial<ChannelVolumes>) => void,
     onCompressorChange: (compressorSettings: CompressorSettings) => void
 }) {
     
@@ -80,9 +80,9 @@ export function MixerControls({
         }));
     };
     
-    const handleGainCommit = (part: 'melody' | 'manualBass' | 'latch' | 'drums', gain: number) => {
+    const handleGainCommit = (part: VolumeChannel, gain: number) => {
         console.log(`[MixerControls] Committing gain change for ${part}: ${gain} dB`);
-        onChannelVolumeChange(part, gain);
+        onChannelVolumeChange(part, { gain });
     };
 
     const handleReverbReturnChange = (value: number) => {
@@ -193,3 +193,5 @@ export function MixerControls({
         </div>
     );
 }
+
+    

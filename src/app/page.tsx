@@ -43,9 +43,9 @@ function setCookie(name: string, value: string, days: number) {
 }
 
 const defaultVolumes: Volumes = { 
-    melody: { gain: 6, reverbSend: -24, distortion: 0 },
-    manualBass: { gain: 6, reverbSend: -48, distortion: 0 },
-    latch: { gain: -15, reverbSend: -48, distortion: 0 },
+    melody: { gain: 0, reverbSend: -24, distortion: 0 },
+    manualBass: { gain: 0, reverbSend: -48, distortion: 0 },
+    latch: { gain: -9, reverbSend: -48, distortion: 0 },
     drums: { gain: -9, reverbSend: -48, distortion: 0 },
     reverbReturn: -12,
     compressor: {
@@ -220,12 +220,18 @@ export default function Home() {
     }, [setVolumes, cookieConsent]);
     
     const handleChannelVolumeChange = useCallback((channel: keyof Omit<Volumes, 'compressor' | 'reverbReturn'>, newChannelVolumes: Partial<ChannelVolumes>) => {
-        const newVolumes: Volumes = {
-            ...volumes,
-            [channel]: { ...volumes[channel], ...newChannelVolumes }
-        };
-        updateVolumes(newVolumes);
-    }, [volumes, updateVolumes]);
+        setLocalVolumes(prev => {
+            const updatedVolumes = {
+                ...prev,
+                [channel]: { ...prev[channel], ...newChannelVolumes }
+            };
+            setVolumes(updatedVolumes);
+            if (cookieConsent) {
+                saveSettings(updatedVolumes);
+            }
+            return updatedVolumes;
+        });
+    }, [setVolumes, cookieConsent]);
     
     const handleMixerChange = useCallback((changedMixerVolumes: Partial<Omit<Volumes, 'compressor'>>) => {
         const newVolumes: Volumes = { ...volumes, ...changedMixerVolumes };
@@ -429,7 +435,7 @@ export default function Home() {
                             activeTempo={activeTempo}
                             onTempoChange={handleTempoChange}
                             volumes={volumes}
-                            onMixerChange={onMixerChange}
+                            onMixerChange={handleMixerChange}
                             onChannelVolumeChange={(channel, gain) => handleChannelVolumeChange(channel, { gain })}
                             onCompressorChange={handleCompressorChange}
                             isMobile={isMobile}
@@ -446,7 +452,7 @@ export default function Home() {
                         activeTempo={activeTempo}
                         onTempoChange={handleTempoChange}
                         volumes={volumes}
-                        onMixerChange={onMixerChange}
+                        onMixerChange={handleMixerChange}
                         onChannelVolumeChange={(channel, gain) => handleChannelVolumeChange(channel, { gain })}
                         onCompressorChange={handleCompressorChange}
                         isMobile={isMobile}
@@ -457,3 +463,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
