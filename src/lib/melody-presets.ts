@@ -14,7 +14,7 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
     },
     {
         id: "organ",
-        name: "Church Organ",
+        name: "Organ",
         params: {
             oscillator: { type: 'sine' }, // Fundamental 8'
             envelope: { attack: 0.2, decay: 0.1, sustain: 0.9, release: 2.5 },
