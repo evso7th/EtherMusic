@@ -8,27 +8,29 @@ class ThereminProcessor extends AudioWorkletProcessor {
     super(options);
     this.voices = new Map();
     this.polyphony = options.processorOptions.polyphony || 4;
-
+    
+    // Default preset
     this.preset = {
-      oscillator: { type: 'sine' },
-      envelope: { attack: 0.1, decay: 0.2, sustain: 0.5, release: 1.0 },
-      filter: { Q: 1, frequency: 1000, type: 'lowpass' },
-      portamento: 0,
-      layers: [],
-      stagger: 0,
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 1.5 },
+        filter: { Q: 1.0, frequency: 1000, type: 'lowpass' },
+        portamento: 0,
+        layers: []
     };
 
     this.port.onmessage = (event) => {
       const { type, note, id, preset } = event.data;
+      console.log('[4. WORKLET] theremin-processor.js: Received message:', JSON.parse(JSON.stringify(event.data)));
+
       switch (type) {
         case 'noteOn':
           this.noteOn(note);
           break;
-        case 'noteUpdate':
-          this.noteUpdate(note);
-          break;
         case 'noteOff':
           this.noteOff(id);
+          break;
+        case 'noteUpdate':
+          this.noteUpdate(note);
           break;
         case 'allNotesOff':
           this.allNotesOff();
@@ -39,22 +41,27 @@ class ThereminProcessor extends AudioWorkletProcessor {
       }
     };
   }
-  
+
   applyPreset(preset) {
-    this.preset = { ...this.preset, ...preset };
+    console.log('[5. WORKLET] theremin-processor.js: Applying preset', JSON.parse(JSON.stringify(preset)));
+    if (!preset) return;
+    // Deep merge would be better, but for now this is fine.
+    this.preset = {
+        ...this.preset,
+        ...preset,
+        oscillator: { ...this.preset.oscillator, ...preset.oscillator },
+        envelope: { ...this.preset.envelope, ...preset.envelope },
+        filter: { ...this.preset.filter, ...preset.filter },
+        layers: preset.layers || []
+    };
   }
 
   noteOn(note) {
-    if (this.voices.has(note.id)) {
-      this.noteUpdate(note);
-      return;
-    }
-
     if (this.voices.size >= this.polyphony) {
       const oldestVoiceId = this.voices.keys().next().value;
       this.noteOff(oldestVoiceId);
     }
-    
+
     const voice = this.createVoice(note.frequency, this.preset);
     voice.targetVolume = note.volume;
     this.voices.set(note.id, voice);
@@ -76,55 +83,59 @@ class ThereminProcessor extends AudioWorkletProcessor {
   }
 
   allNotesOff() {
-     this.voices.forEach(voice => {
+    this.voices.forEach(voice => {
       voice.isReleasing = true;
     });
   }
-  
+
   createVoice(frequency, preset) {
-    const createLayer = (layerPreset, baseFreq) => {
-        const layerOscillator = layerPreset.oscillator || {};
-        const layerEnvelope = layerPreset.envelope || {};
+    console.log('[6. WORKLET] theremin-processor.js: Creating voice with preset:', JSON.parse(JSON.stringify(preset)));
+
+    const createLayer = (layerPreset, baseFreq, isMainLayer = false) => {
+        const osc = layerPreset.oscillator || preset.oscillator;
+        const env = layerPreset.envelope || preset.envelope;
+        // If it's a main layer, gain is 1. If it's an additional layer, its specific gain is used, defaulting to 0.7 if not provided.
+        const gain = isMainLayer ? 1.0 : (layerPreset.gain !== undefined ? layerPreset.gain : 0.7);
 
         return {
             phase: 0,
             frequency: baseFreq,
-            detune: layerOscillator.detune || 0,
-            type: layerOscillator.type || 'sine',
-            gain: layerPreset.gain === undefined ? 1.0 : layerPreset.gain,
+            detune: osc.detune || 0,
+            type: osc.type || 'sine',
+            gain: gain,
             envelope: {
-                attack: layerEnvelope.attack || 0.01,
-                decay: layerEnvelope.decay || 0.1,
-                sustain: layerEnvelope.sustain ?? 0.5,
-                release: layerEnvelope.release || 0.5,
                 state: 'attack',
                 currentValue: 0,
-                attackSamples: Math.max(1, (layerEnvelope.attack || 0.01) * sampleRate),
-                decaySamples: Math.max(1, (layerEnvelope.decay || 0.1) * sampleRate),
-                releaseSamples: Math.max(1, (layerEnvelope.release || 0.5) * sampleRate),
+                attackSamples: Math.max(1, (env.attack || 0.01) * sampleRate),
+                decaySamples: Math.max(1, (env.decay || 0.1) * sampleRate),
+                sustain: env.sustain ?? 0.5,
+                releaseSamples: Math.max(1, (env.release || 0.5) * sampleRate),
             }
         };
     };
 
-    const mainLayer = createLayer(preset, frequency);
+    const mainLayer = createLayer(preset, frequency, true);
     const additionalLayers = (preset.layers || []).map(layer => createLayer(layer, frequency));
+    const allLayers = [mainLayer, ...additionalLayers];
+    
+    console.log(`[6a. WORKLET] Creating voice with ${allLayers.length} layers.`);
 
     return {
       id: Math.random(),
-      frequency: frequency,
+      frequency,
       targetVolume: 0,
       currentVolume: 0,
-      filterState: [0, 0, 0, 0], 
+      filterState: [0, 0, 0, 0], // for 2nd order Biquad
       portamentoTime: preset.portamento ? 0.05 / preset.portamento : 0,
       portamentoTarget: frequency,
-      layers: [mainLayer, ...additionalLayers],
+      layers: allLayers,
       stagger: preset.stagger ? preset.stagger * sampleRate : 0,
       staggerCounter: 0,
       isReleasing: false,
       preset: preset,
     };
   }
-
+  
   process(inputs, outputs, parameters) {
     const output = outputs[0];
     const channel = output[0];
@@ -133,99 +144,92 @@ class ThereminProcessor extends AudioWorkletProcessor {
       let sample = 0;
       this.voices.forEach((voice, id) => {
         let voiceSample = 0;
-
+        
+        voice.currentVolume += (voice.targetVolume - voice.currentVolume) * 0.1; // Quick volume slide
         if (voice.portamentoTime > 0) {
-            voice.frequency += (voice.portamentoTarget - voice.frequency) * voice.portamentoTime;
-        } else {
-            voice.frequency = voice.portamentoTarget;
+          voice.frequency += (voice.portamentoTarget - voice.frequency) * voice.portamentoTime;
         }
-        
-        const volAttackSpeed = 1 / ((voice.preset.envelope.attack || 0.01) * sampleRate || 1);
-        const volReleaseSpeed = 1 / ((voice.preset.envelope.release || 0.5) * sampleRate || 1);
 
-        if (voice.isReleasing) {
-            voice.currentVolume -= volReleaseSpeed;
-            if (voice.currentVolume <= 0) {
-                this.voices.delete(id);
-                return;
-            }
-        } else {
-            if (voice.currentVolume < voice.targetVolume) {
-                voice.currentVolume = Math.min(voice.targetVolume, voice.currentVolume + volAttackSpeed);
-            } else if (voice.currentVolume > voice.targetVolume) {
-                voice.currentVolume = Math.max(voice.targetVolume, voice.currentVolume - volAttackSpeed * 2); // Faster downward adjustment
-            }
-        }
-        
         voice.layers.forEach((layer, layerIndex) => {
-            if (voice.stagger > 0 && layerIndex > 0 && voice.staggerCounter < voice.stagger * layerIndex) {
-                return; 
-            }
-            
-            const env = layer.envelope;
-            let envelopeValue = env.currentValue;
+           if (voice.stagger > 0 && layerIndex > 0 && voice.staggerCounter < voice.stagger * layerIndex) {
+              return;
+           }
+           
+           const env = layer.envelope;
+           let envelopeValue = env.currentValue;
+           
+           if (!voice.isReleasing) {
+               if (env.state === 'attack') {
+                   envelopeValue += 1 / env.attackSamples;
+                   if (envelopeValue >= 1.0) {
+                       envelopeValue = 1.0;
+                       env.state = 'decay';
+                   }
+               } else if (env.state === 'decay') {
+                   envelopeValue -= (1.0 - env.sustain) / env.decaySamples;
+                   if (envelopeValue <= env.sustain) {
+                       envelopeValue = env.sustain;
+                       env.state = 'sustain';
+                   }
+               }
+           } else {
+               envelopeValue -= (env.sustain || 0.5) / env.releaseSamples;
+               if (envelopeValue <= 0) {
+                   envelopeValue = 0;
+               }
+           }
+           env.currentValue = envelopeValue;
+           
+           let oscSample = 0;
+           const currentFreq = voice.frequency * Math.pow(2, (layer.detune || 0) / 1200);
+           const phaseIncrement = currentFreq / sampleRate;
 
-            if (!voice.isReleasing) {
-                if (env.state === 'attack') {
-                    envelopeValue += 1 / env.attackSamples;
-                    if (envelopeValue >= 1.0) {
-                        envelopeValue = 1.0;
-                        env.state = 'decay';
-                    }
-                } else if (env.state === 'decay') {
-                    envelopeValue -= (1.0 - env.sustain) / env.decaySamples;
-                    if (envelopeValue <= env.sustain) {
-                        envelopeValue = env.sustain;
-                        env.state = 'sustain';
-                    }
-                }
-            } else {
-                envelopeValue -= env.sustain / env.releaseSamples;
-                if (envelopeValue <= 0) {
-                    envelopeValue = 0;
-                }
-            }
-            env.currentValue = envelopeValue;
-            
-            let oscSample = 0;
-            const currentFreq = voice.frequency * Math.pow(2, layer.detune / 1200);
-            const phaseIncrement = currentFreq / sampleRate;
-
-            switch (layer.type) {
-                 case 'sawtooth':
-                     oscSample = (layer.phase * 2) - 1;
-                     break;
-                 case 'square':
-                     oscSample = layer.phase < 0.5 ? 1 : -1;
-                     break;
-                 case 'triangle':
-                     oscSample = 1 - 4 * Math.abs(Math.round(layer.phase - 0.25) - (layer.phase - 0.25));
-                     break;
-                 case 'sine':
-                 default:
-                     oscSample = Math.sin(layer.phase * 2 * Math.PI);
-            }
-            layer.phase = (layer.phase + phaseIncrement) % 1;
-            voiceSample += oscSample * envelopeValue * layer.gain;
+           switch (layer.type) {
+               case 'sawtooth':
+                   oscSample = (layer.phase * 2) - 1;
+                   break;
+               case 'square':
+                   oscSample = layer.phase < 0.5 ? 1 : -1;
+                   break;
+               case 'triangle':
+                   oscSample = 1 - 4 * Math.abs(Math.round(layer.phase - 0.25) - (layer.phase - 0.25));
+                   break;
+               case 'sine':
+               default:
+                   oscSample = Math.sin(layer.phase * 2 * Math.PI);
+           }
+           layer.phase = (layer.phase + phaseIncrement) % 1;
+           
+           voiceSample += oscSample * envelopeValue * layer.gain;
         });
-
-        if (voice.stagger > 0) voice.staggerCounter++;
-
-        const { frequency: cutoff, Q: qValue } = voice.preset.filter;
-        const w0 = 2 * Math.PI * cutoff / sampleRate;
-        const alpha = Math.sin(w0) / (2 * qValue);
-        const b0 = (1 - Math.cos(w0)) / 2;
-        const b1 = 1 - Math.cos(w0);
-        const b2 = (1 - Math.cos(w0)) / 2;
-        const a0 = 1 + alpha;
-        const a1 = -2 * Math.cos(w0);
-        const a2 = 1 - alpha;
         
-        const [x1, x2, y1, y2] = voice.filterState;
-        const filteredSample = (b0/a0)*voiceSample + (b1/a0)*x1 + (b2/a0)*x2 - (a1/a0)*y1 - (a2/a0)*y2;
-        voice.filterState = [voiceSample, x1, filteredSample, y1];
+        voice.staggerCounter++;
+        
+        voiceSample *= voice.currentVolume;
+        
+        const { frequency: cutoff, Q: qValue, type: filterType } = voice.preset?.filter || this.preset.filter;
+        if (filterType === 'lowpass') {
+            const w0 = 2 * Math.PI * cutoff / sampleRate;
+            const alpha = Math.sin(w0) / (2 * qValue);
+            const b0 = (1 - Math.cos(w0)) / 2;
+            const b1 = 1 - Math.cos(w0);
+            const b2 = (1 - Math.cos(w0)) / 2;
+            const a0 = 1 + alpha;
+            const a1 = -2 * Math.cos(w0);
+            const a2 = 1 - alpha;
+            
+            const [x1, x2, y1, y2] = voice.filterState;
+            const filteredSample = (b0/a0)*voiceSample + (b1/a0)*x1 + (b2/a0)*x2 - (a1/a0)*y1 - (a2/a0)*y2;
+            voice.filterState = [voiceSample, x1, filteredSample, y1];
+            sample += filteredSample;
+        } else {
+            sample += voiceSample;
+        }
 
-        sample += filteredSample * voice.currentVolume;
+
+        if (voice.isReleasing && voice.layers.every(l => l.envelope.currentValue <= 0)) {
+          this.voices.delete(id);
+        }
       });
 
       channel[i] = sample;
@@ -235,3 +239,5 @@ class ThereminProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('theremin-processor', ThereminProcessor);
+
+    

@@ -38,7 +38,15 @@ class LatchProcessor extends AudioWorkletProcessor {
   }
 
   applyPreset(preset) {
-    this.preset = { ...this.preset, ...preset };
+    if (!preset) return;
+    this.preset = {
+        ...this.preset,
+        ...preset,
+        oscillator: { ...this.preset.oscillator, ...preset.oscillator },
+        envelope: { ...this.preset.envelope, ...preset.envelope },
+        filter: { ...this.preset.filter, ...preset.filter },
+        layers: preset.layers || []
+    };
   }
 
   noteOn(note) {
@@ -66,24 +74,31 @@ class LatchProcessor extends AudioWorkletProcessor {
   }
 
   createVoice(frequency, preset) {
-     const createLayer = (layerPreset, baseFreq) => ({
-      phase: 0,
-      frequency: baseFreq * Math.pow(2, (layerPreset.oscillator?.detune || 0) / 1200),
-      type: layerPreset.oscillator?.type || 'sine',
-      gain: layerPreset.gain || 1.0,
-      envelope: {
-        ...layerPreset.envelope,
-        state: 'attack',
-        currentValue: 0,
-        attackSamples: Math.max(1, (layerPreset.envelope?.attack || 0.01) * sampleRate),
-        decaySamples: Math.max(1, (layerPreset.envelope?.decay || 0.1) * sampleRate),
-        sustain: layerPreset.envelope?.sustain ?? 0.5,
-        releaseSamples: Math.max(1, (layerPreset.envelope?.release || 0.5) * sampleRate),
-      }
-    });
+     const createLayer = (layerPreset, baseFreq, isMainLayer = false) => {
+      const osc = layerPreset.oscillator || preset.oscillator;
+      const env = layerPreset.envelope || preset.envelope;
+      const gain = isMainLayer ? 1.0 : (layerPreset.gain !== undefined ? layerPreset.gain : 0.7);
 
-    const mainLayer = createLayer(preset, frequency);
+      return {
+        phase: 0,
+        frequency: baseFreq,
+        detune: osc.detune || 0,
+        type: osc.type || 'sine',
+        gain: gain,
+        envelope: {
+          state: 'attack',
+          currentValue: 0,
+          attackSamples: Math.max(1, (env.attack || 0.01) * sampleRate),
+          decaySamples: Math.max(1, (env.decay || 0.1) * sampleRate),
+          sustain: env.sustain ?? 0.5,
+          releaseSamples: Math.max(1, (env.release || 0.5) * sampleRate),
+        }
+      };
+    };
+
+    const mainLayer = createLayer(preset, frequency, true);
     const additionalLayers = (preset.layers || []).map(layer => createLayer(layer, frequency));
+    const allLayers = [mainLayer, ...additionalLayers];
 
     return {
       id: Math.random(),
@@ -93,7 +108,7 @@ class LatchProcessor extends AudioWorkletProcessor {
       filterState: [0, 0, 0, 0], // for 2nd order Biquad
       portamentoTime: preset.portamento ? 0.05 / preset.portamento : 0,
       portamentoTarget: frequency,
-      layers: [mainLayer, ...additionalLayers],
+      layers: allLayers,
       stagger: preset.stagger ? preset.stagger * sampleRate : 0,
       staggerCounter: 0,
       isReleasing: false,
@@ -137,7 +152,7 @@ class LatchProcessor extends AudioWorkletProcessor {
                    }
                }
            } else {
-               envelopeValue -= env.sustain / env.releaseSamples;
+               envelopeValue -= (env.sustain || 0.5) / env.releaseSamples;
                if (envelopeValue <= 0) {
                    envelopeValue = 0;
                }
@@ -147,7 +162,7 @@ class LatchProcessor extends AudioWorkletProcessor {
            const volumeAdjusted = voice.targetVolume;
            
            let oscSample = 0;
-           const currentFreq = voice.frequency * Math.pow(2, (layer.oscillator?.detune || 0) / 1200);
+           const currentFreq = voice.frequency * Math.pow(2, (layer.detune || 0) / 1200);
            const phaseIncrement = currentFreq / sampleRate;
 
            switch (layer.type) {
@@ -171,21 +186,26 @@ class LatchProcessor extends AudioWorkletProcessor {
         
         voice.staggerCounter++;
 
-        const { frequency: cutoff, Q: qValue } = voice.preset?.filter || this.preset.filter;
-        const w0 = 2 * Math.PI * cutoff / sampleRate;
-        const alpha = Math.sin(w0) / (2 * qValue);
-        const b0 = (1 - Math.cos(w0)) / 2;
-        const b1 = 1 - Math.cos(w0);
-        const b2 = (1 - Math.cos(w0)) / 2;
-        const a0 = 1 + alpha;
-        const a1 = -2 * Math.cos(w0);
-        const a2 = 1 - alpha;
-        
-        const [x1, x2, y1, y2] = voice.filterState;
-        const filteredSample = (b0/a0)*voiceSample + (b1/a0)*x1 + (b2/a0)*x2 - (a1/a0)*y1 - (a2/a0)*y2;
-        voice.filterState = [voiceSample, x1, filteredSample, y1];
+        const { frequency: cutoff, Q: qValue, type: filterType } = voice.preset?.filter || this.preset.filter;
 
-        sample += filteredSample;
+        if (filterType === 'lowpass') {
+            const w0 = 2 * Math.PI * cutoff / sampleRate;
+            const alpha = Math.sin(w0) / (2 * qValue);
+            const b0 = (1 - Math.cos(w0)) / 2;
+            const b1 = 1 - Math.cos(w0);
+            const b2 = (1 - Math.cos(w0)) / 2;
+            const a0 = 1 + alpha;
+            const a1 = -2 * Math.cos(w0);
+            const a2 = 1 - alpha;
+            
+            const [x1, x2, y1, y2] = voice.filterState;
+            const filteredSample = (b0/a0)*voiceSample + (b1/a0)*x1 + (b2/a0)*x2 - (a1/a0)*y1 - (a2/a0)*y2;
+            voice.filterState = [voiceSample, x1, filteredSample, y1];
+            sample += filteredSample;
+        } else {
+            sample += voiceSample;
+        }
+
 
         if (voice.isReleasing && voice.layers.every(l => l.envelope.currentValue <= 0)) {
           this.voices.delete(id);
@@ -199,3 +219,5 @@ class LatchProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('latch-processor', LatchProcessor);
+
+    

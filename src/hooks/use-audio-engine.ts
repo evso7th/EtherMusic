@@ -5,7 +5,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
-import type { Volumes, Instrument, BassInstrument } from '@/types';
+import type { Volumes, Instrument, BassInstrument, InstrumentPreset, BassInstrumentPreset, CompressorSettings } from '@/types';
 
 export function useAudioEngine() {
     const { toast } = useToast();
@@ -36,8 +36,6 @@ export function useAudioEngine() {
             setIsReady(true);
             setIsPlaying(audioEngine.current.isPlaying);
             
-            console.log("AudioEngine initialized and ready.");
-
         } catch(e) {
             console.error("Failed to initialize audio engines:", e);
             toast({
@@ -134,12 +132,17 @@ export function useAudioEngine() {
         audioEngine.current.handleThereminInteraction(type, data, state);
     }, [isReady]);
 
-    const setMelodyInstrument = useCallback((instrumentName: Instrument) => {
-        audioEngine.current?.setMelodyInstrument(instrumentName);
+    const setMelodyInstrument = useCallback((instrument: InstrumentPreset) => {
+        console.log('[2. HOOK] use-audio-engine: setMelodyInstrument called with:', instrument.id);
+        audioEngine.current?.setMelodyInstrument(instrument);
     }, []);
     
-    const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
-        audioEngine.current?.setBassInstrument(instrumentName);
+    const setBassInstrument = useCallback((instrument: BassInstrumentPreset) => {
+        audioEngine.current?.setBassInstrument(instrument);
+    }, []);
+    
+    const handleCompressorChange = useCallback((compressorSettings: CompressorSettings) => {
+        audioEngine.current?.setCompressorSettings(compressorSettings);
     }, []);
 
 
@@ -162,6 +165,7 @@ export function useAudioEngine() {
         stopRecording,
         handleThereminInteraction,
         setSleepTimer,
+        handleCompressorChange,
     };
 }
 
