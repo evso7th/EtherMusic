@@ -160,11 +160,11 @@ export class AudioEngine {
             outputChannelCount: [1]
         });
     
-        // Routing: Worklet -> Distortion -> Main Gain -> Reverb Send -> Pre-compressor Out
+        // Routing: Worklet -> Distortion -> Main Gain -> Pre-compressor Out & Reverb Send
         workletNode.connect(distortionNode);
         distortionNode.connect(gainNode);
-        gainNode.connect(this.preCompressorOut);
-        gainNode.connect(reverbSendNode); // Send to reverb after gain control
+        gainNode.connect(this.preCompressorOut); 
+        gainNode.connect(reverbSendNode); 
 
         // Store all nodes
         this.nodes.set(part, {
@@ -322,7 +322,7 @@ export class AudioEngine {
     
     public setTempo(bpm: number) {
         if (!this.isInitialized) return;
-        this.nodes.get('drums')?.worklet.port.postMessage({type: 'setTempo', bpm});
+        this.nodes.get('drums')?.worklet.port.postMessage({type: 'setTempo', bpm: 90});
     }
     
     public setVolumes(newVolumes: Volumes) {
@@ -335,25 +335,29 @@ export class AudioEngine {
 
             if (part === 'compressor') {
                 const settings = newVolumes.compressor;
-                this.compressor.threshold.linearRampToValueAtTime(settings.threshold, rampTime);
-                this.compressor.ratio.linearRampToValueAtTime(settings.ratio, rampTime);
-                this.compressor.attack.linearRampToValueAtTime(settings.attack, rampTime);
-                this.compressor.release.linearRampToValueAtTime(settings.release, rampTime);
+                if (this.compressor && settings) {
+                    this.compressor.threshold.linearRampToValueAtTime(settings.threshold, rampTime);
+                    this.compressor.ratio.linearRampToValueAtTime(settings.ratio, rampTime);
+                    this.compressor.attack.linearRampToValueAtTime(settings.attack, rampTime);
+                    this.compressor.release.linearRampToValueAtTime(settings.release, rampTime);
 
-                if (settings.enabled) {
-                    this.preCompressorOut.disconnect();
-                    this.preCompressorOut.connect(this.compressor);
-                } else {
-                    this.preCompressorOut.disconnect();
-                    this.preCompressorOut.connect(this.masterOut);
+                    if (settings.enabled) {
+                        this.preCompressorOut.disconnect();
+                        this.preCompressorOut.connect(this.compressor);
+                    } else {
+                        this.preCompressorOut.disconnect();
+                        this.preCompressorOut.connect(this.masterOut);
+                    }
                 }
             } else if (part === 'reverbReturn') {
-                this.reverbReturn.gain.linearRampToValueAtTime(dbToGain(newVolumes.reverbReturn), rampTime);
+                if (this.reverbReturn) {
+                    this.reverbReturn.gain.linearRampToValueAtTime(dbToGain(newVolumes.reverbReturn), rampTime);
+                }
             } else {
                  const nodeInfo = this.nodes.get(part);
-                 if (nodeInfo) {
-                    const channelVols = newVolumes[part];
-                    
+                 const channelVols = newVolumes[part];
+
+                 if (nodeInfo && channelVols) {
                     if (channelVols.gain !== undefined) {
                         const gainValue = dbToGain(channelVols.gain);
                         nodeInfo.gain.gain.linearRampToValueAtTime(gainValue, rampTime);
@@ -412,3 +416,5 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
+
+    

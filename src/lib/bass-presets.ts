@@ -61,7 +61,7 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
             layers: [
                 {
                     oscillator: { type: 'triangle' },
-                    envelope: { attack: 0.1, release: 2.0 },
+                    envelope: { attack: 0.1, release: 2.0, sustain: 1.0, decay: 0.1 },
                 }
             ],
             stagger: 0.015
@@ -79,7 +79,7 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
             layers: [
                  {
                     oscillator: { type: 'sawtooth' },
-                    envelope: { attack: 0.05, release: 1.5 },
+                    envelope: { attack: 0.05, release: 1.5, sustain: 0.5, decay: 0.3 },
                 }
             ],
             stagger: 0.005
@@ -88,3 +88,5 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
 ];
 
 export const defaultBassInstrument: BassInstrument = 'classicBass';
+
+    

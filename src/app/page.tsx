@@ -77,19 +77,19 @@ function loadSettings() {
         }
 
         // Ensure all properties exist, merging with defaults
-        const ensureChannelSettings = (channel: Partial<ChannelVolumes> | undefined): ChannelVolumes => ({
-            gain: channel?.gain ?? 0,
-            reverbSend: channel?.reverbSend ?? -24,
-            distortion: channel?.distortion ?? 0
+        const ensureChannelSettings = (channel: Partial<ChannelVolumes> | undefined, defaults: ChannelVolumes): ChannelVolumes => ({
+            gain: channel?.gain ?? defaults.gain,
+            reverbSend: channel?.reverbSend ?? defaults.reverbSend,
+            distortion: channel?.distortion ?? defaults.distortion,
         });
 
         const mergedVolumes: Volumes = {
             ...defaultVolumes,
             ...volumes,
-            melody: ensureChannelSettings(volumes.melody),
-            manualBass: ensureChannelSettings(volumes.manualBass),
-            latch: ensureChannelSettings(volumes.latch),
-            drums: ensureChannelSettings(volumes.drums),
+            melody: ensureChannelSettings(volumes.melody, defaultVolumes.melody),
+            manualBass: ensureChannelSettings(volumes.manualBass, defaultVolumes.manualBass),
+            latch: ensureChannelSettings(volumes.latch, defaultVolumes.latch),
+            drums: ensureChannelSettings(volumes.drums, defaultVolumes.drums),
             compressor: { ...defaultVolumes.compressor, ...volumes.compressor },
         };
 
@@ -199,11 +199,11 @@ export default function Home() {
         const currentScale = Object.keys(SCALES).includes(keyOrScale) ? keyOrScale as MusicScale : newScale;
 
         // Bass Pad: Octaves C2-C3
-        const baseBassNote = 36; // C2
-        const bassFreqs = getScaleFrequencies(baseBassNote, SCALES[currentScale], [0, 1]);
+        const baseBassNote = 24; // C1
+        const bassFreqs = getScaleFrequencies(baseBassNote, SCALES[currentScale], [1, 2]);
 
-        // Melody Pad: Octaves C4-C5
-        const baseMelodyNote = 60; // C4
+        // Melody Pad: Octaves C3-C4
+        const baseMelodyNote = 48; // C3
         const melodyFreqs = getScaleFrequencies(baseMelodyNote, SCALES[currentScale], [0, 1]);
     
         setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
@@ -231,7 +231,18 @@ export default function Home() {
     }, [volumes, updateVolumes]);
     
     const handleMixerChange = useCallback((changedMixerVolumes: Partial<Omit<Volumes, 'compressor'>>) => {
-        const newVolumes: Volumes = { ...volumes, ...changedMixerVolumes };
+        const newVolumes: Volumes = { ...volumes };
+        for (const key in changedMixerVolumes) {
+            const channelKey = key as keyof typeof changedMixerVolumes;
+            if (channelKey === 'reverbReturn') {
+                newVolumes.reverbReturn = changedMixerVolumes.reverbReturn!;
+            } else {
+                newVolumes[channelKey] = {
+                    ...newVolumes[channelKey],
+                    ...changedMixerVolumes[channelKey]
+                }
+            }
+        }
         updateVolumes(newVolumes);
     }, [volumes, updateVolumes]);
     
@@ -291,7 +302,7 @@ export default function Home() {
         if(preset) {
             setActiveMelodyInstrument(instrumentName);
             setMelodyInstrument(instrumentName);
-            handleChannelVolumeChange('melody', { distortion: preset.params.distortion ?? 0 });
+            handleChannelVolumeChange('melody', { distortion: preset.params.distortion });
         }
     }, [setMelodyInstrument, handleChannelVolumeChange]);
 
@@ -301,8 +312,9 @@ export default function Home() {
             setActiveBassInstrument(instrumentName);
             setBassInstrument(instrumentName);
             const distortion = preset.params.distortion ?? 0;
-            handleChannelVolumeChange('manualBass', { distortion });
-            handleChannelVolumeChange('latch', { distortion });
+            const channelVolumes = { distortion };
+            handleChannelVolumeChange('manualBass', channelVolumes);
+            handleChannelVolumeChange('latch', channelVolumes);
         }
     }, [setBassInstrument, handleChannelVolumeChange]);
     
@@ -435,7 +447,7 @@ export default function Home() {
                             onPatternChange={handlePatternChange}
                             volumes={volumes}
                             handleMixerChange={handleMixerChange}
-                            onChannelVolumeChange={(channel, newVolumes) => handleChannelVolumeChange(channel, newVolumes)}
+                            onChannelVolumeChange={handleChannelVolumeChange}
                             onCompressorChange={handleCompressorChange}
                             isMobile={isMobile}
                         />
@@ -449,7 +461,7 @@ export default function Home() {
                         onPatternChange={handlePatternChange}
                         volumes={volumes}
                         handleMixerChange={handleMixerChange}
-                        onChannelVolumeChange={(channel, newVolumes) => handleChannelVolumeChange(channel, newVolumes)}
+                        onChannelVolumeChange={handleChannelVolumeChange}
                         onCompressorChange={handleCompressorChange}
                         isMobile={isMobile}
                         isLandscape={true}
@@ -459,3 +471,5 @@ export default function Home() {
         </div>
     );
 }
+
+    

@@ -28,9 +28,10 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
         id: "mellotron",
         name: "Mellotron",
         params: {
-            oscillator: { type: 'sawtooth' },
+            // Using fat-sawtooth to simulate the detuned/chorus effect of a real mellotron
+            oscillator: { type: 'sawtooth' }, 
             envelope: { attack: 0.3, decay: 0.2, sustain: 0.6, release: 1.5 },
-            filter: { Q: 0.5, frequency: 500, type: 'lowpass' },
+            filter: { Q: 1.5, frequency: 500, type: 'lowpass' },
             portamento: 0.01,
             distortion: 5,
         }
@@ -49,3 +50,5 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
 ];
 
 export const defaultMelodyInstrument: Instrument = 'synth';
+
+    

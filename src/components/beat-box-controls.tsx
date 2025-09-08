@@ -23,7 +23,7 @@ interface BeatBoxControlsProps {
     activePattern: BeatPattern;
     onPatternChange: (pattern: BeatPattern) => void;
     volumes: Volumes;
-    handleMixerChange: (volumes: Partial<Omit<Volumes, 'compressor'>>) => void;
+    handleMixerChange: (volumes: Partial<Omit<Volumes, 'compressor' | 'reverbReturn'>> & { reverbReturn?: number }) => void;
     onChannelVolumeChange: (channel: keyof Omit<Volumes, 'compressor' | 'reverbReturn'>, newVolumes: Partial<ChannelVolumes>) => void;
     onCompressorChange: (compressorSettings: CompressorSettings) => void;
     isMobile: boolean;
@@ -170,7 +170,6 @@ export function BeatBoxControls({
                                 <div className="pr-4 py-4">
                                     <MixerControls 
                                         volumes={volumes} 
-                                        onMixerChange={handleMixerChange}
                                         onChannelVolumeChange={onChannelVolumeChange}
                                         onCompressorChange={onCompressorChange}
                                     />
@@ -251,7 +250,7 @@ export function BeatBoxControls({
                         </DialogContent>
                     </Dialog>
 
-                    <Dialog open={isMixerOpen} onOpenChange={handleMixerOpenChange}>
+                    <Dialog open={isMixerOpen} onOpenChange={setIsMixerOpen}>
                         <DialogTrigger asChild>
                              <ControlButtonWrapper tooltipText="Mixer" variant="outline" className="flex-1 px-2 md:px-4" size={buttonSize}>
                                 <SlidersHorizontal className="w-4 h-4 md:mr-2"/>
@@ -265,8 +264,7 @@ export function BeatBoxControls({
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="pr-4 py-4">
                                     <MixerControls 
-                                        volumes={volumes} 
-                                        onMixerChange={handleMixerChange}
+                                        volumes={volumes}
                                         onChannelVolumeChange={onChannelVolumeChange}
                                         onCompressorChange={onCompressorChange}
                                     />
@@ -281,5 +279,8 @@ export function BeatBoxControls({
         </TooltipProvider>
     );
 }
+
+    
+
 
     

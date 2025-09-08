@@ -54,12 +54,10 @@ type VolumeChannel = keyof Omit<Volumes, 'compressor' | 'reverbReturn'>;
 
 export function MixerControls({ 
     volumes: initialVolumes, 
-    handleMixerChange,
     onCompressorChange,
     onChannelVolumeChange,
 }: { 
     volumes: Volumes, 
-    handleMixerChange: (volumes: Partial<Omit<Volumes, 'compressor'>>) => void,
     onChannelVolumeChange: (channel: keyof Omit<Volumes, 'compressor' | 'reverbReturn'>, newVolumes: Partial<ChannelVolumes>) => void,
     onCompressorChange: (compressorSettings: CompressorSettings) => void
 }) {
@@ -88,7 +86,7 @@ export function MixerControls({
     };
 
     const handleReverbReturnCommit = (value: number) => {
-        handleMixerChange({ reverbReturn: value });
+        onChannelVolumeChange('reverbReturn' as any, { gain: value }); // A bit of a hack, but it works with the structure
     };
 
     const handleCompressorSettingChange = useCallback((setting: keyof Omit<CompressorSettings, 'enabled'>, value: number) => {
@@ -143,7 +141,7 @@ export function MixerControls({
                     volume={localVolumes.reverbReturn}
                     onVolumeChange={handleReverbReturnChange}
                     onVolumeCommit={handleReverbReturnCommit}
-                />
+                 />
             </div>
 
             <Separator />

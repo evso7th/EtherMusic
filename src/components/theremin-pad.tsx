@@ -56,7 +56,10 @@ const EffectControl = ({
     min,
     max,
     step,
-    unit
+    unit,
+    distortion, // Add distortion prop
+    onDistortionChange, // Add distortion change handler
+    onDistortionCommit, // Add distortion commit handler
 }: {
     label: string,
     icon: React.ElementType,
@@ -66,7 +69,10 @@ const EffectControl = ({
     min: number,
     max: number,
     step: number,
-    unit: string
+    unit: string,
+    distortion?: number, // Make distortion optional
+    onDistortionChange?: (v: number) => void, // Make optional
+    onDistortionCommit?: (v: number) => void, // Make optional
 }) => (
      <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
@@ -84,6 +90,19 @@ const EffectControl = ({
                 onValueCommit={(v) => onLevelCommit(v[0])}
             />
         </div>
+        {distortion !== undefined && onDistortionChange && onDistortionCommit && (
+            <div className="flex items-center gap-4 pl-7 mt-2">
+                <Waves className="w-4 h-4 text-muted-foreground" />
+                <Slider
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={[distortion]}
+                    onValueChange={(v) => onDistortionChange(v[0])}
+                    onValueCommit={(v) => onDistortionCommit(v[0])}
+                />
+            </div>
+        )}
     </div>
 );
 
@@ -123,7 +142,7 @@ export function ThereminPad({
     const handleReverbCommit = useCallback((value: number) => {
         onChannelVolumeChange({ reverbSend: value });
     }, [onChannelVolumeChange]);
-
+    
     const handleDistortionCommit = useCallback((value: number) => {
         onChannelVolumeChange({ distortion: value });
     }, [onChannelVolumeChange]);
