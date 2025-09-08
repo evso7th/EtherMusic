@@ -131,17 +131,14 @@ export function useAudioEngine() {
     
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isReady || !audioEngine.current) return;
-        console.log(`[1. HOOK] handleThereminInteraction. Type: ${type}, State: ${state}`, data);
         audioEngine.current.handleThereminInteraction(type, data, state);
     }, [isReady]);
 
     const setMelodyInstrument = useCallback((instrumentName: Instrument) => {
-        console.log(`[1. HOOK] setMelodyInstrument called with: ${instrumentName}`);
         audioEngine.current?.setMelodyInstrument(instrumentName);
     }, []);
     
     const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
-        console.log(`[1. HOOK] setBassInstrument called with: ${instrumentName}`);
         audioEngine.current?.setBassInstrument(instrumentName);
     }, []);
     

@@ -55,12 +55,12 @@ class Voice {
     }
 
     initLayers(preset) {
+        this.layers = []; // Clear existing layers
         const createLayer = (layerConfig, baseFrequency) => {
-            // Use frequency from layer if available, otherwise calculate from base
             const freq = layerConfig.freqMult !== undefined 
                 ? baseFrequency * layerConfig.freqMult * Math.pow(2, (layerConfig.detune || 0) / 1200)
                 : baseFrequency;
-
+    
             return {
                 osc: new Oscillator(layerConfig.type || 'sine', this.sampleRate),
                 level: layerConfig.level ?? 1.0,
@@ -69,15 +69,16 @@ class Voice {
             };
         };
         
-        // Add the main oscillator config as the first layer
-        this.layers.push(createLayer({
+        // The main oscillator config is treated as the first layer
+        const mainOscillatorConfig = {
             type: preset.oscillator?.type || 'sine',
             level: 1.0, 
             freqMult: 1,
             detune: preset.oscillator?.detune || 0,
-        }, this.baseFrequency));
+        };
 
-        // Add additional layers if they exist
+        this.layers.push(createLayer(mainOscillatorConfig, this.baseFrequency));
+    
         if (preset.layers && preset.layers.length > 0) {
              preset.layers.forEach(layer => this.layers.push(createLayer(layer, this.baseFrequency)));
         }
@@ -120,8 +121,7 @@ class Voice {
     processLFO() {
         if (!this.lfo) return 0;
         const lfoSample = Math.sin(this.lfo.phase * 2 * Math.PI) * this.lfo.depth;
-        this.lfo.phase += this.lfo.freq / this.sampleRate;
-        if (this.lfo.phase >= 1.0) this.lfo.phase -= 1.0;
+        this.lfo.phase = (this.lfo.phase + this.lfo.freq / this.sampleRate) % 1.0;
         return lfoSample;
     }
 
@@ -154,18 +154,48 @@ class Voice {
                 a1 = -2 * cos_w0;
                 a2 = 1 - alpha / A;
                 break;
-            default: // including highpass, bandpass, etc.
-                return inputSample; // Fallback for unimplemented types
+            case 'highpass':
+                b0 = (1 + cos_w0) / 2;
+                b1 = -(1 + cos_w0);
+                b2 = (1 + cos_w0) / 2;
+                a0 = 1 + alpha;
+                a1 = -2 * cos_w0;
+                a2 = 1 - alpha;
+                break;
+            case 'bandpass':
+                b0 = Q * alpha;
+                b1 = 0;
+                b2 = -Q * alpha;
+                a0 = 1 + alpha;
+                a1 = -2 * cos_w0;
+                a2 = 1 - alpha;
+                break;
+            case 'notch':
+                b0 = 1;
+                b1 = -2 * cos_w0;
+                b2 = 1;
+                a0 = 1 + alpha;
+                a1 = -2 * cos_w0;
+                a2 = 1 - alpha;
+                break;
+            default:
+                return inputSample;
         }
     
-        const outputSample = (b0/a0) * inputSample + (b1/a0) * this.filter.x1 + (b2/a0) * this.filter.x2 - (a1/a0) * this.filter.y1 - (a2/a0) * this.filter.y2;
+        const x1 = this.filter.x1 || 0;
+        const x2 = this.filter.x2 || 0;
+        const y1 = this.filter.y1 || 0;
+        const y2 = this.filter.y2 || 0;
         
-        this.filter.x2 = this.filter.x1;
+        let outputSample = (b0/a0) * inputSample + (b1/a0) * x1 + (b2/a0) * x2 - (a1/a0) * y1 - (a2/a0) * y2;
+        outputSample = isNaN(outputSample) ? 0 : outputSample;
+        
+        this.filter.x2 = x1;
         this.filter.x1 = inputSample;
-        this.filter.y2 = this.filter.y1;
-        this.filter.y1 = isNaN(outputSample) ? 0 : outputSample;
+        this.filter.y2 = y1;
+        this.filter.y1 = outputSample;
         
-        return this.filter.y1;
+        return outputSample;
     }
 
     processEnvelope() {
@@ -206,7 +236,7 @@ class Voice {
         }
 
         const lfoModulation = this.processLFO();
-        this.envelopeLevel = this.processEnvelope();
+        const envelopeValue = this.processEnvelope();
         
         let mixedSample = 0;
         this.layers.forEach(layer => {
@@ -216,7 +246,7 @@ class Voice {
 
         const filteredSample = this.processFilter(mixedSample / this.layers.length);
 
-        return filteredSample * this.envelopeLevel * this.volume;
+        return filteredSample * envelopeValue * this.volume;
     }
 
     noteUpdate(frequency, volume) {
@@ -240,18 +270,13 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.preset = this.getDefaultPreset();
         
         this.port.onmessage = this.handleMessage.bind(this);
-        console.log('[3. WORKLET] SynthProcessor created');
     }
 
     handleMessage(event) {
         const { type, note, id, preset } = event.data;
-        // console.log(`[3. WORKLET] Received message: ${type}`);
         switch (type) {
             case 'noteOn':
-                if (note) {
-                    console.log(`[3. WORKLET] noteOn: id=${note.id}, freq=${note.frequency.toFixed(2)}, vol=${note.volume.toFixed(2)}`);
-                    this.noteOn(note);
-                }
+                if (note) this.noteOn(note);
                 break;
             case 'noteOff':
                 if (id !== undefined) this.noteOff(id);
@@ -263,17 +288,15 @@ class SynthProcessor extends AudioWorkletProcessor {
                 this.allNotesOff();
                 break;
             case 'setPreset':
-                if (preset) {
-                    console.log('[3. WORKLET] Received new preset:', JSON.parse(JSON.stringify(preset)));
-                    this.applyPreset(preset);
-                }
+                if (preset) this.applyPreset(preset);
                 break;
         }
     }
 
     applyPreset(preset) {
         this.preset = { ...this.getDefaultPreset(), ...preset };
-        console.log('[3. WORKLET] Preset applied:', this.preset);
+        this.voices.forEach(voice => voice.release());
+        this.voices.clear();
     }
 
     noteOn(note) {
