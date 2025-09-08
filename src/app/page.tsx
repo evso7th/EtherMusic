@@ -43,8 +43,8 @@ function setCookie(name: string, value: string, days: number) {
 }
 
 const defaultVolumes: Volumes = { 
-    melody: { gain: 0, reverbSend: -24 },
-    manualBass: { gain: 0, reverbSend: -48 },
+    melody: { gain: 6, reverbSend: -24 },
+    manualBass: { gain: 6, reverbSend: -48 },
     latch: { gain: -15, reverbSend: -48 },
     drums: { gain: -9, reverbSend: -48 },
     reverbReturn: -12,
@@ -432,6 +432,8 @@ export default function Home() {
         </div>
     );
 }
+
+    
 
     
 
