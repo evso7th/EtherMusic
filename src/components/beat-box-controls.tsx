@@ -14,7 +14,7 @@ import { Separator } from "./ui/separator";
 import { Switch } from "./ui/switch";
 import { ScrollArea } from "./ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
-import type { BeatPattern, Tempo, Volumes, CompressorSettings, ChannelVolumes } from '@/types';
+import type { BeatPattern, Volumes, CompressorSettings, ChannelVolumes } from '@/types';
 import { MixerControls } from "./mixer-controls";
 
 
@@ -22,9 +22,6 @@ interface BeatBoxControlsProps {
     patterns: BeatPattern[];
     activePattern: BeatPattern;
     onPatternChange: (pattern: BeatPattern) => void;
-    tempos: Tempo[];
-    activeTempo: Tempo;
-    onTempoChange: (tempo: Tempo) => void;
     volumes: Volumes;
     onMixerChange: (volumes: Partial<Omit<Volumes, 'compressor'>>) => void;
     onChannelVolumeChange: (channel: keyof Omit<Volumes, 'compressor' | 'reverbReturn'>, newVolumes: Partial<ChannelVolumes>) => void;
@@ -51,9 +48,6 @@ export function BeatBoxControls({
     patterns,
     activePattern,
     onPatternChange,
-    tempos,
-    activeTempo,
-    onTempoChange,
     volumes,
     onMixerChange,
     onCompressorChange,
@@ -62,7 +56,6 @@ export function BeatBoxControls({
     isLandscape = false,
 }: BeatBoxControlsProps) {
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
-    const [isTempoOpen, setIsTempoOpen] = useState(false);
     const [isMixerOpen, setIsMixerOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<'Meditative' | 'Classic'>('Meditative');
     
@@ -163,37 +156,6 @@ export function BeatBoxControls({
                         </DialogContent>
                     </Dialog>
 
-                    <Dialog open={isTempoOpen} onOpenChange={setIsTempoOpen}>
-                        <DialogTrigger asChild>
-                             <ControlButtonWithTooltip tooltipText="Tempo" variant="outline" size="icon" className="w-10 h-10 rounded-full">
-                                <Zap className="w-5 h-5" />
-                            </ControlButtonWithTooltip>
-                        </DialogTrigger>
-                         <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Adjust Tempo</DialogTitle>
-                            </DialogHeader>
-                             <ScrollArea className="h-auto max-h-[70vh]">
-                                <div className="grid grid-cols-1 gap-2 py-4 pr-4">
-                                    {tempos.map((tempo) => (
-                                        <Button
-                                            key={tempo.name}
-                                            variant={activeTempo.name === tempo.name ? 'default' : 'outline'}
-                                            onClick={() => {
-                                                onTempoChange(tempo);
-                                                setIsTempoOpen(false);
-                                            }}
-                                            className="flex justify-between w-full"
-                                        >
-                                            <span>{tempo.name}</span>
-                                            <span className="text-sm text-muted-foreground">{tempo.bpm} BPM</span>
-                                        </Button>
-                                    ))}
-                                </div>
-                            </ScrollArea>
-                        </DialogContent>
-                    </Dialog>
-                    
                     <Dialog open={isMixerOpen} onOpenChange={handleMixerOpenChange}>
                         <DialogTrigger asChild>
                              <ControlButtonWithTooltip tooltipText="Mixer" variant="outline" size="icon" className="w-10 h-10 rounded-full">
@@ -284,38 +246,6 @@ export function BeatBoxControls({
                                             </Button>
                                         </div>
                                     )}
-                                </div>
-                            </ScrollArea>
-                        </DialogContent>
-                    </Dialog>
-
-                    <Dialog open={isTempoOpen} onOpenChange={setIsTempoOpen}>
-                        <DialogTrigger asChild>
-                            <ControlButtonWrapper tooltipText="Tempo" variant="outline" className="flex-1" size={buttonSize}>
-                                <Zap className="w-4 h-4 md:mr-2" />
-                                <span className="hidden sm:inline">Tempo</span>
-                            </ControlButtonWrapper>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Adjust Tempo</DialogTitle>
-                            </DialogHeader>
-                            <ScrollArea className="h-auto max-h-[70vh]">
-                                <div className="grid grid-cols-1 gap-2 py-4 pr-4">
-                                    {tempos.map((tempo) => (
-                                        <Button
-                                            key={tempo.name}
-                                            variant={activeTempo.name === tempo.name ? 'default' : 'outline'}
-                                            onClick={() => {
-                                                onTempoChange(tempo);
-                                                setIsTempoOpen(false);
-                                            }}
-                                            className="flex justify-between w-full"
-                                        >
-                                            <span>{tempo.name}</span>
-                                            <span className="text-sm text-muted-foreground">{tempo.bpm} BPM</span>
-                                        </Button>
-                                    ))}
                                 </div>
                             </ScrollArea>
                         </DialogContent>

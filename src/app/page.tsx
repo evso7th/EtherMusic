@@ -19,7 +19,7 @@ import { SleepTimer } from '@/components/sleep-timer';
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
 import { melodyInstruments, defaultMelodyInstrument } from '@/lib/melody-presets';
 import { bassInstruments, defaultBassInstrument } from '@/lib/bass-presets';
-import type { MusicKey, MusicScale, Tempo, Volumes, Instrument, BassInstrument, ChannelVolumes, CompressorSettings } from '@/types';
+import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, ChannelVolumes, CompressorSettings } from '@/types';
 import { cn } from '@/lib/utils';
 
 
@@ -104,14 +104,6 @@ function saveSettings(volumes: Volumes) {
     }
 }
 
-export const tempos: Tempo[] = [
-    { name: 'Largo', bpm: 50 },
-    { name: 'Adagio', bpm: 70 },
-    { name: 'Andante', bpm: 90 },
-    { name: 'Moderato', bpm: 110 },
-    { name: 'Allegretto', bpm: 130 },
-];
-
 const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
 const MemoizedThereminPad = memo(ThereminPad);
 
@@ -171,7 +163,6 @@ export default function Home() {
     } = useAudioEngine();
     
     const [isRecording, setIsRecording] = useState(false);
-    const [activeTempo, setActiveTempo] = useState<Tempo>(tempos[2]);
     const [activePattern, setActivePattern] = useState<(typeof beatPatterns)[number]>(beatPatterns.find(p => p.name === 'Off')!);
     const [musicKey, setMusicKey] = useState<MusicKey>('G');
     const [musicScale, setMusicScale] = useState<MusicScale>('Minor');
@@ -181,7 +172,6 @@ export default function Home() {
     const [activeBassInstrument, setActiveBassInstrument] = useState<BassInstrument>(defaultBassInstrument);
     
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
-    const [isMixerOpen, setIsMixerOpen] = useState(false);
 
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         let newKey = musicKey;
@@ -203,8 +193,8 @@ export default function Home() {
         const bassFreqs = getScaleFrequencies(baseBassNote, SCALES[currentScale], [1, 2]);
 
         // Melody Pad: Octaves C3-C4
-        const baseMelodyNote = 36 + ALL_NOTES[currentKey]; // C2 base
-        const melodyFreqs = getScaleFrequencies(baseMelodyNote, SCALES[currentScale], [1, 2]);
+        const baseMelodyNote = 48 + ALL_NOTES[currentKey]; // C3 base
+        const melodyFreqs = getScaleFrequencies(baseMelodyNote, SCALES[currentScale], [0, 1]);
     
         setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
     }, [musicKey, musicScale]);
@@ -287,11 +277,6 @@ export default function Home() {
         }
     }, [setBeatPattern, isPlaying, play]);
 
-    const handleTempoChange = useCallback((tempo: Tempo) => {
-        setActiveTempo(tempo);
-        setTempo(tempo.bpm);
-    }, [setTempo]);
-
     const handleLatchToggle = useCallback((isOn: boolean) => {
         setIsBassLatchOn(isOn);
         setBassLatch(isOn);
@@ -320,7 +305,7 @@ export default function Home() {
                     <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
                 </div>
                 <div className={cn("absolute inset-0 z-0 transition-opacity duration-1000", isAppStarted ? 'opacity-100' : 'opacity-30')}>
-                    <MemoizedOrbitalAnimation tempo={activeTempo.bpm}/>
+                    <MemoizedOrbitalAnimation />
                 </div>
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
@@ -351,7 +336,7 @@ export default function Home() {
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
             <div className="fixed inset-0 z-0">
-                 <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={activeTempo.bpm} />
+                 <MemoizedOrbitalAnimation isPlaying={isPlaying} />
             </div>
             
              <div className="relative z-10 flex h-full portrait:flex-col portrait:p-2 md:p-6 lg:p-8 landscape:flex-row landscape:p-1 landscape:gap-1">
@@ -434,12 +419,9 @@ export default function Home() {
                             patterns={beatPatterns}
                             activePattern={activePattern}
                             onPatternChange={handlePatternChange}
-                            tempos={tempos}
-                            activeTempo={activeTempo}
-                            onTempoChange={handleTempoChange}
                             volumes={volumes}
                             onMixerChange={handleMixerChange}
-                            onChannelVolumeChange={(newChannelVolumes) => handleChannelVolumeChange('drums', newChannelVolumes)}
+                            onChannelVolumeChange={(channel, newVolumes) => handleChannelVolumeChange(channel, newVolumes)}
                             onCompressorChange={handleCompressorChange}
                             isMobile={isMobile}
                         />
@@ -451,12 +433,9 @@ export default function Home() {
                         patterns={beatPatterns}
                         activePattern={activePattern}
                         onPatternChange={handlePatternChange}
-                        tempos={tempos}
-                        activeTempo={activeTempo}
-                        onTempoChange={handleTempoChange}
                         volumes={volumes}
                         onMixerChange={handleMixerChange}
-                        onChannelVolumeChange={(newChannelVolumes) => handleChannelVolumeChange('drums', newChannelVolumes)}
+                        onChannelVolumeChange={(channel, newVolumes) => handleChannelVolumeChange(channel, newVolumes)}
                         onCompressorChange={handleCompressorChange}
                         isMobile={isMobile}
                         isLandscape={true}
@@ -466,7 +445,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
-
-    
