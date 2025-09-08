@@ -11,6 +11,7 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
             filter: { Q: 1.0, frequency: 700, type: 'lowpass', gain: 0 },
             portamento: 0.03,
             layers: [
+                { type: 'triangle', freqMult: 1, level: 1.0, detune: 0 },
                 { type: 'sawtooth', freqMult: 0.5, level: 0.3, detune: 2 },
                 { type: 'sine', freqMult: 2, level: 0.5, detune: -2 },
             ],
@@ -21,17 +22,18 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
         id: "organ",
         name: "Орган",
         params: {
-            oscillator: { type: 'sine' }, // Fundamental 8'
-            envelope: { attack: 0.2, decay: 0.1, sustain: 0.9, release: 3.5 },
-            filter: { Q: 3.5, frequency: 1800, type: 'peaking', gain: 5 },
-            vibrato: { frequency: 5, depth: 3 },
+            oscillator: { type: 'sine' },
+            envelope: { attack: 0.1, decay: 0.2, sustain: 0.8, release: 2.5 },
+            filter: { Q: 4, frequency: 1500, type: 'peaking', gain: 6 },
+            vibrato: { frequency: 5.5, depth: 2 },
             portamento: 0,
             layers: [
-                { type: 'sine', freqMult: 0.5, level: 0.7, detune: -2 },  // Sub Octave (16')
-                { type: 'sine', freqMult: 2, level: 0.6, detune: 2 },     // Octave (4')
-                { type: 'triangle', freqMult: 3, level: 0.4, detune: -3 }, // Fifth (2 2/3')
-                { type: 'sine', freqMult: 4.0, level: 0.3, detune: 3 },    // Super Octave (2')
-                { type: 'triangle', freqMult: 6.0, level: 0.2, detune: -4}, // Twelfth (1 1/3')
+                { type: 'sine', freqMult: 1, level: 1.0, detune: 0 },      // 8'
+                { type: 'sine', freqMult: 0.5, level: 0.8, detune: -2 }, // 16'
+                { type: 'sine', freqMult: 2, level: 0.7, detune: 2 },     // 4'
+                { type: 'triangle', freqMult: 1.5, level: 0.5, detune: -3 }, // Quint
+                { type: 'sine', freqMult: 4.0, level: 0.4, detune: 3 },    // 2'
+                { type: 'triangle', freqMult: 6.0, level: 0.2, detune: -4}, // Larigot
             ],
         }
     },
@@ -61,6 +63,7 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
             vibrato: { frequency: 6, depth: 5 },
             portamento: 0.1,
             layers: [
+                { type: 'sine', freqMult: 1, level: 1.0, detune: 0 },
                 { type: 'sine', freqMult: 1, level: 0.8, detune: 4 },
             ]
         }

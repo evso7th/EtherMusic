@@ -1,3 +1,4 @@
+
 // A class representing a single oscillator with its own phase.
 class Oscillator {
     constructor(type, sampleRate) {
@@ -55,26 +56,30 @@ class Voice {
 
     initLayers(preset) {
         const createLayer = (layerConfig, baseFrequency) => {
-            const freq = baseFrequency * (layerConfig.freqMult || 1) * Math.pow(2, (layerConfig.detune || 0) / 1200);
+            // Use frequency from layer if available, otherwise calculate from base
+            const freq = layerConfig.freqMult !== undefined 
+                ? baseFrequency * layerConfig.freqMult * Math.pow(2, (layerConfig.detune || 0) / 1200)
+                : baseFrequency;
+
             return {
                 osc: new Oscillator(layerConfig.type || 'sine', this.sampleRate),
-                level: layerConfig.level || 1.0,
+                level: layerConfig.level ?? 1.0,
                 baseFreq: freq,
                 currentFreq: freq,
             };
         };
 
-        // Main oscillator as the first layer
-        this.layers.push(createLayer({
-            type: preset.oscillator?.type || 'sine',
-            level: 1.0,
-            freqMult: 1,
-            detune: 0,
-        }, this.baseFrequency));
-
-        // Additional layers
-        if (preset.layers) {
-            preset.layers.forEach(layer => this.layers.push(createLayer(layer, this.baseFrequency)));
+        // Main oscillator as the first layer, only if no layers are defined or to add it to the stack
+        if (!preset.layers || preset.layers.length === 0) {
+            this.layers.push(createLayer({
+                type: preset.oscillator?.type || 'sine',
+                level: 1.0,
+                freqMult: 1,
+                detune: preset.oscillator?.detune || 0,
+            }, this.baseFrequency));
+        } else {
+             // If layers are defined, they completely define the sound.
+             preset.layers.forEach(layer => this.layers.push(createLayer(layer, this.baseFrequency)));
         }
     }
 

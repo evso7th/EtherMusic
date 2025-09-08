@@ -6,7 +6,6 @@ export type MusicScale = 'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentato
 
 export type Instrument = 'synth' | 'organ' | 'theremin' | 'mellotron';
 export type BassInstrument = 'classicBass' | 'glideBass' | 'ambientDrone' | 'resonantGliss' | 'hypnoticDrone' | 'livingRiff';
-export type AutopilotStyle = 'Ambient' | 'Sequence' | 'Water' | 'Air' | 'Toccata' | 'Promenade' | 'Space';
 
 
 // These presets are sent to the AudioWorklet, so they must contain only serializable data.
@@ -29,12 +28,12 @@ export interface BaseInstrumentParams {
         frequency: number;
         gain: number;
         type: BiquadFilterType;
-    };
+    } | null;
     portamento?: number;
     vibrato?: {
         frequency: number;
         depth: number;
-    };
+    } | null;
     layers?: {
         type: OscillatorType;
         freqMult: number; // Frequency multiplier relative to base
@@ -93,28 +92,31 @@ export interface Volumes {
   drums: ChannelVolumes;
   reverbReturn: number; // in dB
   compressor: CompressorSettings;
-  autopilotMelody?: ChannelVolumes;
-  autopilotAccompaniment?: ChannelVolumes;
-  autopilotBass?: ChannelVolumes;
 }
 
-export interface AutopilotSettings {
-    enabled: boolean;
-    style: AutopilotStyle;
-    density: number; // 0 to 1
-    key: MusicKey;
-    scale: MusicScale;
-    instruments: {
-        melody: Instrument;
-        accompaniment: Instrument;
-        bass: BassInstrument;
-    }
+export interface SynthNote {
+    id: number;
+    frequency: number;
+    volume: number;
+    duration?: number;
+    time?: number;
 }
 
-export interface AutopilotPreset {
-    instruments: AutopilotSettings['instruments'];
-    volumes: Volumes;
-}
+
+export type WorkerMessage = 
+    | { type: 'noteOn', note: SynthNote }
+    | { type: 'noteOff', id: number }
+    | { type: 'noteUpdate', note: SynthNote }
+    | { type: 'allNotesOff' }
+    | { type: 'setPreset', preset: InstrumentPresetParams | BassInstrumentPresetParams };
+
+export type DrumWorkerMessage =
+    | { type: 'start', bpm: number, startTime: number }
+    | { type: 'stop' }
+    | { type: 'setBpm', bpm: number }
+    | { type: 'setPattern', pattern: string };
+
+export type EnvelopeCurve = "linear" | "exponential";
 
 
 export interface Note {
@@ -124,36 +126,3 @@ export interface Note {
     duration?: number; // for autopilot and scheduled notes
     time?: number; // for autopilot and scheduled notes
 }
-
-export type WorkerMessage = 
-    | { type: 'noteOn', note: Note, preset?: InstrumentPresetParams | BassInstrumentPresetParams }
-    | { type: 'noteOff', id: number }
-    | { type: 'noteUpdate', note: Note }
-    | { type: 'allNotesOff' }
-    | { type: 'setPreset', preset: InstrumentPresetParams | BassInstrumentPresetParams }
-    | { type: 'start', bpm: number, startTime: number }
-    | { type: 'stop' }
-    | { type: 'setBpm', bpm: number }
-    | { type: 'setPattern', pattern: string };
-
-export type EnvelopeCurve = "linear" | "exponential";
-
-export type AutopilotWorkerMessage = 
-    | { type: 'start' }
-    | { type: 'stop' }
-    | { type: 'updateSettings', settings: Partial<AutopilotSettings> }
-    | { type: 'setBpm', bpm: number }
-    | { type: 'tick', time: number, beatNumber: number };
-
-export type AutopilotScore = {
-    melody: (Note & { x: number, y: number })[];
-    accompaniment: Note[];
-    bass: Note[];
-    sparkle: (Note & { x: number, y: number })[];
-};
-
-export type AutopilotWorkerResponse = {
-    type: 'score';
-    score: AutopilotScore;
-    time: number; // The audio context time for scheduling
-};
