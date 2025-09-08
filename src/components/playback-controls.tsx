@@ -29,18 +29,17 @@ interface PlaybackControlsProps {
     isReady: boolean;
 }
 
-const ControlButton = ({ tooltip, children, isMobile, ...props }: { tooltip: string, children: React.ReactNode, isMobile: boolean } & React.ComponentProps<typeof Button>) => {
+const ControlButton = ({ tooltipText, children, isMobile, ...props }: { tooltipText: string, children: React.ReactNode, isMobile: boolean } & React.ComponentProps<typeof Button>) => {
     if (isMobile) {
         return <Button {...props}>{children}</Button>;
     }
-    const { tooltip: _, ...buttonProps } = props as any; // remove tooltip from props
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <Button {...buttonProps}>{children}</Button>
+                <Button {...props}>{children}</Button>
             </TooltipTrigger>
             <TooltipContent>
-                <p>{tooltip}</p>
+                <p>{tooltipText}</p>
             </TooltipContent>
         </Tooltip>
     );
@@ -74,7 +73,7 @@ export function PlaybackControls({
     return (
         <TooltipProvider>
              <ControlButton
-                tooltip={isPlaying ? "Pause" : "Play"}
+                tooltipText={isPlaying ? "Pause" : "Play"}
                 onClick={isPlaying ? onPause : onPlay} 
                 size="icon" 
                 variant="outline" 
@@ -85,11 +84,11 @@ export function PlaybackControls({
              >
                 {isPlaying ? <Pause className="w-5 h-5 md:w-6 md:h-6" /> : <Play className="w-5 h-5 md:w-6 md:h-6" />}
             </ControlButton>
-             <ControlButton tooltip="Stop" onClick={onStop} size="icon" variant="outline" className="w-10 h-10 rounded-full" aria-label="Stop" disabled={!isReady} isMobile={isMobile}>
+             <ControlButton tooltipText="Stop" onClick={onStop} size="icon" variant="outline" className="w-10 h-10 rounded-full" aria-label="Stop" disabled={!isReady} isMobile={isMobile}>
                 <StopCircle className="w-5 h-5 md:w-6 md:h-6" />
             </ControlButton>
             <ControlButton
-                tooltip="Record"
+                tooltipText="Record"
                 onClick={onRecord} 
                 variant={isRecording ? 'destructive' : 'outline'} 
                 size="icon" 

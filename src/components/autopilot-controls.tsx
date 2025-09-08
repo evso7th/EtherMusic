@@ -41,10 +41,11 @@ interface AutopilotControlsProps {
 }
 
 const ControlButtonWithTooltip = memo(function ControlButtonWithTooltip({ tooltipText, children, ...props }: React.ComponentProps<typeof Button> & { tooltipText: string, children: React.ReactNode }) {
+    const { ...buttonProps } = props;
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <Button {...props}>{children}</Button>
+                <Button {...buttonProps}>{children}</Button>
             </TooltipTrigger>
             <TooltipContent>
                 <p>{tooltipText}</p>
@@ -310,7 +311,7 @@ export function AutopilotControls({
 
     const buttonSize = isMobile ? 'sm' : 'default';
 
-    const ControlButton = ({ tooltipText, ...props }: React.ComponentProps<typeof Button> & { tooltipText: string }) => {
+    const ControlButton = ({ tooltipText, ...props }: Omit<React.ComponentProps<typeof Button>, 'tooltipText'> & { tooltipText: string }) => {
         if (isMobile) {
             return <Button {...props} />;
         }

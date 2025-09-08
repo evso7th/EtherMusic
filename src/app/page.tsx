@@ -327,7 +327,6 @@ export default function Home() {
     }, [setVolumes, cookieConsent]);
 
     const handleAutopilotSettingsChange = useCallback((newSettings: Partial<AutopilotSettings>) => {
-        console.log('[1. UI] page.tsx: handleAutopilotSettingsChange. Settings changed:', newSettings);
         const updatedSettings = { ...autopilotSettings, ...newSettings };
         setAutopilotSettingsState(updatedSettings);
         setAutopilotSettings(updatedSettings);
@@ -382,15 +381,11 @@ export default function Home() {
     }, [setBassLatch]);
     
     const handleMelodyInstrumentChange = useCallback((instrumentId: Instrument) => {
-        const preset = melodyInstruments.find(p => p.id === instrumentId);
-        console.log('[1. UI] page.tsx: handleMelodyInstrumentChange. Preset selected:', preset);
         setActiveMelodyInstrument(instrumentId);
         setMelodyInstrument(instrumentId);
     }, [setMelodyInstrument]);
 
     const handleBassInstrumentChange = useCallback((instrumentId: BassInstrument) => {
-        const preset = bassInstruments.find(p => p.id === instrumentId);
-        console.log('[1. UI] page.tsx: handleBassInstrumentChange. Preset selected:', preset);
         setActiveBassInstrument(instrumentId);
         setBassInstrument(instrumentId);
     }, [setBassInstrument]);
@@ -401,7 +396,6 @@ export default function Home() {
     }, [handleAutopilotSettingsChange, updateVolumes, volumes]);
 
     const handleThereminInteractionCallback = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
-        console.log(`[1. UI] page.tsx: handleThereminInteraction. Type: ${type}, State: ${state}`, data);
         handleThereminInteraction(type, data, state);
     }, [handleThereminInteraction]);
 
@@ -559,7 +553,7 @@ export default function Home() {
                         setTempo={handleTempoChange}
                         autopilotSettings={autopilotSettings}
                         onAutopilotSettingsChange={handleAutopilotSettingsChange}
-                        onAutopilotPresetLoad={onAutopilotPresetLoad}
+                        onAutopilotPresetLoad={handleAutopilotPresetLoad}
                     />
                 </div>
             </div>
