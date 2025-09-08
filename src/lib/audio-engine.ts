@@ -7,12 +7,28 @@ import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
 import { bassInstruments } from './bass-presets';
 
+
 type PartName = 'melody' | 'manualBass' | 'latch' | 'drums';
 
 function dbToGain(db: number): number {
     if (db <= -48) return 0;
     return Math.pow(10, db / 20);
 }
+
+function createDistortionCurve(amount: number): Float32Array {
+    const k = typeof amount === 'number' ? amount : 50;
+    const n_samples = 44100;
+    const curve = new Float32Array(n_samples);
+    const deg = Math.PI / 180;
+    let i = 0;
+    let x;
+    for ( ; i < n_samples; ++i ) {
+        x = i * 2 / n_samples - 1;
+        curve[i] = ( 3 + k ) * x * 20 * deg / ( Math.PI + k * Math.abs(x) );
+    }
+    return curve;
+}
+
 
 export class AudioEngine {
     public isInitialized = false;
@@ -24,17 +40,19 @@ export class AudioEngine {
     private masterOut: GainNode;
     private preCompressorOut: GainNode;
     private compressor: DynamicsCompressorNode;
+    private reverb: ReverbNode;
+    private reverbReturnGain: GainNode;
+
     private nodes = new Map<PartName, { 
         worklet: AudioWorkletNode, 
-        gain: GainNode, 
+        gain: GainNode,
+        distortion: WaveShaperNode,
         reverbSend: GainNode,
-        distortionNode: AudioWorkletNode,
     }>();
-    private reverbReturn: GainNode;
-
+    
     private volumes: Volumes = { 
         melody: { gain: 0, reverbSend: -24, distortion: 0 },
-        manualBass: { gain: 0, reverbSend: -48, distortion: 0 },
+        manualBass: { gain: -3, reverbSend: -48, distortion: 0 },
         latch: { gain: -9, reverbSend: -48, distortion: 0 },
         drums: { gain: -9, reverbSend: -48, distortion: 0 },
         reverbReturn: -12,
@@ -68,8 +86,11 @@ export class AudioEngine {
         this.preCompressorOut.connect(this.compressor);
         this.compressor.connect(this.masterOut);
 
-        this.reverbReturn = this.context.createGain();
-        this.reverbReturn.connect(this.preCompressorOut);
+        // Reverb setup
+        this.reverb = this.context.createConvolver();
+        this.reverbReturnGain = this.context.createGain();
+        this.reverb.connect(this.reverbReturnGain);
+        this.reverbReturnGain.connect(this.preCompressorOut); // Reverb returns to pre-compressor bus
     }
     
     getContext() {
@@ -90,7 +111,6 @@ export class AudioEngine {
         if (this.context.state === 'suspended') {
             await this.context.resume();
         }
-        console.log("AudioContext is active.");
         
         const mediaStreamDest = this.context.createMediaStreamDestination();
         this.masterOut.connect(mediaStreamDest);
@@ -120,37 +140,47 @@ export class AudioEngine {
              await this.context.audioWorklet.addModule('/worklets/theremin-processor.js');
              await this.context.audioWorklet.addModule('/worklets/latch-processor.js');
              await this.context.audioWorklet.addModule('/worklets/drum-processor.js');
-             await this.context.audioWorklet.addModule('/worklets/reverb-processor.js');
-             await this.context.audioWorklet.addModule('/worklets/distortion-processor.js');
              console.log('AudioWorklet modules loaded.');
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
             throw new Error("Could not load core audio components. Please try refreshing the page.");
         }
         
-        const reverbBus = new AudioWorkletNode(this.context, 'reverb-processor');
-        reverbBus.connect(this.reverbReturn);
-        
-        this.createWorkletNode('melody', 'theremin-processor', 4, reverbBus);
-        this.createWorkletNode('manualBass', 'theremin-processor', 4, reverbBus);
-        this.createWorkletNode('latch', 'latch-processor', 4, reverbBus);
-        this.createWorkletNode('drums', 'drum-processor', 8, reverbBus);
+        await this.loadReverbImpulse();
+
+        this.createWorkletNode('melody', 'theremin-processor', 4);
+        this.createWorkletNode('manualBass', 'theremin-processor', 4);
+        this.createWorkletNode('latch', 'latch-processor', 4);
+        this.createWorkletNode('drums', 'drum-processor', 8);
 
         this.setVolumes(this.volumes);
         
         this.isInitialized = true;
-        console.log('AudioEngine initialized and ready.');
     }
     
-    private createWorkletNode(part: PartName, processorName: string, polyphony: number, reverbBus: AudioWorkletNode) {
+    private async loadReverbImpulse() {
+        try {
+            const response = await fetch('/assets/impulse/reverb.wav');
+            const arrayBuffer = await response.arrayBuffer();
+            const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+            this.reverb.buffer = audioBuffer;
+            console.log('Reverb impulse loaded.');
+        } catch (e) {
+            console.error('Failed to load reverb impulse response:', e);
+        }
+    }
+    
+    private createWorkletNode(part: PartName, processorName: string, polyphony: number) {
         if (!this.context) return;
     
         const gainNode = this.context.createGain();
 
-        const distortionNode = new AudioWorkletNode(this.context, 'distortion-processor');
+        const distortionNode = this.context.createWaveShaper();
+        distortionNode.curve = createDistortionCurve(0);
+        distortionNode.oversample = '4x';
         
         const reverbSendNode = this.context.createGain();
-        reverbSendNode.connect(reverbBus);
+        reverbSendNode.connect(this.reverb);
     
         const workletNode = new AudioWorkletNode(this.context, processorName, {
             processorOptions: { sampleRate: this.context.sampleRate, polyphony },
@@ -165,10 +195,9 @@ export class AudioEngine {
         this.nodes.set(part, {
             worklet: workletNode,
             gain: gainNode,
+            distortion: distortionNode,
             reverbSend: reverbSendNode,
-            distortionNode: distortionNode,
         });
-        console.log(`Created worklet node for: ${part}`);
     }
     
     private tick() {
@@ -287,12 +316,10 @@ export class AudioEngine {
     }
 
     public setMelodyInstrument(instrumentName: Instrument) {
-        console.log(`[TRACING] audio-engine.ts: setMelodyInstrument called with: ${instrumentName}`);
         const preset = melodyInstruments.find(p => p.id === instrumentName);
         if (preset && this.nodes.has('melody')) {
             const worklet = this.nodes.get('melody')?.worklet;
             if(worklet) {
-                console.log(`[TRACING] audio-engine.ts: Sending preset to melody worklet:`, preset.params);
                 worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
             }
         }
@@ -304,11 +331,9 @@ export class AudioEngine {
             const manualBassNode = this.nodes.get('manualBass');
             const latchNode = this.nodes.get('latch');
             if (manualBassNode) {
-                 console.log(`[TRACING] audio-engine.ts: Sending preset to manualBass worklet:`, preset.params);
                 manualBassNode.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
             }
             if (latchNode) {
-                console.log(`[TRACING] audio-engine.ts: Sending preset to latch worklet:`, preset.params);
                 latchNode.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
             }
         }
@@ -349,30 +374,17 @@ export class AudioEngine {
                     }
                 }
             } else if (part === 'reverbReturn') {
-                 if (this.reverbReturn) {
-                    this.reverbReturn.gain.linearRampToValueAtTime(dbToGain(this.volumes.reverbReturn), rampTime);
-                }
+                 this.reverbReturnGain.gain.linearRampToValueAtTime(dbToGain(this.volumes.reverbReturn), 0.05);
             } else {
                  const nodeInfo = this.nodes.get(part);
                  const channelVols = this.volumes[part];
 
                  if (nodeInfo && channelVols) {
-                    if (channelVols.gain !== undefined) {
-                        const gainValue = dbToGain(channelVols.gain);
-                        nodeInfo.gain.gain.linearRampToValueAtTime(gainValue, rampTime);
-                    }
+                    nodeInfo.gain.gain.linearRampToValueAtTime(dbToGain(channelVols.gain), rampTime);
+                    nodeInfo.reverbSend.gain.linearRampToValueAtTime(dbToGain(channelVols.reverbSend), rampTime);
                     
-                    if (channelVols.reverbSend !== undefined) {
-                        const reverbSendValue = dbToGain(channelVols.reverbSend);
-                        nodeInfo.reverbSend.gain.linearRampToValueAtTime(reverbSendValue, rampTime);
-                    }
-                    
-                    const driveParam = nodeInfo.distortionNode.parameters.get('drive');
-                    if (driveParam) {
-                        const distortion = channelVols.distortion ?? 0;
-                        const driveValue = 1.0 + (distortion / 100) * 49;
-                        driveParam.linearRampToValueAtTime(driveValue, rampTime);
-                    }
+                    const distortionAmount = channelVols.distortion ?? 0;
+                    nodeInfo.distortion.curve = createDistortionCurve(distortionAmount * 0.7); // Scale to a reasonable range
                  }
             }
         });
@@ -392,7 +404,6 @@ export class AudioEngine {
         if (!this.mediaRecorder || this.mediaRecorder.state === 'recording') return;
         this.recordedChunks = [];
         this.mediaRecorder.start();
-        console.log("Recording started.");
     }
     
     public stopRecording() {
@@ -416,5 +427,3 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
-
-    

@@ -11,6 +11,7 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
             filter: { Q: 1.0, frequency: 700, type: 'lowpass' },
             portamento: 0.03,
             distortion: 0,
+            reverbSend: -18,
         }
     },
     {
@@ -18,7 +19,7 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
         name: "Organ",
         params: {
             oscillator: { type: 'sine' },
-            envelope: { attack: 0.02, decay: 0.1, sustain: 0.9, release: 1.0 },
+            envelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 1.0 },
             filter: { Q: 0.7, frequency: 1200, type: 'lowpass' },
             portamento: 0,
             distortion: 2,
@@ -26,12 +27,12 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
             layers: [
                 {
                     oscillator: { type: 'sine', detune: 1200 }, // 1st Octave
-                    envelope: { attack: 0.03, decay: 0.1, sustain: 0.9, release: 1.0 },
+                    envelope: { attack: 0.02, decay: 0.1, sustain: 0.9, release: 1.0 },
                     gain: 0.75,
                 },
                 {
-                    oscillator: { type: 'sine', detune: 700 }, // Perfect 5th
-                    envelope: { attack: 0.04, decay: 0.1, sustain: 0.9, release: 1.0 },
+                    oscillator: { type: 'sine', detune: 2400 }, // 2nd Octave
+                    envelope: { attack: 0.03, decay: 0.1, sustain: 0.9, release: 1.0 },
                     gain: 0.5, 
                 }
             ],
@@ -64,7 +65,3 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
 ];
 
 export const defaultMelodyInstrument: Instrument = 'synth';
-
-    
-
-    

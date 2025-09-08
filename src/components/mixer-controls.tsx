@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Waves, Drum, Anchor, Blend, AudioLines, Music } from 'lucide-react';
 import { useState, useCallback, useEffect } from 'react';
-import type { Volumes, CompressorSettings, ChannelVolumes } from '@/types';
+import type { Volumes, CompressorSettings } from '@/types';
 import { cn } from "@/lib/utils";
 
 const VolumeControl = ({
@@ -78,7 +78,7 @@ export function MixerControls({
     };
     
     const handleVolumeCommit = (part: VolumeChannel, gain: number) => {
-        onMixerChange({ [part]: { ...localVolumes[part], gain } });
+        onMixerChange({ [part]: { ...localVolumes[part], gain: gain } });
     };
 
     const handleReverbReturnChange = (value: number) => {
@@ -141,6 +141,10 @@ export function MixerControls({
                     volume={localVolumes.reverbReturn}
                     onVolumeChange={handleReverbReturnChange}
                     onVolumeCommit={handleReverbReturnCommit}
+                    min={-48}
+                    max={6}
+                    step={1}
+                    unit="dB"
                  />
             </div>
 
@@ -186,3 +190,5 @@ export function MixerControls({
         </div>
     );
 }
+
+    

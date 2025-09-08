@@ -26,14 +26,14 @@ export interface InstrumentPresetParams {
         type: BiquadFilterType;
     };
     portamento?: number;
-    distortion?: number;
-    reverbSend?: number;
+    distortion: number; // in percent (0-100)
+    reverbSend: number; // in dB (-48 to 6)
     layers?: {
         oscillator: { type: OscillatorType; detune?: number; };
         envelope: { attack: number; decay: number, sustain: number, release: number; };
         gain?: number; // Gain for this layer
     }[];
-    stagger?: number;
+    stagger?: number; // Delay between layer note ons
 }
 
 
@@ -90,7 +90,7 @@ export interface Volumes {
   manualBass: ChannelVolumes;
   latch: ChannelVolumes;
   drums: ChannelVolumes;
-  reverbReturn: number;
+  reverbReturn: number; // in dB
   compressor: CompressorSettings;
 }
 
@@ -101,4 +101,3 @@ export interface Note {
     volume: number;
 }
 
-    

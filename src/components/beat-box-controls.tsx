@@ -84,16 +84,6 @@ export function BeatBoxControls({
             </Tooltip>
         );
     }, [isMobile]);
-    
-    const handleMixerOpenChange = (open: boolean) => {
-        console.log(`[TRACING] Mixer dialog state changed. Is open: ${open}`);
-        setIsMixerOpen(open);
-    };
-
-    const handleMixerTriggerClick = () => {
-        console.log('[TRACING] Mixer button clicked');
-        setIsMixerOpen(true);
-    };
 
     if (isLandscape) {
         return (
@@ -160,13 +150,11 @@ export function BeatBoxControls({
                         </DialogContent>
                     </Dialog>
 
-                    <Dialog open={isMixerOpen} onOpenChange={handleMixerOpenChange}>
+                    <Dialog open={isMixerOpen} onOpenChange={setIsMixerOpen}>
                         <DialogTrigger asChild>
-                            <div onClick={handleMixerTriggerClick}>
-                                <ControlButtonWithTooltip tooltipText="Mixer" variant="outline" size="icon" className="w-10 h-10 rounded-full">
-                                    <SlidersHorizontal className="w-5 h-5"/>
-                                </ControlButtonWithTooltip>
-                            </div>
+                            <ControlButtonWithTooltip tooltipText="Mixer" variant="outline" size="icon" className="w-10 h-10 rounded-full">
+                                <SlidersHorizontal className="w-5 h-5"/>
+                            </ControlButtonWithTooltip>
                         </DialogTrigger>
                         <DialogContent>
                             <DialogHeader>
@@ -256,14 +244,12 @@ export function BeatBoxControls({
                         </DialogContent>
                     </Dialog>
 
-                    <Dialog open={isMixerOpen} onOpenChange={handleMixerOpenChange}>
+                    <Dialog open={isMixerOpen} onOpenChange={setIsMixerOpen}>
                          <DialogTrigger asChild>
-                            <div onClick={handleMixerTriggerClick}>
-                                <ControlButtonWrapper tooltipText="Mixer" variant="outline" className="flex-1 px-2 md:px-4" size={buttonSize}>
-                                    <SlidersHorizontal className="w-4 h-4 md:mr-2"/>
-                                    <span className="hidden sm:inline">Mixer</span>
-                                </ControlButtonWrapper>
-                            </div>
+                            <ControlButtonWrapper tooltipText="Mixer" variant="outline" className="flex-1 px-2 md:px-4" size={buttonSize}>
+                                <SlidersHorizontal className="w-4 h-4 md:mr-2"/>
+                                <span className="hidden sm:inline">Mixer</span>
+                            </ControlButtonWrapper>
                         </DialogTrigger>
                         <DialogContent>
                             <DialogHeader>
@@ -287,5 +273,3 @@ export function BeatBoxControls({
         </TooltipProvider>
     );
 }
-
-    

@@ -72,7 +72,6 @@ function loadSettings() {
         
         // Basic validation
         if (!volumes.melody || typeof volumes.melody.gain !== 'number' || !volumes.compressor) {
-             console.log("Loading default volumes due to invalid structure in cookie.");
             return { volumes: defaultVolumes }; 
         }
 
@@ -144,7 +143,6 @@ export default function Home() {
     useEffect(() => {
         if (cookieConsent) {
             const loaded = loadSettings();
-            console.log("Loaded settings from cookie:", loaded.volumes);
             setVolumesState(loaded.volumes);
         } else {
             setVolumesState(defaultVolumes);
@@ -159,8 +157,6 @@ export default function Home() {
         play,
         pause,
         stop,
-        setTempo,
-        setVolumes,
         setBeatPattern,
         setBassLatch,
         startRecording,
@@ -170,6 +166,7 @@ export default function Home() {
         setMelodyInstrument,
         setBassInstrument,
         orbManager,
+        setVolumes,
     } = useAudioEngine();
     
     const [isRecording, setIsRecording] = useState(false);
@@ -198,10 +195,10 @@ export default function Home() {
         const currentKey = Object.keys(ALL_NOTES).includes(keyOrScale) ? keyOrScale as MusicKey : newKey;
         const currentScale = Object.keys(SCALES).includes(keyOrScale) ? keyOrScale as MusicScale : newScale;
     
-        const baseBassNote = 24; // C1
+        const baseBassNote = 24; // C1 -> C2-C3 range
         const bassFreqs = getScaleFrequencies(baseBassNote, SCALES[currentScale], [1, 2]);
 
-        const baseMelodyNote = 48; // C3
+        const baseMelodyNote = 48; // C3 -> C3-C4 range
         const melodyFreqs = getScaleFrequencies(baseMelodyNote, SCALES[currentScale], [0, 1]);
     
         setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
@@ -220,7 +217,7 @@ export default function Home() {
         }
     }, [setVolumes, cookieConsent]);
     
-    const handleChannelVolumeChange = useCallback((channel: keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'drums'>, newVolumes: Partial<ChannelVolumes>) => {
+    const handleChannelVolumeChange = useCallback((channel: keyof Omit<Volumes, 'compressor' | 'reverbReturn'>, newVolumes: Partial<ChannelVolumes>) => {
         setVolumesState(prevVolumes => {
             const updatedChannel = { ...prevVolumes[channel], ...newVolumes };
             const finalVolumes = {
@@ -292,33 +289,33 @@ export default function Home() {
     }, [setBassLatch]);
     
     const handleMelodyInstrumentChange = useCallback((instrumentName: Instrument) => {
-        console.log(`[TRACING] page.tsx: handleMelodyInstrumentChange called with: ${instrumentName}`);
         const preset = melodyInstruments.find(p => p.id === instrumentName);
-        console.log(`[TRACING] page.tsx: Found preset:`, preset);
         if(preset) {
             setActiveMelodyInstrument(instrumentName);
             setMelodyInstrument(instrumentName);
-            const newChannelVolumes: Partial<ChannelVolumes> = { 
+            const newChannelVolumes: ChannelVolumes = { 
+                gain: volumes.melody.gain, // Keep current gain
                 reverbSend: preset.params.reverbSend,
-                distortion: preset.params.distortion 
+                distortion: preset.params.distortion,
             };
             handleChannelVolumeChange('melody', newChannelVolumes);
         }
-    }, [setMelodyInstrument, handleChannelVolumeChange]);
+    }, [setMelodyInstrument, handleChannelVolumeChange, volumes.melody.gain]);
 
     const handleBassInstrumentChange = useCallback((instrumentName: BassInstrument) => {
         const preset = bassInstruments.find(p => p.id === instrumentName);
         if(preset) {
             setActiveBassInstrument(instrumentName);
             setBassInstrument(instrumentName);
-            const newChannelVolumes: Partial<ChannelVolumes> = { 
+            const newChannelVolumes: ChannelVolumes = { 
+                gain: volumes.manualBass.gain, // Keep current gain
                 reverbSend: preset.params.reverbSend,
                 distortion: preset.params.distortion 
             };
             handleChannelVolumeChange('manualBass', newChannelVolumes);
-            handleChannelVolumeChange('latch', newChannelVolumes);
+            handleChannelVolumeChange('latch', { ...newChannelVolumes, gain: volumes.latch.gain });
         }
-    }, [setBassInstrument, handleChannelVolumeChange]);
+    }, [setBassInstrument, handleChannelVolumeChange, volumes.manualBass.gain, volumes.latch.gain]);
     
     if (!isClient) {
         return <Preloader />;
@@ -419,7 +416,7 @@ export default function Home() {
                             onInstrumentChange={handleBassInstrumentChange}
                             orbManager={orbManager}
                             channelVolumes={volumes.manualBass}
-                            onChannelVolumeChange={(channel, newVolumes) => handleChannelVolumeChange(channel as any, newVolumes)}
+                            onChannelVolumeChange={handleChannelVolumeChange}
                         />
                         <MemoizedThereminPad
                             type="melody"
@@ -439,7 +436,7 @@ export default function Home() {
                             isPolyphonic
                             orbManager={orbManager}
                             channelVolumes={volumes.melody}
-                             onChannelVolumeChange={(channel, newVolumes) => handleChannelVolumeChange(channel as any, newVolumes)}
+                            onChannelVolumeChange={handleChannelVolumeChange}
                         />
                     </div>
                     <div className="flex-shrink-0 portrait:block landscape:hidden">
@@ -471,5 +468,3 @@ export default function Home() {
         </div>
     );
 }
-
-    

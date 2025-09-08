@@ -39,7 +39,7 @@ interface ThereminPadProps {
     onLatchToggle?: (checked: boolean) => void;
     orbManager?: OrbManager | null;
     channelVolumes: ChannelVolumes;
-    onChannelVolumeChange: (channel: 'melody' | 'manualBass' | 'latch', newVolumes: Partial<Omit<ChannelVolumes, 'gain'>>) => void;
+    onChannelVolumeChange: (channel: 'melody' | 'manualBass' | 'latch', newVolumes: Partial<ChannelVolumes>) => void;
 }
 
 const padTitles = {
@@ -120,8 +120,8 @@ export function ThereminPad({
         setLocalVolumes(channelVolumes);
     }, [channelVolumes]);
 
-    const handleChannelChange = useCallback((volumeType: keyof Omit<ChannelVolumes, 'gain'>, value: number) => {
-         const channelKey = type === 'bass' ? 'manualBass' : type; // Latch volume is separate
+    const handleChannelVolumeCommit = useCallback((volumeType: keyof Omit<ChannelVolumes, 'gain'>, value: number) => {
+         const channelKey = type === 'bass' ? 'manualBass' : 'melody'; // Latch volume is separate
          onChannelVolumeChange(channelKey, { [volumeType]: value });
          if (type === 'bass') {
              onChannelVolumeChange('latch', { [volumeType]: value });
@@ -133,16 +133,16 @@ export function ThereminPad({
     }, []);
 
     const handleReverbCommit = useCallback((value: number) => {
-        handleChannelChange('reverbSend', value);
-    }, [handleChannelChange]);
+        handleChannelVolumeCommit('reverbSend', value);
+    }, [handleChannelVolumeCommit]);
     
     const handleDistortionChange = useCallback((value: number) => {
         setLocalVolumes(prev => ({...prev, distortion: value}));
     }, []);
 
     const handleDistortionCommit = useCallback((value: number) => {
-        handleChannelChange('distortion', value);
-    }, [handleChannelChange]);
+        handleChannelVolumeCommit('distortion', value);
+    }, [handleChannelVolumeCommit]);
 
     // Manage orbs for latch mode
     useEffect(() => {
@@ -286,7 +286,7 @@ export function ThereminPad({
                             <Separator />
                             <div className="space-y-4">
                                 <EffectControl
-                                    label="Reverb Send"
+                                    label="Reverb"
                                     icon={Blend}
                                     level={localVolumes.reverbSend}
                                     onLevelChange={handleReverbChange}
@@ -332,21 +332,12 @@ export function ThereminPad({
             style={{ willChange: 'border-color, box-shadow' }}
         >
             <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between p-2">
-                <div className="text-xs text-muted-foreground capitalize pl-2">
+                 <div className="text-xs text-muted-foreground capitalize pl-2">
                    {type === 'bass' && onLatchToggle ? (
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <div className="flex items-center space-x-1 h-8 px-2 rounded-md hover:bg-accent/10">
-                                        <Switch id="latch-mode" checked={isLatchOn} onCheckedChange={onLatchToggle} />
-                                        <Label htmlFor="latch-mode" className="flex items-center gap-1 text-xs cursor-pointer"><Anchor className="w-3 h-3" /> Latch</Label>
-                                    </div>
-                                </TooltipTrigger>
-                                <TooltipContent hidden={isMobile}>
-                                    <p>Hold bass notes</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
+                        <div className="flex items-center space-x-1 h-8 px-2 rounded-md">
+                            <Switch id="latch-mode" checked={isLatchOn} onCheckedChange={onLatchToggle} />
+                            <Label htmlFor="latch-mode" className="flex items-center gap-1 text-xs cursor-pointer"><Anchor className="w-3 h-3" /> Latch</Label>
+                        </div>
                     ) : (
                         type === 'melody' ? 'Theremin' : 'Bass Synth'
                     )}
@@ -384,5 +375,3 @@ export function ThereminPad({
         </Card>
     );
 }
-
-    
