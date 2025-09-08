@@ -39,12 +39,12 @@ interface ThereminPadProps {
     onLatchToggle?: (checked: boolean) => void;
     orbManager?: OrbManager | null;
     channelVolumes: ChannelVolumes;
-    onChannelVolumeChange: (channel: 'melody' | 'manualBass' | 'latch' | 'drums', newVolumes: Partial<ChannelVolumes>) => void;
+    onChannelVolumeChange: (channel: 'melody' | 'manualBass' | 'latch', newVolumes: Partial<ChannelVolumes>) => void;
 }
 
 const padTitles = {
-    melody: "Melody Pad",
-    bass: "Bass Pad"
+    melody: "Melody Theremin",
+    bass: "Bass Theremin"
 }
 
 const EffectControl = ({
@@ -72,14 +72,14 @@ const EffectControl = ({
         <div className="flex items-center gap-2">
             <Icon className="w-5 h-5 text-accent flex-shrink-0" />
             <Label className="text-sm font-medium flex-1 truncate">{label}</Label>
-            <span className="text-xs text-muted-foreground w-12 text-right">{level.toFixed(0)}{unit}</span>
+            <span className="text-xs text-muted-foreground w-12 text-right">{(level || 0).toFixed(0)}{unit}</span>
         </div>
         <div className="flex items-center gap-4 pl-7">
             <Slider
                 min={min}
                 max={max}
                 step={step}
-                value={[level]}
+                value={[level || 0]}
                 onValueChange={(v) => onLevelChange(v[0])}
                 onValueCommit={(v) => onLevelCommit(v[0])}
             />
@@ -120,8 +120,8 @@ export function ThereminPad({
         setLocalVolumes(channelVolumes);
     }, [channelVolumes]);
 
-    const handleChannelChange = (volumeType: keyof ChannelVolumes, value: number) => {
-         const channelKey = type === 'bass' ? 'manualBass' : type;
+    const handleChannelChange = (volumeType: keyof Omit<ChannelVolumes, 'gain'>, value: number) => {
+         const channelKey = type === 'bass' ? (isLatchOn ? 'latch' : 'manualBass') : type;
          onChannelVolumeChange(channelKey, { [volumeType]: value });
     };
     
@@ -287,7 +287,7 @@ export function ThereminPad({
                                 <EffectControl
                                     label="Reverb Send"
                                     icon={Blend}
-                                    level={localVolumes.reverbSend}
+                                    level={localVolumes.reverbSend ?? 0}
                                     onLevelChange={handleReverbChange}
                                     onLevelCommit={handleReverbCommit}
                                     min={-48} max={6} step={1} unit="dB"
@@ -295,7 +295,7 @@ export function ThereminPad({
                                 <EffectControl
                                     label="Distortion"
                                     icon={Waves}
-                                    level={localVolumes.distortion}
+                                    level={localVolumes.distortion ?? 0}
                                     onLevelChange={handleDistortionChange}
                                     onLevelCommit={handleDistortionCommit}
                                     min={0} max={100} step={1} unit="%"

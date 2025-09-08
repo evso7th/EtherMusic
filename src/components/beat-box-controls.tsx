@@ -14,7 +14,7 @@ import { Separator } from "./ui/separator";
 import { Switch } from "./ui/switch";
 import { ScrollArea } from "./ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
-import type { BeatPattern, Volumes, CompressorSettings } from '@/types';
+import type { BeatPattern, Volumes, CompressorSettings, ChannelVolumes } from '@/types';
 import { MixerControls } from "./mixer-controls";
 
 
@@ -248,9 +248,9 @@ export function BeatBoxControls({
                         </DialogContent>
                     </Dialog>
 
-                    <Dialog open={isMixerOpen} onOpenChange={handleMixerOpenChange}>
+                    <Dialog open={isMixerOpen} onOpenChange={setIsMixerOpen}>
                         <DialogTrigger asChild>
-                             <ControlButtonWrapper tooltipText="Mixer" variant="outline" className="flex-1 px-2 md:px-4" size={buttonSize}>
+                             <ControlButtonWrapper tooltipText="Mixer" variant="outline" className="flex-1 px-2 md:px-4" size={buttonSize} onClick={() => setIsMixerOpen(true)}>
                                 <SlidersHorizontal className="w-4 h-4 md:mr-2"/>
                                 <span className="hidden sm:inline">Mixer</span>
                             </ControlButtonWrapper>

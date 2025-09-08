@@ -220,7 +220,7 @@ export default function Home() {
         }
     }, [setVolumes, cookieConsent]);
     
-    const handleChannelVolumeChange = useCallback((channel: keyof Omit<Volumes, 'compressor' | 'reverbReturn'>, newVolumes: Partial<ChannelVolumes>) => {
+    const handleChannelVolumeChange = useCallback((channel: keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'drums'>, newVolumes: Partial<ChannelVolumes>) => {
         const newGlobalVolumes = {
             ...volumes,
             [channel]: { ...volumes[channel], ...newVolumes }
@@ -301,7 +301,7 @@ export default function Home() {
         if(preset) {
             setActiveBassInstrument(instrumentName);
             setBassInstrument(instrumentName);
-            const newChannelVolumes = { 
+            const newChannelVolumes: Partial<ChannelVolumes> = { 
                 reverbSend: preset.params.reverbSend,
                 distortion: preset.params.distortion 
             };
@@ -409,7 +409,7 @@ export default function Home() {
                             onInstrumentChange={handleBassInstrumentChange}
                             orbManager={orbManager}
                             channelVolumes={volumes.manualBass}
-                            onChannelVolumeChange={handleChannelVolumeChange}
+                            onChannelVolumeChange={(channel, newVolumes) => handleChannelVolumeChange(channel as any, newVolumes)}
                         />
                         <MemoizedThereminPad
                             type="melody"
@@ -429,7 +429,7 @@ export default function Home() {
                             isPolyphonic
                             orbManager={orbManager}
                             channelVolumes={volumes.melody}
-                            onChannelVolumeChange={handleChannelVolumeChange}
+                             onChannelVolumeChange={(channel, newVolumes) => handleChannelVolumeChange(channel as any, newVolumes)}
                         />
                     </div>
                     <div className="flex-shrink-0 portrait:block landscape:hidden">
