@@ -241,18 +241,16 @@ export function ThereminPad({
             style={{ willChange: 'border-color, box-shadow' }}
         >
             <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between p-2">
+                <div className="text-xs text-muted-foreground capitalize pl-2 h-8 flex items-center">
+                    {instrumentName}
+                </div>
                 <div className="flex items-center gap-2">
-                   {type === 'bass' && onLatchToggle ? (
+                    {type === 'bass' && onLatchToggle ? (
                         <div className="flex items-center space-x-1 h-8 px-2 rounded-md">
                              <Label htmlFor="latch-mode" className="flex items-center gap-1 text-xs cursor-pointer"><Anchor className="w-3 h-3" /> Latch</Label>
                             <Switch id="latch-mode" checked={isLatchOn} onCheckedChange={onLatchToggle} />
                         </div>
                     ) : null}
-                     <div className="text-xs text-muted-foreground capitalize pl-2 h-8 flex items-center">
-                        {instrumentName}
-                    </div>
-                </div>
-                <div className="flex items-center gap-2">
                      <TooltipProvider>
                         {renderSettingsControls()}
                     </TooltipProvider>
