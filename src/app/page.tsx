@@ -43,9 +43,9 @@ function setCookie(name: string, value: string, days: number) {
 }
 
 const defaultVolumes: Volumes = { 
-    melody: { gain: 0, reverbSend: -24, distortion: 0 },
-    manualBass: { gain: -3, reverbSend: -48, distortion: 0 },
-    latch: { gain: -9, reverbSend: -48, distortion: 0 },
+    melody: { gain: 0, reverbSend: -18, distortion: 0 },
+    manualBass: { gain: -3, reverbSend: -48, distortion: 5 },
+    latch: { gain: -9, reverbSend: -48, distortion: 5 },
     drums: { gain: -9, reverbSend: -48, distortion: 0 },
     reverbReturn: -12,
     compressor: {
@@ -70,12 +70,10 @@ function loadSettings() {
         const savedVolumes = getCookie("ethermusic_volumes");
         const volumes = savedVolumes ? JSON.parse(savedVolumes) : defaultVolumes;
         
-        // Basic validation
         if (!volumes.melody || typeof volumes.melody.gain !== 'number' || !volumes.compressor) {
             return { volumes: defaultVolumes }; 
         }
 
-        // Ensure all properties exist, merging with defaults
         const ensureChannelSettings = (channel: Partial<ChannelVolumes> | undefined, defaults: ChannelVolumes): ChannelVolumes => ({
             gain: channel?.gain ?? defaults.gain,
             reverbSend: channel?.reverbSend ?? defaults.reverbSend,
@@ -128,31 +126,26 @@ export default function Home() {
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [isClient, setIsClient] = useState(false);
-    const [cookieConsent, setCookieConsent] = useState(false);
+    const [cookieConsent, setCookieConsent] = useState<boolean | undefined>(undefined);
     
     const [volumes, setVolumesState] = useState<Volumes>(defaultVolumes);
 
     useEffect(() => {
       setIsClient(true);
-      if (typeof window !== 'undefined') {
-        const consent = getCookie("ethermusic_consent") === 'true';
-        setCookieConsent(consent);
-        if (consent) {
-            const loaded = loadSettings();
-            setVolumesState(loaded.volumes);
-        }
-      }
+      const consent = getCookie("ethermusic_consent");
+      setCookieConsent(consent === 'true');
     }, []);
 
-    useEffect(() => {
-        if (cookieConsent) {
+    const onConsentChange = useCallback((consent: boolean) => {
+        setCookieConsent(consent);
+        if (consent) {
             const loaded = loadSettings();
             setVolumesState(loaded.volumes);
         } else {
             setVolumesState(defaultVolumes);
         }
-    }, [cookieConsent]);
-    
+    }, []); 
+
     const {
         isAppStarted,
         isReady,
@@ -283,8 +276,8 @@ export default function Home() {
     }, [setBassLatch]);
     
     const handleMelodyInstrumentChange = useCallback((instrumentName: Instrument) => {
+        console.log('[1. UI] page.tsx: handleMelodyInstrumentChange. Preset selected:', melodyInstruments.find(p => p.id === instrumentName));
         const preset = melodyInstruments.find(p => p.id === instrumentName);
-        console.log('[1. UI] page.tsx: handleMelodyInstrumentChange. Preset selected:', preset);
         if (preset) {
             setActiveMelodyInstrument(instrumentName);
             setMelodyInstrument(instrumentName);
@@ -329,13 +322,9 @@ export default function Home() {
                     <p>&copy; 2024, EVS</p>
                     <p className="mt-2">v.2.1 "Maestro"</p>
                 </footer>
-                <CookieConsent onConsentChange={(consent) => {
-                    setCookieConsent(consent);
-                    if (consent) {
-                        const loaded = loadSettings();
-                        setVolumesState(loaded.volumes);
-                    }
-                }} />
+                {cookieConsent === undefined || cookieConsent === false ? (
+                    <CookieConsent onConsentChange={onConsentChange} />
+                ) : null}
             </div>
         )
     }
@@ -452,3 +441,5 @@ export default function Home() {
         </div>
     );
 }
+
+    

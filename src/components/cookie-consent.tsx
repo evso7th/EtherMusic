@@ -32,13 +32,12 @@ export function CookieConsent({ onConsentChange }: CookieConsentProps) {
     const [showConsent, setShowConsent] = useState(false);
 
     useEffect(() => {
-        if (typeof window !== 'undefined') {
-            const consent = getCookie("ethermusic_consent");
-            if (consent === null) {
-                setShowConsent(true);
-            } else {
-                onConsentChange(consent === 'true');
-            }
+        const consent = getCookie("ethermusic_consent");
+        if (consent === null) {
+            setShowConsent(true);
+        } else {
+            // Defer the call to avoid state updates during render
+            setTimeout(() => onConsentChange(consent === 'true'), 0);
         }
     }, [onConsentChange]);
 

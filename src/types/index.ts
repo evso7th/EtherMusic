@@ -35,7 +35,10 @@ export interface InstrumentPresetParams {
 }
 
 
-export interface BassInstrumentPresetParams extends InstrumentPresetParams {}
+export interface BassInstrumentPresetParams extends InstrumentPresetParams {
+    distortion?: number;
+    reverbSend?: number;
+}
 
 
 export interface InstrumentPreset {
@@ -59,6 +62,8 @@ export type BeatPattern = {
 // Volume settings for a single channel (instrument)
 export interface ChannelVolumes {
   gain: number;
+  reverbSend: number; 
+  distortion: number; 
 }
 
 export interface CompressorSettings {
@@ -74,9 +79,7 @@ export interface Volumes {
   manualBass: ChannelVolumes;
   latch: ChannelVolumes;
   drums: ChannelVolumes;
-  reverbSend: number; // in dB, sent to the reverb
-  reverbReturn: number; // in dB, return from the reverb
-  distortion: number; // percentage
+  reverbReturn: number; // in dB
   compressor: CompressorSettings;
 }
 
@@ -86,3 +89,5 @@ export interface Note {
     frequency: number;
     volume: number;
 }
+
+    
