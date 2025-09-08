@@ -51,54 +51,54 @@ class Voice {
         this.initLFO(preset.vibrato);
 
         this.portamentoSpeed = preset.portamento > 0 ? 1 - Math.exp(-1 / (preset.portamento * this.sampleRate)) : 0;
-        this.envelopeLevel = 0;
-        
-        console.log(`[3. WORKLET] Voice ${this.id} created with preset:`, preset);
-        console.log(`[3. WORKLET] Layers for voice ${this.id}:`, this.layers);
     }
 
     initLayers(preset) {
-        this.layers = []; // Clear existing layers
+        this.layers = [];
 
-        const createLayer = (layerConfig, baseFrequency) => {
-            const freq = layerConfig.freqMult !== undefined 
-                ? baseFrequency * layerConfig.freqMult
-                : baseFrequency;
-            
+        const createLayer = (layerConfig, baseFreq, isMainOsc) => {
+            const freq = (layerConfig.freqMult !== undefined ? baseFreq * layerConfig.freqMult : baseFreq);
             const detunedFreq = freq * Math.pow(2, (layerConfig.detune || 0) / 1200);
+
+            const envConfig = isMainOsc ? preset.envelope : (layerConfig.envelope || preset.envelope);
 
             return {
                 osc: new Oscillator(layerConfig.type || 'sine', this.sampleRate),
                 level: layerConfig.level ?? 1.0,
                 baseFreq: freq,
                 currentFreq: detunedFreq,
+                envelope: {
+                    attackSamples: Math.max(1, (envConfig.attack || 0.01) * this.sampleRate),
+                    decaySamples: Math.max(1, (envConfig.decay || 0.1) * this.sampleRate),
+                    sustainLevel: envConfig.sustain ?? 1.0,
+                    releaseSamples: Math.max(1, (envConfig.release || 0.5) * this.sampleRate),
+                    state: 'attack',
+                    currentValue: 0,
+                    releaseLevel: 1.0,
+                },
             };
         };
         
-        const mainOscillatorConfig = {
-            ...preset.oscillator,
-            level: 1.0, 
-            freqMult: 1,
-        };
-
-        this.layers.push(createLayer(mainOscillatorConfig, this.baseFrequency));
+        // The main oscillator is treated as the first layer
+        if (preset.oscillator) {
+            const mainOscillatorConfig = {
+                ...preset.oscillator,
+                level: 1.0,
+                freqMult: 1,
+            };
+            this.layers.push(createLayer(mainOscillatorConfig, this.baseFrequency, true));
+        }
     
         if (preset.layers && preset.layers.length > 0) {
-             preset.layers.forEach(layer => this.layers.push(createLayer(layer, this.baseFrequency)));
+             preset.layers.forEach(layer => this.layers.push(createLayer(layer, this.baseFrequency, false)));
         }
     }
-
-    initEnvelope(env) {
-        this.envelope = {
-            attackSamples: Math.max(1, (env.attack || 0.01) * this.sampleRate),
-            decaySamples: Math.max(1, (env.decay || 0.1) * this.sampleRate),
-            sustainLevel: env.sustain ?? 1.0,
-            releaseSamples: Math.max(1, (env.release || 0.5) * this.sampleRate),
-            state: 'attack',
-            currentValue: 0,
-        };
-    }
     
+    initEnvelope() {
+      // Envelope is now per-layer, this main envelope state is for the overall voice state
+      this.envelopeState = 'attack';
+    }
+
     initFilter(filter) {
         if (!filter || filter.frequency <= 0) {
             this.filter = null;
@@ -142,45 +142,25 @@ class Voice {
     
         switch (type) {
             case 'lowpass':
-                b0 = (1 - cos_w0) / 2;
-                b1 = 1 - cos_w0;
-                b2 = (1 - cos_w0) / 2;
-                a0 = 1 + alpha;
-                a1 = -2 * cos_w0;
-                a2 = 1 - alpha;
+                b0 = (1 - cos_w0) / 2; b1 = 1 - cos_w0; b2 = (1 - cos_w0) / 2;
+                a0 = 1 + alpha; a1 = -2 * cos_w0; a2 = 1 - alpha;
                 break;
             case 'peaking':
                 const A = Math.pow(10, gain / 40);
-                b0 = 1 + alpha * A;
-                b1 = -2 * cos_w0;
-                b2 = 1 - alpha * A;
-                a0 = 1 + alpha / A;
-                a1 = -2 * cos_w0;
-                a2 = 1 - alpha / A;
+                b0 = 1 + alpha * A; b1 = -2 * cos_w0; b2 = 1 - alpha * A;
+                a0 = 1 + alpha / A; a1 = -2 * cos_w0; a2 = 1 - alpha / A;
                 break;
             case 'highpass':
-                b0 = (1 + cos_w0) / 2;
-                b1 = -(1 + cos_w0);
-                b2 = (1 + cos_w0) / 2;
-                a0 = 1 + alpha;
-                a1 = -2 * cos_w0;
-                a2 = 1 - alpha;
+                b0 = (1 + cos_w0) / 2; b1 = -(1 + cos_w0); b2 = (1 + cos_w0) / 2;
+                a0 = 1 + alpha; a1 = -2 * cos_w0; a2 = 1 - alpha;
                 break;
             case 'bandpass':
-                b0 = Q * alpha;
-                b1 = 0;
-                b2 = -Q * alpha;
-                a0 = 1 + alpha;
-                a1 = -2 * cos_w0;
-                a2 = 1 - alpha;
+                b0 = alpha; b1 = 0; b2 = -alpha;
+                a0 = 1 + alpha; a1 = -2 * cos_w0; a2 = 1 - alpha;
                 break;
             case 'notch':
-                b0 = 1;
-                b1 = -2 * cos_w0;
-                b2 = 1;
-                a0 = 1 + alpha;
-                a1 = -2 * cos_w0;
-                a2 = 1 - alpha;
+                b0 = 1; b1 = -2 * cos_w0; b2 = 1;
+                a0 = 1 + alpha; a1 = -2 * cos_w0; a2 = 1 - alpha;
                 break;
             default:
                 return inputSample;
@@ -202,8 +182,15 @@ class Voice {
         return outputSample;
     }
 
-    processEnvelope() {
-        const env = this.envelope;
+    processLayerEnvelope(layer) {
+        const env = layer.envelope;
+        if (this.isReleasing) {
+          if (env.state !== 'release') {
+              env.state = 'release';
+              env.releaseLevel = env.currentValue;
+          }
+        }
+
         switch (env.state) {
             case 'attack':
                 env.currentValue += 1.0 / env.attackSamples;
@@ -220,12 +207,11 @@ class Voice {
                 }
                 break;
             case 'sustain':
-                break; // Level remains at sustainLevel
+                break;
             case 'release':
-                env.currentValue -= this.releaseLevel / env.releaseSamples;
+                env.currentValue -= env.releaseLevel / env.releaseSamples;
                 if (env.currentValue <= 0) {
                     env.currentValue = 0;
-                    this.isFinished = true;
                 }
                 break;
         }
@@ -233,6 +219,9 @@ class Voice {
     }
 
     render() {
+        if (this.isReleasing && this.layers.every(l => l.envelope.currentValue <= 0)) {
+            this.isFinished = true;
+        }
         if (this.isFinished) return 0;
         
         if (this.portamentoSpeed > 0) {
@@ -240,23 +229,18 @@ class Voice {
         }
 
         const lfoModulation = this.processLFO();
-        const envelopeValue = this.processEnvelope();
         
         let mixedSample = 0;
         this.layers.forEach(layer => {
-            const modulatedFrequency = (this.baseFrequency + lfoModulation) * (layer.baseFreq / this.baseFrequency);
-            mixedSample += layer.osc.process(modulatedFrequency) * layer.level;
+            const envelopeValue = this.processLayerEnvelope(layer);
+            const modulatedFrequency = (this.baseFrequency * layer.freqMult) + lfoModulation;
+            const oscSample = layer.osc.process(modulatedFrequency);
+            mixedSample += oscSample * layer.level * envelopeValue;
         });
         
-        const filteredSample = this.processFilter(mixedSample / this.layers.length);
+        const filteredSample = this.processFilter(mixedSample);
         
-        const finalSample = filteredSample * envelopeValue * this.volume;
-
-        if(this.id === 0 && Math.random() < 0.001) { // Log occasionally for the first voice
-             console.log(`[4. WORKLET-RENDER] Voice ${this.id}: envelope=${envelopeValue.toFixed(2)}, mix=${mixedSample.toFixed(2)}, filtered=${filteredSample.toFixed(2)}, final=${finalSample.toFixed(2)}`);
-        }
-
-        return finalSample;
+        return filteredSample * this.volume;
     }
 
     noteUpdate(frequency, volume) {
@@ -267,8 +251,6 @@ class Voice {
     release() {
         if (this.isReleasing) return;
         this.isReleasing = true;
-        this.envelope.state = 'release';
-        this.releaseLevel = this.envelope.currentValue;
     }
 }
 
@@ -283,7 +265,6 @@ class SynthProcessor extends AudioWorkletProcessor {
     }
 
     handleMessage(event) {
-        console.log('[3. WORKLET] Received message:', event.data);
         const { type, note, id, preset } = event.data;
         switch (type) {
             case 'noteOn':
@@ -306,8 +287,7 @@ class SynthProcessor extends AudioWorkletProcessor {
 
     applyPreset(preset) {
         this.preset = { ...this.getDefaultPreset(), ...preset };
-        this.voices.forEach(voice => voice.release());
-        this.voices.clear();
+        this.allNotesOff();
     }
 
     noteOn(note) {
@@ -351,7 +331,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         if (channel) {
             for (let i = 0; i < channel.length; i++) {
                 let mixedSample = 0;
-                this.voices.forEach((id, voice) => { // Corrected iteration
+                this.voices.forEach((voice, id) => {
                     mixedSample += voice.render();
                     if (voice.isFinished) {
                         this.voices.delete(id);
