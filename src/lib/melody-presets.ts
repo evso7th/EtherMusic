@@ -10,6 +10,11 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
             envelope: { attack: 0.15, decay: 0.5, sustain: 0.4, release: 1.0 },
             filter: { Q: 1.0, frequency: 700, type: 'lowpass', gain: 0 },
             portamento: 0.03,
+            layers: [
+                { type: 'sawtooth', freqMult: 0.5, level: 0.3, detune: 2 },
+                { type: 'sine', freqMult: 2, level: 0.5, detune: -2 },
+            ],
+            stagger: 0.005,
         }
     },
     {
@@ -54,7 +59,10 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
             envelope: { attack: 0.3, decay: 0.1, sustain: 1.0, release: 1.5 },
             filter: { Q: 0.6, frequency: 2000, type: 'lowpass', gain: 0 },
             vibrato: { frequency: 6, depth: 5 },
-            portamento: 0.08,
+            portamento: 0.1,
+            layers: [
+                { type: 'sine', freqMult: 1, level: 0.8, detune: 4 },
+            ]
         }
     }
 ];
