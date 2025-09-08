@@ -60,7 +60,7 @@ export function MixerControls({
     onChannelVolumeChange,
 }: { 
     volumes: Volumes, 
-    onMixerChange: (volumes: Partial<Omit<MixerVolumes, 'melody' | 'manualBass'>>) => void,
+    onMixerChange: (volumes: Partial<Omit<Volumes, 'compressor' | 'melody' | 'manualBass' | 'latch' | 'drums'>>) => void,
     onChannelVolumeChange: (channel: 'melody' | 'manualBass' | 'latch' | 'drums', gain: number) => void,
     onCompressorChange: (compressorSettings: CompressorSettings) => void
 }) {

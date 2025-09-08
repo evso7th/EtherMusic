@@ -10,7 +10,7 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
             oscillator: { type: 'sawtooth' },
             envelope: { attack: 0.01, decay: 0.3, sustain: 0.5, release: 0.3 },
             filter: { Q: 0.7, frequency: 400, type: 'lowpass' },
-            distortion: 0.05
+            distortion: 5
         }
     },
     {
@@ -21,7 +21,8 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
             oscillator: { type: 'triangle' },
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.8, release: 1.5 },
             filter: { Q: 0.5, frequency: 300, type: 'lowpass' },
-            portamento: 0.03
+            portamento: 0.03,
+            distortion: 0
         }
     },
     {
@@ -32,7 +33,8 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
             oscillator: { type: 'sine' },
             envelope: { attack: 0.2, decay: 0.1, sustain: 1.0, release: 3.0 },
             filter: { Q: 1.2, frequency: 120, type: 'lowpass' },
-            portamento: 0.08
+            portamento: 0.08,
+            distortion: 0
         }
     },
     {
@@ -44,7 +46,7 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
             envelope: { attack: 0.02, decay: 0.2, sustain: 0.7, release: 1.0 },
             filter: { Q: 1.4, frequency: 500, type: 'lowpass' },
             portamento: 0.06,
-            distortion: 0.1
+            distortion: 10
         }
     },
     {
@@ -55,6 +57,7 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
             oscillator: { type: 'sine' },
             envelope: { attack: 0.2, decay: 0.1, sustain: 1.0, release: 3.0 },
             filter: { Q: 1.0, frequency: 150, type: 'lowpass' },
+            distortion: 0,
             layers: [
                 {
                     oscillator: { type: 'triangle' },
@@ -72,7 +75,7 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
             oscillator: { type: 'sine' },
             envelope: { attack: 0.01, decay: 0.2, sustain: 0.8, release: 1.0 },
             filter: { Q: 1.0, frequency: 350, type: 'lowpass' },
-            distortion: 0.1,
+            distortion: 15,
             layers: [
                  {
                     oscillator: { type: 'sawtooth' },
@@ -85,5 +88,3 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
 ];
 
 export const defaultBassInstrument: BassInstrument = 'classicBass';
-
-    

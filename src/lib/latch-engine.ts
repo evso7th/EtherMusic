@@ -29,7 +29,7 @@ export class LatchEngine {
         return this.activeNotes.findIndex(note => {
             const distSq = (note.x - x) ** 2 + (note.y - y) ** 2;
             const isNearby = distSq < TAP_RADIUS_SQUARED;
-            console.log(`[LatchEngine] Checking distance for note ${note.id}: tap at (${x.toFixed(1)}, ${y.toFixed(1)}), note at (${note.x.toFixed(1)}, ${note.y.toFixed(1)}), distSq=${distSq.toFixed(1)}, radiusSq=${TAP_RADIUS_SQUARED}. Is nearby: ${isNearby}`);
+            // console.log(`[LatchEngine] Checking distance for note ${note.id}: tap at (${x.toFixed(1)}, ${y.toFixed(1)}), note at (${note.x.toFixed(1)}, ${note.y.toFixed(1)}), distSq=${distSq.toFixed(1)}, radiusSq=${TAP_RADIUS_SQUARED}. Is nearby: ${isNearby}`);
             return isNearby;
         });
     }
@@ -40,11 +40,11 @@ export class LatchEngine {
         const { x, y, frequency, volume } = tapData;
         const existingNoteIndex = this.findNearbyNoteIndex(x, y);
 
-        console.log(`[LatchEngine] toggleNote called. Tap at (${x.toFixed(1)}, ${y.toFixed(1)}). Active notes: (${this.activeNotes.length})`, this.activeNotes.map(n => n.id));
+        // console.log(`[LatchEngine] toggleNote called. Tap at (${x.toFixed(1)}, ${y.toFixed(1)}). Active notes: (${this.activeNotes.length})`, this.activeNotes.map(n => n.id));
 
         if (existingNoteIndex > -1) {
             const noteToRemove = this.activeNotes.splice(existingNoteIndex, 1)[0];
-            console.log('[LatchEngine] Removing existing note:', noteToRemove);
+            // console.log('[LatchEngine] Removing existing note:', noteToRemove);
             return {
                 action: 'removed',
                 noteOff: noteToRemove,
@@ -57,17 +57,16 @@ export class LatchEngine {
 
         if (this.activeNotes.length >= MAX_LATCH_NOTES) {
             noteToTurnOff = this.activeNotes.shift(); 
-            console.log('[LatchEngine] Max notes reached. Removing oldest note:', noteToTurnOff);
+            // console.log('[LatchEngine] Max notes reached. Removing oldest note:', noteToTurnOff);
             if (noteToTurnOff) {
                 noteToAnimateRemove = { id: noteToTurnOff.id, type: 'remove' };
             }
         }
         
-        // Use a simple incrementing ID for uniqueness, as pointerId is always 1 for mouse
         const id = this.nextId++;
         const newNote: Note & { x: number; y: number } = { id, frequency, volume, x, y };
         this.activeNotes.push(newNote);
-        console.log('[LatchEngine] Adding new note:', newNote);
+        // console.log('[LatchEngine] Adding new note:', newNote);
 
         const result: LatchToggleResult = {
             action: 'added',
@@ -77,12 +76,12 @@ export class LatchEngine {
             noteToAnimateRemove: noteToAnimateRemove
         };
         
-        console.log('[LatchEngine] toggleNote result:', result);
+        // console.log('[LatchEngine] toggleNote result:', result);
         return result;
     }
     
     public clear(): Note[] {
-        console.log('[LatchEngine] Clearing all notes.');
+        // console.log('[LatchEngine] Clearing all notes.');
         const notesToTurnOff = [...this.activeNotes];
         this.activeNotes = [];
         return notesToTurnOff;

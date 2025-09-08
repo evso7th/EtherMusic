@@ -25,6 +25,7 @@ export interface InstrumentPresetParams {
         type: BiquadFilterType;
     };
     portamento?: number;
+    distortion?: number;
 }
 
 export interface BassInstrumentPresetParams extends InstrumentPresetParams {
@@ -64,6 +65,7 @@ export type BeatPattern = {
 export interface ChannelVolumes {
   gain: number;
   reverbSend: number;
+  distortion: number; // Added distortion level
 }
 
 export interface CompressorSettings {

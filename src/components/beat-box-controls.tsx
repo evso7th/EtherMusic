@@ -26,7 +26,7 @@ interface BeatBoxControlsProps {
     activeTempo: Tempo;
     onTempoChange: (tempo: Tempo) => void;
     volumes: Volumes;
-    onMixerChange: (volumes: Partial<Omit<Volumes, 'compressor' | 'melody' | 'manualBass'>>) => void;
+    onMixerChange: (volumes: Partial<Omit<Volumes, 'compressor' | 'melody' | 'manualBass' | 'latch' | 'drums'>>) => void;
     onChannelVolumeChange: (channel: 'melody' | 'manualBass' | 'latch' | 'drums', gain: number) => void;
     onCompressorChange: (compressorSettings: CompressorSettings) => void;
     isMobile: boolean;
@@ -95,7 +95,6 @@ export function BeatBoxControls({
     }, [isMobile]);
     
     const handleMixerOpenChange = (open: boolean) => {
-        console.log('[BeatBoxControls] Mixer Dialog onOpenChange, new state:', open);
         setIsMixerOpen(open);
     };
 
@@ -196,7 +195,7 @@ export function BeatBoxControls({
                     </Dialog>
                     
                     <Dialog open={isMixerOpen} onOpenChange={handleMixerOpenChange}>
-                        <DialogTrigger asChild onClick={() => console.log('[BeatBoxControls] Mixer DialogTrigger clicked in landscape')}>
+                        <DialogTrigger asChild>
                              <ControlButtonWithTooltip tooltipText="Mixer" variant="outline" size="icon" className="w-10 h-10 rounded-full">
                                 <SlidersHorizontal className="w-5 h-5"/>
                             </ControlButtonWithTooltip>
@@ -323,7 +322,7 @@ export function BeatBoxControls({
                     </Dialog>
 
                     <Dialog open={isMixerOpen} onOpenChange={handleMixerOpenChange}>
-                        <DialogTrigger asChild onClick={() => console.log('[BeatBoxControls] Mixer DialogTrigger clicked in portrait')}>
+                        <DialogTrigger asChild>
                              <ControlButtonWrapper tooltipText="Mixer" variant="outline" className="flex-1 px-2 md:px-4" size={buttonSize}>
                                 <SlidersHorizontal className="w-4 h-4 md:mr-2"/>
                                 <span className="hidden sm:inline">Mixer</span>

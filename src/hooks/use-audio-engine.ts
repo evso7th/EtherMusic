@@ -62,8 +62,8 @@ export function useAudioEngine() {
 
     useEffect(() => {
       const resumeAudio = async () => {
-        if (audioEngine.current?.isInitialized && audioEngine.current.masterOut.context.state === 'suspended') {
-          await audioEngine.current.masterOut.context.resume();
+        if (audioEngine.current?.isInitialized && audioEngine.current.getContext().state === 'suspended') {
+          await audioEngine.current.getContext().resume();
         }
       };
       document.addEventListener('click', resumeAudio);

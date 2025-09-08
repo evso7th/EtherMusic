@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Anchor, SlidersHorizontal, Blend, Music } from 'lucide-react';
+import { Anchor, SlidersHorizontal, Blend, Waves } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { MusicKey, MusicScale, Instrument, BassInstrument, InstrumentPreset, BassInstrumentPreset, ChannelVolumes } from '@/types';
@@ -39,7 +39,7 @@ interface ThereminPadProps {
     onLatchToggle?: (checked: boolean) => void;
     orbManager?: OrbManager | null;
     channelVolumes: ChannelVolumes;
-    onReverbSendChange: (reverbSend: number) => void;
+    onChannelVolumeChange: (newVolumes: Partial<ChannelVolumes>) => void;
 }
 
 const padTitles = {
@@ -47,30 +47,38 @@ const padTitles = {
     bass: "Bass Pad"
 }
 
-const ReverbSendControl = ({
+const EffectControl = ({
     label,
     icon: Icon,
     level,
     onLevelChange,
     onLevelCommit,
+    min,
+    max,
+    step,
+    unit
 }: {
     label: string,
     icon: React.ElementType,
     level: number,
     onLevelChange: (v: number) => void,
     onLevelCommit: (v: number) => void,
+    min: number,
+    max: number,
+    step: number,
+    unit: string
 }) => (
      <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
             <Icon className="w-5 h-5 text-accent flex-shrink-0" />
             <Label className="text-sm font-medium flex-1 truncate">{label}</Label>
-            <span className="text-xs text-muted-foreground w-10 text-right">{level.toFixed(0)} dB</span>
+            <span className="text-xs text-muted-foreground w-12 text-right">{level.toFixed(0)}{unit}</span>
         </div>
         <div className="flex items-center gap-4 pl-7">
             <Slider
-                min={-48}
-                max={6}
-                step={1}
+                min={min}
+                max={max}
+                step={step}
                 value={[level]}
                 onValueChange={(v) => onLevelChange(v[0])}
                 onValueCommit={(v) => onLevelCommit(v[0])}
@@ -100,20 +108,24 @@ export function ThereminPad({
     onLatchToggle,
     orbManager,
     channelVolumes,
-    onReverbSendChange
+    onChannelVolumeChange
 }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const isMobile = useIsMobile();
     
-    const [localReverbSend, setLocalReverbSend] = useState(channelVolumes.reverbSend);
+    const [localVolumes, setLocalVolumes] = useState(channelVolumes);
 
     useEffect(() => {
-        setLocalReverbSend(channelVolumes.reverbSend);
+        setLocalVolumes(channelVolumes);
     }, [channelVolumes]);
 
-    const handleCommit = () => {
-        onReverbSendChange(localReverbSend);
+    const handleReverbCommit = (value: number) => {
+        onChannelVolumeChange({ reverbSend: value });
+    };
+
+    const handleDistortionCommit = (value: number) => {
+        onChannelVolumeChange({ distortion: value });
     };
 
     // Manage orbs for latch mode
@@ -148,8 +160,6 @@ export function ThereminPad({
         if (isDisabled) return;
         (event.target as HTMLElement).setPointerCapture(event.pointerId);
         
-        console.log(`[ThereminPad] Latch mode tap DOWN.`);
-
         const interactionData = calculateInteraction(event);
         if (interactionData) {
             onInteraction(type, interactionData, 'down');
@@ -168,10 +178,8 @@ export function ThereminPad({
     const handlePointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
         if (isDisabled) return;
         
-        console.log(`[ThereminPad] Pointer UP.`);
-        
         if (isLatchOn && type === 'bass') {
-             console.log("[ThereminPad] Latch mode tap UP (ignored).");
+             // In latch mode, up event doesn't stop the note, it's handled by toggle
         } else {
              const interactionData = calculateInteraction(event);
              onInteraction(type, interactionData, 'up');
@@ -263,12 +271,21 @@ export function ThereminPad({
                             
                             <Separator />
                             <div className="space-y-4">
-                                <ReverbSendControl
-                                    label="Reverb Send"
+                                <EffectControl
+                                    label="Reverb"
                                     icon={Blend}
-                                    level={localReverbSend}
-                                    onLevelChange={setLocalReverbSend}
-                                    onLevelCommit={handleCommit}
+                                    level={localVolumes.reverbSend}
+                                    onLevelChange={(v) => setLocalVolumes(prev => ({...prev, reverbSend: v}))}
+                                    onLevelCommit={handleReverbCommit}
+                                    min={-48} max={6} step={1} unit="dB"
+                                />
+                                <EffectControl
+                                    label="Distortion"
+                                    icon={Waves}
+                                    level={localVolumes.distortion}
+                                    onLevelChange={(v) => setLocalVolumes(prev => ({...prev, distortion: v}))}
+                                    onLevelCommit={handleDistortionCommit}
+                                    min={0} max={100} step={1} unit="%"
                                 />
                             </div>
 

@@ -43,10 +43,10 @@ function setCookie(name: string, value: string, days: number) {
 }
 
 const defaultVolumes: Volumes = { 
-    melody: { gain: 6, reverbSend: -24 },
-    manualBass: { gain: 6, reverbSend: -48 },
-    latch: { gain: -15, reverbSend: -48 },
-    drums: { gain: -9, reverbSend: -48 },
+    melody: { gain: 6, reverbSend: -24, distortion: 0 },
+    manualBass: { gain: 6, reverbSend: -48, distortion: 0 },
+    latch: { gain: -15, reverbSend: -48, distortion: 0 },
+    drums: { gain: -9, reverbSend: -48, distortion: 0 },
     reverbReturn: -12,
     compressor: {
         enabled: true,
@@ -70,10 +70,21 @@ function loadSettings() {
         const savedVolumes = getCookie("ethermusic_volumes");
         const volumes = savedVolumes ? JSON.parse(savedVolumes) : defaultVolumes;
         
-        // A simple check to see if the loaded volumes object is valid and has the new structure
-        if (!volumes.melody || typeof volumes.melody.gain !== 'number' || typeof volumes.melody.reverbSend !== 'number' || !volumes.compressor) {
+        if (!volumes.melody || typeof volumes.melody.gain !== 'number' || !volumes.compressor) {
             return { volumes: defaultVolumes }; 
         }
+
+        // Ensure distortion property exists
+        const ensureChannelSettings = (channel: ChannelVolumes): ChannelVolumes => ({
+            gain: channel.gain ?? 0,
+            reverbSend: channel.reverbSend ?? -48,
+            distortion: channel.distortion ?? 0
+        });
+
+        volumes.melody = ensureChannelSettings(volumes.melody);
+        volumes.manualBass = ensureChannelSettings(volumes.manualBass);
+        volumes.latch = ensureChannelSettings(volumes.latch);
+        volumes.drums = ensureChannelSettings(volumes.drums);
         
         return { volumes };
     } catch (e) {
@@ -115,7 +126,6 @@ const Preloader = () => (
 );
 
 export default function Home() {
-    console.log('[Page] Rendering Home component');
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [isClient, setIsClient] = useState(false);
@@ -208,28 +218,17 @@ export default function Home() {
             saveSettings(newVolumes);
         }
     }, [setVolumes, cookieConsent]);
-
-    const handleChannelVolumeChange = useCallback((channel: 'melody' | 'manualBass' | 'latch' | 'drums', gain: number) => {
+    
+    const handleChannelVolumeChange = useCallback((channel: keyof Omit<Volumes, 'compressor' | 'reverbReturn'>, newChannelVolumes: Partial<ChannelVolumes>) => {
         const newVolumes: Volumes = {
             ...volumes,
-            [channel]: { ...volumes[channel], gain }
+            [channel]: { ...volumes[channel], ...newChannelVolumes }
         };
         updateVolumes(newVolumes);
     }, [volumes, updateVolumes]);
     
-    const handleReverbSendChange = useCallback((channel: 'melody' | 'manualBass' | 'latch' | 'drums', reverbSend: number) => {
-        const newVolumes: Volumes = {
-            ...volumes,
-            [channel]: { ...volumes[channel], reverbSend }
-        };
-        updateVolumes(newVolumes);
-    }, [volumes, updateVolumes]);
-
-    const handleMixerChange = useCallback((changedMixerVolumes: Partial<Omit<Volumes, 'compressor' | 'melody' | 'manualBass'>>) => {
-        const newVolumes: Volumes = {
-            ...volumes,
-            ...changedMixerVolumes
-        };
+    const handleMixerChange = useCallback((changedMixerVolumes: Partial<Omit<Volumes, 'compressor'>>) => {
+        const newVolumes: Volumes = { ...volumes, ...changedMixerVolumes };
         updateVolumes(newVolumes);
     }, [volumes, updateVolumes]);
     
@@ -398,7 +397,7 @@ export default function Home() {
                             onInstrumentChange={handleBassInstrumentChange}
                             orbManager={orbManager}
                             channelVolumes={volumes.manualBass}
-                            onReverbSendChange={(v) => handleReverbSendChange('manualBass', v)}
+                            onChannelVolumeChange={(v) => handleChannelVolumeChange('manualBass', v)}
                         />
                         <MemoizedThereminPad
                             type="melody"
@@ -418,7 +417,7 @@ export default function Home() {
                             isPolyphonic
                             orbManager={orbManager}
                             channelVolumes={volumes.melody}
-                            onReverbSendChange={(v) => handleReverbSendChange('melody', v)}
+                            onChannelVolumeChange={(v) => handleChannelVolumeChange('melody', v)}
                         />
                     </div>
                     <div className="flex-shrink-0 portrait:block landscape:hidden">
@@ -430,8 +429,8 @@ export default function Home() {
                             activeTempo={activeTempo}
                             onTempoChange={handleTempoChange}
                             volumes={volumes}
-                            onMixerChange={handleMixerChange}
-                            onChannelVolumeChange={handleChannelVolumeChange}
+                            onMixerChange={onMixerChange}
+                            onChannelVolumeChange={(channel, gain) => handleChannelVolumeChange(channel, { gain })}
                             onCompressorChange={handleCompressorChange}
                             isMobile={isMobile}
                         />
@@ -447,8 +446,8 @@ export default function Home() {
                         activeTempo={activeTempo}
                         onTempoChange={handleTempoChange}
                         volumes={volumes}
-                        onMixerChange={handleMixerChange}
-                        onChannelVolumeChange={handleChannelVolumeChange}
+                        onMixerChange={onMixerChange}
+                        onChannelVolumeChange={(channel, gain) => handleChannelVolumeChange(channel, { gain })}
                         onCompressorChange={handleCompressorChange}
                         isMobile={isMobile}
                         isLandscape={true}
@@ -458,11 +457,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
-
-    
-
-    
-
-    
