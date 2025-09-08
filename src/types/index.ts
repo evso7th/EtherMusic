@@ -26,8 +26,6 @@ export interface InstrumentPresetParams {
         type: BiquadFilterType;
     };
     portamento?: number;
-    distortion?: number; 
-    reverbSend?: number; 
     layers?: {
         oscillator: { type: OscillatorType; detune?: number; };
         envelope: { attack: number; decay: number, sustain: number, release: number; };
@@ -37,14 +35,7 @@ export interface InstrumentPresetParams {
 }
 
 
-export interface BassInstrumentPresetParams extends InstrumentPresetParams {
-    layers?: {
-        oscillator: { type: OscillatorType; detune?: number; };
-        envelope: { attack: number; decay: number, sustain: number, release: number; };
-        gain?: number;
-    }[];
-    stagger?: number;
-}
+export interface BassInstrumentPresetParams extends InstrumentPresetParams {}
 
 
 export interface InstrumentPreset {
@@ -65,11 +56,9 @@ export type BeatPattern = {
     type: 'Meditative' | 'Classic' | 'System';
 };
 
-// New structured volume type
+// Volume settings for a single channel (instrument)
 export interface ChannelVolumes {
   gain: number;
-  reverbSend: number; 
-  distortion: number; 
 }
 
 export interface CompressorSettings {
@@ -85,7 +74,9 @@ export interface Volumes {
   manualBass: ChannelVolumes;
   latch: ChannelVolumes;
   drums: ChannelVolumes;
-  reverbReturn: number; // in dB
+  reverbSend: number; // in dB, sent to the reverb
+  reverbReturn: number; // in dB, return from the reverb
+  distortion: number; // percentage
   compressor: CompressorSettings;
 }
 

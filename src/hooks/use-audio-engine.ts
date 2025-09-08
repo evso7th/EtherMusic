@@ -35,7 +35,7 @@ export function useAudioEngine() {
             
             setIsReady(true);
             setIsPlaying(audioEngine.current.isPlaying);
-            console.log("AudioEngine initialized and ready.");
+            
 
         } catch(e) {
             console.error("Failed to initialize audio engines:", e);
@@ -92,6 +92,10 @@ export function useAudioEngine() {
     const setVolumes = useCallback((volumes: Volumes) => {
         audioEngine.current?.setVolumes(volumes);
     }, []);
+
+    const setTempo = useCallback((tempo: number) => {
+        audioEngine.current?.setTempo(tempo);
+    }, []);
     
     const setBeatPattern = useCallback((patternName: string) => {
         audioEngine.current?.setBeatPattern(patternName);
@@ -130,6 +134,7 @@ export function useAudioEngine() {
     }, [isReady]);
 
     const setMelodyInstrument = useCallback((instrumentName: Instrument) => {
+        console.log('[2. HOOK] use-audio-engine: setMelodyInstrument called with:', instrumentName);
         audioEngine.current?.setMelodyInstrument(instrumentName);
     }, []);
     
@@ -148,6 +153,7 @@ export function useAudioEngine() {
         pause,
         stop,
         setVolumes,
+        setTempo,
         setMelodyInstrument,
         setBassInstrument,
         setBeatPattern,

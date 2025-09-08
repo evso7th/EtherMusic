@@ -171,6 +171,7 @@ export default function Home() {
         setBassInstrument,
         orbManager,
         setVolumes,
+        setTempo,
     } = useAudioEngine();
     
     const [isRecording, setIsRecording] = useState(false);
@@ -183,6 +184,10 @@ export default function Home() {
     const [activeBassInstrument, setActiveBassInstrument] = useState<BassInstrument>(defaultBassInstrument);
     
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
+    
+    const handleTempoChange = useCallback((newTempo: number) => {
+        setTempo(newTempo);
+    }, [setTempo]);
 
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         let newKey = musicKey;
@@ -219,23 +224,6 @@ export default function Home() {
         if (cookieConsent) {
             saveSettings(newVolumes);
         }
-    }, [setVolumes, cookieConsent]);
-    
-    const handleChannelVolumeChange = useCallback((channel: keyof Omit<Volumes, 'compressor' | 'reverbReturn'>, type: keyof ChannelVolumes, value: number) => {
-        setVolumesState(prevVolumes => {
-            const updatedVolumes = {
-                ...prevVolumes,
-                [channel]: {
-                    ...prevVolumes[channel],
-                    [type]: value,
-                },
-            };
-            if (cookieConsent) {
-                saveSettings(updatedVolumes);
-            }
-            setVolumes(updatedVolumes);
-            return updatedVolumes;
-        });
     }, [setVolumes, cookieConsent]);
     
     const handleMixerChange = useCallback((changedMixerVolumes: Partial<Volumes>) => {
@@ -296,30 +284,20 @@ export default function Home() {
     
     const handleMelodyInstrumentChange = useCallback((instrumentName: Instrument) => {
         const preset = melodyInstruments.find(p => p.id === instrumentName);
+        console.log('[1. UI] page.tsx: handleMelodyInstrumentChange. Preset selected:', preset);
         if (preset) {
             setActiveMelodyInstrument(instrumentName);
             setMelodyInstrument(instrumentName);
-            const newChannelVolumes: ChannelVolumes = {
-                ...volumes.melody,
-                reverbSend: preset.params.reverbSend ?? defaultVolumes.melody.reverbSend,
-                distortion: preset.params.distortion ?? defaultVolumes.melody.distortion,
-            };
-            handleMixerChange({ melody: newChannelVolumes });
         }
-    }, [setMelodyInstrument, handleMixerChange, volumes.melody]);
+    }, [setMelodyInstrument]);
 
     const handleBassInstrumentChange = useCallback((instrumentName: BassInstrument) => {
         const preset = bassInstruments.find(p => p.id === instrumentName);
         if (preset) {
             setActiveBassInstrument(instrumentName);
             setBassInstrument(instrumentName);
-            const reverbSend = preset.params.reverbSend ?? defaultVolumes.manualBass.reverbSend;
-            const distortion = preset.params.distortion ?? defaultVolumes.manualBass.distortion;
-            const newManualBassVolumes: ChannelVolumes = {...volumes.manualBass, reverbSend, distortion };
-            const newLatchVolumes: ChannelVolumes = {...volumes.latch, reverbSend, distortion };
-            handleMixerChange({ manualBass: newManualBassVolumes, latch: newLatchVolumes });
         }
-    }, [setBassInstrument, handleMixerChange, volumes.manualBass, volumes.latch]);
+    }, [setBassInstrument]);
     
     if (!isClient) {
         return <Preloader />;
@@ -353,6 +331,10 @@ export default function Home() {
                 </footer>
                 <CookieConsent onConsentChange={(consent) => {
                     setCookieConsent(consent);
+                    if (consent) {
+                        const loaded = loadSettings();
+                        setVolumesState(loaded.volumes);
+                    }
                 }} />
             </div>
         )
@@ -419,8 +401,6 @@ export default function Home() {
                             activeInstrument={activeBassInstrument}
                             onInstrumentChange={handleBassInstrumentChange}
                             orbManager={orbManager}
-                            channelVolumes={volumes.manualBass}
-                            onChannelVolumeChange={(type, value) => handleChannelVolumeChange('manualBass', type, value)}
                         />
                         <MemoizedThereminPad
                             type="melody"
@@ -439,8 +419,6 @@ export default function Home() {
                             onInstrumentChange={handleMelodyInstrumentChange}
                             isPolyphonic
                             orbManager={orbManager}
-                            channelVolumes={volumes.melody}
-                            onChannelVolumeChange={(type, value) => handleChannelVolumeChange('melody', type, value)}
                         />
                     </div>
                     <div className="flex-shrink-0 portrait:block landscape:hidden">
@@ -452,6 +430,7 @@ export default function Home() {
                             onMixerChange={handleMixerChange}
                             onCompressorChange={handleCompressorChange}
                             isMobile={isMobile}
+                            setTempo={handleTempoChange}
                         />
                     </div>
                 </main>
@@ -466,6 +445,7 @@ export default function Home() {
                         onCompressorChange={handleCompressorChange}
                         isMobile={isMobile}
                         isLandscape={true}
+                        setTempo={handleTempoChange}
                     />
                 </div>
             </div>

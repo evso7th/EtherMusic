@@ -7,17 +7,16 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Anchor, SlidersHorizontal, Blend, Waves } from 'lucide-react';
+import { Anchor, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { MusicKey, MusicScale, Instrument, BassInstrument, InstrumentPreset, BassInstrumentPreset, ChannelVolumes } from '@/types';
+import type { MusicKey, MusicScale, Instrument, BassInstrument, InstrumentPreset, BassInstrumentPreset } from '@/types';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import type { OrbManager } from '@/lib/orb-manager';
-import { Slider } from './ui/slider';
 
 interface ThereminPadProps {
     type: 'melody' | 'bass';
@@ -38,55 +37,12 @@ interface ThereminPadProps {
     isLatchOn?: boolean;
     onLatchToggle?: (checked: boolean) => void;
     orbManager?: OrbManager | null;
-    channelVolumes: ChannelVolumes;
-    onChannelVolumeChange: (type: keyof ChannelVolumes, value: number) => void;
 }
 
 const padTitles = {
     melody: "Melody Theremin",
     bass: "Bass Theremin"
 }
-
-const EffectControl = ({
-    label,
-    icon: Icon,
-    level,
-    onLevelChange,
-    onLevelCommit,
-    min,
-    max,
-    step,
-    unit,
-}: {
-    label: string,
-    icon: React.ElementType,
-    level: number,
-    onLevelChange: (v: number) => void,
-    onLevelCommit: (v: number) => void,
-    min: number,
-    max: number,
-    step: number,
-    unit: string,
-}) => (
-     <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-            <Icon className="w-5 h-5 text-accent flex-shrink-0" />
-            <Label className="text-sm font-medium flex-1 truncate">{label}</Label>
-            <span className="text-xs text-muted-foreground w-12 text-right">{(level ?? 0).toFixed(0)}{unit}</span>
-        </div>
-        <div className="flex items-center gap-4 pl-7">
-            <Slider
-                min={min}
-                max={max}
-                step={step}
-                value={[level ?? 0]}
-                onValueChange={(v) => onLevelChange(v[0])}
-                onValueCommit={(v) => onLevelCommit(v[0])}
-            />
-        </div>
-    </div>
-);
-
 
 export function ThereminPad({ 
     type, 
@@ -106,22 +62,11 @@ export function ThereminPad({
     onScaleChange,
     isLatchOn,
     onLatchToggle,
-    orbManager,
-    channelVolumes,
-    onChannelVolumeChange
+    orbManager
 }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const isMobile = useIsMobile();
-    
-    const [localReverb, setLocalReverb] = useState(channelVolumes.reverbSend);
-    const [localDistortion, setLocalDistortion] = useState(channelVolumes.distortion);
-
-    useEffect(() => {
-        setLocalReverb(channelVolumes.reverbSend);
-        setLocalDistortion(channelVolumes.distortion);
-    }, [channelVolumes]);
-
 
     // Manage orbs for latch mode
     useEffect(() => {
@@ -231,26 +176,6 @@ export function ThereminPad({
                                 </div>
                             )}
                              
-                            <div className="space-y-4">
-                                <h3 className="text-base font-semibold tracking-tight text-foreground">Effects</h3>
-                                <EffectControl
-                                    label="Reverb"
-                                    icon={Blend}
-                                    level={localReverb}
-                                    onLevelChange={setLocalReverb}
-                                    onLevelCommit={(v) => onChannelVolumeChange('reverbSend', v)}
-                                    min={-48} max={6} step={1} unit="dB"
-                                />
-                                <EffectControl
-                                    label="Drive"
-                                    icon={Waves}
-                                    level={localDistortion}
-                                    onLevelChange={setLocalDistortion}
-                                    onLevelCommit={(v) => onChannelVolumeChange('distortion', v)}
-                                    min={0} max={100} step={1} unit="%"
-                                />
-                             </div>
-
                             {(musicKeys || musicScales) && <Separator />}
 
                             {type === 'melody' && (

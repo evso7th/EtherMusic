@@ -19,6 +19,7 @@ class ThereminProcessor extends AudioWorkletProcessor {
     };
 
     this.port.onmessage = (event) => {
+      console.log('[4. WORKLET] theremin-processor: Received message:', JSON.parse(JSON.stringify(event.data)));
       const { type, note, id, preset } = event.data;
       switch (type) {
         case 'noteOn':
@@ -41,14 +42,8 @@ class ThereminProcessor extends AudioWorkletProcessor {
   }
   
   applyPreset(preset) {
+    console.log('[5. WORKLET] theremin-processor: Applying preset:', JSON.parse(JSON.stringify(preset)));
     this.preset = { ...this.preset, ...preset };
-    this.voices.forEach((voice, id) => {
-      const newVoiceData = this.createVoice(voice.frequency, this.preset);
-      newVoiceData.targetVolume = voice.targetVolume;
-      newVoiceData.currentVolume = voice.currentVolume;
-      newVoiceData.isReleasing = voice.isReleasing;
-      this.voices.set(id, newVoiceData);
-    });
   }
 
   noteOn(note) {
@@ -89,22 +84,31 @@ class ThereminProcessor extends AudioWorkletProcessor {
   }
   
   createVoice(frequency, preset) {
-    const createLayer = (layerPreset, baseFreq) => ({
-      phase: 0,
-      frequency: baseFreq,
-      detune: layerPreset.oscillator?.detune || 0,
-      type: layerPreset.oscillator?.type || 'sine',
-      gain: layerPreset.gain || 1.0,
-      envelope: {
-        ...layerPreset.envelope,
-        state: 'attack',
-        currentValue: 0,
-        attackSamples: Math.max(1, (layerPreset.envelope?.attack || 0.01) * sampleRate),
-        decaySamples: Math.max(1, (layerPreset.envelope?.decay || 0.1) * sampleRate),
-        sustain: layerPreset.envelope?.sustain ?? 0.5,
-        releaseSamples: Math.max(1, (layerPreset.envelope?.release || 0.5) * sampleRate),
-      }
-    });
+    console.log('[6. WORKLET] theremin-processor: Creating voice with preset:', JSON.parse(JSON.stringify(preset)));
+
+    const createLayer = (layerPreset, baseFreq) => {
+        const layerOscillator = layerPreset.oscillator || {};
+        const layerEnvelope = layerPreset.envelope || {};
+
+        return {
+            phase: 0,
+            frequency: baseFreq,
+            detune: layerOscillator.detune || 0,
+            type: layerOscillator.type || 'sine',
+            gain: layerPreset.gain || 1.0,
+            envelope: {
+                attack: layerEnvelope.attack || 0.01,
+                decay: layerEnvelope.decay || 0.1,
+                sustain: layerEnvelope.sustain ?? 0.5,
+                release: layerEnvelope.release || 0.5,
+                state: 'attack',
+                currentValue: 0,
+                attackSamples: Math.max(1, (layerEnvelope.attack || 0.01) * sampleRate),
+                decaySamples: Math.max(1, (layerEnvelope.decay || 0.1) * sampleRate),
+                releaseSamples: Math.max(1, (layerEnvelope.release || 0.5) * sampleRate),
+            }
+        };
+    };
 
     const mainLayer = createLayer(preset, frequency);
     const additionalLayers = (preset.layers || []).map(layer => createLayer(layer, frequency));
@@ -140,11 +144,8 @@ class ThereminProcessor extends AudioWorkletProcessor {
             voice.frequency = voice.portamentoTarget;
         }
         
-        const attackSamples = (voice.preset.envelope.attack || 0.01) * sampleRate;
-        const releaseSamples = (voice.preset.envelope.release || 0.5) * sampleRate;
-        
-        const volAttackSpeed = 1 / (attackSamples || 1);
-        const volReleaseSpeed = 1 / (releaseSamples || 1);
+        const volAttackSpeed = 1 / ((voice.preset.envelope.attack || 0.01) * sampleRate || 1);
+        const volReleaseSpeed = 1 / ((voice.preset.envelope.release || 0.5) * sampleRate || 1);
 
         if (voice.isReleasing) {
             voice.currentVolume -= volReleaseSpeed;
@@ -165,6 +166,31 @@ class ThereminProcessor extends AudioWorkletProcessor {
                 return; 
             }
             
+            const env = layer.envelope;
+            let envelopeValue = env.currentValue;
+
+            if (!voice.isReleasing) {
+                if (env.state === 'attack') {
+                    envelopeValue += 1 / env.attackSamples;
+                    if (envelopeValue >= 1.0) {
+                        envelopeValue = 1.0;
+                        env.state = 'decay';
+                    }
+                } else if (env.state === 'decay') {
+                    envelopeValue -= (1.0 - env.sustain) / env.decaySamples;
+                    if (envelopeValue <= env.sustain) {
+                        envelopeValue = env.sustain;
+                        env.state = 'sustain';
+                    }
+                }
+            } else {
+                envelopeValue -= env.sustain / env.releaseSamples;
+                if (envelopeValue <= 0) {
+                    envelopeValue = 0;
+                }
+            }
+            env.currentValue = envelopeValue;
+            
             let oscSample = 0;
             const currentFreq = voice.frequency * Math.pow(2, layer.detune / 1200);
             const phaseIncrement = currentFreq / sampleRate;
@@ -184,7 +210,7 @@ class ThereminProcessor extends AudioWorkletProcessor {
                      oscSample = Math.sin(layer.phase * 2 * Math.PI);
             }
             layer.phase = (layer.phase + phaseIncrement) % 1;
-            voiceSample += oscSample * (layer.gain || 1.0);
+            voiceSample += oscSample * envelopeValue * layer.gain;
         });
 
         if (voice.stagger > 0) voice.staggerCounter++;

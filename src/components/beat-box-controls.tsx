@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { SlidersHorizontal, Drum } from 'lucide-react';
+import { SlidersHorizontal, Drum, Bot } from 'lucide-react';
 import { useState, useMemo, useCallback, memo } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
@@ -25,6 +25,7 @@ interface BeatBoxControlsProps {
     volumes: Volumes;
     onMixerChange: (volumes: Partial<Volumes>) => void;
     onCompressorChange: (compressorSettings: CompressorSettings) => void;
+    setTempo: (tempo: number) => void;
     isMobile: boolean;
     isLandscape?: boolean;
 }
@@ -50,11 +51,14 @@ export function BeatBoxControls({
     volumes,
     onMixerChange,
     onCompressorChange,
+    setTempo,
     isMobile,
     isLandscape = false,
 }: BeatBoxControlsProps) {
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isMixerOpen, setIsMixerOpen] = useState(false);
+    const [isTempoOpen, setIsTempoOpen] = useState(false);
+    const [isAutopilotOpen, setIsAutopilotOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<'Meditative' | 'Classic'>('Meditative');
     
     const { classicPatterns, meditativePatterns, offPattern } = useMemo(() => {
@@ -166,6 +170,7 @@ export function BeatBoxControls({
                                         volumes={volumes} 
                                         onMixerChange={onMixerChange}
                                         onCompressorChange={onCompressorChange}
+                                        setTempo={setTempo}
                                     />
                                 </div>
                             </ScrollArea>
@@ -261,11 +266,28 @@ export function BeatBoxControls({
                                         volumes={volumes}
                                         onMixerChange={onMixerChange}
                                         onCompressorChange={onCompressorChange}
+                                        setTempo={setTempo}
                                     />
                                 </div>
                             </ScrollArea>
                         </DialogContent>
                     </Dialog>
+
+                     <Dialog open={isAutopilotOpen} onOpenChange={setIsAutopilotOpen}>
+                         <DialogTrigger asChild>
+                            <ControlButtonWrapper tooltipText="Autopilot" variant={'outline'} className="flex-1" size={buttonSize}>
+                                <Bot className="w-4 h-4 md:mr-2" />
+                                <span className="hidden sm:inline">Autopilot</span>
+                            </ControlButtonWrapper>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Autopilot</DialogTitle>
+                            </DialogHeader>
+                            {/* Autopilot content will go here */}
+                        </DialogContent>
+                    </Dialog>
+
 
                     <HelpGuide buttonVariant="outline" buttonClassName="flex-1" size={buttonSize}/>
                 </CardContent>
