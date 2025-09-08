@@ -11,7 +11,7 @@ import { Anchor, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { MusicKey, MusicScale, Instrument, BassInstrument, InstrumentPreset, BassInstrumentPreset } from '@/types';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -159,6 +159,7 @@ export function ThereminPad({
                 <SheetContent side={isMobile ? "bottom" : "right"}>
                     <SheetHeader>
                         <SheetTitle>{padTitles[type]} Settings</SheetTitle>
+                        <SheetDescription>Configure the sound and behavior of the instrument.</SheetDescription>
                     </SheetHeader>
                      <ScrollArea className="h-[85vh]">
                         <div className="py-4 pr-4 space-y-6">
@@ -281,3 +282,5 @@ export function ThereminPad({
         </Card>
     );
 }
+
+    

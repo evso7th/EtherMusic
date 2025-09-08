@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 
@@ -36,7 +36,7 @@ export function CookieConsent({ onConsentChange }: CookieConsentProps) {
         if (consent === null) {
             setShowConsent(true);
         } else {
-            // Defer the call to avoid state updates during render
+             // Defer the call to avoid state updates during render, which can cause loops
             setTimeout(() => onConsentChange(consent === 'true'), 0);
         }
     }, [onConsentChange]);

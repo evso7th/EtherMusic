@@ -36,6 +36,7 @@ export function useAudioEngine() {
             setIsReady(true);
             setIsPlaying(audioEngine.current.isPlaying);
             
+            console.log("AudioEngine initialized and ready.");
 
         } catch(e) {
             console.error("Failed to initialize audio engines:", e);
@@ -134,7 +135,6 @@ export function useAudioEngine() {
     }, [isReady]);
 
     const setMelodyInstrument = useCallback((instrumentName: Instrument) => {
-        console.log('[2. HOOK] use-audio-engine: setMelodyInstrument called with:', instrumentName);
         audioEngine.current?.setMelodyInstrument(instrumentName);
     }, []);
     
@@ -164,3 +164,5 @@ export function useAudioEngine() {
         setSleepTimer,
     };
 }
+
+    

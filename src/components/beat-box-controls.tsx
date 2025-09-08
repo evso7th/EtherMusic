@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { SlidersHorizontal, Drum, Bot } from 'lucide-react';
 import { useState, useMemo, useCallback, memo } from "react";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,7 @@ interface BeatBoxControlsProps {
     volumes: Volumes;
     onMixerChange: (volumes: Partial<Volumes>) => void;
     onCompressorChange: (compressorSettings: CompressorSettings) => void;
+    tempo: number;
     setTempo: (tempo: number) => void;
     isMobile: boolean;
     isLandscape?: boolean;
@@ -51,6 +52,7 @@ export function BeatBoxControls({
     volumes,
     onMixerChange,
     onCompressorChange,
+    tempo,
     setTempo,
     isMobile,
     isLandscape = false,
@@ -102,6 +104,7 @@ export function BeatBoxControls({
                          <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>Beat Patterns</DialogTitle>
+                                <DialogDescription>Select a rhythm style.</DialogDescription>
                             </DialogHeader>
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="space-y-4 py-4 pr-4">
@@ -163,6 +166,7 @@ export function BeatBoxControls({
                         <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>Mixer</DialogTitle>
+                                <DialogDescription>Adjust volume, effects, and tempo.</DialogDescription>
                             </DialogHeader>
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="pr-4 py-4">
@@ -170,6 +174,7 @@ export function BeatBoxControls({
                                         volumes={volumes} 
                                         onMixerChange={onMixerChange}
                                         onCompressorChange={onCompressorChange}
+                                        tempo={tempo}
                                         setTempo={setTempo}
                                     />
                                 </div>
@@ -197,6 +202,7 @@ export function BeatBoxControls({
                         <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>Beat Patterns</DialogTitle>
+                                <DialogDescription>Select a rhythm style.</DialogDescription>
                             </DialogHeader>
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="space-y-4 py-4 pr-4">
@@ -259,6 +265,7 @@ export function BeatBoxControls({
                         <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>Mixer</DialogTitle>
+                                <DialogDescription>Adjust volume, effects, and tempo.</DialogDescription>
                             </DialogHeader>
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="pr-4 py-4">
@@ -266,6 +273,7 @@ export function BeatBoxControls({
                                         volumes={volumes}
                                         onMixerChange={onMixerChange}
                                         onCompressorChange={onCompressorChange}
+                                        tempo={tempo}
                                         setTempo={setTempo}
                                     />
                                 </div>
@@ -283,8 +291,13 @@ export function BeatBoxControls({
                         <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>Autopilot</DialogTitle>
+                                <DialogDescription>This feature is coming soon.</DialogDescription>
                             </DialogHeader>
-                            {/* Autopilot content will go here */}
+                            <div className="py-4">
+                                <p className="text-sm text-muted-foreground">
+                                    The Autopilot will automatically generate music for you. You'll be able to choose from different styles and even save your own presets. Stay tuned!
+                                </p>
+                            </div>
                         </DialogContent>
                     </Dialog>
 
@@ -295,3 +308,5 @@ export function BeatBoxControls({
         </TooltipProvider>
     );
 }
+
+    

@@ -10,8 +10,6 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
             envelope: { attack: 0.15, decay: 0.5, sustain: 0.4, release: 1.0 },
             filter: { Q: 1.0, frequency: 700, type: 'lowpass' },
             portamento: 0.03,
-            reverbSend: -18,
-            distortion: 0,
         }
     },
     {
@@ -19,20 +17,18 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
         name: "Organ",
         params: {
             oscillator: { type: 'sine' },
-            envelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 1.0 },
+            envelope: { attack: 0.01, decay: 0.2, sustain: 0.9, release: 0.3 },
             filter: { Q: 0.7, frequency: 1200, type: 'lowpass' },
             portamento: 0,
-            reverbSend: -18,
-            distortion: 2,
             layers: [
                 {
                     oscillator: { type: 'sine', detune: 1200 }, // 1st Octave
-                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 1.0 },
+                    envelope: { attack: 0.015, decay: 0.2, sustain: 0.9, release: 0.35 },
                     gain: 0.75,
                 },
                 {
-                    oscillator: { type: 'sine', detune: 1900 }, // A fifth above the octave
-                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 1.0 },
+                    oscillator: { type: 'sine', detune: 2400 }, // 2nd Octave
+                    envelope: { attack: 0.02, decay: 0.2, sustain: 0.9, release: 0.4 },
                     gain: 0.5, 
                 }
             ],
@@ -46,8 +42,6 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
             envelope: { attack: 0.3, decay: 0.2, sustain: 0.6, release: 1.5 },
             filter: { Q: 1.5, frequency: 500, type: 'lowpass' },
             portamento: 0.01,
-            reverbSend: -12,
-            distortion: 5,
         }
     },
     {
@@ -58,10 +52,10 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
             envelope: { attack: 0.3, decay: 0.1, sustain: 1.0, release: 1.5 },
             filter: { Q: 0.6, frequency: 600, type: 'lowpass' },
             portamento: 0.08,
-            reverbSend: -9,
-            distortion: 0,
         }
     }
 ];
 
 export const defaultMelodyInstrument: Instrument = 'synth';
+
+    

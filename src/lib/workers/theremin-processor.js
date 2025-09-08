@@ -19,7 +19,6 @@ class ThereminProcessor extends AudioWorkletProcessor {
     };
 
     this.port.onmessage = (event) => {
-      console.log('[4. WORKLET] theremin-processor: Received message:', JSON.parse(JSON.stringify(event.data)));
       const { type, note, id, preset } = event.data;
       switch (type) {
         case 'noteOn':
@@ -42,7 +41,6 @@ class ThereminProcessor extends AudioWorkletProcessor {
   }
   
   applyPreset(preset) {
-    console.log('[5. WORKLET] theremin-processor: Applying preset:', JSON.parse(JSON.stringify(preset)));
     this.preset = { ...this.preset, ...preset };
   }
 
@@ -84,8 +82,6 @@ class ThereminProcessor extends AudioWorkletProcessor {
   }
   
   createVoice(frequency, preset) {
-    console.log('[6. WORKLET] theremin-processor: Creating voice with preset:', JSON.parse(JSON.stringify(preset)));
-
     const createLayer = (layerPreset, baseFreq) => {
         const layerOscillator = layerPreset.oscillator || {};
         const layerEnvelope = layerPreset.envelope || {};
@@ -95,7 +91,7 @@ class ThereminProcessor extends AudioWorkletProcessor {
             frequency: baseFreq,
             detune: layerOscillator.detune || 0,
             type: layerOscillator.type || 'sine',
-            gain: layerPreset.gain || 1.0,
+            gain: layerPreset.gain === undefined ? 1.0 : layerPreset.gain,
             envelope: {
                 attack: layerEnvelope.attack || 0.01,
                 decay: layerEnvelope.decay || 0.1,
@@ -239,3 +235,5 @@ class ThereminProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('theremin-processor', ThereminProcessor);
+
+    

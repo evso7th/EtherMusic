@@ -133,7 +133,11 @@ export default function Home() {
     useEffect(() => {
       setIsClient(true);
       const consent = getCookie("ethermusic_consent");
-      setCookieConsent(consent === 'true');
+      if (consent !== null) {
+          setCookieConsent(consent === 'true');
+      } else {
+          setCookieConsent(undefined);
+      }
     }, []);
 
     const onConsentChange = useCallback((consent: boolean) => {
@@ -143,6 +147,8 @@ export default function Home() {
             setVolumesState(loaded.volumes);
         } else {
             setVolumesState(defaultVolumes);
+            // also remove the cookie
+            document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
         }
     }, []); 
 
@@ -177,8 +183,18 @@ export default function Home() {
     const [activeBassInstrument, setActiveBassInstrument] = useState<BassInstrument>(defaultBassInstrument);
     
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
+    const [currentTempo, setCurrentTempo] = useState(90);
     
+    useEffect(() => {
+        const consent = getCookie("ethermusic_consent");
+        if (consent === 'true') {
+            const loaded = loadSettings();
+            setVolumesState(loaded.volumes);
+        }
+    }, [cookieConsent]);
+
     const handleTempoChange = useCallback((newTempo: number) => {
+        setCurrentTempo(newTempo);
         setTempo(newTempo);
     }, [setTempo]);
 
@@ -214,10 +230,10 @@ export default function Home() {
     const updateVolumes = useCallback((newVolumes: Volumes) => {
         setVolumesState(newVolumes);
         setVolumes(newVolumes);
-        if (cookieConsent) {
+        if (getCookie("ethermusic_consent") === 'true') {
             saveSettings(newVolumes);
         }
-    }, [setVolumes, cookieConsent]);
+    }, [setVolumes]);
     
     const handleMixerChange = useCallback((changedMixerVolumes: Partial<Volumes>) => {
         const newVolumes: Volumes = { ...volumes, ...changedMixerVolumes };
@@ -276,7 +292,6 @@ export default function Home() {
     }, [setBassLatch]);
     
     const handleMelodyInstrumentChange = useCallback((instrumentName: Instrument) => {
-        console.log('[1. UI] page.tsx: handleMelodyInstrumentChange. Preset selected:', melodyInstruments.find(p => p.id === instrumentName));
         const preset = melodyInstruments.find(p => p.id === instrumentName);
         if (preset) {
             setActiveMelodyInstrument(instrumentName);
@@ -336,7 +351,7 @@ export default function Home() {
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
             <div className="fixed inset-0 z-0">
-                 <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={90} />
+                 <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={currentTempo} />
             </div>
             
              <div className="relative z-10 flex h-full portrait:flex-col portrait:p-2 md:p-6 lg:p-8 landscape:flex-row landscape:p-1 landscape:gap-1">
@@ -344,9 +359,12 @@ export default function Home() {
                      <div className="portrait:block landscape:hidden">
                         {isMobile ? (
                              <Dialog>
+                                 <DialogTrigger asChild>
+                                    <Button variant="ghost" className="text-primary text-xl font-bold p-0 h-auto">EtherMusic</Button>
+                                 </DialogTrigger>
                                 <DialogContent>
                                     <DialogHeader>
-                                        <DialogTitle>What is This?</DialogTitle>
+                                        <DialogTitle>What is EtherMusic?</DialogTitle>
                                     </DialogHeader>
                                     <div className="text-sm text-muted-foreground space-y-4 py-4">
                                         <p>This is not a professional tool, but a **virtual music box**, a "Neuro-Meditation Sound Processor."</p>
@@ -419,6 +437,7 @@ export default function Home() {
                             onMixerChange={handleMixerChange}
                             onCompressorChange={handleCompressorChange}
                             isMobile={isMobile}
+                            tempo={currentTempo}
                             setTempo={handleTempoChange}
                         />
                     </div>
@@ -434,6 +453,7 @@ export default function Home() {
                         onCompressorChange={handleCompressorChange}
                         isMobile={isMobile}
                         isLandscape={true}
+                        tempo={currentTempo}
                         setTempo={handleTempoChange}
                     />
                 </div>
