@@ -1,21 +1,22 @@
 
-import type { InstrumentPreset, Instrument } from "@/types";
+import type { InstrumentPreset, Instrument, BassInstrumentPresetParams } from "@/types";
 
 export const melodyInstruments: readonly InstrumentPreset[] = [
     {
         id: "synth",
         name: "Synth",
         params: {
-            oscillator: { type: 'triangle' },
+            oscillator: { type: 'triangle', detune: -5 },
             envelope: { attack: 0.15, decay: 0.5, sustain: 0.4, release: 1.0 },
             filter: { Q: 1.0, frequency: 700, type: 'lowpass', gain: 0 },
             portamento: 0.03,
             layers: [
-                { type: 'triangle', freqMult: 1, level: 1.0, detune: 0 },
                 { type: 'sawtooth', freqMult: 0.5, level: 0.3, detune: 2 },
                 { type: 'sine', freqMult: 2, level: 0.5, detune: -2 },
             ],
             stagger: 0.005,
+            reverbSend: -18,
+            distortion: 5,
         }
     },
     {
@@ -28,29 +29,32 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
             vibrato: { frequency: 5.5, depth: 2 },
             portamento: 0,
             layers: [
-                { type: 'sine', freqMult: 1, level: 1.0, detune: 0 },      // 8'
-                { type: 'sine', freqMult: 0.5, level: 0.8, detune: -2 }, // 16'
-                { type: 'sine', freqMult: 2, level: 0.7, detune: 2 },     // 4'
-                { type: 'triangle', freqMult: 1.5, level: 0.5, detune: -3 }, // Quint
-                { type: 'sine', freqMult: 4.0, level: 0.4, detune: 3 },    // 2'
-                { type: 'triangle', freqMult: 6.0, level: 0.2, detune: -4}, // Larigot
+                { type: 'sine', freqMult: 1, level: 1.0, detune: 0 },
+                { type: 'sine', freqMult: 0.5, level: 0.8, detune: -2 },
+                { type: 'sine', freqMult: 2, level: 0.7, detune: 2 },
+                { type: 'triangle', freqMult: 1.5, level: 0.5, detune: -3 },
+                { type: 'sine', freqMult: 4.0, level: 0.4, detune: 3 },
+                { type: 'triangle', freqMult: 6.0, level: 0.2, detune: -4}, 
             ],
+            reverbSend: -12,
+            distortion: 0,
         }
     },
     {
         id: "mellotron",
         name: "Mellotron",
         params: {
-            oscillator: { type: 'sine' },
+            oscillator: { type: 'sawtooth', detune: 3 },
             envelope: { attack: 0.3, decay: 0.2, sustain: 0.6, release: 1.5 },
             filter: { Q: 8, frequency: 1500, type: 'lowpass', gain: 0 },
             vibrato: { frequency: 4.5, depth: 3 },
             portamento: 0.01,
             layers: [
-                { type: 'triangle', freqMult: 1.0, level: 0.8, detune: -5 },
-                { type: 'sine', freqMult: 2.0, level: 0.6, detune: 5 },
-                { type: 'sawtooth', freqMult: 0.5, level: 0.2, detune: -10 }
+                { type: 'triangle', freqMult: 1.0, level: 0.6, detune: -5 },
+                { type: 'sine', freqMult: 2.0, level: 0.4, detune: 5 },
             ],
+            reverbSend: -20,
+            distortion: 10,
         }
     },
     {
@@ -63,9 +67,10 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
             vibrato: { frequency: 6, depth: 5 },
             portamento: 0.1,
             layers: [
-                { type: 'sine', freqMult: 1, level: 1.0, detune: 0 },
-                { type: 'sine', freqMult: 1, level: 0.8, detune: 4 },
-            ]
+                { type: 'sine', freqMult: 1.0, level: 0.8, detune: 4 },
+            ],
+            reverbSend: -15,
+            distortion: 0,
         }
     }
 ];

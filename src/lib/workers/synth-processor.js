@@ -56,28 +56,29 @@ class Voice {
 
     initLayers(preset) {
         this.layers = []; // Clear existing layers
-        const createLayer = (layerConfig, baseFrequency) => {
+
+        const createLayer = (layerConfig, baseFrequency, isMainLayer = false) => {
             const freq = layerConfig.freqMult !== undefined 
-                ? baseFrequency * layerConfig.freqMult * Math.pow(2, (layerConfig.detune || 0) / 1200)
+                ? baseFrequency * layerConfig.freqMult
                 : baseFrequency;
-    
+            
+            const detunedFreq = freq * Math.pow(2, (layerConfig.detune || 0) / 1200);
+
             return {
                 osc: new Oscillator(layerConfig.type || 'sine', this.sampleRate),
                 level: layerConfig.level ?? 1.0,
                 baseFreq: freq,
-                currentFreq: freq,
+                currentFreq: detunedFreq,
             };
         };
         
-        // The main oscillator config is treated as the first layer
         const mainOscillatorConfig = {
-            type: preset.oscillator?.type || 'sine',
+            ...preset.oscillator,
             level: 1.0, 
             freqMult: 1,
-            detune: preset.oscillator?.detune || 0,
         };
 
-        this.layers.push(createLayer(mainOscillatorConfig, this.baseFrequency));
+        this.layers.push(createLayer(mainOscillatorConfig, this.baseFrequency, true));
     
         if (preset.layers && preset.layers.length > 0) {
              preset.layers.forEach(layer => this.layers.push(createLayer(layer, this.baseFrequency)));
@@ -243,7 +244,7 @@ class Voice {
             const modulatedFrequency = (this.baseFrequency + lfoModulation) * (layer.baseFreq / this.baseFrequency);
             mixedSample += layer.osc.process(modulatedFrequency) * layer.level;
         });
-
+        
         const filteredSample = this.processFilter(mixedSample / this.layers.length);
 
         return filteredSample * envelopeValue * this.volume;
@@ -301,7 +302,6 @@ class SynthProcessor extends AudioWorkletProcessor {
 
     noteOn(note) {
         if (this.voices.has(note.id)) {
-            // Re-trigger existing note
             const voice = this.voices.get(note.id);
             voice.noteUpdate(note.frequency, note.volume);
             return;
@@ -309,7 +309,7 @@ class SynthProcessor extends AudioWorkletProcessor {
 
         if (this.voices.size >= this.polyphony) {
             const oldestVoiceId = this.voices.keys().next().value;
-            this.voices.delete(oldestVoiceId);
+            this.voices.get(oldestVoiceId)?.release();
         }
 
         const voice = new Voice(note.id, note.frequency, note.volume, this.preset, sampleRate);

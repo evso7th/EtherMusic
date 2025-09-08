@@ -358,10 +358,15 @@ export class AudioEngine {
             
             // Also update the volume settings associated with the preset
             const newVolumes = { ...this.volumes };
-            newVolumes.manualBass.reverbSend = bassPresetParams.reverbSend;
-            newVolumes.manualBass.distortion = bassPresetParams.distortion;
-            newVolumes.latch.reverbSend = bassPresetParams.reverbSend;
-            newVolumes.latch.distortion = bassPresetParams.distortion;
+            if (bassPresetParams.reverbSend !== undefined) {
+                newVolumes.manualBass.reverbSend = bassPresetParams.reverbSend;
+                newVolumes.latch.reverbSend = bassPresetParams.reverbSend;
+            }
+            if (bassPresetParams.distortion !== undefined) {
+                newVolumes.manualBass.distortion = bassPresetParams.distortion;
+                newVolumes.latch.distortion = bassPresetParams.distortion;
+            }
+
             this.setVolumes(newVolumes);
         }
     }

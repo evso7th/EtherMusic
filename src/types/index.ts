@@ -5,12 +5,13 @@ export type MusicKey = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' |
 export type MusicScale = 'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentatonic';
 
 export type Instrument = 'synth' | 'organ' | 'theremin' | 'mellotron';
-export type BassInstrument = 'classicBass' | 'glideBass' | 'ambientDrone' | 'resonantGliss' | 'hypnoticDrone' | 'livingRiff';
+export type BassInstrument = 'classicBass' | 'organ' | 'mellotron' | 'synth';
 
 // These presets are sent to the AudioWorklet, so they must contain only serializable data.
 export interface BaseInstrumentParams {
     oscillator: {
         type: OscillatorType;
+        detune?: number; 
     };
     envelope: {
         attack: number;
@@ -39,6 +40,8 @@ export interface BaseInstrumentParams {
         detune?: number; // Detune in cents
     }[];
     stagger?: number; // Delay between layer note ons in seconds
+    reverbSend?: number;
+    distortion?: number;
 }
 
 export interface InstrumentPresetParams extends BaseInstrumentParams {}
@@ -116,4 +119,10 @@ export type DrumWorkerMessage =
 
 export type EnvelopeCurve = "linear" | "exponential";
 
-    
+export interface Note {
+    id: number;
+    frequency: number;
+    volume: number;
+    duration?: number; // for autopilot and scheduled notes
+    time?: number; // for autopilot and scheduled notes
+}

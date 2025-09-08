@@ -177,12 +177,6 @@ export default function Home() {
             setVolumesState(defaultVolumes);
             if (typeof document !== 'undefined') {
                 document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-                // We don't have autopilot presets anymore, but keeping this in case it's needed later for other settings
-                Object.keys(localStorage).forEach(key => {
-                    if (key.startsWith('ethermusic_')) {
-                        localStorage.removeItem(key);
-                    }
-                });
             }
         }
     }, []);
@@ -480,5 +474,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
