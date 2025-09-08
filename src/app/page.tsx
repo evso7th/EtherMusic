@@ -14,7 +14,7 @@ import { HelpGuide } from "@/components/help-guide";
 import { beatPatterns } from '@/lib/drum-machine';
 import { CookieConsent } from '@/components/cookie-consent';
 import { useAudioEngine } from '@/hooks/use-audio-engine';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { SleepTimer } from '@/components/sleep-timer';
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
 import { melodyInstruments, defaultMelodyInstrument } from '@/lib/melody-presets';
@@ -148,7 +148,9 @@ export default function Home() {
         } else {
             setVolumesState(defaultVolumes);
             // also remove the cookie
-            document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            if (typeof document !== 'undefined') {
+                document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            }
         }
     }, []); 
 
@@ -295,7 +297,7 @@ export default function Home() {
         const preset = melodyInstruments.find(p => p.id === instrumentName);
         if (preset) {
             setActiveMelodyInstrument(instrumentName);
-            setMelodyInstrument(instrumentName);
+            setMelodyInstrument(preset);
         }
     }, [setMelodyInstrument]);
 
@@ -303,7 +305,7 @@ export default function Home() {
         const preset = bassInstruments.find(p => p.id === instrumentName);
         if (preset) {
             setActiveBassInstrument(instrumentName);
-            setBassInstrument(instrumentName);
+            setBassInstrument(preset);
         }
     }, [setBassInstrument]);
     
@@ -461,5 +463,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
