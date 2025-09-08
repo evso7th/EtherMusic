@@ -130,7 +130,7 @@ export function ThereminPad({
         }
     }, [calculateInteraction, isDisabled, onInteraction, type, isLatchOn]);
     
-     const renderSettingsControls = () => {
+    const renderSettingsControls = () => {
         const triggerButton = (
              <Button variant="outline" size="sm" className={cn("h-8 capitalize",
                     type === 'melody' ? "border-primary text-primary hover:bg-primary hover:text-primary-foreground" : "border-accent text-accent hover:bg-accent hover:text-accent-foreground"
@@ -226,6 +226,10 @@ export function ThereminPad({
 
 
     const [title, subtitle] = padTitles[type].split(' ');
+    
+    const instrumentName = useMemo(() => {
+        return instruments?.find(i => i.id === activeInstrument)?.name || '...';
+    }, [instruments, activeInstrument]);
 
     return (
         <Card 
@@ -243,11 +247,10 @@ export function ThereminPad({
                              <Label htmlFor="latch-mode" className="flex items-center gap-1 text-xs cursor-pointer"><Anchor className="w-3 h-3" /> Latch</Label>
                             <Switch id="latch-mode" checked={isLatchOn} onCheckedChange={onLatchToggle} />
                         </div>
-                    ) : (
-                        <div className="text-xs text-muted-foreground capitalize pl-2 h-8 flex items-center">
-                            {type === 'melody' ? 'Theremin' : 'Bass Synth'}
-                        </div>
-                    )}
+                    ) : null}
+                     <div className="text-xs text-muted-foreground capitalize pl-2 h-8 flex items-center">
+                        {instrumentName}
+                    </div>
                 </div>
                 <div className="flex items-center gap-2">
                      <TooltipProvider>
@@ -282,5 +285,3 @@ export function ThereminPad({
         </Card>
     );
 }
-
-    
