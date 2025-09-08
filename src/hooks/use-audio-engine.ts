@@ -132,13 +132,12 @@ export function useAudioEngine() {
         audioEngine.current.handleThereminInteraction(type, data, state);
     }, [isReady]);
 
-    const setMelodyInstrument = useCallback((instrument: InstrumentPreset) => {
-        console.log('[2. HOOK] use-audio-engine: setMelodyInstrument called with:', instrument.id);
-        audioEngine.current?.setMelodyInstrument(instrument);
+    const setMelodyInstrument = useCallback((instrumentName: Instrument) => {
+        audioEngine.current?.setMelodyInstrument(instrumentName);
     }, []);
     
-    const setBassInstrument = useCallback((instrument: BassInstrumentPreset) => {
-        audioEngine.current?.setBassInstrument(instrument);
+    const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
+        audioEngine.current?.setBassInstrument(instrumentName);
     }, []);
     
     const handleCompressorChange = useCallback((compressorSettings: CompressorSettings) => {

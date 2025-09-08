@@ -159,7 +159,7 @@ export class AudioEngine {
             throw new Error("Could not load core audio components. Please try refreshing the page.");
         }
         
-        await this.loadReverbImpulse();
+        // await this.loadReverbImpulse();
 
         this.createWorkletNode('melody', 'theremin-processor', 4, this.melodyDistortion);
         this.createWorkletNode('manualBass', 'theremin-processor', 4, this.bassDistortion);
@@ -341,23 +341,25 @@ export class AudioEngine {
         }
     }
     
-    public setMelodyInstrument(instrument: InstrumentPreset) {
-        console.log('[3. ENGINE] audio-engine.ts: setMelodyInstrument called with:', instrument.id);
-        const nodeInfo = this.nodes.get('melody');
+    private sendPresetToWorklet(part: PartName, params: InstrumentPreset['params'] | BassInstrumentPreset['params']) {
+        const nodeInfo = this.nodes.get(part);
         if (nodeInfo) {
-             console.log('[3. ENGINE] audio-engine.ts: Sending preset to melody worklet:', JSON.parse(JSON.stringify(instrument.params)));
-            nodeInfo.worklet.port.postMessage({ type: 'setPreset', preset: instrument.params });
+            nodeInfo.worklet.port.postMessage({ type: 'setPreset', preset: params });
+        }
+    }
+
+    public setMelodyInstrument(instrumentName: Instrument) {
+        const preset = melodyInstruments.find(p => p.id === instrumentName);
+        if (preset) {
+            this.sendPresetToWorklet('melody', preset.params);
         }
     }
     
-    public setBassInstrument(instrument: BassInstrumentPreset) {
-        const manualBassNode = this.nodes.get('manualBass');
-        if (manualBassNode) {
-            manualBassNode.worklet.port.postMessage({ type: 'setPreset', preset: instrument.params });
-        }
-        const latchNode = this.nodes.get('latch');
-        if (latchNode) {
-            latchNode.worklet.port.postMessage({ type: 'setPreset', preset: instrument.params });
+    public setBassInstrument(instrumentName: BassInstrument) {
+        const preset = bassInstruments.find(p => p.id === instrumentName);
+        if (preset) {
+            this.sendPresetToWorklet('manualBass', preset.params);
+            this.sendPresetToWorklet('latch', preset.params);
         }
     }
     
@@ -453,5 +455,3 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
-
-    

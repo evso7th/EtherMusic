@@ -183,11 +183,11 @@ export default function Home() {
         const consent = getCookie("ethermusic_consent");
         const initialConsent = consent === 'true';
         if (consent !== null) {
-            setCookieConsent(initialConsent);
+             setCookieConsent(initialConsent);
         } else {
             setCookieConsent(undefined);
         }
-        if (initialConsent) {
+       if (initialConsent) {
             const loaded = loadSettings();
             setVolumesState(loaded.volumes);
         }
@@ -254,16 +254,16 @@ export default function Home() {
             setVolumes(volumes);
             const melodyPreset = melodyInstruments.find(i => i.id === activeMelodyInstrument);
             if (melodyPreset) {
-                console.log('[1.A UI] page.tsx: useEffect[isReady] setting melody instrument:', JSON.parse(JSON.stringify(melodyPreset)));
-                setMelodyInstrument(melodyPreset);
+                setMelodyInstrument(melodyPreset.id);
             }
 
             const bassPreset = bassInstruments.find(i => i.id === activeBassInstrument);
             if(bassPreset) {
-                setBassInstrument(bassPreset);
+                setBassInstrument(bassPreset.id);
             }
         }
-    }, [isReady, setVolumes, volumes, setMelodyInstrument, activeMelodyInstrument, setBassInstrument, activeBassInstrument]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isReady, setVolumes]);
     
     const handleStartApp = useCallback(() => {
         startApp();
@@ -301,20 +301,13 @@ export default function Home() {
     }, [setBassLatch]);
     
     const handleMelodyInstrumentChange = useCallback((instrumentId: Instrument) => {
-        const preset = melodyInstruments.find(p => p.id === instrumentId);
-        if (preset) {
-            console.log('[1. UI] page.tsx: handleMelodyInstrumentChange. Preset selected:', JSON.parse(JSON.stringify(preset)));
-            setActiveMelodyInstrument(instrumentId);
-            setMelodyInstrument(preset);
-        }
+        setActiveMelodyInstrument(instrumentId);
+        setMelodyInstrument(instrumentId);
     }, [setMelodyInstrument]);
 
     const handleBassInstrumentChange = useCallback((instrumentId: BassInstrument) => {
-        const preset = bassInstruments.find(p => p.id === instrumentId);
-        if (preset) {
-            setActiveBassInstrument(instrumentId);
-            setBassInstrument(preset);
-        }
+        setActiveBassInstrument(instrumentId);
+        setBassInstrument(instrumentId);
     }, [setBassInstrument]);
 
     if (!isClient) {

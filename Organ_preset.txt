@@ -1,0 +1,201 @@
+Как сделать настоящий звук органа
+1. Используй несколько осцилляторов с разными частотами
+Орган строится на гармонических частотах (как у drawbars в Hammond):
+
+js
+
+
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+⌄
+// Пример "регистров" органа
+const drawbars = [
+  { level: 8, freq: 1.0 },   // Основная частота
+  { level: 8, freq: 2.0 },   // Октава
+  { level: 8, freq: 3.0 },   // Квинта
+  { level: 8, freq: 4.0 },   // Две октавы
+  { level: 5, freq: 5.0 },   // Мажорная септима
+  { level: 3, freq: 6.0 },   // Кварт
+  { level: 2, freq: 0.5 },   // Субоктава
+];
+Каждый — отдельный осциллятор, смешанный в один голос.
+
+2. Создай OrganSynth с несколькими слоями
+js
+
+
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+⌄
+⌄
+// В theremin-processor.js
+
+createOrganVoice(frequency) {
+  const voices = [];
+
+  // Основной регистр
+  voices.push(this.createOscillator(frequency, 'sine', 0.6));
+  voices.push(this.createOscillator(frequency * 2, 'sine', 0.4)); // Октава
+  voices.push(this.createOscillator(frequency * 3, 'triangle', 0.3)); // Квинта
+  voices.push(this.createOscillator(frequency * 4, 'sawtooth', 0.2)); // Две октавы
+  voices.push(this.createOscillator(frequency * 0.5, 'sine', 0.5)); // Субоктава
+
+  // Добавь лёгкий шум (как у воздушного органа)
+  if (Math.random() < 0.1) {
+    voices.push(this.createNoise(0.02));
+  }
+
+  return voices;
+}
+3. Добавь вибрато (модуляцию)
+Орган всегда немного дрожит:
+
+js
+
+
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+// Внутри createOrganVoice
+const lfo = this.context.createOscillator();
+lfo.frequency.value = 5.5; // Частота вибрато
+const gain = this.context.createGain();
+gain.gain.value = 2; // Глубина
+
+lfo.connect(gain);
+gain.connect(oscillator.frequency);
+
+lfo.start();
+4. Добавь формантный фильтр
+Чтобы звук стал "органным", а не "синтезаторным":
+
+js
+
+
+1
+2
+3
+4
+5
+const filter = this.context.createBiquadFilter();
+filter.type = 'peaking';
+filter.frequency.value = 1200; // "Голос" органа
+filter.Q.value = 3;
+filter.gain.value = 12; // Подчеркиваем средние частоты
+5. Добавь реверб и лёгкий хорус
+js
+
+
+1
+2
+3
+4
+5
+// В AudioEngine — для органа
+const chorus = new Chorus({ frequency: 1.5, delayTime: 4, depth: 0.3 });
+const reverb = new Reverb({ decay: 6, wet: 0.4 });
+
+organNode.connect(chorus).connect(reverb).connect(master);
+✅ Пример пресета для "органа"
+ts
+
+
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+⌄
+⌄
+⌄
+⌄
+⌄
+⌄
+const ORGAN_PRESET = {
+  oscillator: { type: 'custom' }, // Не 'sine', а мультиосциллятор
+  envelope: {
+    attack: 0.1,
+    decay: 0.3,
+    sustain: 0.7,
+    release: 0.5
+  },
+  filter: {
+    type: 'peaking',
+    frequency: 1200,
+    Q: 3,
+    gain: 12
+  },
+  vibrato: {
+    frequency: 5.5,
+    depth: 2
+  },
+  layers: [
+    { freqMult: 0.5, type: 'sine', level: 0.5 },
+    { freqMult: 1.0, type: 'sine', level: 0.6 },
+    { freqMult: 2.0, type: 'sine', level: 0.4 },
+    { freqMult: 3.0, type: 'triangle', level: 0.3 },
+    { freqMult: 4.0, type: 'sawtooth', level: 0.2 }
+  ],
+  effects: {
+    reverbSend: -12,
+    chorus: true
+  }
+};
+
