@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { SlidersHorizontal, Drum, Zap, Music, Waves, Anchor, Blend, AudioLines } from 'lucide-react';
-import { useState, useMemo, memo, useCallback } from "react";
+import { SlidersHorizontal, Drum } from 'lucide-react';
+import { useState, useMemo, useCallback, memo } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
 import { Separator } from "./ui/separator";
@@ -23,7 +23,7 @@ interface BeatBoxControlsProps {
     activePattern: BeatPattern;
     onPatternChange: (pattern: BeatPattern) => void;
     volumes: Volumes;
-    onMixerChange: (volumes: Partial<Omit<Volumes, 'compressor'>>) => void;
+    handleMixerChange: (volumes: Partial<Omit<Volumes, 'compressor'>>) => void;
     onChannelVolumeChange: (channel: keyof Omit<Volumes, 'compressor' | 'reverbReturn'>, newVolumes: Partial<ChannelVolumes>) => void;
     onCompressorChange: (compressorSettings: CompressorSettings) => void;
     isMobile: boolean;
@@ -49,7 +49,7 @@ export function BeatBoxControls({
     activePattern,
     onPatternChange,
     volumes,
-    onMixerChange,
+    handleMixerChange,
     onCompressorChange,
     onChannelVolumeChange,
     isMobile,
@@ -170,7 +170,7 @@ export function BeatBoxControls({
                                 <div className="pr-4 py-4">
                                     <MixerControls 
                                         volumes={volumes} 
-                                        onMixerChange={onMixerChange}
+                                        onMixerChange={handleMixerChange}
                                         onChannelVolumeChange={onChannelVolumeChange}
                                         onCompressorChange={onCompressorChange}
                                     />
@@ -266,8 +266,8 @@ export function BeatBoxControls({
                                 <div className="pr-4 py-4">
                                     <MixerControls 
                                         volumes={volumes} 
-                                        onMixerChange={onMixerChange}
-                                        onChannelVolumeChange={(channel, newVolumes) => onChannelVolumeChange(channel, newVolumes)}
+                                        onMixerChange={handleMixerChange}
+                                        onChannelVolumeChange={onChannelVolumeChange}
                                         onCompressorChange={onCompressorChange}
                                     />
                                 </div>

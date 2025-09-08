@@ -120,13 +120,13 @@ export function ThereminPad({
         setLocalVolumes(channelVolumes);
     }, [channelVolumes]);
 
-    const handleReverbCommit = (value: number) => {
+    const handleReverbCommit = useCallback((value: number) => {
         onChannelVolumeChange({ reverbSend: value });
-    };
+    }, [onChannelVolumeChange]);
 
-    const handleDistortionCommit = (value: number) => {
+    const handleDistortionCommit = useCallback((value: number) => {
         onChannelVolumeChange({ distortion: value });
-    };
+    }, [onChannelVolumeChange]);
 
     // Manage orbs for latch mode
     useEffect(() => {

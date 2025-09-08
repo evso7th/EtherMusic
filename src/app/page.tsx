@@ -70,23 +70,31 @@ function loadSettings() {
         const savedVolumes = getCookie("ethermusic_volumes");
         const volumes = savedVolumes ? JSON.parse(savedVolumes) : defaultVolumes;
         
+        // Basic validation
         if (!volumes.melody || typeof volumes.melody.gain !== 'number' || !volumes.compressor) {
+             console.log("Loading default volumes due to invalid structure in cookie.");
             return { volumes: defaultVolumes }; 
         }
 
-        // Ensure distortion property exists
-        const ensureChannelSettings = (channel: ChannelVolumes): ChannelVolumes => ({
-            gain: channel.gain ?? 0,
-            reverbSend: channel.reverbSend ?? -48,
-            distortion: channel.distortion ?? 0
+        // Ensure all properties exist, merging with defaults
+        const ensureChannelSettings = (channel: Partial<ChannelVolumes> | undefined): ChannelVolumes => ({
+            gain: channel?.gain ?? 0,
+            reverbSend: channel?.reverbSend ?? -24,
+            distortion: channel?.distortion ?? 0
         });
 
-        volumes.melody = ensureChannelSettings(volumes.melody);
-        volumes.manualBass = ensureChannelSettings(volumes.manualBass);
-        volumes.latch = ensureChannelSettings(volumes.latch);
-        volumes.drums = ensureChannelSettings(volumes.drums);
-        
-        return { volumes };
+        const mergedVolumes: Volumes = {
+            ...defaultVolumes,
+            ...volumes,
+            melody: ensureChannelSettings(volumes.melody),
+            manualBass: ensureChannelSettings(volumes.manualBass),
+            latch: ensureChannelSettings(volumes.latch),
+            drums: ensureChannelSettings(volumes.drums),
+            compressor: { ...defaultVolumes.compressor, ...volumes.compressor },
+        };
+
+        return { volumes: mergedVolumes };
+
     } catch (e) {
         console.error("Failed to load settings from cookies", e);
         return { volumes: defaultVolumes };
@@ -123,7 +131,7 @@ export default function Home() {
     const [isClient, setIsClient] = useState(false);
     const [cookieConsent, setCookieConsent] = useState(false);
     
-    const [volumes, setLocalVolumes] = useState<Volumes>(defaultVolumes);
+    const [volumes, setVolumesState] = useState<Volumes>(defaultVolumes);
 
     useEffect(() => {
       setIsClient(true);
@@ -135,9 +143,11 @@ export default function Home() {
 
     useEffect(() => {
         if (cookieConsent) {
-            setLocalVolumes(loadSettings().volumes);
+            const loaded = loadSettings();
+            console.log("Loaded settings from cookie:", loaded.volumes);
+            setVolumesState(loaded.volumes);
         } else {
-            setLocalVolumes(defaultVolumes);
+            setVolumesState(defaultVolumes);
         }
     }, [cookieConsent]);
     
@@ -189,11 +199,11 @@ export default function Home() {
         const currentScale = Object.keys(SCALES).includes(keyOrScale) ? keyOrScale as MusicScale : newScale;
 
         // Bass Pad: Octaves C2-C3
-        const baseBassNote = 24 + ALL_NOTES[currentKey]; // C1 base
-        const bassFreqs = getScaleFrequencies(baseBassNote, SCALES[currentScale], [1, 2]);
+        const baseBassNote = 36; // C2
+        const bassFreqs = getScaleFrequencies(baseBassNote, SCALES[currentScale], [0, 1]);
 
-        // Melody Pad: Octaves C3-C4
-        const baseMelodyNote = 48 + ALL_NOTES[currentKey]; // C3 base
+        // Melody Pad: Octaves C4-C5
+        const baseMelodyNote = 60; // C4
         const melodyFreqs = getScaleFrequencies(baseMelodyNote, SCALES[currentScale], [0, 1]);
     
         setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
@@ -203,28 +213,22 @@ export default function Home() {
         handleHarmonyChange(musicKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
+    
     const updateVolumes = useCallback((newVolumes: Volumes) => {
-        setLocalVolumes(newVolumes);
+        setVolumesState(newVolumes);
         setVolumes(newVolumes);
         if (cookieConsent) {
             saveSettings(newVolumes);
         }
     }, [setVolumes, cookieConsent]);
     
-    const handleChannelVolumeChange = useCallback((channel: keyof Omit<Volumes, 'compressor' | 'reverbReturn'>, newChannelVolumes: Partial<ChannelVolumes>) => {
-        setLocalVolumes(prev => {
-            const updatedVolumes = {
-                ...prev,
-                [channel]: { ...prev[channel], ...newChannelVolumes }
-            };
-            setVolumes(updatedVolumes);
-            if (cookieConsent) {
-                saveSettings(updatedVolumes);
-            }
-            return updatedVolumes;
-        });
-    }, [setVolumes, cookieConsent]);
+    const handleChannelVolumeChange = useCallback((channel: keyof Omit<Volumes, 'compressor' | 'reverbReturn'>, newVolumes: Partial<ChannelVolumes>) => {
+        const newGlobalVolumes = {
+            ...volumes,
+            [channel]: { ...volumes[channel], ...newVolumes }
+        };
+        updateVolumes(newGlobalVolumes);
+    }, [volumes, updateVolumes]);
     
     const handleMixerChange = useCallback((changedMixerVolumes: Partial<Omit<Volumes, 'compressor'>>) => {
         const newVolumes: Volumes = { ...volumes, ...changedMixerVolumes };
@@ -283,14 +287,24 @@ export default function Home() {
     }, [setBassLatch]);
     
     const handleMelodyInstrumentChange = useCallback((instrumentName: Instrument) => {
-        setActiveMelodyInstrument(instrumentName);
-        setMelodyInstrument(instrumentName);
-    }, [setMelodyInstrument]);
+        const preset = melodyInstruments.find(p => p.id === instrumentName);
+        if(preset) {
+            setActiveMelodyInstrument(instrumentName);
+            setMelodyInstrument(instrumentName);
+            handleChannelVolumeChange('melody', { distortion: preset.params.distortion ?? 0 });
+        }
+    }, [setMelodyInstrument, handleChannelVolumeChange]);
 
     const handleBassInstrumentChange = useCallback((instrumentName: BassInstrument) => {
-        setActiveBassInstrument(instrumentName);
-        setBassInstrument(instrumentName);
-    }, [setBassInstrument]);
+        const preset = bassInstruments.find(p => p.id === instrumentName);
+        if(preset) {
+            setActiveBassInstrument(instrumentName);
+            setBassInstrument(instrumentName);
+            const distortion = preset.params.distortion ?? 0;
+            handleChannelVolumeChange('manualBass', { distortion });
+            handleChannelVolumeChange('latch', { distortion });
+        }
+    }, [setBassInstrument, handleChannelVolumeChange]);
     
     if (!isClient) {
         return <Preloader />;
@@ -336,7 +350,7 @@ export default function Home() {
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
             <div className="fixed inset-0 z-0">
-                 <MemoizedOrbitalAnimation isPlaying={isPlaying} />
+                 <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={90} />
             </div>
             
              <div className="relative z-10 flex h-full portrait:flex-col portrait:p-2 md:p-6 lg:p-8 landscape:flex-row landscape:p-1 landscape:gap-1">
@@ -420,7 +434,7 @@ export default function Home() {
                             activePattern={activePattern}
                             onPatternChange={handlePatternChange}
                             volumes={volumes}
-                            onMixerChange={handleMixerChange}
+                            handleMixerChange={handleMixerChange}
                             onChannelVolumeChange={(channel, newVolumes) => handleChannelVolumeChange(channel, newVolumes)}
                             onCompressorChange={handleCompressorChange}
                             isMobile={isMobile}
@@ -434,7 +448,7 @@ export default function Home() {
                         activePattern={activePattern}
                         onPatternChange={handlePatternChange}
                         volumes={volumes}
-                        onMixerChange={handleMixerChange}
+                        handleMixerChange={handleMixerChange}
                         onChannelVolumeChange={(channel, newVolumes) => handleChannelVolumeChange(channel, newVolumes)}
                         onCompressorChange={handleCompressorChange}
                         isMobile={isMobile}

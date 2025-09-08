@@ -50,17 +50,16 @@ const VolumeControl = ({
     </div>
 );
 
-type MixerVolumes = Omit<Volumes, 'compressor'>;
-type VolumeChannel = keyof Omit<MixerVolumes, 'reverbReturn'>;
+type VolumeChannel = keyof Omit<Volumes, 'compressor' | 'reverbReturn'>;
 
 export function MixerControls({ 
     volumes: initialVolumes, 
-    onMixerChange,
+    handleMixerChange,
     onCompressorChange,
     onChannelVolumeChange,
 }: { 
     volumes: Volumes, 
-    onMixerChange: (volumes: Partial<Omit<Volumes, 'compressor' | 'melody' | 'manualBass' | 'latch' | 'drums'>>) => void,
+    handleMixerChange: (volumes: Partial<Omit<Volumes, 'compressor'>>) => void,
     onChannelVolumeChange: (channel: keyof Omit<Volumes, 'compressor' | 'reverbReturn'>, newVolumes: Partial<ChannelVolumes>) => void,
     onCompressorChange: (compressorSettings: CompressorSettings) => void
 }) {
@@ -73,7 +72,7 @@ export function MixerControls({
         setCompressor(initialVolumes.compressor);
     }, [initialVolumes]);
 
-    const handleLocalGainChange = (part: VolumeChannel, gain: number) => {
+    const handleGainChange = (part: VolumeChannel, gain: number) => {
         setLocalVolumes(prev => ({
             ...prev,
             [part]: { ...prev[part], gain }
@@ -81,7 +80,6 @@ export function MixerControls({
     };
     
     const handleGainCommit = (part: VolumeChannel, gain: number) => {
-        console.log(`[MixerControls] Committing gain change for ${part}: ${gain} dB`);
         onChannelVolumeChange(part, { gain });
     };
 
@@ -89,9 +87,8 @@ export function MixerControls({
         setLocalVolumes(prev => ({ ...prev, reverbReturn: value }));
     };
 
-    const handleReverbReturnCommit = () => {
-        console.log(`[MixerControls] Committing reverbReturn change: ${localVolumes.reverbReturn} dB`);
-        onMixerChange({ reverbReturn: localVolumes.reverbReturn });
+    const handleReverbReturnCommit = (value: number) => {
+        handleMixerChange({ reverbReturn: value });
     };
 
     const handleCompressorSettingChange = useCallback((setting: keyof Omit<CompressorSettings, 'enabled'>, value: number) => {
@@ -99,7 +96,6 @@ export function MixerControls({
     }, []);
 
     const handleCompressorCommit = useCallback(() => {
-        console.log(`[MixerControls] Committing compressor change:`, compressor);
         onCompressorChange(compressor);
     }, [compressor, onCompressorChange]);
     
@@ -107,7 +103,6 @@ export function MixerControls({
         const newSettings = { ...compressor, enabled };
         setCompressor(newSettings);
         onCompressorChange(newSettings);
-        console.log(`[MixerControls] Toggled compressor: ${enabled}`);
     }, [compressor, onCompressorChange]);
 
 
@@ -118,28 +113,28 @@ export function MixerControls({
                     label="Melody"
                     icon={Music}
                     volume={localVolumes.melody.gain}
-                    onVolumeChange={(v) => handleLocalGainChange('melody', v)}
+                    onVolumeChange={(v) => handleGainChange('melody', v)}
                     onVolumeCommit={(v) => handleGainCommit('melody', v)}
                 />
                  <VolumeControl 
                     label="Bass"
                     icon={Waves}
                     volume={localVolumes.manualBass.gain}
-                    onVolumeChange={(v) => handleLocalGainChange('manualBass', v)}
+                    onVolumeChange={(v) => handleGainChange('manualBass', v)}
                     onVolumeCommit={(v) => handleGainCommit('manualBass', v)}
                 />
                  <VolumeControl 
                     label="Latch"
                     icon={Anchor}
                     volume={localVolumes.latch.gain}
-                    onVolumeChange={(v) => handleLocalGainChange('latch', v)}
+                    onVolumeChange={(v) => handleGainChange('latch', v)}
                     onVolumeCommit={(v) => handleGainCommit('latch', v)}
                 />
                 <VolumeControl 
                     label="Drums"
                     icon={Drum}
                     volume={localVolumes.drums.gain}
-                    onVolumeChange={(v) => handleLocalGainChange('drums', v)}
+                    onVolumeChange={(v) => handleGainChange('drums', v)}
                     onVolumeCommit={(v) => handleGainCommit('drums', v)}
                 />
                  <VolumeControl 
