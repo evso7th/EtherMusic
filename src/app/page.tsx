@@ -115,6 +115,7 @@ const Preloader = () => (
 );
 
 export default function Home() {
+    console.log('[Page] Rendering Home component');
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [isClient, setIsClient] = useState(false);
@@ -208,18 +209,26 @@ export default function Home() {
         }
     }, [setVolumes, cookieConsent]);
 
-    const handleChannelVolumeChange = useCallback((channel: keyof Omit<Volumes, 'reverbReturn' | 'compressor'>, newChannelVolumes: ChannelVolumes) => {
+    const handleChannelVolumeChange = useCallback((channel: 'melody' | 'manualBass' | 'latch' | 'drums', gain: number) => {
         const newVolumes: Volumes = {
             ...volumes,
-            [channel]: newChannelVolumes
+            [channel]: { ...volumes[channel], gain }
         };
         updateVolumes(newVolumes);
     }, [volumes, updateVolumes]);
     
-    const handleMixerChange = useCallback((changedVolumes: Partial<Omit<Volumes, 'compressor'>>) => {
+    const handleReverbSendChange = useCallback((channel: 'melody' | 'manualBass' | 'latch' | 'drums', reverbSend: number) => {
         const newVolumes: Volumes = {
             ...volumes,
-            ...changedVolumes
+            [channel]: { ...volumes[channel], reverbSend }
+        };
+        updateVolumes(newVolumes);
+    }, [volumes, updateVolumes]);
+
+    const handleMixerChange = useCallback((changedMixerVolumes: Partial<Omit<Volumes, 'compressor' | 'melody' | 'manualBass'>>) => {
+        const newVolumes: Volumes = {
+            ...volumes,
+            ...changedMixerVolumes
         };
         updateVolumes(newVolumes);
     }, [volumes, updateVolumes]);
@@ -389,7 +398,7 @@ export default function Home() {
                             onInstrumentChange={handleBassInstrumentChange}
                             orbManager={orbManager}
                             channelVolumes={volumes.manualBass}
-                            onChannelVolumeChange={(v) => handleChannelVolumeChange('manualBass', v)}
+                            onReverbSendChange={(v) => handleReverbSendChange('manualBass', v)}
                         />
                         <MemoizedThereminPad
                             type="melody"
@@ -409,7 +418,7 @@ export default function Home() {
                             isPolyphonic
                             orbManager={orbManager}
                             channelVolumes={volumes.melody}
-                            onChannelVolumeChange={(v) => handleChannelVolumeChange('melody', v)}
+                            onReverbSendChange={(v) => handleReverbSendChange('melody', v)}
                         />
                     </div>
                     <div className="flex-shrink-0 portrait:block landscape:hidden">
@@ -422,6 +431,7 @@ export default function Home() {
                             onTempoChange={handleTempoChange}
                             volumes={volumes}
                             onMixerChange={handleMixerChange}
+                            onChannelVolumeChange={handleChannelVolumeChange}
                             onCompressorChange={handleCompressorChange}
                             isMobile={isMobile}
                         />
@@ -438,6 +448,7 @@ export default function Home() {
                         onTempoChange={handleTempoChange}
                         volumes={volumes}
                         onMixerChange={handleMixerChange}
+                        onChannelVolumeChange={handleChannelVolumeChange}
                         onCompressorChange={handleCompressorChange}
                         isMobile={isMobile}
                         isLandscape={true}
@@ -455,4 +466,3 @@ export default function Home() {
     
 
     
-

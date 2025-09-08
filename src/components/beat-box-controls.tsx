@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { SlidersHorizontal, Drum, Zap } from 'lucide-react';
+import { SlidersHorizontal, Drum, Zap, Music, Waves, Anchor, Blend, AudioLines } from 'lucide-react';
 import { useState, useMemo, memo, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
@@ -26,7 +26,8 @@ interface BeatBoxControlsProps {
     activeTempo: Tempo;
     onTempoChange: (tempo: Tempo) => void;
     volumes: Volumes;
-    onMixerChange: (volumes: Partial<Omit<Volumes, 'compressor'>>) => void;
+    onMixerChange: (volumes: Partial<Omit<Volumes, 'compressor' | 'melody' | 'manualBass'>>) => void;
+    onChannelVolumeChange: (channel: 'melody' | 'manualBass' | 'latch' | 'drums', gain: number) => void;
     onCompressorChange: (compressorSettings: CompressorSettings) => void;
     isMobile: boolean;
     isLandscape?: boolean;
@@ -56,11 +57,13 @@ export function BeatBoxControls({
     volumes,
     onMixerChange,
     onCompressorChange,
+    onChannelVolumeChange,
     isMobile,
     isLandscape = false,
 }: BeatBoxControlsProps) {
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isTempoOpen, setIsTempoOpen] = useState(false);
+    const [isMixerOpen, setIsMixerOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<'Meditative' | 'Classic'>('Meditative');
     
     const { classicPatterns, meditativePatterns, offPattern } = useMemo(() => {
@@ -77,12 +80,12 @@ export function BeatBoxControls({
     
     const buttonSize = isMobile ? 'sm' : 'default';
 
-    const ControlButtonWrapper = useCallback(({ tooltipText, children }: { tooltipText: string, children: React.ReactNode }) => {
-        if (isMobile) return <>{children}</>;
+    const ControlButtonWrapper = useCallback(({ tooltipText, children, ...props }: React.ComponentProps<typeof Button> & { tooltipText: string, children: React.ReactNode }) => {
+        if (isMobile) return <Button {...props}>{children}</Button>;
         return (
              <Tooltip>
                 <TooltipTrigger asChild>
-                    {children}
+                    <Button {...props}>{children}</Button>
                 </TooltipTrigger>
                 <TooltipContent>
                     <p>{tooltipText}</p>
@@ -90,6 +93,11 @@ export function BeatBoxControls({
             </Tooltip>
         );
     }, [isMobile]);
+    
+    const handleMixerOpenChange = (open: boolean) => {
+        console.log('[BeatBoxControls] Mixer Dialog onOpenChange, new state:', open);
+        setIsMixerOpen(open);
+    };
 
     if (isLandscape) {
         return (
@@ -187,8 +195,8 @@ export function BeatBoxControls({
                         </DialogContent>
                     </Dialog>
                     
-                    <Dialog>
-                        <DialogTrigger asChild>
+                    <Dialog open={isMixerOpen} onOpenChange={handleMixerOpenChange}>
+                        <DialogTrigger asChild onClick={() => console.log('[BeatBoxControls] Mixer DialogTrigger clicked in landscape')}>
                              <ControlButtonWithTooltip tooltipText="Mixer" variant="outline" size="icon" className="w-10 h-10 rounded-full">
                                 <SlidersHorizontal className="w-5 h-5"/>
                             </ControlButtonWithTooltip>
@@ -202,6 +210,7 @@ export function BeatBoxControls({
                                     <MixerControls 
                                         volumes={volumes} 
                                         onMixerChange={onMixerChange}
+                                        onChannelVolumeChange={onChannelVolumeChange}
                                         onCompressorChange={onCompressorChange}
                                     />
                                 </div>
@@ -221,11 +230,9 @@ export function BeatBoxControls({
                 <CardContent className="p-2 md:p-4 flex justify-around items-center gap-1 md:gap-2">
                     <Dialog open={isBeatsOpen} onOpenChange={setIsBeatsOpen}>
                         <DialogTrigger asChild>
-                            <ControlButtonWrapper tooltipText="Beats">
-                                <Button variant={isBeatsOn ? 'default' : 'outline'} className="flex-1" size={buttonSize}>
-                                    <Drum className="w-4 h-4 md:mr-2" />
-                                    <span className="hidden sm:inline">Beats</span>
-                                </Button>
+                            <ControlButtonWrapper tooltipText="Beats" variant={isBeatsOn ? 'default' : 'outline'} className="flex-1" size={buttonSize}>
+                                <Drum className="w-4 h-4 md:mr-2" />
+                                <span className="hidden sm:inline">Beats</span>
                             </ControlButtonWrapper>
                         </DialogTrigger>
                         <DialogContent>
@@ -285,11 +292,9 @@ export function BeatBoxControls({
 
                     <Dialog open={isTempoOpen} onOpenChange={setIsTempoOpen}>
                         <DialogTrigger asChild>
-                            <ControlButtonWrapper tooltipText="Tempo">
-                                <Button variant="outline" className="flex-1" size={buttonSize}>
-                                    <Zap className="w-4 h-4 md:mr-2" />
-                                    <span className="hidden sm:inline">Tempo</span>
-                                </Button>
+                            <ControlButtonWrapper tooltipText="Tempo" variant="outline" className="flex-1" size={buttonSize}>
+                                <Zap className="w-4 h-4 md:mr-2" />
+                                <span className="hidden sm:inline">Tempo</span>
                             </ControlButtonWrapper>
                         </DialogTrigger>
                         <DialogContent>
@@ -317,13 +322,11 @@ export function BeatBoxControls({
                         </DialogContent>
                     </Dialog>
 
-                    <Dialog>
-                        <DialogTrigger asChild>
-                            <ControlButtonWrapper tooltipText="Mixer">
-                                <Button variant="outline" className="flex-1 px-2 md:px-4" size={buttonSize}>
-                                    <SlidersHorizontal className="w-4 h-4 md:mr-2"/>
-                                    <span className="hidden sm:inline">Mixer</span>
-                                </Button>
+                    <Dialog open={isMixerOpen} onOpenChange={handleMixerOpenChange}>
+                        <DialogTrigger asChild onClick={() => console.log('[BeatBoxControls] Mixer DialogTrigger clicked in portrait')}>
+                             <ControlButtonWrapper tooltipText="Mixer" variant="outline" className="flex-1 px-2 md:px-4" size={buttonSize}>
+                                <SlidersHorizontal className="w-4 h-4 md:mr-2"/>
+                                <span className="hidden sm:inline">Mixer</span>
                             </ControlButtonWrapper>
                         </DialogTrigger>
                         <DialogContent>
@@ -335,6 +338,7 @@ export function BeatBoxControls({
                                     <MixerControls 
                                         volumes={volumes} 
                                         onMixerChange={onMixerChange}
+                                        onChannelVolumeChange={onChannelVolumeChange}
                                         onCompressorChange={onCompressorChange}
                                     />
                                 </div>
@@ -348,4 +352,3 @@ export function BeatBoxControls({
         </TooltipProvider>
     );
 }
-

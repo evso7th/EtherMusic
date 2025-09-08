@@ -51,14 +51,17 @@ const VolumeControl = ({
 );
 
 type MixerVolumes = Omit<Volumes, 'compressor'>;
+type VolumeChannel = keyof Omit<MixerVolumes, 'reverbReturn'>;
 
 export function MixerControls({ 
     volumes: initialVolumes, 
     onMixerChange,
-    onCompressorChange 
+    onCompressorChange,
+    onChannelVolumeChange,
 }: { 
     volumes: Volumes, 
-    onMixerChange: (volumes: Partial<MixerVolumes>) => void,
+    onMixerChange: (volumes: Partial<Omit<MixerVolumes, 'melody' | 'manualBass'>>) => void,
+    onChannelVolumeChange: (channel: 'melody' | 'manualBass' | 'latch' | 'drums', gain: number) => void,
     onCompressorChange: (compressorSettings: CompressorSettings) => void
 }) {
     
@@ -70,28 +73,33 @@ export function MixerControls({
         setCompressor(initialVolumes.compressor);
     }, [initialVolumes]);
 
-    const handleLocalVolumeChange = useCallback((part: keyof MixerVolumes, value: number) => {
-        setLocalVolumes(prev => {
-            const newVolumes = { ...prev };
-            if (part === 'reverbReturn') {
-                 newVolumes.reverbReturn = value;
-            } else if (typeof newVolumes[part] === 'object') {
-                (newVolumes[part] as ChannelVolumes).gain = value;
-            }
-            return newVolumes;
-        });
-    }, []);
+    const handleLocalGainChange = (part: VolumeChannel, gain: number) => {
+        setLocalVolumes(prev => ({
+            ...prev,
+            [part]: { ...prev[part], gain }
+        }));
+    };
+    
+    const handleGainCommit = (part: 'melody' | 'manualBass' | 'latch' | 'drums', gain: number) => {
+        console.log(`[MixerControls] Committing gain change for ${part}: ${gain} dB`);
+        onChannelVolumeChange(part, gain);
+    };
 
-    const handleVolumeCommit = useCallback(() => {
-        const { compressor, ...mixerVolumes } = localVolumes;
-        onMixerChange(mixerVolumes);
-    }, [localVolumes, onMixerChange]);
+    const handleReverbReturnChange = (value: number) => {
+        setLocalVolumes(prev => ({ ...prev, reverbReturn: value }));
+    };
 
-    const handleCompressorSettingChange = useCallback((setting: keyof CompressorSettings, value: number | boolean) => {
+    const handleReverbReturnCommit = () => {
+        console.log(`[MixerControls] Committing reverbReturn change: ${localVolumes.reverbReturn} dB`);
+        onMixerChange({ reverbReturn: localVolumes.reverbReturn });
+    };
+
+    const handleCompressorSettingChange = useCallback((setting: keyof Omit<CompressorSettings, 'enabled'>, value: number) => {
         setCompressor(prev => ({ ...prev, [setting]: value }));
     }, []);
 
     const handleCompressorCommit = useCallback(() => {
+        console.log(`[MixerControls] Committing compressor change:`, compressor);
         onCompressorChange(compressor);
     }, [compressor, onCompressorChange]);
     
@@ -99,6 +107,7 @@ export function MixerControls({
         const newSettings = { ...compressor, enabled };
         setCompressor(newSettings);
         onCompressorChange(newSettings);
+        console.log(`[MixerControls] Toggled compressor: ${enabled}`);
     }, [compressor, onCompressorChange]);
 
 
@@ -109,36 +118,36 @@ export function MixerControls({
                     label="Melody"
                     icon={Music}
                     volume={localVolumes.melody.gain}
-                    onVolumeChange={(v) => handleLocalVolumeChange('melody', v)}
-                    onVolumeCommit={handleVolumeCommit}
+                    onVolumeChange={(v) => handleLocalGainChange('melody', v)}
+                    onVolumeCommit={(v) => handleGainCommit('melody', v)}
                 />
                  <VolumeControl 
                     label="Bass"
                     icon={Waves}
                     volume={localVolumes.manualBass.gain}
-                    onVolumeChange={(v) => handleLocalVolumeChange('manualBass', v)}
-                    onVolumeCommit={handleVolumeCommit}
+                    onVolumeChange={(v) => handleLocalGainChange('manualBass', v)}
+                    onVolumeCommit={(v) => handleGainCommit('manualBass', v)}
                 />
                  <VolumeControl 
                     label="Latch"
                     icon={Anchor}
                     volume={localVolumes.latch.gain}
-                    onVolumeChange={(v) => handleLocalVolumeChange('latch', v)}
-                    onVolumeCommit={handleVolumeCommit}
+                    onVolumeChange={(v) => handleLocalGainChange('latch', v)}
+                    onVolumeCommit={(v) => handleGainCommit('latch', v)}
                 />
                 <VolumeControl 
                     label="Drums"
                     icon={Drum}
                     volume={localVolumes.drums.gain}
-                    onVolumeChange={(v) => handleLocalVolumeChange('drums', v)}
-                    onVolumeCommit={handleVolumeCommit}
+                    onVolumeChange={(v) => handleLocalGainChange('drums', v)}
+                    onVolumeCommit={(v) => handleGainCommit('drums', v)}
                 />
                  <VolumeControl 
                     label="Reverb Mix"
                     icon={Blend}
                     volume={localVolumes.reverbReturn}
-                    onVolumeChange={(v) => handleLocalVolumeChange('reverbReturn', v)}
-                    onVolumeCommit={handleVolumeCommit}
+                    onVolumeChange={handleReverbReturnChange}
+                    onVolumeCommit={handleReverbReturnCommit}
                 />
             </div>
 
@@ -184,4 +193,3 @@ export function MixerControls({
         </div>
     );
 }
-

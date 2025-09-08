@@ -39,7 +39,7 @@ interface ThereminPadProps {
     onLatchToggle?: (checked: boolean) => void;
     orbManager?: OrbManager | null;
     channelVolumes: ChannelVolumes;
-    onChannelVolumeChange: (volumes: ChannelVolumes) => void;
+    onReverbSendChange: (reverbSend: number) => void;
 }
 
 const padTitles = {
@@ -100,23 +100,20 @@ export function ThereminPad({
     onLatchToggle,
     orbManager,
     channelVolumes,
-    onChannelVolumeChange
+    onReverbSendChange
 }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const isMobile = useIsMobile();
     
-    const [localVolumes, setLocalVolumes] = useState(channelVolumes);
+    const [localReverbSend, setLocalReverbSend] = useState(channelVolumes.reverbSend);
 
     useEffect(() => {
-        setLocalVolumes(channelVolumes);
+        setLocalReverbSend(channelVolumes.reverbSend);
     }, [channelVolumes]);
 
-    const handleReverbSendChange = (reverbSend: number) => {
-        setLocalVolumes(prev => ({...prev, reverbSend}));
-    };
     const handleCommit = () => {
-        onChannelVolumeChange(localVolumes);
+        onReverbSendChange(localReverbSend);
     };
 
     // Manage orbs for latch mode
@@ -269,8 +266,8 @@ export function ThereminPad({
                                 <ReverbSendControl
                                     label="Reverb Send"
                                     icon={Blend}
-                                    level={localVolumes.reverbSend}
-                                    onLevelChange={handleReverbSendChange}
+                                    level={localReverbSend}
+                                    onLevelChange={setLocalReverbSend}
                                     onLevelCommit={handleCommit}
                                 />
                             </div>
@@ -355,4 +352,3 @@ export function ThereminPad({
         </Card>
     );
 }
-
