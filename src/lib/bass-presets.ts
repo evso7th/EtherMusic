@@ -25,13 +25,13 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
         params: {
             oscillator: { type: 'triangle' },
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.8, release: 1.5 },
-            filter: { Q: 1, frequency: 1200, type: 'lowpass', gain: 6 },
+            filter: { Q: 1, frequency: 1500, type: 'lowpass', gain: 12 },
             portamento: 0.03,
             reverbSend: -36,
             distortion: 0,
             layers: [
-                { type: 'triangle', freqMult: 1, level: 0.9, detune: 0 },
-                { type: 'sine', freqMult: 1, level: 0.7, detune: 5 }
+                { type: 'triangle', freqMult: 1, level: 1.0, detune: 0 },
+                { type: 'sine', freqMult: 1, level: 0.8, detune: 5 }
             ]
         }
     },
@@ -42,7 +42,7 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
         params: {
             oscillator: { type: 'sine' },
             envelope: { attack: 0.2, decay: 0.1, sustain: 1.0, release: 3.0 },
-            filter: { Q: 1.2, frequency: 800, type: 'lowpass', gain: 3 },
+            filter: { Q: 1.2, frequency: 1200, type: 'lowpass', gain: 3 },
             portamento: 0.08,
             reverbSend: -24,
             distortion: 0,
@@ -76,7 +76,7 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
         params: {
             oscillator: { type: 'sine' },
             envelope: { attack: 0.2, decay: 0.1, sustain: 1.0, release: 3.0 },
-            filter: { Q: 1.0, frequency: 950, type: 'lowpass', gain: 4 },
+            filter: { Q: 1.0, frequency: 1100, type: 'lowpass', gain: 4 },
             reverbSend: -20,
             distortion: 5,
             layers: [
@@ -84,7 +84,7 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
                 {
                     type: 'triangle',
                     freqMult: 1,
-                    level: 0.8,
+                    level: 0.9,
                     detune: 10
                 }
             ],
