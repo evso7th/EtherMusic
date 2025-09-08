@@ -33,10 +33,11 @@ const ControlButton = ({ tooltip, children, isMobile, ...props }: { tooltip: str
     if (isMobile) {
         return <Button {...props}>{children}</Button>;
     }
+    const { tooltip: _, ...buttonProps } = props as any; // remove tooltip from props
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <Button {...props}>{children}</Button>
+                <Button {...buttonProps}>{children}</Button>
             </TooltipTrigger>
             <TooltipContent>
                 <p>{tooltip}</p>

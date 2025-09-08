@@ -52,6 +52,7 @@ const ControlButtonWithTooltip = memo(function ControlButtonWithTooltip({ toolti
         </Tooltip>
     );
 });
+ControlButtonWithTooltip.displayName = 'ControlButtonWithTooltip';
 
 export function AutopilotControls({
     isMobile,
@@ -308,7 +309,16 @@ export function AutopilotControls({
     );
 
     const buttonSize = isMobile ? 'sm' : 'default';
-    const ControlButton = isMobile ? Button : ControlButtonWithTooltip;
+
+    const ControlButton = ({ tooltipText, ...props }: React.ComponentProps<typeof Button> & { tooltipText: string }) => {
+        if (isMobile) {
+            return <Button {...props} />;
+        }
+        return (
+            <ControlButtonWithTooltip tooltipText={tooltipText} {...props} />
+        );
+    };
+
 
     return (
         <TooltipProvider>

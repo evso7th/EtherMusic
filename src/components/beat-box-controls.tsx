@@ -46,6 +46,7 @@ const ControlButtonWithTooltip = memo(function ControlButtonWithTooltip({ toolti
         </Tooltip>
     );
 });
+ControlButtonWithTooltip.displayName = 'ControlButtonWithTooltip';
 
 
 export function BeatBoxControls({
@@ -83,17 +84,10 @@ export function BeatBoxControls({
     
     const buttonSize = isMobile ? 'sm' : 'default';
 
-    const ControlButtonWrapper = useCallback(({ tooltipText, children, ...props }: React.ComponentProps<typeof Button> & { tooltipText: string, children: React.ReactNode }) => {
-        if (isMobile) return <Button {...props}>{children}</Button>;
+    const ControlButtonWrapper = useCallback(({ tooltipText, ...props }: React.ComponentProps<typeof Button> & { tooltipText: string }) => {
+        if (isMobile) return <Button {...props} />;
         return (
-             <Tooltip>
-                <TooltipTrigger asChild>
-                    <Button {...props}>{children}</Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                    <p>{tooltipText}</p>
-                </TooltipContent>
-            </Tooltip>
+             <ControlButtonWithTooltip tooltipText={tooltipText} {...props} />
         );
     }, [isMobile]);
 
