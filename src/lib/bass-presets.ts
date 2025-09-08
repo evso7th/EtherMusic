@@ -67,7 +67,7 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
                 {
                     oscillator: { type: 'triangle' },
                     envelope: { attack: 0.1, decay: 0.1, sustain: 1.0, release: 2.0 },
-                    gain: 1.0
+                    gain: 0.5
                 }
             ],
             stagger: 0.015
@@ -87,7 +87,7 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
                  {
                     oscillator: { type: 'sawtooth' },
                     envelope: { attack: 0.05, decay: 0.3, sustain: 0.5, release: 1.5 },
-                    gain: 1.0,
+                    gain: 0.6,
                 }
             ],
             stagger: 0.005

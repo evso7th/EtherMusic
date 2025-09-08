@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Volumes, Note, Instrument, BassInstrument, CompressorSettings } from '@/types';
+import type { Volumes, Note, Instrument, BassInstrument, CompressorSettings, InstrumentPresetParams, BassInstrumentPresetParams } from '@/types';
 import { OrbManager } from './orb-manager';
 import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
@@ -40,7 +40,7 @@ export class AudioEngine {
     private compressor: DynamicsCompressorNode;
     
     // Effects chain
-    private reverb: ConvolverNode;
+    private convolver: ConvolverNode;
     private reverbReturnGain: GainNode;
 
     private nodes = new Map<PartName, { 
@@ -87,9 +87,9 @@ export class AudioEngine {
         this.compressor.connect(this.masterOut);
 
         // Reverb setup
-        this.reverb = this.context.createConvolver();
+        this.convolver = this.context.createConvolver();
         this.reverbReturnGain = this.context.createGain();
-        this.reverb.connect(this.reverbReturnGain);
+        this.convolver.connect(this.reverbReturnGain);
         this.reverbReturnGain.connect(this.preCompressorOut); // Reverb returns to pre-compressor bus
     }
     
@@ -155,16 +155,22 @@ export class AudioEngine {
         this.setVolumes(this.volumes);
         
         this.isInitialized = true;
+        console.log("AudioEngine initialized and ready.");
     }
     
     private async loadReverbImpulse() {
         try {
+            // Corrected path
             const response = await fetch('/assets/impulse/reverb.wav');
+            if (!response.ok) {
+                throw new Error(`Failed to fetch impulse: ${response.status} ${response.statusText}`);
+            }
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
-            this.reverb.buffer = audioBuffer;
+            this.convolver.buffer = audioBuffer;
         } catch (e) {
             console.error('Failed to load reverb impulse response:', e);
+            // Fallback or error notification could be handled here
         }
     }
     
@@ -178,7 +184,7 @@ export class AudioEngine {
         distortionNode.oversample = '4x';
         
         const reverbSendNode = this.context.createGain();
-        reverbSendNode.connect(this.reverb);
+        reverbSendNode.connect(this.convolver);
     
         const workletNode = new AudioWorkletNode(this.context, processorName, {
             processorOptions: { sampleRate: this.context.sampleRate, polyphony },
@@ -199,6 +205,7 @@ export class AudioEngine {
         workletNode.port.onmessage = (event) => {
             // Optional: handle messages back from the worklet if needed
         };
+        console.log(`Created worklet node for: ${part}`);
     }
     
     private tick() {
@@ -316,25 +323,25 @@ export class AudioEngine {
         }
     }
 
+    private sendPresetToWorklet(part: PartName, params: InstrumentPresetParams | BassInstrumentPresetParams) {
+        const nodeInfo = this.nodes.get(part);
+        if (nodeInfo) {
+            nodeInfo.worklet.port.postMessage({ type: 'setPreset', preset: params });
+        }
+    }
+
     public setMelodyInstrument(instrumentName: Instrument) {
         const preset = melodyInstruments.find(p => p.id === instrumentName);
-        const nodeInfo = this.nodes.get('melody');
-        if (preset && nodeInfo) {
-            nodeInfo.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
+        if (preset) {
+            this.sendPresetToWorklet('melody', preset.params);
         }
     }
     
     public setBassInstrument(instrumentName: BassInstrument) {
         const preset = bassInstruments.find(p => p.id === instrumentName);
         if (preset) {
-            const manualBassNode = this.nodes.get('manualBass');
-            const latchNode = this.nodes.get('latch');
-            if (manualBassNode) {
-                manualBassNode.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
-            }
-            if (latchNode) {
-                latchNode.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
-            }
+            this.sendPresetToWorklet('manualBass', preset.params);
+            this.sendPresetToWorklet('latch', preset.params);
         }
     }
     

@@ -20,14 +20,19 @@ class LatchProcessor extends AudioWorkletProcessor {
 
     this.port.onmessage = (event) => {
       const { type, note, id, preset } = event.data;
-      if (type === 'noteOn') {
-        this.noteOn(note);
-      } else if (type === 'noteOff') {
-        this.noteOff(id);
-      } else if (type === 'allNotesOff') {
-        this.allNotesOff();
-      } else if (type === 'setPreset') {
-        this.applyPreset(preset);
+      switch (type) {
+        case 'noteOn':
+          this.noteOn(note);
+          break;
+        case 'noteOff':
+          this.noteOff(id);
+          break;
+        case 'allNotesOff':
+          this.allNotesOff();
+          break;
+        case 'setPreset':
+          this.applyPreset(preset);
+          break;
       }
     };
   }
@@ -50,14 +55,12 @@ class LatchProcessor extends AudioWorkletProcessor {
   noteOff(id) {
     const voice = this.voices.get(id);
     if (voice) {
-      voice.targetVolume = 0; // Start release phase
       voice.isReleasing = true;
     }
   }
 
   allNotesOff() {
     this.voices.forEach(voice => {
-      voice.targetVolume = 0;
       voice.isReleasing = true;
     });
   }
@@ -94,6 +97,7 @@ class LatchProcessor extends AudioWorkletProcessor {
       stagger: preset.stagger ? preset.stagger * sampleRate : 0,
       staggerCounter: 0,
       isReleasing: false,
+      preset: preset,
     };
   }
   

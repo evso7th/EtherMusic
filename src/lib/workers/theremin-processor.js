@@ -20,26 +20,30 @@ class ThereminProcessor extends AudioWorkletProcessor {
 
     this.port.onmessage = (event) => {
       const { type, note, id, preset } = event.data;
-      if (type === 'noteOn') {
-        this.noteOn(note);
-      } else if (type === 'noteUpdate') {
-        this.noteUpdate(note);
-      } else if (type === 'noteOff') {
-        this.noteOff(id);
-      } else if (type === 'allNotesOff') {
-        this.allNotesOff();
-      } else if (type === 'setPreset') {
-        this.applyPreset(preset);
+      switch (type) {
+        case 'noteOn':
+          this.noteOn(note);
+          break;
+        case 'noteUpdate':
+          this.noteUpdate(note);
+          break;
+        case 'noteOff':
+          this.noteOff(id);
+          break;
+        case 'allNotesOff':
+          this.allNotesOff();
+          break;
+        case 'setPreset':
+          this.applyPreset(preset);
+          break;
       }
     };
   }
   
   applyPreset(preset) {
     this.preset = { ...this.preset, ...preset };
-     // When a new preset is applied, update all active voices
     this.voices.forEach((voice, id) => {
       const newVoiceData = this.createVoice(voice.frequency, this.preset);
-      // Preserve the current state of the voice
       newVoiceData.targetVolume = voice.targetVolume;
       newVoiceData.currentVolume = voice.currentVolume;
       newVoiceData.isReleasing = voice.isReleasing;
@@ -87,7 +91,8 @@ class ThereminProcessor extends AudioWorkletProcessor {
   createVoice(frequency, preset) {
     const createLayer = (layerPreset, baseFreq) => ({
       phase: 0,
-      frequency: baseFreq * Math.pow(2, (layerPreset.oscillator?.detune || 0) / 1200),
+      frequency: baseFreq,
+      detune: layerPreset.oscillator?.detune || 0,
       type: layerPreset.oscillator?.type || 'sine',
       gain: layerPreset.gain || 1.0,
       envelope: {
@@ -116,7 +121,7 @@ class ThereminProcessor extends AudioWorkletProcessor {
       stagger: preset.stagger ? preset.stagger * sampleRate : 0,
       staggerCounter: 0,
       isReleasing: false,
-      preset: preset, // Store the preset with the voice
+      preset: preset,
     };
   }
 
@@ -137,24 +142,21 @@ class ThereminProcessor extends AudioWorkletProcessor {
         
         const attackSamples = (voice.preset.envelope.attack || 0.01) * sampleRate;
         const releaseSamples = (voice.preset.envelope.release || 0.5) * sampleRate;
+        
+        const volAttackSpeed = 1 / (attackSamples || 1);
+        const volReleaseSpeed = 1 / (releaseSamples || 1);
 
         if (voice.isReleasing) {
-            voice.currentVolume -= (1 / releaseSamples);
+            voice.currentVolume -= volReleaseSpeed;
             if (voice.currentVolume <= 0) {
                 this.voices.delete(id);
                 return;
             }
         } else {
             if (voice.currentVolume < voice.targetVolume) {
-                voice.currentVolume += (1 / attackSamples);
-                 if(voice.currentVolume > voice.targetVolume) {
-                    voice.currentVolume = voice.targetVolume
-                 }
+                voice.currentVolume = Math.min(voice.targetVolume, voice.currentVolume + volAttackSpeed);
             } else if (voice.currentVolume > voice.targetVolume) {
-                voice.currentVolume -= (1 / attackSamples) * 2; // Faster downward adjustment
-                 if(voice.currentVolume < voice.targetVolume) {
-                    voice.currentVolume = voice.targetVolume
-                 }
+                voice.currentVolume = Math.max(voice.targetVolume, voice.currentVolume - volAttackSpeed * 2); // Faster downward adjustment
             }
         }
         
@@ -164,7 +166,7 @@ class ThereminProcessor extends AudioWorkletProcessor {
             }
             
             let oscSample = 0;
-            const currentFreq = voice.frequency * Math.pow(2, (layer.detune || 0) / 1200);
+            const currentFreq = voice.frequency * Math.pow(2, layer.detune / 1200);
             const phaseIncrement = currentFreq / sampleRate;
 
             switch (layer.type) {

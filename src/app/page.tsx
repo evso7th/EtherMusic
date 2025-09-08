@@ -299,10 +299,14 @@ export default function Home() {
         if (preset) {
             setActiveMelodyInstrument(instrumentName);
             setMelodyInstrument(instrumentName);
-            handleChannelVolumeChange('melody', 'reverbSend', preset.params.reverbSend ?? defaultVolumes.melody.reverbSend);
-            handleChannelVolumeChange('melody', 'distortion', preset.params.distortion ?? defaultVolumes.melody.distortion);
+            const newChannelVolumes: ChannelVolumes = {
+                ...volumes.melody,
+                reverbSend: preset.params.reverbSend ?? defaultVolumes.melody.reverbSend,
+                distortion: preset.params.distortion ?? defaultVolumes.melody.distortion,
+            };
+            handleMixerChange({ melody: newChannelVolumes });
         }
-    }, [setMelodyInstrument, handleChannelVolumeChange]);
+    }, [setMelodyInstrument, handleMixerChange, volumes.melody]);
 
     const handleBassInstrumentChange = useCallback((instrumentName: BassInstrument) => {
         const preset = bassInstruments.find(p => p.id === instrumentName);
@@ -311,12 +315,11 @@ export default function Home() {
             setBassInstrument(instrumentName);
             const reverbSend = preset.params.reverbSend ?? defaultVolumes.manualBass.reverbSend;
             const distortion = preset.params.distortion ?? defaultVolumes.manualBass.distortion;
-            handleChannelVolumeChange('manualBass', 'reverbSend', reverbSend);
-            handleChannelVolumeChange('manualBass', 'distortion', distortion);
-            handleChannelVolumeChange('latch', 'reverbSend', reverbSend);
-            handleChannelVolumeChange('latch', 'distortion', distortion);
+            const newManualBassVolumes: ChannelVolumes = {...volumes.manualBass, reverbSend, distortion };
+            const newLatchVolumes: ChannelVolumes = {...volumes.latch, reverbSend, distortion };
+            handleMixerChange({ manualBass: newManualBassVolumes, latch: newLatchVolumes });
         }
-    }, [setBassInstrument, handleChannelVolumeChange]);
+    }, [setBassInstrument, handleMixerChange, volumes.manualBass, volumes.latch]);
     
     if (!isClient) {
         return <Preloader />;
