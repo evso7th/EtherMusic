@@ -255,6 +255,15 @@ export default function Home() {
         }
     }, []);
 
+    useEffect(() => {
+        if (isReady && activeMelodyInstrument) {
+            setMelodyInstrument(activeMelodyInstrument);
+        }
+        if (isReady && activeBassInstrument) {
+            setBassInstrument(activeBassInstrument);
+        }
+    }, [isReady, activeMelodyInstrument, activeBassInstrument, setMelodyInstrument, setBassInstrument]);
+    
     const handleTempoChange = useCallback((newTempo: number) => {
         setCurrentTempo(newTempo);
         setTempo(newTempo);
@@ -390,14 +399,16 @@ export default function Home() {
         setBassInstrument(instrumentId);
     }, [setBassInstrument]);
     
-     const handleAutopilotPresetLoad = useCallback((preset: AutopilotPreset) => {
+    const handleAutopilotPresetLoad = useCallback((preset: AutopilotPreset) => {
         handleAutopilotSettingsChange({ instruments: preset.instruments });
         updateVolumes({ ...volumes, ...preset.volumes });
     }, [handleAutopilotSettingsChange, updateVolumes, volumes]);
 
+
     const handleThereminInteractionCallback = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
+        if (!isReady || !audioEngine) return;
         handleThereminInteraction(type, data, state);
-    }, [handleThereminInteraction]);
+    }, [isReady, handleThereminInteraction]);
 
     if (!isClient) {
         return <Preloader />;
@@ -553,7 +564,7 @@ export default function Home() {
                         setTempo={handleTempoChange}
                         autopilotSettings={autopilotSettings}
                         onAutopilotSettingsChange={handleAutopilotSettingsChange}
-                        onAutopilotPresetLoad={handleAutopilotPresetLoad}
+                        onAutopilotPresetLoad={onAutopilotPresetLoad}
                     />
                 </div>
             </div>

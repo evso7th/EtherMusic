@@ -131,18 +131,15 @@ export function useAudioEngine() {
     }, [sleepTimerId]);
     
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
-        console.log(`[2. HOOK] use-audio-engine.ts: handleThereminInteraction. Type: ${type}, State: ${state}`, data);
         if (!isReady || !audioEngine.current) return;
         audioEngine.current.handleThereminInteraction(type, data, state);
     }, [isReady]);
 
     const setMelodyInstrument = useCallback((instrumentName: Instrument) => {
-        console.log('[2. HOOK] use-audio-engine.ts: setMelodyInstrument called with:', instrumentName);
         audioEngine.current?.setMelodyInstrument(instrumentName);
     }, []);
     
     const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
-        console.log('[2. HOOK] use-audio-engine.ts: setBassInstrument called with:', instrumentName);
         audioEngine.current?.setBassInstrument(instrumentName);
     }, []);
     
@@ -151,7 +148,6 @@ export function useAudioEngine() {
     }, []);
     
     const handleAutopilotSettingsChange = useCallback((settings: Partial<AutopilotSettings>) => {
-        console.log('[2. HOOK] use-audio-engine.ts: setAutopilotSettings called with:', settings);
         audioEngine.current?.setAutopilotSettings(settings);
     }, []);
 
