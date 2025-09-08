@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Volumes, Note, Instrument, BassInstrument, CompressorSettings, InstrumentPreset, BassInstrumentPreset } from '@/types';
+import type { Volumes, Note, Instrument, BassInstrument, CompressorSettings, InstrumentPreset, BassInstrumentPreset, ChannelVolumes } from '@/types';
 import { OrbManager } from './orb-manager';
 import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
@@ -42,9 +42,9 @@ export class AudioEngine {
     private compressor: DynamicsCompressorNode;
     
     // Effects chain
-    private convolver: ConvolverNode;
     private reverbSend: GainNode;
     private reverbReturnGain: GainNode;
+    private convolver: ConvolverNode;
     
     private melodyDistortion: WaveShaperNode;
     private bassDistortion: WaveShaperNode;
@@ -181,6 +181,7 @@ export class AudioEngine {
             this.convolver.buffer = audioBuffer;
         } catch (e) {
             console.error('Failed to load reverb impulse response:', e);
+            // Fallback to a generated reverb if loading fails
             this.convolver.buffer = this.createFallbackReverb();
         }
     }
@@ -450,5 +451,3 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
-
-    

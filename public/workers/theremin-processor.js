@@ -1,163 +1,237 @@
 
 class ThereminProcessor extends AudioWorkletProcessor {
-    constructor(options) {
-        super(options);
+  static get parameterDescriptors() {
+    return [];
+  }
 
-        this.polyphony = options.processorOptions.polyphony || 4;
-        this.voices = Array(this.polyphony).fill(null).map(() => ({
-            isActive: false,
-            pointerId: null,
-            frequency: 0,
-            targetFrequency: 0,
-            gain: 0,
-            targetGain: 0,
+  constructor(options) {
+    super(options);
+    this.voices = new Map();
+    this.polyphony = options.processorOptions.polyphony || 4;
+
+    this.preset = {
+      oscillator: { type: 'sine' },
+      envelope: { attack: 0.1, decay: 0.2, sustain: 0.5, release: 1.0 },
+      filter: { Q: 1, frequency: 1000, type: 'lowpass' },
+      portamento: 0,
+      layers: [],
+      stagger: 0,
+    };
+
+    this.port.onmessage = (event) => {
+      const { type, note, id, preset } = event.data;
+      switch (type) {
+        case 'noteOn':
+          this.noteOn(note);
+          break;
+        case 'noteUpdate':
+          this.noteUpdate(note);
+          break;
+        case 'noteOff':
+          this.noteOff(id);
+          break;
+        case 'allNotesOff':
+          this.allNotesOff();
+          break;
+        case 'setPreset':
+          this.applyPreset(preset);
+          break;
+      }
+    };
+  }
+  
+  applyPreset(preset) {
+    this.preset = { ...this.preset, ...preset };
+  }
+
+  noteOn(note) {
+    if (this.voices.has(note.id)) {
+      this.noteUpdate(note);
+      return;
+    }
+
+    if (this.voices.size >= this.polyphony) {
+      const oldestVoiceId = this.voices.keys().next().value;
+      this.noteOff(oldestVoiceId);
+    }
+    
+    const voice = this.createVoice(note.frequency, this.preset);
+    voice.targetVolume = note.volume;
+    this.voices.set(note.id, voice);
+  }
+
+  noteUpdate(note) {
+    const voice = this.voices.get(note.id);
+    if (voice) {
+      voice.portamentoTarget = note.frequency;
+      voice.targetVolume = note.volume;
+    }
+  }
+
+  noteOff(id) {
+    const voice = this.voices.get(id);
+    if (voice) {
+      voice.isReleasing = true;
+    }
+  }
+
+  allNotesOff() {
+     this.voices.forEach(voice => {
+      voice.isReleasing = true;
+    });
+  }
+  
+  createVoice(frequency, preset) {
+    const createLayer = (layerPreset, baseFreq) => {
+        const layerOscillator = layerPreset.oscillator || {};
+        const layerEnvelope = layerPreset.envelope || {};
+
+        return {
             phase: 0,
-            glideProgress: 1, // Start at 1 to prevent gliding on first note
-            glideTime: 0.05, // Glide time in seconds
-            env: { attack: 0.01, release: 0.5 },
-            envelopePhase: 'idle', // idle, attack, sustain, release
-            envelopeLevel: 0
-        }));
+            frequency: baseFreq,
+            detune: layerOscillator.detune || 0,
+            type: layerOscillator.type || 'sine',
+            gain: layerPreset.gain === undefined ? 1.0 : layerPreset.gain,
+            envelope: {
+                attack: layerEnvelope.attack || 0.01,
+                decay: layerEnvelope.decay || 0.1,
+                sustain: layerEnvelope.sustain ?? 0.5,
+                release: layerEnvelope.release || 0.5,
+                state: 'attack',
+                currentValue: 0,
+                attackSamples: Math.max(1, (layerEnvelope.attack || 0.01) * sampleRate),
+                decaySamples: Math.max(1, (layerEnvelope.decay || 0.1) * sampleRate),
+                releaseSamples: Math.max(1, (layerEnvelope.release || 0.5) * sampleRate),
+            }
+        };
+    };
 
-        this.instrument = 'theremin';
+    const mainLayer = createLayer(preset, frequency);
+    const additionalLayers = (preset.layers || []).map(layer => createLayer(layer, frequency));
 
-        this.port.onmessage = this.handleMessage.bind(this);
-    }
+    return {
+      id: Math.random(),
+      frequency: frequency,
+      targetVolume: 0,
+      currentVolume: 0,
+      filterState: [0, 0, 0, 0], 
+      portamentoTime: preset.portamento ? 0.05 / preset.portamento : 0,
+      portamentoTarget: frequency,
+      layers: [mainLayer, ...additionalLayers],
+      stagger: preset.stagger ? preset.stagger * sampleRate : 0,
+      staggerCounter: 0,
+      isReleasing: false,
+      preset: preset,
+    };
+  }
 
-    handleMessage(event) {
-        const { type, note, id, instrument } = event.data;
+  process(inputs, outputs, parameters) {
+    const output = outputs[0];
+    const channel = output[0];
 
-        if (type === 'setInstrument') {
-            this.instrument = instrument;
-            this.voices.forEach(v => {
-                if (v.isActive) {
-                    v.targetGain = 0; // fade out old instrument sound
-                }
-            });
-            return;
+    for (let i = 0; i < channel.length; i++) {
+      let sample = 0;
+      this.voices.forEach((voice, id) => {
+        let voiceSample = 0;
+
+        if (voice.portamentoTime > 0) {
+            voice.frequency += (voice.portamentoTarget - voice.frequency) * voice.portamentoTime;
+        } else {
+            voice.frequency = voice.portamentoTarget;
         }
-
-        if (type === 'allNotesOff') {
-            this.voices.forEach(v => {
-                v.targetGain = 0;
-            });
-            return;
-        }
-
-        if (!note && !id) return;
         
-        const pointerId = note ? note.id : id;
+        const volAttackSpeed = 1 / ((voice.preset.envelope.attack || 0.01) * sampleRate || 1);
+        const volReleaseSpeed = 1 / ((voice.preset.envelope.release || 0.5) * sampleRate || 1);
 
-        if (type === 'noteOn') {
-            let voice = this.voices.find(v => v.pointerId === pointerId);
-            if (!voice) {
-                voice = this.voices.find(v => !v.isActive);
+        if (voice.isReleasing) {
+            voice.currentVolume -= volReleaseSpeed;
+            if (voice.currentVolume <= 0) {
+                this.voices.delete(id);
+                return;
             }
-
-            if (voice) {
-                voice.isActive = true;
-                voice.pointerId = pointerId;
-                voice.targetFrequency = note.frequency;
-                voice.targetGain = note.volume;
-                // If the voice was inactive, jump to the frequency, otherwise glide
-                if (voice.envelopePhase === 'idle' || voice.envelopePhase === 'release') {
-                    voice.frequency = note.frequency;
-                    voice.glideProgress = 1;
-                } else {
-                    voice.glideProgress = 0;
-                }
-                voice.envelopePhase = 'attack';
-            }
-        } else if (type === 'noteUpdate') {
-            const voice = this.voices.find(v => v.pointerId === pointerId);
-            if (voice) {
-                if (voice.targetFrequency !== note.frequency) {
-                     voice.targetFrequency = note.frequency;
-                     voice.glideProgress = 0;
-                }
-                voice.targetGain = note.volume;
-            }
-        } else if (type === 'noteOff') {
-            const voice = this.voices.find(v => v.pointerId === pointerId);
-            if (voice) {
-                voice.envelopePhase = 'release';
+        } else {
+            if (voice.currentVolume < voice.targetVolume) {
+                voice.currentVolume = Math.min(voice.targetVolume, voice.currentVolume + volAttackSpeed);
+            } else if (voice.currentVolume > voice.targetVolume) {
+                voice.currentVolume = Math.max(voice.targetVolume, voice.currentVolume - volAttackSpeed * 2); // Faster downward adjustment
             }
         }
-    }
-
-    process(inputs, outputs) {
-        const output = outputs[0];
-        const channel = output[0]; // Process mono and copy to stereo later if needed
-
-        for (let i = 0; i < channel.length; i++) {
-            let mixedSample = 0;
-
-            for (const voice of this.voices) {
-                if (!voice.isActive) continue;
-
-                // --- Envelope ---
-                if (voice.envelopePhase === 'attack') {
-                    voice.envelopeLevel += 1 / (sampleRate * voice.env.attack);
-                    if (voice.envelopeLevel >= 1) {
-                        voice.envelopeLevel = 1;
-                        voice.envelopePhase = 'sustain';
-                    }
-                } else if (voice.envelopePhase === 'release') {
-                    voice.envelopeLevel -= 1 / (sampleRate * voice.env.release);
-                    if (voice.envelopeLevel <= 0) {
-                        voice.envelopeLevel = 0;
-                        voice.isActive = false;
-                        voice.pointerId = null;
-                        voice.envelopePhase = 'idle';
-                        continue;
-                    }
-                }
-                
-                // --- Glide (Portamento) ---
-                if (voice.frequency !== voice.targetFrequency) {
-                     voice.glideProgress += 1 / (sampleRate * voice.glideTime);
-                     voice.glideProgress = Math.min(1, voice.glideProgress);
-                     const t = 0.5 * (1 - Math.cos(Math.PI * voice.glideProgress)); // Ease in/out
-                     voice.frequency = voice.frequency + (voice.targetFrequency - voice.frequency) * t;
-                }
-                
-                // --- Oscillator ---
-                let sample = 0;
-                const phaseIncrement = voice.frequency / sampleRate;
-
-                // Simple waveform generator based on instrument
-                switch (this.instrument) {
-                    case 'organ': // Additive synthesis for organ
-                         sample = (Math.sin(voice.phase * (2 * Math.PI)) * 0.6 +
-                                  Math.sin(voice.phase * 2 * (2 * Math.PI)) * 0.2 +
-                                  Math.sin(voice.phase * 3 * (2 * Math.PI)) * 0.1 +
-                                  Math.sin(voice.phase * 4 * (2 * Math.PI)) * 0.1) / 1.0;
-                        break;
-                    case 'ebass': // Square wave for bass
-                        sample = Math.sign(Math.sin(voice.phase * 2 * Math.PI));
-                        break;
-                    case 'theremin':
-                    case 'synth':
-                    default: // Sine wave for others
-                        sample = Math.sin(voice.phase * 2 * Math.PI);
-                        break;
-                }
-
-                voice.phase = (voice.phase + phaseIncrement) % 1.0;
-
-                mixedSample += sample * voice.envelopeLevel * voice.targetGain;
+        
+        voice.layers.forEach((layer, layerIndex) => {
+            if (voice.stagger > 0 && layerIndex > 0 && voice.staggerCounter < voice.stagger * layerIndex) {
+                return; 
             }
-
-            const finalSample = mixedSample / (this.polyphony > 0 ? Math.sqrt(this.polyphony) : 1);
             
-            // Output to all channels
-            for(let j=0; j < output.length; j++) {
-                output[j][i] = finalSample;
-            }
-        }
+            const env = layer.envelope;
+            let envelopeValue = env.currentValue;
 
-        return true;
+            if (!voice.isReleasing) {
+                if (env.state === 'attack') {
+                    envelopeValue += 1 / env.attackSamples;
+                    if (envelopeValue >= 1.0) {
+                        envelopeValue = 1.0;
+                        env.state = 'decay';
+                    }
+                } else if (env.state === 'decay') {
+                    envelopeValue -= (1.0 - env.sustain) / env.decaySamples;
+                    if (envelopeValue <= env.sustain) {
+                        envelopeValue = env.sustain;
+                        env.state = 'sustain';
+                    }
+                }
+            } else {
+                envelopeValue -= env.sustain / env.releaseSamples;
+                if (envelopeValue <= 0) {
+                    envelopeValue = 0;
+                }
+            }
+            env.currentValue = envelopeValue;
+            
+            let oscSample = 0;
+            const currentFreq = voice.frequency * Math.pow(2, layer.detune / 1200);
+            const phaseIncrement = currentFreq / sampleRate;
+
+            switch (layer.type) {
+                 case 'sawtooth':
+                     oscSample = (layer.phase * 2) - 1;
+                     break;
+                 case 'square':
+                     oscSample = layer.phase < 0.5 ? 1 : -1;
+                     break;
+                 case 'triangle':
+                     oscSample = 1 - 4 * Math.abs(Math.round(layer.phase - 0.25) - (layer.phase - 0.25));
+                     break;
+                 case 'sine':
+                 default:
+                     oscSample = Math.sin(layer.phase * 2 * Math.PI);
+            }
+            layer.phase = (layer.phase + phaseIncrement) % 1;
+            voiceSample += oscSample * envelopeValue * layer.gain;
+        });
+
+        if (voice.stagger > 0) voice.staggerCounter++;
+
+        const { frequency: cutoff, Q: qValue } = voice.preset.filter;
+        const w0 = 2 * Math.PI * cutoff / sampleRate;
+        const alpha = Math.sin(w0) / (2 * qValue);
+        const b0 = (1 - Math.cos(w0)) / 2;
+        const b1 = 1 - Math.cos(w0);
+        const b2 = (1 - Math.cos(w0)) / 2;
+        const a0 = 1 + alpha;
+        const a1 = -2 * Math.cos(w0);
+        const a2 = 1 - alpha;
+        
+        const [x1, x2, y1, y2] = voice.filterState;
+        const filteredSample = (b0/a0)*voiceSample + (b1/a0)*x1 + (b2/a0)*x2 - (a1/a0)*y1 - (a2/a0)*y2;
+        voice.filterState = [voiceSample, x1, filteredSample, y1];
+
+        sample += filteredSample * voice.currentVolume;
+      });
+
+      channel[i] = sample;
     }
+    return true;
+  }
 }
 
 registerProcessor('theremin-processor', ThereminProcessor);
