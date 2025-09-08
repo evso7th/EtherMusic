@@ -228,7 +228,7 @@ export default function Home() {
         const currentKey = isKey(keyOrScale) ? keyOrScale : newKey;
         const currentScale = isScale(keyOrScale) ? keyOrScale : newScale;
     
-        const bassFreqs = getScaleFrequencies(currentKey, currentScale, [0, 1]);
+        const bassFreqs = getScaleFrequencies(currentKey, currentScale, [2, 3]);
         const melodyFreqs = getScaleFrequencies(currentKey, currentScale, [2, 3, 4]);
     
         setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
