@@ -288,7 +288,9 @@ export default function Home() {
                 <div className="absolute top-4 right-4 z-20">
                     <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
                 </div>
-                <MemoizedOrbitalAnimation isPlaying={false} tempo={activeTempo.bpm}/>
+                <div className={cn("absolute inset-0 z-0 transition-opacity duration-1000", isAppStarted ? 'opacity-100' : 'opacity-30')}>
+                    <MemoizedOrbitalAnimation tempo={activeTempo.bpm}/>
+                </div>
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
                         <h1 className="text-4xl md:text-5xl font-bold text-primary">EtherMusic</h1>
@@ -302,7 +304,7 @@ export default function Home() {
                  <footer className="z-10 text-xs text-white/50 pb-4 text-center">
                     <p>Powered by Web Audio API</p>
                     <p>&copy; 2024, EVS</p>
-                    <p className="mt-2">v.2.0 "Maestro"</p>
+                    <p className="mt-2">v.2.1 "Maestro"</p>
                 </footer>
                 <CookieConsent onConsentChange={(consent) => {
                     setCookieConsent(consent);
@@ -429,5 +431,7 @@ export default function Home() {
         </div>
     );
 }
+
+    
 
     
