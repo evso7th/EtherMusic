@@ -251,6 +251,7 @@ export class AudioEngine {
         if (!this.isInitialized) return;
         
         const partName = type === 'bass' ? (this.isBassLatchOn ? 'latch' : 'manualBass') : 'melody';
+        console.log(`[2. ENGINE] handleThereminInteraction: partName=${partName}, type=${type}, state=${state}`);
         
         if (partName === 'latch') {
             if (state === 'down' && data) { 
@@ -270,6 +271,7 @@ export class AudioEngine {
             this.activePointers.set(pointerId, { type, noteId });
             const note: SynthNote = { id: noteId, frequency: data.frequency, volume: data.volume };
             const message: WorkerMessage = { type: 'noteOn', note };
+            console.log('[2b. ENGINE] Posting noteOn to worklet', { note });
             nodeInfo.worklet.port.postMessage(message);
             this.orbManager.addOrb(pointerId, type, data.x, data.y);
         } else if (state === 'move' && data) {
@@ -277,6 +279,7 @@ export class AudioEngine {
             if (activePointer) {
                  const note: SynthNote = { id: activePointer.noteId, frequency: data.frequency, volume: data.volume };
                  const message: WorkerMessage = { type: 'noteUpdate', note };
+                 console.log('[2b. ENGINE] Posting noteUpdate to worklet', { note });
                  nodeInfo.worklet.port.postMessage(message);
                  this.orbManager.updateOrb(pointerId, data.x, data.y);
             }
@@ -284,6 +287,7 @@ export class AudioEngine {
             const activePointer = this.activePointers.get(pointerId);
             if (activePointer) {
                 const message: WorkerMessage = { type: 'noteOff', id: activePointer.noteId };
+                console.log('[2b. ENGINE] Posting noteOff to worklet', { id: activePointer.noteId });
                 nodeInfo.worklet.port.postMessage(message);
                 this.activePointers.delete(pointerId);
                 this.orbManager.removeOrb(pointerId);
@@ -293,6 +297,7 @@ export class AudioEngine {
                         const nodeToStop = this.nodes.get(partName);
                         if (nodeToStop) {
                             const message: WorkerMessage = { type: 'noteOff', id: pInfo.noteId };
+                            console.log('[2b. ENGINE] Posting noteOff for dangling pointer', { id: pInfo.noteId });
                             nodeToStop.worklet.port.postMessage(message);
                         }
                         this.orbManager.removeOrb(pId);
@@ -340,20 +345,25 @@ export class AudioEngine {
     }
     
     public setMelodyInstrument(instrumentName: Instrument) {
+        console.log('[2. ENGINE] setMelodyInstrument called with:', instrumentName);
         const preset = melodyInstruments.find(p => p.id === instrumentName);
         if (preset && this.nodes.has('melody')) {
             const message: WorkerMessage = { type: 'setPreset', preset: preset.params };
+            console.log('[2. ENGINE] Sending preset to melody worklet:', preset.params);
             this.nodes.get('melody')?.worklet.port.postMessage(message);
         }
     }
     
     public setBassInstrument(instrumentName: BassInstrument) {
+        console.log('[2. ENGINE] setBassInstrument called with:', instrumentName);
         const preset = bassInstruments.find(p => p.id === instrumentName);
         if (preset) {
             const bassPresetParams = preset.params;
             const message: WorkerMessage = { type: 'setPreset', preset: bassPresetParams };
             
+            console.log('[2. ENGINE] Sending preset to manualBass worklet:', bassPresetParams);
             this.nodes.get('manualBass')?.worklet.port.postMessage(message);
+            console.log('[2. ENGINE] Sending preset to latch worklet:', bassPresetParams);
             this.nodes.get('latch')?.worklet.port.postMessage(message);
             
             // Also update the volume settings associated with the preset

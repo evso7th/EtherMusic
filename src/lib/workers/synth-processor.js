@@ -52,12 +52,15 @@ class Voice {
 
         this.portamentoSpeed = preset.portamento > 0 ? 1 - Math.exp(-1 / (preset.portamento * this.sampleRate)) : 0;
         this.envelopeLevel = 0;
+        
+        console.log(`[3. WORKLET] Voice ${this.id} created with preset:`, preset);
+        console.log(`[3. WORKLET] Layers for voice ${this.id}:`, this.layers);
     }
 
     initLayers(preset) {
         this.layers = []; // Clear existing layers
 
-        const createLayer = (layerConfig, baseFrequency, isMainLayer = false) => {
+        const createLayer = (layerConfig, baseFrequency) => {
             const freq = layerConfig.freqMult !== undefined 
                 ? baseFrequency * layerConfig.freqMult
                 : baseFrequency;
@@ -78,7 +81,7 @@ class Voice {
             freqMult: 1,
         };
 
-        this.layers.push(createLayer(mainOscillatorConfig, this.baseFrequency, true));
+        this.layers.push(createLayer(mainOscillatorConfig, this.baseFrequency));
     
         if (preset.layers && preset.layers.length > 0) {
              preset.layers.forEach(layer => this.layers.push(createLayer(layer, this.baseFrequency)));
@@ -246,8 +249,14 @@ class Voice {
         });
         
         const filteredSample = this.processFilter(mixedSample / this.layers.length);
+        
+        const finalSample = filteredSample * envelopeValue * this.volume;
 
-        return filteredSample * envelopeValue * this.volume;
+        if(this.id === 0 && Math.random() < 0.001) { // Log occasionally for the first voice
+             console.log(`[4. WORKLET-RENDER] Voice ${this.id}: envelope=${envelopeValue.toFixed(2)}, mix=${mixedSample.toFixed(2)}, filtered=${filteredSample.toFixed(2)}, final=${finalSample.toFixed(2)}`);
+        }
+
+        return finalSample;
     }
 
     noteUpdate(frequency, volume) {
@@ -274,6 +283,7 @@ class SynthProcessor extends AudioWorkletProcessor {
     }
 
     handleMessage(event) {
+        console.log('[3. WORKLET] Received message:', event.data);
         const { type, note, id, preset } = event.data;
         switch (type) {
             case 'noteOn':
@@ -341,7 +351,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         if (channel) {
             for (let i = 0; i < channel.length; i++) {
                 let mixedSample = 0;
-                this.voices.forEach((voice, id) => {
+                this.voices.forEach((id, voice) => { // Corrected iteration
                     mixedSample += voice.render();
                     if (voice.isFinished) {
                         this.voices.delete(id);
