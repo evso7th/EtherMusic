@@ -1,5 +1,5 @@
 
-import type { InstrumentPreset, Instrument, InstrumentPresetParams } from "@/types";
+import type { InstrumentPreset, Instrument } from "@/types";
 
 export const melodyInstruments: readonly InstrumentPreset[] = [
     {
@@ -14,17 +14,19 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
     },
     {
         id: "organ",
-        name: "Organ",
+        name: "Church Organ",
         params: {
-            oscillator: { type: 'sine' }, // Base layer
-            envelope: { attack: 0.1, decay: 0.2, sustain: 0.9, release: 0.8 },
-            filter: { Q: 3, frequency: 1200, type: 'peaking', gain: 12 },
-            vibrato: { frequency: 5.5, depth: 2 },
+            oscillator: { type: 'sine' }, // Fundamental 8'
+            envelope: { attack: 0.2, decay: 0.1, sustain: 0.9, release: 2.5 },
+            filter: { Q: 2.5, frequency: 1500, type: 'peaking', gain: 6 },
+            vibrato: { frequency: 4.5, depth: 1.5 },
             portamento: 0,
             layers: [
-                { type: 'sine', freqMult: 2.0, level: 0.75, detune: 2 },    // Octave
-                { type: 'sine', freqMult: 3.0, level: 0.5, detune: -2 },   // Fifth
-                { type: 'sine', freqMult: 0.5, level: 0.75, detune: 0 },   // Sub Octave
+                { type: 'sine', freqMult: 0.5, level: 0.65, detune: -2 },  // Sub Octave (16')
+                { type: 'sine', freqMult: 2.0, level: 0.5, detune: 2 },     // Octave (4')
+                { type: 'sine', freqMult: 3.0, level: 0.3, detune: 0 },     // Fifth (2 2/3')
+                { type: 'sine', freqMult: 4.0, level: 0.25, detune: 2 },    // Super Octave (2')
+                { type: 'triangle', freqMult: 6.0, level: 0.1, detune: -2}, // Twelfth (1 1/3') - for brightness
             ],
         }
     },
