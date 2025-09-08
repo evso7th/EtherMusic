@@ -1,7 +1,6 @@
 
 "use client";
 
-import Tone from 'tone';
 import type { Volumes, Note, Instrument, BassInstrument } from '@/types';
 import { OrbManager } from './orb-manager';
 import { LatchEngine, type LatchToggleResult } from './latch-engine';
@@ -22,10 +21,10 @@ export class AudioEngine {
     private mediaRecorder: MediaRecorder | null = null;
     private recordedChunks: Blob[] = [];
 
-    public masterOut: Tone.Gain;
-    private compressor: Tone.Compressor;
-    private nodes = new Map<PartName, { worklet: AudioWorkletNode, gain: Tone.Gain, reverbSend: Tone.Gain }>();
-    private reverbReturn: Tone.Gain;
+    public masterOut: GainNode;
+    private compressor: DynamicsCompressorNode;
+    private nodes = new Map<PartName, { worklet: AudioWorkletNode, gain: GainNode, reverbSend: GainNode }>();
+    private reverbReturn: GainNode;
 
     private volumes: Volumes = { 
         melody: { gain: 6, reverbSend: -24 },
@@ -45,14 +44,18 @@ export class AudioEngine {
     constructor(context: AudioContext, orbManager: OrbManager) {
         this.context = context;
         this.orbManager = orbManager;
-        // The masterOut needs to be a Tone.Gain node to be connectable to Tone.Compressor
-        this.masterOut = new Tone.Gain(1); // will connect to destination via compressor
-        this.reverbReturn = new Tone.Gain(1);
+        this.masterOut = this.context.createGain();
+        this.reverbReturn = this.context.createGain();
 
-        // Initialize compressor right away
-        this.compressor = new Tone.Compressor(-24, 12);
+        this.compressor = this.context.createDynamicsCompressor();
+        this.compressor.threshold.value = -24;
+        this.compressor.knee.value = 30;
+        this.compressor.ratio.value = 12;
+        this.compressor.attack.value = 0.003;
+        this.compressor.release.value = 0.25;
+        
         this.masterOut.connect(this.compressor);
-        this.compressor.toDestination();
+        this.compressor.connect(this.context.destination);
     }
 
     public get isPlaying(): boolean {
@@ -66,8 +69,9 @@ export class AudioEngine {
     public async initialize() {
         if (this.isInitialized) return;
 
-        // Use the passed-in context to initialize Tone.js
-        await Tone.setContext(this.context).ready();
+        if (this.context.state === 'suspended') {
+            await this.context.resume();
+        }
         console.log("AudioContext is active.");
         
         const mediaStreamDest = this.context.createMediaStreamDestination();
@@ -124,9 +128,11 @@ export class AudioEngine {
     private createWorkletNode(part: PartName, processorName: string, polyphony: number, reverbBus: AudioWorkletNode) {
         if (!this.context || !this.masterOut) return;
         
-        const gainNode = new Tone.Gain(1).connect(this.masterOut);
+        const gainNode = this.context.createGain();
+        gainNode.connect(this.masterOut);
 
-        const reverbSendNode = new Tone.Gain(0).connect(reverbBus);
+        const reverbSendNode = this.context.createGain();
+        reverbSendNode.connect(reverbBus);
 
         const workletNode = new AudioWorkletNode(this.context, processorName, {
             processorOptions: {
@@ -339,5 +345,3 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
-
-    

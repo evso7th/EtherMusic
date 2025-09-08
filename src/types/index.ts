@@ -7,6 +7,8 @@ export type MusicScale = 'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentato
 export type Instrument = 'synth' | 'organ' | 'theremin' | 'mellotron';
 export type BassInstrument = 'classicBass' | 'glideBass' | 'ambientDrone' | 'resonantGliss' | 'hypnoticDrone' | 'livingRiff';
 
+// These presets are sent to the AudioWorklet, so they must contain only serializable data.
+// No Tone.js-specific objects.
 export interface InstrumentPresetParams {
     oscillator: {
         type: OscillatorType;
@@ -23,7 +25,6 @@ export interface InstrumentPresetParams {
         type: BiquadFilterType;
     };
     portamento?: number;
-    reverbSend?: number; // Optional reverb send level
 }
 
 export interface BassInstrumentPresetParams extends InstrumentPresetParams {
@@ -80,4 +81,3 @@ export interface Note {
     volume: number;
 }
 
-    
