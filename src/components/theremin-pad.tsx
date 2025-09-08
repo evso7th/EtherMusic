@@ -39,7 +39,6 @@ interface ThereminPadProps {
     onLatchToggle?: (checked: boolean) => void;
     orbManager?: OrbManager | null;
     channelVolumes: ChannelVolumes;
-    onChannelVolumeChange: (channel: 'melody' | 'manualBass' | 'latch', newVolumes: Partial<ChannelVolumes>) => void;
 }
 
 const padTitles = {
@@ -107,42 +106,11 @@ export function ThereminPad({
     isLatchOn,
     onLatchToggle,
     orbManager,
-    channelVolumes,
-    onChannelVolumeChange
+    channelVolumes
 }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const isMobile = useIsMobile();
-    
-    const [localVolumes, setLocalVolumes] = useState(channelVolumes);
-
-    useEffect(() => {
-        setLocalVolumes(channelVolumes);
-    }, [channelVolumes]);
-
-    const handleChannelVolumeCommit = useCallback((volumeType: keyof Omit<ChannelVolumes, 'gain'>, value: number) => {
-         const channelKey = type === 'bass' ? 'manualBass' : 'melody'; // Latch volume is separate
-         onChannelVolumeChange(channelKey, { [volumeType]: value });
-         if (type === 'bass') {
-             onChannelVolumeChange('latch', { [volumeType]: value });
-         }
-    }, [onChannelVolumeChange, type]);
-    
-    const handleReverbChange = useCallback((value: number) => {
-        setLocalVolumes(prev => ({...prev, reverbSend: value}));
-    }, []);
-
-    const handleReverbCommit = useCallback((value: number) => {
-        handleChannelVolumeCommit('reverbSend', value);
-    }, [handleChannelVolumeCommit]);
-    
-    const handleDistortionChange = useCallback((value: number) => {
-        setLocalVolumes(prev => ({...prev, distortion: value}));
-    }, []);
-
-    const handleDistortionCommit = useCallback((value: number) => {
-        handleChannelVolumeCommit('distortion', value);
-    }, [handleChannelVolumeCommit]);
 
     // Manage orbs for latch mode
     useEffect(() => {
@@ -194,6 +162,8 @@ export function ThereminPad({
         if (isDisabled) return;
         
         if (isLatchOn && type === 'bass') {
+            // In latch mode, the down action handles the logic.
+            // Up action should only release the pointer capture.
         } else {
              const interactionData = calculateInteraction(event);
              onInteraction(type, interactionData, 'up');
@@ -282,28 +252,6 @@ export function ThereminPad({
                                     )}
                                  </>
                             )}
-                            
-                            <Separator />
-                            <div className="space-y-4">
-                                <EffectControl
-                                    label="Reverb"
-                                    icon={Blend}
-                                    level={localVolumes.reverbSend}
-                                    onLevelChange={handleReverbChange}
-                                    onLevelCommit={handleReverbCommit}
-                                    min={-48} max={6} step={1} unit="dB"
-                                />
-                                <EffectControl
-                                    label="Distortion"
-                                    icon={Waves}
-                                    level={localVolumes.distortion}
-                                    onLevelChange={handleDistortionChange}
-                                    onLevelCommit={handleDistortionCommit}
-                                    min={0} max={100} step={1} unit="%"
-                                />
-                            </div>
-
-                            <Separator />
 
                             <Button 
                                 onClick={() => setIsSettingsOpen(false)} 
@@ -335,8 +283,8 @@ export function ThereminPad({
                  <div className="text-xs text-muted-foreground capitalize pl-2">
                    {type === 'bass' && onLatchToggle ? (
                         <div className="flex items-center space-x-1 h-8 px-2 rounded-md">
+                             <Label htmlFor="latch-mode" className="flex items-center gap-1 text-xs cursor-pointer"><Anchor className="w-3 h-3" /> Latch</Label>
                             <Switch id="latch-mode" checked={isLatchOn} onCheckedChange={onLatchToggle} />
-                            <Label htmlFor="latch-mode" className="flex items-center gap-1 text-xs cursor-pointer"><Anchor className="w-3 h-3" /> Latch</Label>
                         </div>
                     ) : (
                         type === 'melody' ? 'Theremin' : 'Bass Synth'

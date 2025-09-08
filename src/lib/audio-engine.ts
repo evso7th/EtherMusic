@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Volumes, Note, Instrument, BassInstrument, CompressorSettings, ChannelVolumes } from '@/types';
+import type { Volumes, Note, Instrument, BassInstrument, CompressorSettings } from '@/types';
 import { OrbManager } from './orb-manager';
 import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
@@ -20,10 +20,8 @@ function createDistortionCurve(amount: number): Float32Array {
     const n_samples = 44100;
     const curve = new Float32Array(n_samples);
     const deg = Math.PI / 180;
-    let i = 0;
-    let x;
-    for ( ; i < n_samples; ++i ) {
-        x = i * 2 / n_samples - 1;
+    for (let i = 0; i < n_samples; ++i ) {
+        const x = i * 2 / n_samples - 1;
         curve[i] = ( 3 + k ) * x * 20 * deg / ( Math.PI + k * Math.abs(x) );
     }
     return curve;
@@ -40,7 +38,9 @@ export class AudioEngine {
     private masterOut: GainNode;
     private preCompressorOut: GainNode;
     private compressor: DynamicsCompressorNode;
-    private reverb: ReverbNode;
+    
+    // Effects chain
+    private reverb: ConvolverNode;
     private reverbReturnGain: GainNode;
 
     private nodes = new Map<PartName, { 
@@ -140,7 +140,6 @@ export class AudioEngine {
              await this.context.audioWorklet.addModule('/worklets/theremin-processor.js');
              await this.context.audioWorklet.addModule('/worklets/latch-processor.js');
              await this.context.audioWorklet.addModule('/worklets/drum-processor.js');
-             console.log('AudioWorklet modules loaded.');
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
             throw new Error("Could not load core audio components. Please try refreshing the page.");
@@ -164,7 +163,6 @@ export class AudioEngine {
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
             this.reverb.buffer = audioBuffer;
-            console.log('Reverb impulse loaded.');
         } catch (e) {
             console.error('Failed to load reverb impulse response:', e);
         }
@@ -187,8 +185,7 @@ export class AudioEngine {
             outputChannelCount: [1]
         });
     
-        workletNode.connect(distortionNode);
-        distortionNode.connect(gainNode);
+        workletNode.connect(distortionNode).connect(gainNode);
         gainNode.connect(this.preCompressorOut); 
         gainNode.connect(reverbSendNode); 
 
@@ -198,6 +195,12 @@ export class AudioEngine {
             distortion: distortionNode,
             reverbSend: reverbSendNode,
         });
+
+        // Remove tracing logs after debugging
+        workletNode.port.onmessage = (event) => {
+            // Optional: handle messages back from the worklet if needed
+            // console.log(`Message from ${part} worklet:`, event.data);
+        };
     }
     
     private tick() {
@@ -236,7 +239,7 @@ export class AudioEngine {
 
     public handleThereminInteraction(type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') {
         if (!this.isInitialized || !this.context) return;
-
+        
         const partName = type === 'bass' ? (this.isBassLatchOn ? 'latch' : 'manualBass') : 'melody';
         
         if (partName === 'latch') {
@@ -317,11 +320,9 @@ export class AudioEngine {
 
     public setMelodyInstrument(instrumentName: Instrument) {
         const preset = melodyInstruments.find(p => p.id === instrumentName);
-        if (preset && this.nodes.has('melody')) {
-            const worklet = this.nodes.get('melody')?.worklet;
-            if(worklet) {
-                worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
-            }
+        const nodeInfo = this.nodes.get('melody');
+        if (preset && nodeInfo) {
+            nodeInfo.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
         }
     }
     
@@ -342,12 +343,6 @@ export class AudioEngine {
     public setBeatPattern(patternName: string) {
         if (!this.isInitialized) return;
         this.nodes.get('drums')?.worklet.port.postMessage({type: 'setPattern', pattern: patternName});
-    }
-    
-    public setTempo(bpm: number) {
-        if (!this.isInitialized) return;
-        this.tempo = bpm;
-        this.nodes.get('drums')?.worklet.port.postMessage({type: 'setTempo', bpm: bpm});
     }
     
     public setVolumes(newVolumes: Volumes) {
@@ -374,7 +369,7 @@ export class AudioEngine {
                     }
                 }
             } else if (part === 'reverbReturn') {
-                 this.reverbReturnGain.gain.linearRampToValueAtTime(dbToGain(this.volumes.reverbReturn), 0.05);
+                 this.reverbReturnGain.gain.linearRampToValueAtTime(dbToGain(this.volumes.reverbReturn), rampTime);
             } else {
                  const nodeInfo = this.nodes.get(part);
                  const channelVols = this.volumes[part];

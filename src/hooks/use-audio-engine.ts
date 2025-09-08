@@ -5,7 +5,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
-import type { Volumes, Instrument, BassInstrument, ChannelVolumes } from '@/types';
+import type { Volumes, Instrument, BassInstrument } from '@/types';
 import { melodyInstruments } from '@/lib/melody-presets';
 import { bassInstruments } from '@/lib/bass-presets';
 
@@ -19,7 +19,6 @@ export function useAudioEngine() {
 
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
-    const isBassLatchOnRef = useRef(false);
     
     const initializeAudioEngine = useCallback(async () => {
         try {
@@ -38,7 +37,6 @@ export function useAudioEngine() {
             
             setIsReady(true);
             setIsPlaying(audioEngine.current.isPlaying);
-            console.log('AudioEngine initialized and ready.');
 
         } catch(e) {
             console.error("Failed to initialize audio engines:", e);
@@ -92,10 +90,6 @@ export function useAudioEngine() {
         setIsPlaying(false);
     }, []);
 
-    const setTempo = useCallback((bpm: number) => {
-        audioEngine.current?.setTempo(bpm);
-    }, []);
-
     const setVolumes = useCallback((volumes: Volumes) => {
         audioEngine.current?.setVolumes(volumes);
     }, []);
@@ -105,7 +99,6 @@ export function useAudioEngine() {
     }, []);
     
     const setBassLatch = useCallback((isOn: boolean) => {
-        isBassLatchOnRef.current = isOn;
         audioEngine.current?.setBassLatch(isOn);
     }, []);
 
@@ -134,13 +127,10 @@ export function useAudioEngine() {
     
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isReady || !audioEngine.current) return;
-        
         audioEngine.current.handleThereminInteraction(type, data, state);
-
     }, [isReady]);
 
     const setMelodyInstrument = useCallback((instrumentName: Instrument) => {
-        console.log(`[TRACING] use-audio-engine: setMelodyInstrument called with: ${instrumentName}`);
         audioEngine.current?.setMelodyInstrument(instrumentName);
     }, []);
     
@@ -158,7 +148,6 @@ export function useAudioEngine() {
         play,
         pause,
         stop,
-        setTempo,
         setVolumes,
         setMelodyInstrument,
         setBassInstrument,
@@ -170,5 +159,3 @@ export function useAudioEngine() {
         setSleepTimer,
     };
 }
-
-    
