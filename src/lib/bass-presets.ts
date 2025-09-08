@@ -25,7 +25,7 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
         params: {
             oscillator: { type: 'triangle' },
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.8, release: 1.5 },
-            filter: { Q: 0.5, frequency: 300, type: 'lowpass', gain: 0 },
+            filter: { Q: 0.8, frequency: 500, type: 'lowpass', gain: 0 },
             portamento: 0.03,
             reverbSend: -36,
             distortion: 0,
@@ -41,13 +41,13 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
         params: {
             oscillator: { type: 'sine' },
             envelope: { attack: 0.2, decay: 0.1, sustain: 1.0, release: 3.0 },
-            filter: { Q: 1.2, frequency: 120, type: 'lowpass', gain: 0 },
+            filter: { Q: 1.2, frequency: 250, type: 'lowpass', gain: 0 },
             portamento: 0.08,
             reverbSend: -24,
             distortion: 0,
             layers: [
                 { type: 'sine', freqMult: 0.5, level: 0.9, detune: -5 },
-                { type: 'triangle', freqMult: 2, level: 0.3, detune: 5 }
+                { type: 'triangle', freqMult: 1, level: 0.7, detune: 5 }
             ]
         }
     },
@@ -74,14 +74,14 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
         params: {
             oscillator: { type: 'sine' },
             envelope: { attack: 0.2, decay: 0.1, sustain: 1.0, release: 3.0 },
-            filter: { Q: 1.0, frequency: 150, type: 'lowpass', gain: 0 },
+            filter: { Q: 1.0, frequency: 450, type: 'lowpass', gain: 0 },
             reverbSend: -20,
             distortion: 5,
             layers: [
                 {
                     type: 'triangle',
                     freqMult: 1,
-                    level: 0.5,
+                    level: 0.8,
                     detune: 10
                 }
             ],
@@ -112,3 +112,4 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
 ];
 
 export const defaultBassInstrument: BassInstrument = 'classicBass';
+
