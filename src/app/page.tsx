@@ -9,17 +9,18 @@ import { useToast } from "@/hooks/use-toast";
 import { OrbitalAnimation } from '@/components/orbital-animation';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PlaybackControls } from '@/components/playback-controls';
-import { ArrowRight, Bot } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { HelpGuide } from "@/components/help-guide";
 import { beatPatterns } from '@/lib/drum-machine';
 import { CookieConsent } from '@/components/cookie-consent';
 import { useAudioEngine } from '@/hooks/use-audio-engine';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { SleepTimer } from '@/components/sleep-timer';
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
 import { melodyInstruments, defaultMelodyInstrument } from '@/lib/melody-presets';
 import { bassInstruments, defaultBassInstrument } from '@/lib/bass-presets';
-import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, ChannelVolumes, CompressorSettings, InstrumentPreset, BassInstrumentPreset } from '@/types';
+import { defaultAutopilotSettings } from '@/lib/autopilot';
+import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, ChannelVolumes, CompressorSettings, AutopilotSettings, AutopilotPreset } from '@/types';
 import { cn } from '@/lib/utils';
 
 
@@ -43,11 +44,14 @@ function setCookie(name: string, value: string, days: number) {
 }
 
 const defaultVolumes: Volumes = { 
-    melody: { gain: 0, reverbSend: -18, distortion: 2 },
-    manualBass: { gain: -3, reverbSend: -48, distortion: 5 },
-    latch: { gain: -9, reverbSend: -48, distortion: 5 },
+    melody: { gain: 0, reverbSend: -18, distortion: 0 },
+    manualBass: { gain: -3, reverbSend: -48, distortion: 0 },
+    latch: { gain: -9, reverbSend: -48, distortion: 0 },
     drums: { gain: -9, reverbSend: -48, distortion: 0 },
     reverbReturn: -12,
+    autopilotMelody: { gain: -6, reverbSend: -18, distortion: 0 },
+    autopilotAccompaniment: { gain: -9, reverbSend: -12, distortion: 0 },
+    autopilotBass: { gain: -9, reverbSend: -24, distortion: 0 },
     compressor: {
         enabled: true,
         threshold: -24,
@@ -57,28 +61,31 @@ const defaultVolumes: Volumes = {
     }
 };
 
+function loadSettings(): { volumes: Volumes, autopilotSettings: AutopilotSettings } {
+    const loadedVolumes = loadVolumes();
+    const loadedAutopilot = loadAutopilotSettings();
+    return {
+        volumes: loadedVolumes,
+        autopilotSettings: loadedAutopilot,
+    };
+}
 
-function loadSettings() {
-    if (typeof window === 'undefined') {
-        return { volumes: defaultVolumes };
-    }
-    const consent = getCookie("ethermusic_consent") === 'true';
-    if (!consent) {
-        return { volumes: defaultVolumes };
-    }
-    try {
+function loadVolumes(): Volumes {
+     if (typeof window === 'undefined') return defaultVolumes;
+     const consent = getCookie("ethermusic_consent") === 'true';
+     if (!consent) return defaultVolumes;
+     try {
         const savedVolumes = getCookie("ethermusic_volumes");
         const volumes = savedVolumes ? JSON.parse(savedVolumes) : defaultVolumes;
         
         if (!volumes.melody || typeof volumes.melody.gain !== 'number' || !volumes.compressor) {
-            console.log("Returning default volumes due to missing properties.");
-            return { volumes: defaultVolumes }; 
+            return defaultVolumes; 
         }
 
         const ensureChannelSettings = (channel: Partial<ChannelVolumes> | undefined, defaults: ChannelVolumes): ChannelVolumes => ({
-            gain: channel?.gain ?? defaults.gain,
-            reverbSend: channel?.reverbSend ?? defaults.reverbSend,
-            distortion: channel?.distortion ?? defaults.distortion,
+            gain: typeof channel?.gain === 'number' ? channel.gain : defaults.gain,
+            reverbSend: typeof channel?.reverbSend === 'number' ? channel.reverbSend : defaults.reverbSend,
+            distortion: typeof channel?.distortion === 'number' ? channel.distortion : defaults.distortion,
         });
 
         const mergedVolumes: Volumes = {
@@ -88,27 +95,70 @@ function loadSettings() {
             manualBass: ensureChannelSettings(volumes.manualBass, defaultVolumes.manualBass),
             latch: ensureChannelSettings(volumes.latch, defaultVolumes.latch),
             drums: ensureChannelSettings(volumes.drums, defaultVolumes.drums),
-            compressor: { ...defaultVolumes.compressor, ...volumes.compressor },
+            autopilotMelody: ensureChannelSettings(volumes.autopilotMelody, defaultVolumes.autopilotMelody!),
+            autopilotAccompaniment: ensureChannelSettings(volumes.autopilotAccompaniment, defaultVolumes.autopilotAccompaniment!),
+            autopilotBass: ensureChannelSettings(volumes.autopilotBass, defaultVolumes.autopilotBass!),
+            compressor: { ...defaultVolumes.compressor, ...(volumes.compressor || {}) },
         };
         
-        return { volumes: mergedVolumes };
+        return mergedVolumes;
 
     } catch (e) {
-        console.error("Failed to load settings from cookies", e);
-        return { volumes: defaultVolumes };
+        console.error("Failed to load volume settings from cookies", e);
+        return defaultVolumes;
     }
 }
 
-function saveSettings(volumes: Volumes) {
+function loadAutopilotSettings(): AutopilotSettings {
+     if (typeof window === 'undefined') return defaultAutopilotSettings;
+     const consent = getCookie("ethermusic_consent") === 'true';
+     if (!consent) return defaultAutopilotSettings;
+
+    try {
+        const savedSettings = getCookie("ethermusic_autopilot");
+        if (savedSettings) {
+            const parsed = JSON.parse(savedSettings);
+             // Basic validation
+            if(parsed.style && parsed.instruments) {
+                return { ...defaultAutopilotSettings, ...parsed };
+            }
+        }
+        return defaultAutopilotSettings;
+    } catch(e) {
+        console.error("Failed to load autopilot settings", e);
+        return defaultAutopilotSettings;
+    }
+}
+
+
+function saveVolumes(volumes: Volumes) {
     if (typeof window === 'undefined' || getCookie("ethermusic_consent") !== 'true') {
         return;
     }
     try {
         setCookie("ethermusic_volumes", JSON.stringify(volumes), 365);
     } catch (e) {
-        console.error("Failed to save settings to cookies", e);
+        console.error("Failed to save volume settings to cookies", e);
     }
 }
+
+function saveAutopilotSettings(settings: AutopilotSettings) {
+    if (typeof window === 'undefined' || getCookie("ethermusic_consent") !== 'true') {
+        return;
+    }
+    try {
+         const settingsToSave = {
+            enabled: settings.enabled,
+            style: settings.style,
+            density: settings.density,
+            instruments: settings.instruments
+        };
+        setCookie("ethermusic_autopilot", JSON.stringify(settingsToSave), 365);
+    } catch(e) {
+        console.error("Failed to save autopilot settings", e);
+    }
+}
+
 
 const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
 const MemoizedThereminPad = memo(ThereminPad);
@@ -130,6 +180,7 @@ export default function Home() {
     const [cookieConsent, setCookieConsent] = useState<boolean | undefined>(undefined);
     
     const [volumes, setVolumesState] = useState<Volumes>(defaultVolumes);
+    const [autopilotSettings, setAutopilotSettingsState] = useState<AutopilotSettings>(defaultAutopilotSettings);
 
     const {
         isAppStarted,
@@ -151,6 +202,7 @@ export default function Home() {
         setVolumes,
         setTempo,
         handleCompressorChange,
+        setAutopilotSettings,
     } = useAudioEngine();
     
     const [isRecording, setIsRecording] = useState(false);
@@ -168,12 +220,21 @@ export default function Home() {
     const onConsentChange = useCallback((consent: boolean) => {
         setCookieConsent(consent);
         if (consent) {
-            const loaded = loadSettings();
-            setVolumesState(loaded.volumes);
+            const { volumes, autopilotSettings } = loadSettings();
+            setVolumesState(volumes);
+            setAutopilotSettingsState(autopilotSettings);
         } else {
             setVolumesState(defaultVolumes);
+            setAutopilotSettingsState(defaultAutopilotSettings);
             if (typeof document !== 'undefined') {
                 document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+                document.cookie = "ethermusic_autopilot=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+                // Also clear local storage for presets
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith('ethermusic_autopilot_')) {
+                        localStorage.removeItem(key);
+                    }
+                });
             }
         }
     }, []);
@@ -188,8 +249,9 @@ export default function Home() {
             setCookieConsent(undefined);
         }
        if (initialConsent) {
-            const loaded = loadSettings();
-            setVolumesState(loaded.volumes);
+            const { volumes, autopilotSettings } = loadSettings();
+            setVolumesState(volumes);
+            setAutopilotSettingsState(autopilotSettings);
         }
     }, []);
 
@@ -202,69 +264,87 @@ export default function Home() {
         let newKey = musicKey;
         let newScale = musicScale;
     
-        if (Object.keys(ALL_NOTES).includes(keyOrScale)) {
-            newKey = keyOrScale as MusicKey;
+        const isKey = (k: string): k is MusicKey => Object.keys(ALL_NOTES).includes(k);
+        const isScale = (s: string): s is MusicScale => Object.keys(SCALES).includes(s);
+
+        if (isKey(keyOrScale)) {
+            newKey = keyOrScale;
             setMusicKey(newKey);
-        } else if (Object.keys(SCALES).includes(keyOrScale)) {
-            newScale = keyOrScale as MusicScale;
+        } else if (isScale(keyOrScale)) {
+            newScale = keyOrScale;
             setMusicScale(newScale);
         }
         
-        const currentKey = Object.keys(ALL_NOTES).includes(keyOrScale) ? keyOrScale as MusicKey : newKey;
-        const currentScale = Object.keys(SCALES).includes(keyOrScale) ? keyOrScale as MusicScale : newScale;
+        const currentKey = isKey(keyOrScale) ? keyOrScale : newKey;
+        const currentScale = isScale(keyOrScale) ? keyOrScale : newScale;
     
-        const baseBassNote = 36; // C2
-        const bassFreqs = getScaleFrequencies(baseBassNote, SCALES[currentScale], [0, 1]);
-
-        const baseMelodyNote = 48; // C3
-        const melodyFreqs = getScaleFrequencies(baseMelodyNote, SCALES[currentScale], [0, 1, 2]);
+        const bassFreqs = getScaleFrequencies(currentKey, currentScale, [0, 1]);
+        const melodyFreqs = getScaleFrequencies(currentKey, currentScale, [2, 3, 4]);
     
         setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
-    }, [musicKey, musicScale]);
+        
+        if (isReady) {
+            setAutopilotSettings({
+                key: newKey,
+                scale: currentScale
+            });
+        }
+
+    }, [musicKey, musicScale, isReady, setAutopilotSettings]);
 
     useEffect(() => {
-        handleHarmonyChange(musicKey);
+        if (isReady) {
+            handleHarmonyChange(musicKey);
+        }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [isReady]);
     
+    // Load settings from cookies/localstorage into the audio engine once it's ready.
+    useEffect(() => {
+        if(isReady && cookieConsent) {
+            const { volumes: loadedVolumes, autopilotSettings: loadedAutopilotSettings } = loadSettings();
+            
+            // Set volumes for all channels
+            updateVolumes(loadedVolumes);
+            
+            // Set autopilot settings
+            setAutopilotSettingsState(loadedAutopilotSettings);
+            setAutopilotSettings({
+                ...loadedAutopilotSettings,
+                key: musicKey,
+                scale: musicScale,
+            });
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isReady, cookieConsent, musicKey, musicScale]);
+
     const updateVolumes = useCallback((newVolumes: Volumes) => {
         setVolumesState(newVolumes);
         setVolumes(newVolumes);
-        if (getCookie("ethermusic_consent") === 'true') {
-            saveSettings(newVolumes);
+        if (cookieConsent) {
+            saveVolumes(newVolumes);
         }
-    }, [setVolumes]);
+    }, [setVolumes, cookieConsent]);
+
+    const handleAutopilotSettingsChange = useCallback((newSettings: Partial<AutopilotSettings>) => {
+        const updatedSettings = { ...autopilotSettings, ...newSettings };
+        setAutopilotSettingsState(updatedSettings);
+        setAutopilotSettings(updatedSettings);
+        if (cookieConsent) {
+            saveAutopilotSettings(updatedSettings);
+        }
+    }, [autopilotSettings, setAutopilotSettings, cookieConsent]);
     
     const handleMixerChange = useCallback((changedMixerVolumes: Partial<Volumes>) => {
-        const newVolumes: Volumes = { ...volumes, ...changedMixerVolumes };
-        updateVolumes(newVolumes);
+        updateVolumes({ ...volumes, ...changedMixerVolumes });
     }, [volumes, updateVolumes]);
     
     const handleCompressorChangeCallback = useCallback((compressorSettings: CompressorSettings) => {
-        const newVolumes: Volumes = {
-            ...volumes,
-            compressor: compressorSettings,
-        };
+        const newVolumes: Volumes = { ...volumes, compressor: compressorSettings };
         updateVolumes(newVolumes);
         handleCompressorChange(compressorSettings);
     }, [volumes, updateVolumes, handleCompressorChange]);
 
-    useEffect(() => {
-        if (isReady) {
-            setVolumes(volumes);
-            const melodyPreset = melodyInstruments.find(i => i.id === activeMelodyInstrument);
-            if (melodyPreset) {
-                setMelodyInstrument(melodyPreset.id);
-            }
-
-            const bassPreset = bassInstruments.find(i => i.id === activeBassInstrument);
-            if(bassPreset) {
-                setBassInstrument(bassPreset.id);
-            }
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isReady, setVolumes]);
-    
     const handleStartApp = useCallback(() => {
         startApp();
     }, [startApp]);
@@ -309,6 +389,12 @@ export default function Home() {
         setActiveBassInstrument(instrumentId);
         setBassInstrument(instrumentId);
     }, [setBassInstrument]);
+    
+     const handleAutopilotPresetLoad = useCallback((preset: AutopilotPreset) => {
+        handleAutopilotSettingsChange({ instruments: preset.instruments });
+        updateVolumes({ ...volumes, ...preset.volumes });
+    }, [handleAutopilotSettingsChange, updateVolumes, volumes]);
+
 
     if (!isClient) {
         return <Preloader />;
@@ -368,6 +454,9 @@ export default function Home() {
                                 <DialogContent>
                                     <DialogHeader>
                                         <DialogTitle>What is EtherMusic?</DialogTitle>
+                                         <DialogDescription>
+                                            This app is a tool for relaxation and self-expression.
+                                        </DialogDescription>
                                     </DialogHeader>
                                     <div className="text-sm text-muted-foreground space-y-4 py-4">
                                         <p>This is not a professional tool, but a **virtual music box**, a "Neuro-Meditation Sound Processor."</p>
@@ -433,7 +522,6 @@ export default function Home() {
                     </div>
                     <div className="flex-shrink-0 portrait:block landscape:hidden">
                         <BeatBoxControls
-                            patterns={beatPatterns}
                             activePattern={activePattern}
                             onPatternChange={handlePatternChange}
                             volumes={volumes}
@@ -442,13 +530,15 @@ export default function Home() {
                             isMobile={isMobile}
                             tempo={currentTempo}
                             setTempo={handleTempoChange}
+                            autopilotSettings={autopilotSettings}
+                            onAutopilotSettingsChange={handleAutopilotSettingsChange}
+                            onAutopilotPresetLoad={handleAutopilotPresetLoad}
                         />
                     </div>
                 </main>
 
                 <div className="portrait:hidden landscape:flex landscape:flex-col landscape:items-center justify-between landscape:w-16 landscape:gap-2 landscape:py-4">
                      <BeatBoxControls
-                        patterns={beatPatterns}
                         activePattern={activePattern}
                         onPatternChange={handlePatternChange}
                         volumes={volumes}
@@ -458,6 +548,9 @@ export default function Home() {
                         isLandscape={true}
                         tempo={currentTempo}
                         setTempo={handleTempoChange}
+                        autopilotSettings={autopilotSettings}
+                        onAutopilotSettingsChange={handleAutopilotSettingsChange}
+                        onAutopilotPresetLoad={handleAutopilotPresetLoad}
                     />
                 </div>
             </div>

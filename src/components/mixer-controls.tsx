@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Waves, Drum, Anchor, Blend, AudioLines, Music, Clock } from 'lucide-react';
+import { Waves, Drum, Anchor, Blend, AudioLines, Music, Clock, Bot } from 'lucide-react';
 import { useState, useCallback, useEffect } from 'react';
 import type { Volumes, CompressorSettings, ChannelVolumes } from '@/types';
 import { cn } from "@/lib/utils";
@@ -91,20 +91,22 @@ const EffectControl = ({
 );
 
 
-type VolumeChannel = Exclude<keyof Volumes, 'compressor' | 'reverbReturn' >;
+type VolumeChannel = keyof Omit<Volumes, 'compressor' | 'reverbReturn' >;
 
 export function MixerControls({ 
     volumes: initialVolumes, 
     onMixerChange,
     onCompressorChange,
     tempo,
-    setTempo
+    setTempo,
+    isAutopilotMixer = false,
 }: { 
     volumes: Volumes, 
     onMixerChange: (newVolumes: Partial<Volumes>) => void,
     onCompressorChange: (compressorSettings: CompressorSettings) => void,
     tempo: number,
-    setTempo: (tempo: number) => void
+    setTempo: (tempo: number) => void,
+    isAutopilotMixer?: boolean
 }) {
     
     const [localVolumes, setLocalVolumes] = useState(initialVolumes);
@@ -117,18 +119,19 @@ export function MixerControls({
         setLocalTempo(tempo);
     }, [initialVolumes, tempo]);
 
-    const handleChannelVolumeChange = (part: keyof Volumes, key: keyof ChannelVolumes, value: number) => {
-        setLocalVolumes(prev => ({
-            ...prev,
-            [part]: {
-                ...prev[part as VolumeChannel],
-                [key]: value
+    const handleChannelVolumeChange = (part: VolumeChannel, key: keyof ChannelVolumes, value: number) => {
+        setLocalVolumes(prev => {
+            const channel = prev[part] as ChannelVolumes;
+            return {
+                ...prev,
+                [part]: { ...channel, [key]: value }
             }
-        }))
+        });
     }
 
-    const handleChannelVolumeCommit = (part: keyof Volumes, key: keyof ChannelVolumes, value: number) => {
-        onMixerChange({ [part]: { ...localVolumes[part as VolumeChannel], [key]: value } });
+    const handleChannelVolumeCommit = (part: VolumeChannel, key: keyof ChannelVolumes, value: number) => {
+        const currentPartVolume = localVolumes[part] as ChannelVolumes;
+        onMixerChange({ [part]: { ...currentPartVolume, [key]: value } });
     };
 
     const handleReverbReturnCommit = (value: number) => {
@@ -138,7 +141,7 @@ export function MixerControls({
     const handleCompressorSettingChange = useCallback((setting: keyof Omit<CompressorSettings, 'enabled'>, value: number) => {
         setCompressor(prev => ({ ...prev, [setting]: value }));
     }, []);
-
+    
     const handleCompressorCommit = useCallback(() => {
         onCompressorChange(compressor);
     }, [compressor, onCompressorChange]);
@@ -155,141 +158,205 @@ export function MixerControls({
 
     return (
         <div className="space-y-6">
-             <div className="space-y-4">
-                 <VolumeControl 
-                    label="Tempo"
-                    icon={Clock}
-                    volume={localTempo}
-                    onVolumeChange={setLocalTempo}
-                    onVolumeCommit={handleTempoCommit}
-                    min={30}
-                    max={200}
-                    step={1}
-                    unit="BPM"
-                />
-            </div>
+            {!isAutopilotMixer && (
+                <>
+                    <div className="space-y-4">
+                        <VolumeControl 
+                            label="Tempo"
+                            icon={Clock}
+                            volume={localTempo}
+                            onVolumeChange={setLocalTempo}
+                            onVolumeCommit={handleTempoCommit}
+                            min={30}
+                            max={200}
+                            step={1}
+                            unit="BPM"
+                        />
+                    </div>
+                    <Separator />
+                    <div className="space-y-4">
+                        <h3 className="text-lg font-semibold tracking-tight text-foreground">Manual Player Levels</h3>
+                        <VolumeControl 
+                            label="Melody"
+                            icon={Music}
+                            volume={localVolumes.melody.gain}
+                            onVolumeChange={(v) => handleChannelVolumeChange('melody', 'gain', v)}
+                            onVolumeCommit={(v) => handleChannelVolumeCommit('melody', 'gain', v)}
+                        />
+                        <VolumeControl 
+                            label="Bass"
+                            icon={Waves}
+                            volume={localVolumes.manualBass.gain}
+                            onVolumeChange={(v) => handleChannelVolumeChange('manualBass', 'gain', v)}
+                            onVolumeCommit={(v) => handleChannelVolumeCommit('manualBass', 'gain', v)}
+                        />
+                        <VolumeControl 
+                            label="Latch"
+                            icon={Anchor}
+                            volume={localVolumes.latch.gain}
+                            onVolumeChange={(v) => handleChannelVolumeChange('latch', 'gain', v)}
+                            onVolumeCommit={(v) => handleChannelVolumeCommit('latch', 'gain', v)}
+                        />
+                        <VolumeControl 
+                            label="Drums"
+                            icon={Drum}
+                            volume={localVolumes.drums.gain}
+                            onVolumeChange={(v) => handleChannelVolumeChange('drums', 'gain', v)}
+                            onVolumeCommit={(v) => handleChannelVolumeCommit('drums', 'gain', v)}
+                        />
+                    </div>
+                </>
+            )}
 
-            <Separator />
-
-            <div className="space-y-4">
-                 <h3 className="text-lg font-semibold tracking-tight text-foreground">Volume Levels</h3>
-                 <VolumeControl 
-                    label="Melody"
-                    icon={Music}
-                    volume={localVolumes.melody.gain}
-                    onVolumeChange={(v) => handleChannelVolumeChange('melody', 'gain', v)}
-                    onVolumeCommit={(v) => handleChannelVolumeCommit('melody', 'gain', v)}
-                />
-                 <VolumeControl 
-                    label="Bass"
-                    icon={Waves}
-                    volume={localVolumes.manualBass.gain}
-                    onVolumeChange={(v) => handleChannelVolumeChange('manualBass', 'gain', v)}
-                    onVolumeCommit={(v) => handleChannelVolumeCommit('manualBass', 'gain', v)}
-                />
-                 <VolumeControl 
-                    label="Latch"
-                    icon={Anchor}
-                    volume={localVolumes.latch.gain}
-                    onVolumeChange={(v) => handleChannelVolumeChange('latch', 'gain', v)}
-                    onVolumeCommit={(v) => handleChannelVolumeCommit('latch', 'gain', v)}
-                />
-                <VolumeControl 
-                    label="Drums"
-                    icon={Drum}
-                    volume={localVolumes.drums.gain}
-                    onVolumeChange={(v) => handleChannelVolumeChange('drums', 'gain', v)}
-                    onVolumeCommit={(v) => handleChannelVolumeCommit('drums', 'gain', v)}
-                />
-            </div>
+             {isAutopilotMixer && localVolumes.autopilotMelody && localVolumes.autopilotAccompaniment && localVolumes.autopilotBass && (
+                <div className="space-y-4">
+                    <h3 className="text-lg font-semibold tracking-tight text-foreground">Autopilot Player Levels</h3>
+                     <VolumeControl 
+                        label="Melody"
+                        icon={Bot}
+                        volume={localVolumes.autopilotMelody.gain}
+                        onVolumeChange={(v) => handleChannelVolumeChange('autopilotMelody', 'gain', v)}
+                        onVolumeCommit={(v) => handleChannelVolumeCommit('autopilotMelody', 'gain', v)}
+                    />
+                     <VolumeControl 
+                        label="Accompaniment"
+                        icon={Bot}
+                        volume={localVolumes.autopilotAccompaniment.gain}
+                        onVolumeChange={(v) => handleChannelVolumeChange('autopilotAccompaniment', 'gain', v)}
+                        onVolumeCommit={(v) => handleChannelVolumeCommit('autopilotAccompaniment', 'gain', v)}
+                    />
+                     <VolumeControl 
+                        label="Bass"
+                        icon={Bot}
+                        volume={localVolumes.autopilotBass.gain}
+                        onVolumeChange={(v) => handleChannelVolumeChange('autopilotBass', 'gain', v)}
+                        onVolumeCommit={(v) => handleChannelVolumeCommit('autopilotBass', 'gain', v)}
+                    />
+                </div>
+            )}
             
             <Separator />
             
             <div className="space-y-4">
-                <h3 className="text-lg font-semibold tracking-tight text-foreground">Effects Send</h3>
+                <h3 className="text-lg font-semibold tracking-tight text-foreground">Effects</h3>
                 <EffectControl
-                    label="Melody Reverb"
-                    icon={Blend}
-                    level={localVolumes.melody.reverbSend}
-                    onLevelChange={(v) => handleChannelVolumeChange('melody', 'reverbSend', v)}
-                    onLevelCommit={(v) => handleChannelVolumeCommit('melody', 'reverbSend', v)}
-                    min={-48} max={0} step={1} unit="dB"
-                />
-                <EffectControl
-                    label="Bass Reverb"
-                    icon={Blend}
-                    level={localVolumes.manualBass.reverbSend}
-                    onLevelChange={(v) => handleChannelVolumeChange('manualBass', 'reverbSend', v)}
-                    onLevelCommit={(v) => handleChannelVolumeCommit('manualBass', 'reverbSend', v)}
-                    min={-48} max={0} step={1} unit="dB"
-                />
-                 <EffectControl
-                    label="Reverb Return"
+                    label="Reverb Level"
                     icon={Blend}
                     level={localVolumes.reverbReturn}
                     onLevelChange={(v) => setLocalVolumes(p => ({...p, reverbReturn: v}))}
                     onLevelCommit={handleReverbReturnCommit}
                     min={-48} max={6} step={1} unit="dB"
                 />
-                 <EffectControl
-                    label="Melody Distortion"
-                    icon={Waves}
-                    level={localVolumes.melody.distortion}
-                    onLevelChange={(v) => handleChannelVolumeChange('melody', 'distortion', v)}
-                    onLevelCommit={(v) => handleChannelVolumeCommit('melody', 'distortion', v)}
-                    min={0} max={100} step={1} unit="%"
-                />
-                 <EffectControl
-                    label="Bass Distortion"
-                    icon={Waves}
-                    level={localVolumes.manualBass.distortion}
-                    onLevelChange={(v) => handleChannelVolumeChange('manualBass', 'distortion', v)}
-                    onLevelCommit={(v) => handleChannelVolumeCommit('manualBass', 'distortion', v)}
-                    min={0} max={100} step={1} unit="%"
-                />
+                
+                 {!isAutopilotMixer && (
+                    <>
+                        <EffectControl
+                            label="Melody Reverb Send"
+                            icon={Music}
+                            level={localVolumes.melody.reverbSend}
+                            onLevelChange={(v) => handleChannelVolumeChange('melody', 'reverbSend', v)}
+                            onLevelCommit={(v) => handleChannelVolumeCommit('melody', 'reverbSend', v)}
+                            min={-48} max={0} step={1} unit="dB"
+                        />
+                        <EffectControl
+                            label="Bass Reverb Send"
+                            icon={Waves}
+                            level={localVolumes.manualBass.reverbSend}
+                            onLevelChange={(v) => handleChannelVolumeChange('manualBass', 'reverbSend', v)}
+                            onLevelCommit={(v) => handleChannelVolumeCommit('manualBass', 'reverbSend', v)}
+                            min={-48} max={0} step={1} unit="dB"
+                        />
+                        <EffectControl
+                            label="Melody Distortion"
+                            icon={Waves}
+                            level={localVolumes.melody.distortion}
+                            onLevelChange={(v) => handleChannelVolumeChange('melody', 'distortion', v)}
+                            onLevelCommit={(v) => handleChannelVolumeCommit('melody', 'distortion', v)}
+                            min={0} max={100} step={1} unit="%"
+                        />
+                        <EffectControl
+                            label="Bass Distortion"
+                            icon={Waves}
+                            level={localVolumes.manualBass.distortion}
+                            onLevelChange={(v) => handleChannelVolumeChange('manualBass', 'distortion', v)}
+                            onLevelCommit={(v) => handleChannelVolumeCommit('manualBass', 'distortion', v)}
+                            min={0} max={100} step={1} unit="%"
+                        />
+                    </>
+                 )}
+                 {isAutopilotMixer && localVolumes.autopilotMelody && localVolumes.autopilotAccompaniment && localVolumes.autopilotBass && (
+                     <>
+                        <EffectControl
+                            label="AP Melody Reverb"
+                            icon={Bot}
+                            level={localVolumes.autopilotMelody.reverbSend}
+                            onLevelChange={(v) => handleChannelVolumeChange('autopilotMelody', 'reverbSend', v)}
+                            onLevelCommit={(v) => handleChannelVolumeCommit('autopilotMelody', 'reverbSend', v)}
+                            min={-48} max={0} step={1} unit="dB"
+                        />
+                         <EffectControl
+                            label="AP Accomp Reverb"
+                            icon={Bot}
+                            level={localVolumes.autopilotAccompaniment.reverbSend}
+                            onLevelChange={(v) => handleChannelVolumeChange('autopilotAccompaniment', 'reverbSend', v)}
+                            onLevelCommit={(v) => handleChannelVolumeCommit('autopilotAccompaniment', 'reverbSend', v)}
+                            min={-48} max={0} step={1} unit="dB"
+                        />
+                         <EffectControl
+                            label="AP Bass Reverb"
+                            icon={Bot}
+                            level={localVolumes.autopilotBass.reverbSend}
+                            onLevelChange={(v) => handleChannelVolumeChange('autopilotBass', 'reverbSend', v)}
+                            onLevelCommit={(v) => handleChannelVolumeCommit('autopilotBass', 'reverbSend', v)}
+                            min={-48} max={0} step={1} unit="dB"
+                        />
+                     </>
+                 )}
             </div>
 
-            <Separator />
-
-            <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                     <div className="flex items-center gap-2">
-                        <AudioLines className="w-5 h-5 text-primary" />
-                        <Label htmlFor="compressor-switch" className="text-sm font-medium">Master Compressor</Label>
+            {!isAutopilotMixer && (
+                <>
+                    <Separator />
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                             <div className="flex items-center gap-2">
+                                <AudioLines className="w-5 h-5 text-primary" />
+                                <Label htmlFor="compressor-switch" className="text-sm font-medium">Master Compressor</Label>
+                            </div>
+                            <Switch
+                                id="compressor-switch"
+                                checked={compressor.enabled}
+                                onCheckedChange={handleToggleCompressor}
+                            />
+                        </div>
+                        <div className={cn("space-y-4 transition-opacity", !compressor.enabled && "opacity-50 pointer-events-none")}>
+                             <VolumeControl 
+                                label="Threshold"
+                                icon={Waves}
+                                volume={compressor.threshold}
+                                onVolumeChange={(v) => handleCompressorSettingChange('threshold', v)}
+                                onVolumeCommit={handleCompressorCommit}
+                                min={-100}
+                                max={0}
+                                step={1}
+                                unit="dB"
+                            />
+                             <VolumeControl 
+                                label="Ratio"
+                                icon={Waves}
+                                volume={compressor.ratio}
+                                onVolumeChange={(v) => handleCompressorSettingChange('ratio', v)}
+                                onVolumeCommit={handleCompressorCommit}
+                                min={1}
+                                max={20}
+                                step={1}
+                                unit=":1"
+                            />
+                        </div>
                     </div>
-                    <Switch
-                        id="compressor-switch"
-                        checked={compressor.enabled}
-                        onCheckedChange={handleToggleCompressor}
-                    />
-                </div>
-                <div className={cn("space-y-4 transition-opacity", !compressor.enabled && "opacity-50 pointer-events-none")}>
-                     <VolumeControl 
-                        label="Threshold"
-                        icon={Waves}
-                        volume={compressor.threshold}
-                        onVolumeChange={(v) => handleCompressorSettingChange('threshold', v)}
-                        onVolumeCommit={handleCompressorCommit}
-                        min={-100}
-                        max={0}
-                        step={1}
-                        unit="dB"
-                    />
-                     <VolumeControl 
-                        label="Ratio"
-                        icon={Waves}
-                        volume={compressor.ratio}
-                        onVolumeChange={(v) => handleCompressorSettingChange('ratio', v)}
-                        onVolumeCommit={handleCompressorCommit}
-                        min={1}
-                        max={20}
-                        step={1}
-                        unit=":1"
-                    />
-                </div>
-            </div>
+                </>
+            )}
+
         </div>
     );
 }
-
-    

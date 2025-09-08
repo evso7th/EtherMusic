@@ -9,9 +9,9 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
         params: {
             oscillator: { type: 'sawtooth' },
             envelope: { attack: 0.01, decay: 0.3, sustain: 0.5, release: 0.3 },
-            filter: { Q: 0.7, frequency: 400, type: 'lowpass' },
+            filter: { Q: 0.7, frequency: 400, type: 'lowpass', gain: 0 },
             reverbSend: -48,
-            distortion: 5,
+            distortion: 10,
         }
     },
     {
@@ -21,7 +21,7 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
         params: {
             oscillator: { type: 'triangle' },
             envelope: { attack: 0.05, decay: 0.1, sustain: 0.8, release: 1.5 },
-            filter: { Q: 0.5, frequency: 300, type: 'lowpass' },
+            filter: { Q: 0.5, frequency: 300, type: 'lowpass', gain: 0 },
             portamento: 0.03,
             reverbSend: -36,
             distortion: 0,
@@ -34,7 +34,7 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
         params: {
             oscillator: { type: 'sine' },
             envelope: { attack: 0.2, decay: 0.1, sustain: 1.0, release: 3.0 },
-            filter: { Q: 1.2, frequency: 120, type: 'lowpass' },
+            filter: { Q: 1.2, frequency: 120, type: 'lowpass', gain: 0 },
             portamento: 0.08,
             reverbSend: -24,
             distortion: 0,
@@ -47,10 +47,10 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
         params: {
             oscillator: { type: 'sawtooth' },
             envelope: { attack: 0.02, decay: 0.2, sustain: 0.7, release: 1.0 },
-            filter: { Q: 1.4, frequency: 500, type: 'lowpass' },
+            filter: { Q: 1.4, frequency: 500, type: 'lowpass', gain: 0 },
             portamento: 0.06,
             reverbSend: -18,
-            distortion: 10,
+            distortion: 20,
         }
     },
     {
@@ -60,14 +60,15 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
         params: {
             oscillator: { type: 'sine' },
             envelope: { attack: 0.2, decay: 0.1, sustain: 1.0, release: 3.0 },
-            filter: { Q: 1.0, frequency: 150, type: 'lowpass' },
+            filter: { Q: 1.0, frequency: 150, type: 'lowpass', gain: 0 },
             reverbSend: -20,
-            distortion: 0,
+            distortion: 5,
             layers: [
                 {
-                    oscillator: { type: 'triangle' },
-                    envelope: { attack: 0.1, decay: 0.1, sustain: 1.0, release: 2.0 },
-                    gain: 0.5
+                    type: 'triangle',
+                    freqMult: 1,
+                    level: 0.5,
+                    detune: 10
                 }
             ],
             stagger: 0.015
@@ -80,14 +81,15 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
         params: {
             oscillator: { type: 'sine' },
             envelope: { attack: 0.01, decay: 0.2, sustain: 0.8, release: 1.0 },
-            filter: { Q: 1.0, frequency: 350, type: 'lowpass' },
+            filter: { Q: 1.0, frequency: 350, type: 'lowpass', gain: 0 },
             reverbSend: -30,
             distortion: 15,
             layers: [
                  {
-                    oscillator: { type: 'sawtooth' },
-                    envelope: { attack: 0.05, decay: 0.3, sustain: 0.5, release: 1.5 },
-                    gain: 0.6,
+                    type: 'sawtooth',
+                    freqMult: 1.0,
+                    level: 0.6,
+                    detune: -5,
                 }
             ],
             stagger: 0.005

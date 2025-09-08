@@ -14,12 +14,12 @@ import { Separator } from "./ui/separator";
 import { Switch } from "./ui/switch";
 import { ScrollArea } from "./ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
-import type { BeatPattern, Volumes, CompressorSettings } from '@/types';
+import type { BeatPattern, Volumes, CompressorSettings, AutopilotSettings, AutopilotPreset } from '@/types';
 import { MixerControls } from "./mixer-controls";
-
+import { AutopilotControls } from "./autopilot-controls";
+import { beatPatterns } from "@/lib/drum-machine";
 
 interface BeatBoxControlsProps {
-    patterns: BeatPattern[];
     activePattern: BeatPattern;
     onPatternChange: (pattern: BeatPattern) => void;
     volumes: Volumes;
@@ -29,6 +29,9 @@ interface BeatBoxControlsProps {
     setTempo: (tempo: number) => void;
     isMobile: boolean;
     isLandscape?: boolean;
+    autopilotSettings: AutopilotSettings;
+    onAutopilotSettingsChange: (settings: Partial<AutopilotSettings>) => void;
+    onAutopilotPresetLoad: (preset: AutopilotPreset) => void;
 }
 
 const ControlButtonWithTooltip = memo(function ControlButtonWithTooltip({ tooltipText, children, ...props}: React.ComponentProps<typeof Button> & { tooltipText: string, children: React.ReactNode}) {
@@ -46,7 +49,6 @@ const ControlButtonWithTooltip = memo(function ControlButtonWithTooltip({ toolti
 
 
 export function BeatBoxControls({
-    patterns,
     activePattern,
     onPatternChange,
     volumes,
@@ -56,20 +58,24 @@ export function BeatBoxControls({
     setTempo,
     isMobile,
     isLandscape = false,
+    autopilotSettings,
+    onAutopilotSettingsChange,
+    onAutopilotPresetLoad,
 }: BeatBoxControlsProps) {
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isMixerOpen, setIsMixerOpen] = useState(false);
-    const [isTempoOpen, setIsTempoOpen] = useState(false);
-    const [isAutopilotOpen, setIsAutopilotOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<'Meditative' | 'Classic'>('Meditative');
     
     const { classicPatterns, meditativePatterns, offPattern } = useMemo(() => {
+        const classic = beatPatterns.filter(p => p.type === 'Classic');
+        const meditative = beatPatterns.filter(p => p.type === 'Meditative');
+        const system = beatPatterns.find(p => p.type === 'System');
         return {
-            classicPatterns: patterns.filter(p => p.type === 'Classic'),
-            meditativePatterns: patterns.filter(p => p.type === 'Meditative'),
-            offPattern: patterns.find(p => p.type === 'System'),
+            classicPatterns: classic,
+            meditativePatterns: meditative,
+            offPattern: system,
         }
-    }, [patterns]);
+    }, []);
     
     const patternsToShow = selectedCategory === 'Classic' ? classicPatterns : meditativePatterns;
 
@@ -176,12 +182,23 @@ export function BeatBoxControls({
                                         onCompressorChange={onCompressorChange}
                                         tempo={tempo}
                                         setTempo={setTempo}
+                                        isAutopilotMixer={false}
                                     />
                                 </div>
                             </ScrollArea>
                         </DialogContent>
                     </Dialog>
                     
+                    <AutopilotControls
+                        isMobile={isMobile}
+                        isLandscape={true}
+                        initialSettings={autopilotSettings}
+                        onSettingsChange={onAutopilotSettingsChange}
+                        volumes={volumes}
+                        onMixerChange={onMixerChange}
+                        onAutopilotPresetLoad={onAutopilotPresetLoad}
+                    />
+
                     <HelpGuide buttonVariant="outline" size="icon" className="w-10 h-10 rounded-full" showText={false}/>
                 </div>
             </TooltipProvider>
@@ -275,31 +292,22 @@ export function BeatBoxControls({
                                         onCompressorChange={onCompressorChange}
                                         tempo={tempo}
                                         setTempo={setTempo}
+                                        isAutopilotMixer={false}
                                     />
                                 </div>
                             </ScrollArea>
                         </DialogContent>
                     </Dialog>
-
-                     <Dialog open={isAutopilotOpen} onOpenChange={setIsAutopilotOpen}>
-                         <DialogTrigger asChild>
-                            <ControlButtonWrapper tooltipText="Autopilot" variant={'outline'} className="flex-1" size={buttonSize}>
-                                <Bot className="w-4 h-4 md:mr-2" />
-                                <span className="hidden sm:inline">Autopilot</span>
-                            </ControlButtonWrapper>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Autopilot</DialogTitle>
-                                <DialogDescription>This feature is coming soon.</DialogDescription>
-                            </DialogHeader>
-                            <div className="py-4">
-                                <p className="text-sm text-muted-foreground">
-                                    The Autopilot will automatically generate music for you. You'll be able to choose from different styles and even save your own presets. Stay tuned!
-                                </p>
-                            </div>
-                        </DialogContent>
-                    </Dialog>
+                    
+                    <AutopilotControls
+                        isMobile={isMobile}
+                        isLandscape={false}
+                        initialSettings={autopilotSettings}
+                        onSettingsChange={onAutopilotSettingsChange}
+                        volumes={volumes}
+                        onMixerChange={onMixerChange}
+                        onAutopilotPresetLoad={onAutopilotPresetLoad}
+                    />
 
 
                     <HelpGuide buttonVariant="outline" buttonClassName="flex-1" size={buttonSize}/>
@@ -308,5 +316,3 @@ export function BeatBoxControls({
         </TooltipProvider>
     );
 }
-
-    

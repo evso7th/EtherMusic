@@ -13,16 +13,29 @@ export const SCALES: Record<MusicScale, number[]> = {
     'Minor Pentatonic': [0, 3, 5, 7, 10]
 };
 
-export function getScaleFrequencies(baseMidiNote: number, scaleSteps: number[], octaves: number[]): number[] {
+const noteNameToMidi = (note: MusicKey, octave: number): number => {
+    return ALL_NOTES[note] + (octave + 1) * 12;
+}
+
+export function getScaleFrequencies(key: MusicKey, scale: MusicScale, octaves: number[]): number[] {
+    const scaleIntervals = SCALES[scale];
+    if (!scaleIntervals) return [];
+
+    const rootMidi = noteNameToMidi(key, 0); // Use a base octave of 0 for calculation
     const freqs: number[] = [];
+    
     octaves.forEach(octave => {
-        scaleSteps.forEach(interval => {
-            const midiNote = baseMidiNote + (octave * 12) + interval;
+        scaleIntervals.forEach(interval => {
+            const midiNote = rootMidi + (octave * 12) + interval;
             const freq = Math.pow(2, (midiNote - 69) / 12) * 440;
             freqs.push(freq);
         });
     });
+    
+    // Add the octave above the highest note for a complete scale
+    const highestNoteInScale = rootMidi + (octaves[octaves.length - 1] * 12) + scaleIntervals[scaleIntervals.length - 1];
+    const topNote = highestNoteInScale + (12 - scaleIntervals[scaleIntervals.length - 1]);
+    freqs.push(Math.pow(2, (topNote - 69) / 12) * 440);
+
     return freqs.sort((a, b) => a - b);
 }
-
-    

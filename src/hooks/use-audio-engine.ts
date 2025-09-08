@@ -5,7 +5,8 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
-import type { Volumes, Instrument, BassInstrument, CompressorSettings } from '@/types';
+import type { Volumes, Instrument, BassInstrument, CompressorSettings, AutopilotSettings } from '@/types';
+import { defaultAutopilotSettings } from '@/lib/autopilot';
 
 export function useAudioEngine() {
     const { toast } = useToast();
@@ -21,7 +22,8 @@ export function useAudioEngine() {
     const initializeAudioEngine = useCallback(async () => {
         try {
             if (!orbManager.current) {
-                orbManager.current = new OrbManager();
+                const padContainer = document.querySelector('main');
+                orbManager.current = new OrbManager(padContainer);
             }
 
             if (!audioEngine.current) {
@@ -58,15 +60,13 @@ export function useAudioEngine() {
     }, [isAppStarted, initializeAudioEngine]);
 
     useEffect(() => {
-      // Add a global click/touch listener to resume the AudioContext
-      // This is necessary because many browsers suspend the AudioContext until a user interaction.
       const resumeAudio = async () => {
         if (audioEngine.current?.isInitialized && audioEngine.current.getContext().state === 'suspended') {
           await audioEngine.current.getContext().resume();
         }
       };
-      document.addEventListener('click', resumeAudio);
-      document.addEventListener('touchstart', resumeAudio);
+      document.addEventListener('click', resumeAudio, { once: true });
+      document.addEventListener('touchstart', resumeAudio, { once: true });
       return () => {
         document.removeEventListener('click', resumeAudio);
         document.removeEventListener('touchstart', resumeAudio);
@@ -146,6 +146,10 @@ export function useAudioEngine() {
     const handleCompressorChange = useCallback((compressorSettings: CompressorSettings) => {
         audioEngine.current?.setCompressorSettings(compressorSettings);
     }, []);
+    
+    const handleAutopilotSettingsChange = useCallback((settings: Partial<AutopilotSettings>) => {
+        audioEngine.current?.setAutopilotSettings(settings);
+    }, []);
 
 
     return {
@@ -168,7 +172,7 @@ export function useAudioEngine() {
         handleThereminInteraction,
         setSleepTimer,
         handleCompressorChange,
+        autopilotSettings: audioEngine.current?.getAutopilotSettings() ?? defaultAutopilotSettings,
+        setAutopilotSettings: handleAutopilotSettingsChange,
     };
 }
-
-    
