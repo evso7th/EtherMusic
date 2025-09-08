@@ -17,12 +17,27 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
         id: "organ",
         name: "Organ",
         params: {
-            // A combination of triangle waves can approximate an organ sound
-            oscillator: { type: 'triangle' },
-            envelope: { attack: 0.2, decay: 0.1, sustain: 0.9, release: 1.0 },
-            filter: { Q: 0.7, frequency: 600, type: 'lowpass' },
+            // Hammond-like sound using additive synthesis (summing sine waves)
+            oscillator: { type: 'sine' },
+            envelope: { attack: 0.02, decay: 0.1, sustain: 0.9, release: 1.0 },
+            filter: { Q: 0.7, frequency: 1200, type: 'lowpass' },
             portamento: 0,
-            distortion: 0,
+            distortion: 2,
+            reverbSend: -18,
+            layers: [
+                {
+                    // 2nd Harmonic (Octave Up)
+                    oscillator: { type: 'sine', detune: 1200 }, // +12 semitones
+                    envelope: { attack: 0.03, decay: 0.1, sustain: 0.9, release: 1.0 },
+                    gain: 0.75, // Slightly lower volume
+                },
+                {
+                    // 3rd Harmonic (Octave + Fifth Up)
+                    oscillator: { type: 'sine', detune: 1900 }, // +19 semitones
+                    envelope: { attack: 0.04, decay: 0.1, sustain: 0.9, release: 1.0 },
+                    gain: 0.5, // Lower volume
+                }
+            ],
         }
     },
     {
@@ -35,6 +50,7 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
             filter: { Q: 1.5, frequency: 500, type: 'lowpass' },
             portamento: 0.01,
             distortion: 5,
+            reverbSend: -12,
         }
     },
     {
@@ -46,6 +62,7 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
             filter: { Q: 0.6, frequency: 600, type: 'lowpass' },
             portamento: 0.08,
             distortion: 0,
+            reverbSend: -9,
         }
     }
 ];
