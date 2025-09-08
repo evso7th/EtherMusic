@@ -181,6 +181,7 @@ export default function Home() {
     const [activeBassInstrument, setActiveBassInstrument] = useState<BassInstrument>(defaultBassInstrument);
     
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
+    const [isMixerOpen, setIsMixerOpen] = useState(false);
 
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         let newKey = musicKey;
@@ -197,11 +198,13 @@ export default function Home() {
         const currentKey = Object.keys(ALL_NOTES).includes(keyOrScale) ? keyOrScale as MusicKey : newKey;
         const currentScale = Object.keys(SCALES).includes(keyOrScale) ? keyOrScale as MusicScale : newScale;
 
-        const baseMelodyNote = 36 + ALL_NOTES[currentKey]; // C2 for melody start
-        const baseBassNote = 24 + ALL_NOTES[currentKey];   // C1 for bass start
-    
-        const melodyFreqs = getScaleFrequencies(baseMelodyNote, SCALES[currentScale], [0, 1]);
+        // Bass Pad: Octaves C2-C3
+        const baseBassNote = 24 + ALL_NOTES[currentKey]; // C1 base
         const bassFreqs = getScaleFrequencies(baseBassNote, SCALES[currentScale], [1, 2]);
+
+        // Melody Pad: Octaves C3-C4
+        const baseMelodyNote = 36 + ALL_NOTES[currentKey]; // C2 base
+        const melodyFreqs = getScaleFrequencies(baseMelodyNote, SCALES[currentScale], [1, 2]);
     
         setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
     }, [musicKey, musicScale]);
@@ -436,7 +439,7 @@ export default function Home() {
                             onTempoChange={handleTempoChange}
                             volumes={volumes}
                             onMixerChange={handleMixerChange}
-                            onChannelVolumeChange={(channel, gain) => handleChannelVolumeChange(channel, { gain })}
+                            onChannelVolumeChange={(newChannelVolumes) => handleChannelVolumeChange('drums', newChannelVolumes)}
                             onCompressorChange={handleCompressorChange}
                             isMobile={isMobile}
                         />
@@ -453,7 +456,7 @@ export default function Home() {
                         onTempoChange={handleTempoChange}
                         volumes={volumes}
                         onMixerChange={handleMixerChange}
-                        onChannelVolumeChange={(channel, gain) => handleChannelVolumeChange(channel, { gain })}
+                        onChannelVolumeChange={(newChannelVolumes) => handleChannelVolumeChange('drums', newChannelVolumes)}
                         onCompressorChange={handleCompressorChange}
                         isMobile={isMobile}
                         isLandscape={true}
@@ -463,5 +466,7 @@ export default function Home() {
         </div>
     );
 }
+
+    
 
     

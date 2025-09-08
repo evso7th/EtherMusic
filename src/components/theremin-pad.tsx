@@ -272,7 +272,7 @@ export function ThereminPad({
                             <Separator />
                             <div className="space-y-4">
                                 <EffectControl
-                                    label="Reverb"
+                                    label="Reverb Send"
                                     icon={Blend}
                                     level={localVolumes.reverbSend}
                                     onLevelChange={(v) => setLocalVolumes(prev => ({...prev, reverbSend: v}))}
@@ -369,3 +369,5 @@ export function ThereminPad({
         </Card>
     );
 }
+
+    
