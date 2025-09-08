@@ -1,7 +1,7 @@
 
 "use client";
 
-import * as Tone from 'tone';
+import Tone from 'tone';
 import type { Volumes, Note, Instrument, BassInstrument } from '@/types';
 import { OrbManager } from './orb-manager';
 import { LatchEngine, type LatchToggleResult } from './latch-engine';
@@ -23,7 +23,7 @@ export class AudioEngine {
     private recordedChunks: Blob[] = [];
 
     public masterOut: Tone.Gain;
-    private compressor: Tone.Compressor | null = null;
+    private compressor: Tone.Compressor;
     private nodes = new Map<PartName, { worklet: AudioWorkletNode, gain: Tone.Gain, reverbSend: Tone.Gain }>();
     private reverbReturn: Tone.Gain;
 
@@ -42,14 +42,17 @@ export class AudioEngine {
     private _isPlaying = false;
     private animationFrameId: number | null = null;
 
-    private Tone: typeof import('tone') | null = null;
-
     constructor(context: AudioContext, orbManager: OrbManager) {
         this.context = context;
         this.orbManager = orbManager;
         // The masterOut needs to be a Tone.Gain node to be connectable to Tone.Compressor
-        this.masterOut = new Tone.Gain(1).toDestination();
+        this.masterOut = new Tone.Gain(1); // will connect to destination via compressor
         this.reverbReturn = new Tone.Gain(1);
+
+        // Initialize compressor right away
+        this.compressor = new Tone.Compressor(-24, 12);
+        this.masterOut.connect(this.compressor);
+        this.compressor.toDestination();
     }
 
     public get isPlaying(): boolean {
@@ -67,9 +70,6 @@ export class AudioEngine {
         await Tone.setContext(this.context).ready();
         console.log("AudioContext is active.");
         
-        this.compressor = new Tone.Compressor(-24, 12).toDestination();
-        this.masterOut.connect(this.compressor);
-
         const mediaStreamDest = this.context.createMediaStreamDestination();
         this.masterOut.connect(mediaStreamDest); // Connect master output to recorder
         this.mediaRecorder = new MediaRecorder(mediaStreamDest.stream, { mimeType: 'audio/webm' });
@@ -339,3 +339,5 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
+
+    
