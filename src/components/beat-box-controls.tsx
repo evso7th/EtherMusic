@@ -14,7 +14,7 @@ import { Separator } from "./ui/separator";
 import { Switch } from "./ui/switch";
 import { ScrollArea } from "./ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
-import type { BeatPattern, Tempo, Volumes } from '@/types';
+import type { BeatPattern, Tempo, Volumes, CompressorSettings } from '@/types';
 import { MixerControls } from "./mixer-controls";
 
 
@@ -26,7 +26,8 @@ interface BeatBoxControlsProps {
     activeTempo: Tempo;
     onTempoChange: (tempo: Tempo) => void;
     volumes: Volumes;
-    onMixerChange: (volumes: Omit<Volumes, 'melody' | 'manualBass'>) => void;
+    onMixerChange: (volumes: Omit<Volumes, 'melody' | 'manualBass' | 'compressor'>) => void;
+    onCompressorChange: (compressorSettings: CompressorSettings) => void;
     isMobile: boolean;
     isLandscape?: boolean;
 }
@@ -54,6 +55,7 @@ export function BeatBoxControls({
     onTempoChange,
     volumes,
     onMixerChange,
+    onCompressorChange,
     isMobile,
     isLandscape = false,
 }: BeatBoxControlsProps) {
@@ -200,6 +202,7 @@ export function BeatBoxControls({
                                     <MixerControls 
                                         volumes={volumes} 
                                         onVolumeChange={onMixerChange}
+                                        onCompressorChange={onCompressorChange}
                                     />
                                 </div>
                             </ScrollArea>
@@ -332,6 +335,7 @@ export function BeatBoxControls({
                                     <MixerControls 
                                         volumes={volumes} 
                                         onVolumeChange={onMixerChange}
+                                        onCompressorChange={onCompressorChange}
                                     />
                                 </div>
                             </ScrollArea>
@@ -344,5 +348,3 @@ export function BeatBoxControls({
         </TooltipProvider>
     );
 }
-
-    

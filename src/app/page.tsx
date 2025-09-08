@@ -19,7 +19,7 @@ import { SleepTimer } from '@/components/sleep-timer';
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
 import { melodyInstruments, defaultMelodyInstrument } from '@/lib/melody-presets';
 import { bassInstruments, defaultBassInstrument } from '@/lib/bass-presets';
-import type { MusicKey, MusicScale, Tempo, Volumes, Instrument, BassInstrument, ChannelVolumes } from '@/types';
+import type { MusicKey, MusicScale, Tempo, Volumes, Instrument, BassInstrument, ChannelVolumes, CompressorSettings } from '@/types';
 import { cn } from '@/lib/utils';
 
 
@@ -48,6 +48,13 @@ const defaultVolumes: Volumes = {
     latch: { gain: -15, reverbSend: -48 },
     drums: { gain: -9, reverbSend: -48 },
     reverbReturn: -12,
+    compressor: {
+        enabled: true,
+        threshold: -24,
+        ratio: 12,
+        attack: 0.003,
+        release: 0.25
+    }
 };
 
 
@@ -64,7 +71,7 @@ function loadSettings() {
         const volumes = savedVolumes ? JSON.parse(savedVolumes) : defaultVolumes;
         
         // A simple check to see if the loaded volumes object is valid and has the new structure
-        if (!volumes.melody || typeof volumes.melody.gain !== 'number' || typeof volumes.melody.reverbSend !== 'number') {
+        if (!volumes.melody || typeof volumes.melody.gain !== 'number' || typeof volumes.melody.reverbSend !== 'number' || !volumes.compressor) {
             return { volumes: defaultVolumes }; 
         }
         
@@ -201,20 +208,28 @@ export default function Home() {
         }
     }, [setVolumes, cookieConsent]);
 
-    const handleChannelVolumeChange = useCallback((channel: keyof Omit<Volumes, 'reverbReturn'>, newChannelVolumes: ChannelVolumes) => {
-        const newVolumes = {
+    const handleChannelVolumeChange = useCallback((channel: keyof Omit<Volumes, 'reverbReturn' | 'compressor'>, newChannelVolumes: ChannelVolumes) => {
+        const newVolumes: Volumes = {
             ...volumes,
             [channel]: newChannelVolumes
         };
         updateVolumes(newVolumes);
     }, [volumes, updateVolumes]);
     
-    const handleMixerChange = useCallback((mixerVolumes: Omit<Volumes, 'melody' | 'manualBass'>) => {
+    const handleMixerChange = useCallback((mixerVolumes: Omit<Volumes, 'melody' | 'manualBass' | 'compressor'>) => {
         const newVolumes: Volumes = {
             ...volumes,
             latch: mixerVolumes.latch,
             drums: mixerVolumes.drums,
             reverbReturn: mixerVolumes.reverbReturn,
+        };
+        updateVolumes(newVolumes);
+    }, [volumes, updateVolumes]);
+    
+    const handleCompressorChange = useCallback((compressorSettings: CompressorSettings) => {
+        const newVolumes: Volumes = {
+            ...volumes,
+            compressor: compressorSettings,
         };
         updateVolumes(newVolumes);
     }, [volumes, updateVolumes]);
@@ -409,6 +424,7 @@ export default function Home() {
                             onTempoChange={handleTempoChange}
                             volumes={volumes}
                             onMixerChange={handleMixerChange}
+                            onCompressorChange={handleCompressorChange}
                             isMobile={isMobile}
                         />
                     </div>
@@ -424,6 +440,7 @@ export default function Home() {
                         onTempoChange={handleTempoChange}
                         volumes={volumes}
                         onMixerChange={handleMixerChange}
+                        onCompressorChange={handleCompressorChange}
                         isMobile={isMobile}
                         isLandscape={true}
                     />

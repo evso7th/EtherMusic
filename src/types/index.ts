@@ -66,12 +66,21 @@ export interface ChannelVolumes {
   reverbSend: number;
 }
 
+export interface CompressorSettings {
+    enabled: boolean;
+    threshold: number;
+    ratio: number;
+    attack: number;
+    release: number;
+}
+
 export interface Volumes {
   melody: ChannelVolumes;
   manualBass: ChannelVolumes;
   latch: ChannelVolumes;
   drums: ChannelVolumes;
   reverbReturn: number;
+  compressor: CompressorSettings;
 }
 
 
@@ -80,4 +89,3 @@ export interface Note {
     frequency: number;
     volume: number;
 }
-

@@ -1,7 +1,6 @@
 
 "use client";
-
-import type { Volumes, Note, Instrument, BassInstrument } from '@/types';
+import type { Volumes, Note, Instrument, BassInstrument, CompressorSettings } from '@/types';
 import { OrbManager } from './orb-manager';
 import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
@@ -16,12 +15,13 @@ function dbToGain(db: number): number {
 
 export class AudioEngine {
     public isInitialized = false;
-    private context: AudioContext;
+    private context!: AudioContext;
     public orbManager: OrbManager;
     private mediaRecorder: MediaRecorder | null = null;
     private recordedChunks: Blob[] = [];
 
     public masterOut: GainNode;
+    private preCompressorOut: GainNode;
     private compressor: DynamicsCompressorNode;
     private nodes = new Map<PartName, { worklet: AudioWorkletNode, gain: GainNode, reverbSend: GainNode }>();
     private reverbReturn: GainNode;
@@ -32,6 +32,13 @@ export class AudioEngine {
         latch: { gain: -15, reverbSend: -48 },
         drums: { gain: -9, reverbSend: -48 },
         reverbReturn: -12,
+        compressor: {
+            enabled: true,
+            threshold: -24,
+            ratio: 12,
+            attack: 0.003,
+            release: 0.25
+        }
     };
     private isBassLatchOn: boolean = false;
     private latchEngine = new LatchEngine();
@@ -44,18 +51,22 @@ export class AudioEngine {
     constructor(context: AudioContext, orbManager: OrbManager) {
         this.context = context;
         this.orbManager = orbManager;
-        this.masterOut = this.context.createGain();
-        this.reverbReturn = this.context.createGain();
-
-        this.compressor = this.context.createDynamicsCompressor();
-        this.compressor.threshold.value = -24;
-        this.compressor.knee.value = 30;
-        this.compressor.ratio.value = 12;
-        this.compressor.attack.value = 0.003;
-        this.compressor.release.value = 0.25;
         
-        this.masterOut.connect(this.compressor);
-        this.compressor.connect(this.context.destination);
+        // Final output node
+        this.masterOut = this.context.createGain();
+        this.masterOut.connect(this.context.destination);
+        
+        // Pre-compressor bus
+        this.preCompressorOut = this.context.createGain();
+
+        // Compressor setup
+        this.compressor = this.context.createDynamicsCompressor();
+        this.preCompressorOut.connect(this.compressor);
+        this.compressor.connect(this.masterOut);
+
+        // Reverb return connects pre-compressor
+        this.reverbReturn = this.context.createGain();
+        this.reverbReturn.connect(this.preCompressorOut);
     }
 
     public get isPlaying(): boolean {
@@ -75,7 +86,7 @@ export class AudioEngine {
         console.log("AudioContext is active.");
         
         const mediaStreamDest = this.context.createMediaStreamDestination();
-        this.masterOut.connect(mediaStreamDest); // Connect master output to recorder
+        this.masterOut.connect(mediaStreamDest); // Connect final output to recorder
         this.mediaRecorder = new MediaRecorder(mediaStreamDest.stream, { mimeType: 'audio/webm' });
         
         this.mediaRecorder.ondataavailable = (event) => {
@@ -110,7 +121,7 @@ export class AudioEngine {
         }
         
         const reverbBus = new AudioWorkletNode(this.context, 'reverb-processor');
-        this.reverbReturn.connect(this.masterOut);
+        this.reverbReturn.connect(this.preCompressorOut);
         reverbBus.connect(this.reverbReturn);
         
         this.createWorkletNode('melody', 'theremin-processor', 4, reverbBus);
@@ -126,10 +137,10 @@ export class AudioEngine {
     }
     
     private createWorkletNode(part: PartName, processorName: string, polyphony: number, reverbBus: AudioWorkletNode) {
-        if (!this.context || !this.masterOut) return;
+        if (!this.context) return;
         
         const gainNode = this.context.createGain();
-        gainNode.connect(this.masterOut);
+        gainNode.connect(this.preCompressorOut); // Connect part gain to pre-compressor bus
 
         const reverbSendNode = this.context.createGain();
         reverbSendNode.connect(reverbBus);
@@ -295,7 +306,22 @@ export class AudioEngine {
         const rampTime = this.context.currentTime + 0.05;
 
         (Object.keys(newVolumes) as Array<keyof Volumes>).forEach((part) => {
-            if (part === 'reverbReturn') {
+            if (part === 'compressor') {
+                const settings = newVolumes.compressor;
+                this.compressor.threshold.linearRampToValueAtTime(settings.threshold, rampTime);
+                this.compressor.ratio.linearRampToValueAtTime(settings.ratio, rampTime);
+                this.compressor.attack.linearRampToValueAtTime(settings.attack, rampTime);
+                this.compressor.release.linearRampToValueAtTime(settings.release, rampTime);
+
+                if (settings.enabled) {
+                    this.preCompressorOut.disconnect();
+                    this.preCompressorOut.connect(this.compressor);
+                } else {
+                    this.preCompressorOut.disconnect();
+                    this.preCompressorOut.connect(this.masterOut);
+                }
+
+            } else if (part === 'reverbReturn') {
                 this.reverbReturn.gain.linearRampToValueAtTime(dbToGain(newVolumes.reverbReturn), rampTime);
             } else {
                  const partName = part as PartName;
@@ -336,11 +362,15 @@ export class AudioEngine {
 
     public fadeOutAndStop(durationSeconds: number) {
         if (!this.masterOut || !this.context) return;
-        this.masterOut.gain.linearRampToValueAtTime(0, this.context.currentTime + durationSeconds);
+        const now = this.context.currentTime;
+        this.masterOut.gain.cancelScheduledValues(now);
+        this.masterOut.gain.setValueAtTime(this.masterOut.gain.value, now);
+        this.masterOut.gain.linearRampToValueAtTime(0, now + durationSeconds);
         setTimeout(() => {
             this.stop();
             if (this.masterOut && this.context) {
-                this.masterOut.gain.setValueAtTime(1, this.context.currentTime);
+                 this.masterOut.gain.cancelScheduledValues(this.context.currentTime);
+                 this.masterOut.gain.setValueAtTime(1, this.context.currentTime);
             }
         }, (durationSeconds + 0.5) * 1000);
     }
