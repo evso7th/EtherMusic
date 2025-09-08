@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Anchor, SlidersHorizontal, Blend, Waves, Music } from 'lucide-react';
+import { Anchor, SlidersHorizontal, Blend, Music } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { MusicKey, MusicScale, Instrument, BassInstrument, InstrumentPreset, BassInstrumentPreset, ChannelVolumes } from '@/types';
@@ -46,38 +46,6 @@ const padTitles = {
     melody: "Melody Pad",
     bass: "Bass Pad"
 }
-
-const VolumeControl = ({
-    label,
-    icon: Icon,
-    volume,
-    onVolumeChange,
-    onVolumeCommit,
-}: {
-    label: string,
-    icon: React.ElementType,
-    volume: number,
-    onVolumeChange: (v: number) => void,
-    onVolumeCommit: (v: number) => void,
-}) => (
-    <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-            <Icon className="w-5 h-5 text-primary flex-shrink-0" />
-            <Label className="text-sm font-medium flex-1 truncate">{label}</Label>
-            <span className="text-xs text-muted-foreground w-10 text-right">{volume.toFixed(0)} dB</span>
-        </div>
-        <div className="flex items-center gap-4 pl-7">
-            <Slider
-                min={-48}
-                max={6}
-                step={1}
-                value={[volume]}
-                onValueChange={(v) => onVolumeChange(v[0])}
-                onValueCommit={(v) => onVolumeCommit(v[0])}
-            />
-        </div>
-    </div>
-);
 
 const ReverbSendControl = ({
     label,
@@ -144,9 +112,6 @@ export function ThereminPad({
         setLocalVolumes(channelVolumes);
     }, [channelVolumes]);
 
-    const handleGainChange = (gain: number) => {
-        setLocalVolumes(prev => ({...prev, gain}));
-    };
     const handleReverbSendChange = (reverbSend: number) => {
         setLocalVolumes(prev => ({...prev, reverbSend}));
     };
@@ -243,8 +208,6 @@ export function ThereminPad({
             </Tooltip>
         );
         
-        const PartIcon = type === 'melody' ? Music : Waves;
-
         return (
             <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
                 {sheetTrigger}
@@ -303,13 +266,6 @@ export function ThereminPad({
                             
                             <Separator />
                             <div className="space-y-4">
-                                <VolumeControl
-                                    label="Volume"
-                                    icon={PartIcon}
-                                    volume={localVolumes.gain}
-                                    onVolumeChange={handleGainChange}
-                                    onVolumeCommit={handleCommit}
-                                />
                                 <ReverbSendControl
                                     label="Reverb Send"
                                     icon={Blend}
@@ -399,3 +355,4 @@ export function ThereminPad({
         </Card>
     );
 }
+

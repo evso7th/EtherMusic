@@ -26,7 +26,7 @@ interface BeatBoxControlsProps {
     activeTempo: Tempo;
     onTempoChange: (tempo: Tempo) => void;
     volumes: Volumes;
-    onMixerChange: (volumes: Omit<Volumes, 'melody' | 'manualBass' | 'compressor'>) => void;
+    onMixerChange: (volumes: Partial<Omit<Volumes, 'compressor'>>) => void;
     onCompressorChange: (compressorSettings: CompressorSettings) => void;
     isMobile: boolean;
     isLandscape?: boolean;
@@ -201,7 +201,7 @@ export function BeatBoxControls({
                                 <div className="pr-4 py-4">
                                     <MixerControls 
                                         volumes={volumes} 
-                                        onVolumeChange={onMixerChange}
+                                        onMixerChange={onMixerChange}
                                         onCompressorChange={onCompressorChange}
                                     />
                                 </div>
@@ -334,7 +334,7 @@ export function BeatBoxControls({
                                 <div className="pr-4 py-4">
                                     <MixerControls 
                                         volumes={volumes} 
-                                        onVolumeChange={onMixerChange}
+                                        onMixerChange={onMixerChange}
                                         onCompressorChange={onCompressorChange}
                                     />
                                 </div>
@@ -348,3 +348,4 @@ export function BeatBoxControls({
         </TooltipProvider>
     );
 }
+

@@ -216,12 +216,10 @@ export default function Home() {
         updateVolumes(newVolumes);
     }, [volumes, updateVolumes]);
     
-    const handleMixerChange = useCallback((mixerVolumes: Omit<Volumes, 'melody' | 'manualBass' | 'compressor'>) => {
+    const handleMixerChange = useCallback((changedVolumes: Partial<Omit<Volumes, 'compressor'>>) => {
         const newVolumes: Volumes = {
             ...volumes,
-            latch: mixerVolumes.latch,
-            drums: mixerVolumes.drums,
-            reverbReturn: mixerVolumes.reverbReturn,
+            ...changedVolumes
         };
         updateVolumes(newVolumes);
     }, [volumes, updateVolumes]);
@@ -457,3 +455,4 @@ export default function Home() {
     
 
     
+

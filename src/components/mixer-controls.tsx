@@ -5,9 +5,10 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Waves, Drum, Anchor, Blend, AudioLines } from 'lucide-react';
+import { Waves, Drum, Anchor, Blend, AudioLines, Music } from 'lucide-react';
 import { useState, useCallback, useEffect } from 'react';
-import type { Volumes, CompressorSettings } from '@/types';
+import type { Volumes, CompressorSettings, ChannelVolumes } from '@/types';
+import { cn } from "@/lib/utils";
 
 const VolumeControl = ({
     label,
@@ -49,40 +50,42 @@ const VolumeControl = ({
     </div>
 );
 
+type MixerVolumes = Omit<Volumes, 'compressor'>;
+
 export function MixerControls({ 
     volumes: initialVolumes, 
-    onVolumeChange,
+    onMixerChange,
     onCompressorChange 
 }: { 
     volumes: Volumes, 
-    onVolumeChange: (volumes: Omit<Volumes, 'melody' | 'manualBass' | 'compressor'>) => void,
+    onMixerChange: (volumes: Partial<MixerVolumes>) => void,
     onCompressorChange: (compressorSettings: CompressorSettings) => void
 }) {
     
-    const [volumes, setVolumes] = useState(initialVolumes);
+    const [localVolumes, setLocalVolumes] = useState(initialVolumes);
     const [compressor, setCompressor] = useState(initialVolumes.compressor);
 
     useEffect(() => {
-        setVolumes(initialVolumes);
+        setLocalVolumes(initialVolumes);
         setCompressor(initialVolumes.compressor);
     }, [initialVolumes]);
 
-    const handleLocalVolumeChange = useCallback(<K extends keyof Omit<Volumes, 'compressor'>>(part: K, field: keyof (typeof volumes)[K], value: number) => {
-        setVolumes(prev => {
+    const handleLocalVolumeChange = useCallback((part: keyof MixerVolumes, value: number) => {
+        setLocalVolumes(prev => {
             const newVolumes = { ...prev };
-            if (typeof newVolumes[part] === 'object') {
-                (newVolumes[part] as any)[field] = value;
-            } else {
-                (newVolumes[part] as any) = value;
+            if (part === 'reverbReturn') {
+                 newVolumes.reverbReturn = value;
+            } else if (typeof newVolumes[part] === 'object') {
+                (newVolumes[part] as ChannelVolumes).gain = value;
             }
             return newVolumes;
         });
     }, []);
 
     const handleVolumeCommit = useCallback(() => {
-        const { melody, manualBass, compressor, ...mixerVolumes } = volumes;
-        onVolumeChange(mixerVolumes);
-    }, [volumes, onVolumeChange]);
+        const { compressor, ...mixerVolumes } = localVolumes;
+        onMixerChange(mixerVolumes);
+    }, [localVolumes, onMixerChange]);
 
     const handleCompressorSettingChange = useCallback((setting: keyof CompressorSettings, value: number | boolean) => {
         setCompressor(prev => ({ ...prev, [setting]: value }));
@@ -102,25 +105,39 @@ export function MixerControls({
     return (
         <div className="space-y-6">
             <div className="space-y-4">
+                <VolumeControl 
+                    label="Melody"
+                    icon={Music}
+                    volume={localVolumes.melody.gain}
+                    onVolumeChange={(v) => handleLocalVolumeChange('melody', v)}
+                    onVolumeCommit={handleVolumeCommit}
+                />
+                 <VolumeControl 
+                    label="Bass"
+                    icon={Waves}
+                    volume={localVolumes.manualBass.gain}
+                    onVolumeChange={(v) => handleLocalVolumeChange('manualBass', v)}
+                    onVolumeCommit={handleVolumeCommit}
+                />
                  <VolumeControl 
                     label="Latch"
                     icon={Anchor}
-                    volume={volumes.latch.gain}
-                    onVolumeChange={(v) => handleLocalVolumeChange('latch', 'gain', v)}
+                    volume={localVolumes.latch.gain}
+                    onVolumeChange={(v) => handleLocalVolumeChange('latch', v)}
                     onVolumeCommit={handleVolumeCommit}
                 />
                 <VolumeControl 
                     label="Drums"
                     icon={Drum}
-                    volume={volumes.drums.gain}
-                    onVolumeChange={(v) => handleLocalVolumeChange('drums', 'gain', v)}
+                    volume={localVolumes.drums.gain}
+                    onVolumeChange={(v) => handleLocalVolumeChange('drums', v)}
                     onVolumeCommit={handleVolumeCommit}
                 />
                  <VolumeControl 
                     label="Reverb Mix"
                     icon={Blend}
-                    volume={volumes.reverbReturn}
-                    onVolumeChange={(v) => handleLocalVolumeChange('reverbReturn', 'reverbReturn' as any, v)}
+                    volume={localVolumes.reverbReturn}
+                    onVolumeChange={(v) => handleLocalVolumeChange('reverbReturn', v)}
                     onVolumeCommit={handleVolumeCommit}
                 />
             </div>
@@ -167,3 +184,4 @@ export function MixerControls({
         </div>
     );
 }
+
