@@ -44,7 +44,7 @@ function setCookie(name: string, value: string, days: number) {
 
 const defaultVolumes: Volumes = { 
     melody: { gain: 0, reverbSend: -24, distortion: 0 },
-    manualBass: { gain: 0, reverbSend: -48, distortion: 0 },
+    manualBass: { gain: -3, reverbSend: -48, distortion: 0 },
     latch: { gain: -9, reverbSend: -48, distortion: 0 },
     drums: { gain: -9, reverbSend: -48, distortion: 0 },
     reverbReturn: -12,
@@ -197,12 +197,10 @@ export default function Home() {
         
         const currentKey = Object.keys(ALL_NOTES).includes(keyOrScale) ? keyOrScale as MusicKey : newKey;
         const currentScale = Object.keys(SCALES).includes(keyOrScale) ? keyOrScale as MusicScale : newScale;
-
-        // Bass Pad: Octaves C2-C3
+    
         const baseBassNote = 24; // C1
         const bassFreqs = getScaleFrequencies(baseBassNote, SCALES[currentScale], [1, 2]);
 
-        // Melody Pad: Octaves C3-C4
         const baseMelodyNote = 48; // C3
         const melodyFreqs = getScaleFrequencies(baseMelodyNote, SCALES[currentScale], [0, 1]);
     
@@ -230,19 +228,8 @@ export default function Home() {
         updateVolumes(newGlobalVolumes);
     }, [volumes, updateVolumes]);
     
-    const handleMixerChange = useCallback((changedMixerVolumes: Partial<Omit<Volumes, 'compressor'>>) => {
-        const newVolumes: Volumes = { ...volumes };
-        for (const key in changedMixerVolumes) {
-            const channelKey = key as keyof typeof changedMixerVolumes;
-            if (channelKey === 'reverbReturn') {
-                newVolumes.reverbReturn = changedMixerVolumes.reverbReturn!;
-            } else {
-                newVolumes[channelKey] = {
-                    ...newVolumes[channelKey],
-                    ...changedMixerVolumes[channelKey]
-                }
-            }
-        }
+    const handleMixerChange = useCallback((changedMixerVolumes: Partial<Volumes>) => {
+        const newVolumes: Volumes = { ...volumes, ...changedMixerVolumes };
         updateVolumes(newVolumes);
     }, [volumes, updateVolumes]);
     
@@ -302,7 +289,10 @@ export default function Home() {
         if(preset) {
             setActiveMelodyInstrument(instrumentName);
             setMelodyInstrument(instrumentName);
-            handleChannelVolumeChange('melody', { distortion: preset.params.distortion });
+            handleChannelVolumeChange('melody', { 
+                reverbSend: preset.params.reverbSend,
+                distortion: preset.params.distortion 
+            });
         }
     }, [setMelodyInstrument, handleChannelVolumeChange]);
 
@@ -311,10 +301,12 @@ export default function Home() {
         if(preset) {
             setActiveBassInstrument(instrumentName);
             setBassInstrument(instrumentName);
-            const distortion = preset.params.distortion ?? 0;
-            const channelVolumes = { distortion };
-            handleChannelVolumeChange('manualBass', channelVolumes);
-            handleChannelVolumeChange('latch', channelVolumes);
+            const newChannelVolumes = { 
+                reverbSend: preset.params.reverbSend,
+                distortion: preset.params.distortion 
+            };
+            handleChannelVolumeChange('manualBass', newChannelVolumes);
+            handleChannelVolumeChange('latch', newChannelVolumes);
         }
     }, [setBassInstrument, handleChannelVolumeChange]);
     
@@ -417,7 +409,7 @@ export default function Home() {
                             onInstrumentChange={handleBassInstrumentChange}
                             orbManager={orbManager}
                             channelVolumes={volumes.manualBass}
-                            onChannelVolumeChange={(v) => handleChannelVolumeChange('manualBass', v)}
+                            onChannelVolumeChange={handleChannelVolumeChange}
                         />
                         <MemoizedThereminPad
                             type="melody"
@@ -437,7 +429,7 @@ export default function Home() {
                             isPolyphonic
                             orbManager={orbManager}
                             channelVolumes={volumes.melody}
-                            onChannelVolumeChange={(v) => handleChannelVolumeChange('melody', v)}
+                            onChannelVolumeChange={handleChannelVolumeChange}
                         />
                     </div>
                     <div className="flex-shrink-0 portrait:block landscape:hidden">
@@ -446,8 +438,7 @@ export default function Home() {
                             activePattern={activePattern}
                             onPatternChange={handlePatternChange}
                             volumes={volumes}
-                            handleMixerChange={handleMixerChange}
-                            onChannelVolumeChange={handleChannelVolumeChange}
+                            onMixerChange={handleMixerChange}
                             onCompressorChange={handleCompressorChange}
                             isMobile={isMobile}
                         />
@@ -460,8 +451,7 @@ export default function Home() {
                         activePattern={activePattern}
                         onPatternChange={handlePatternChange}
                         volumes={volumes}
-                        handleMixerChange={handleMixerChange}
-                        onChannelVolumeChange={handleChannelVolumeChange}
+                        onMixerChange={handleMixerChange}
                         onCompressorChange={handleCompressorChange}
                         isMobile={isMobile}
                         isLandscape={true}
@@ -471,5 +461,3 @@ export default function Home() {
         </div>
     );
 }
-
-    

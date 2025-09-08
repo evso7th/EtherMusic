@@ -39,7 +39,7 @@ interface ThereminPadProps {
     onLatchToggle?: (checked: boolean) => void;
     orbManager?: OrbManager | null;
     channelVolumes: ChannelVolumes;
-    onChannelVolumeChange: (newVolumes: Partial<ChannelVolumes>) => void;
+    onChannelVolumeChange: (channel: 'melody' | 'manualBass' | 'latch' | 'drums', newVolumes: Partial<ChannelVolumes>) => void;
 }
 
 const padTitles = {
@@ -57,9 +57,6 @@ const EffectControl = ({
     max,
     step,
     unit,
-    distortion, // Add distortion prop
-    onDistortionChange, // Add distortion change handler
-    onDistortionCommit, // Add distortion commit handler
 }: {
     label: string,
     icon: React.ElementType,
@@ -70,9 +67,6 @@ const EffectControl = ({
     max: number,
     step: number,
     unit: string,
-    distortion?: number, // Make distortion optional
-    onDistortionChange?: (v: number) => void, // Make optional
-    onDistortionCommit?: (v: number) => void, // Make optional
 }) => (
      <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
@@ -90,19 +84,6 @@ const EffectControl = ({
                 onValueCommit={(v) => onLevelCommit(v[0])}
             />
         </div>
-        {distortion !== undefined && onDistortionChange && onDistortionCommit && (
-            <div className="flex items-center gap-4 pl-7 mt-2">
-                <Waves className="w-4 h-4 text-muted-foreground" />
-                <Slider
-                    min={0}
-                    max={100}
-                    step={1}
-                    value={[distortion]}
-                    onValueChange={(v) => onDistortionChange(v[0])}
-                    onValueCommit={(v) => onDistortionCommit(v[0])}
-                />
-            </div>
-        )}
     </div>
 );
 
@@ -139,21 +120,26 @@ export function ThereminPad({
         setLocalVolumes(channelVolumes);
     }, [channelVolumes]);
 
+    const handleChannelChange = (volumeType: keyof ChannelVolumes, value: number) => {
+         const channelKey = type === 'bass' ? 'manualBass' : type;
+         onChannelVolumeChange(channelKey, { [volumeType]: value });
+    };
+    
     const handleReverbChange = useCallback((value: number) => {
         setLocalVolumes(prev => ({...prev, reverbSend: value}));
     }, []);
 
     const handleReverbCommit = useCallback((value: number) => {
-        onChannelVolumeChange({ reverbSend: value });
-    }, [onChannelVolumeChange]);
+        handleChannelChange('reverbSend', value);
+    }, [handleChannelChange]);
     
     const handleDistortionChange = useCallback((value: number) => {
         setLocalVolumes(prev => ({...prev, distortion: value}));
     }, []);
 
     const handleDistortionCommit = useCallback((value: number) => {
-        onChannelVolumeChange({ distortion: value });
-    }, [onChannelVolumeChange]);
+        handleChannelChange('distortion', value);
+    }, [handleChannelChange]);
 
     // Manage orbs for latch mode
     useEffect(() => {
@@ -346,11 +332,8 @@ export function ThereminPad({
         >
             <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between p-2">
                 <div className="text-xs text-muted-foreground capitalize pl-2">
-                   {type === 'melody' ? 'Theremin' : 'Bass Synth'}
-                </div>
-                <div className="flex items-center gap-2">
-                    {type === 'bass' && onLatchToggle && (
-                         <TooltipProvider>
+                   {type === 'bass' && onLatchToggle ? (
+                        <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <div className="flex items-center space-x-1 h-8 px-2 rounded-md hover:bg-accent/10">
@@ -363,7 +346,11 @@ export function ThereminPad({
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
+                    ) : (
+                        type === 'melody' ? 'Theremin' : 'Bass Synth'
                     )}
+                </div>
+                <div className="flex items-center gap-2">
                      <TooltipProvider>
                         {renderSettingsControls()}
                     </TooltipProvider>
@@ -396,5 +383,3 @@ export function ThereminPad({
         </Card>
     );
 }
-
-    

@@ -17,6 +17,7 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
         id: "organ",
         name: "Organ",
         params: {
+            // A combination of triangle waves can approximate an organ sound
             oscillator: { type: 'triangle' },
             envelope: { attack: 0.2, decay: 0.1, sustain: 0.9, release: 1.0 },
             filter: { Q: 0.7, frequency: 600, type: 'lowpass' },
@@ -28,8 +29,8 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
         id: "mellotron",
         name: "Mellotron",
         params: {
-            // Using fat-sawtooth to simulate the detuned/chorus effect of a real mellotron
-            oscillator: { type: 'sawtooth' }, 
+            // A 'fat' sawtooth gives a nice, slightly detuned/chorused feel
+            oscillator: { type: 'sawtooth' },
             envelope: { attack: 0.3, decay: 0.2, sustain: 0.6, release: 1.5 },
             filter: { Q: 1.5, frequency: 500, type: 'lowpass' },
             portamento: 0.01,
@@ -50,5 +51,3 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
 ];
 
 export const defaultMelodyInstrument: Instrument = 'synth';
-
-    

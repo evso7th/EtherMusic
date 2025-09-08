@@ -26,13 +26,13 @@ export interface InstrumentPresetParams {
     };
     portamento?: number;
     distortion?: number;
+    reverbSend?: number; // Added to individual presets
 }
 
 export interface BassInstrumentPresetParams extends InstrumentPresetParams {
-    distortion?: number;
     layers?: {
         oscillator: { type: OscillatorType };
-        envelope: { attack: number, release: number };
+        envelope: { attack: number; decay: number, sustain: number, release: number; };
     }[];
     stagger?: number;
 }
@@ -64,8 +64,8 @@ export type BeatPattern = {
 // New structured volume type
 export interface ChannelVolumes {
   gain: number;
-  reverbSend: number;
-  distortion: number; // Added distortion level
+  reverbSend: number; 
+  distortion: number; 
 }
 
 export interface CompressorSettings {

@@ -14,7 +14,7 @@ import { Separator } from "./ui/separator";
 import { Switch } from "./ui/switch";
 import { ScrollArea } from "./ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
-import type { BeatPattern, Volumes, CompressorSettings, ChannelVolumes } from '@/types';
+import type { BeatPattern, Volumes, CompressorSettings } from '@/types';
 import { MixerControls } from "./mixer-controls";
 
 
@@ -23,8 +23,7 @@ interface BeatBoxControlsProps {
     activePattern: BeatPattern;
     onPatternChange: (pattern: BeatPattern) => void;
     volumes: Volumes;
-    handleMixerChange: (volumes: Partial<Omit<Volumes, 'compressor' | 'reverbReturn'>> & { reverbReturn?: number }) => void;
-    onChannelVolumeChange: (channel: keyof Omit<Volumes, 'compressor' | 'reverbReturn'>, newVolumes: Partial<ChannelVolumes>) => void;
+    onMixerChange: (volumes: Partial<Volumes>) => void;
     onCompressorChange: (compressorSettings: CompressorSettings) => void;
     isMobile: boolean;
     isLandscape?: boolean;
@@ -49,9 +48,8 @@ export function BeatBoxControls({
     activePattern,
     onPatternChange,
     volumes,
-    handleMixerChange,
+    onMixerChange,
     onCompressorChange,
-    onChannelVolumeChange,
     isMobile,
     isLandscape = false,
 }: BeatBoxControlsProps) {
@@ -170,7 +168,7 @@ export function BeatBoxControls({
                                 <div className="pr-4 py-4">
                                     <MixerControls 
                                         volumes={volumes} 
-                                        onChannelVolumeChange={onChannelVolumeChange}
+                                        onMixerChange={onMixerChange}
                                         onCompressorChange={onCompressorChange}
                                     />
                                 </div>
@@ -250,7 +248,7 @@ export function BeatBoxControls({
                         </DialogContent>
                     </Dialog>
 
-                    <Dialog open={isMixerOpen} onOpenChange={setIsMixerOpen}>
+                    <Dialog open={isMixerOpen} onOpenChange={handleMixerOpenChange}>
                         <DialogTrigger asChild>
                              <ControlButtonWrapper tooltipText="Mixer" variant="outline" className="flex-1 px-2 md:px-4" size={buttonSize}>
                                 <SlidersHorizontal className="w-4 h-4 md:mr-2"/>
@@ -265,7 +263,7 @@ export function BeatBoxControls({
                                 <div className="pr-4 py-4">
                                     <MixerControls 
                                         volumes={volumes}
-                                        onChannelVolumeChange={onChannelVolumeChange}
+                                        onMixerChange={onMixerChange}
                                         onCompressorChange={onCompressorChange}
                                     />
                                 </div>
@@ -279,8 +277,3 @@ export function BeatBoxControls({
         </TooltipProvider>
     );
 }
-
-    
-
-
-    
