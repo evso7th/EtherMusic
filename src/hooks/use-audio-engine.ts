@@ -5,7 +5,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
-import type { Volumes, Instrument, BassInstrument, InstrumentPreset, BassInstrumentPreset, CompressorSettings } from '@/types';
+import type { Volumes, Instrument, BassInstrument, CompressorSettings } from '@/types';
 
 export function useAudioEngine() {
     const { toast } = useToast();
@@ -37,10 +37,10 @@ export function useAudioEngine() {
             setIsPlaying(audioEngine.current.isPlaying);
             
         } catch(e) {
-            console.error("Failed to initialize audio engines:", e);
+            console.error("Failed to initialize audio engine:", e);
             toast({
                 title: "Audio Error",
-                description: e instanceof Error ? e.message : "Could not initialize the audio engine. Please refresh the page.",
+                description: e instanceof Error ? e.message : "Could not initialize the audio engine. Please try refreshing the page.",
                 variant: "destructive"
             });
         }
@@ -50,6 +50,7 @@ export function useAudioEngine() {
         if (isAppStarted) return;
         
         setIsAppStarted(true);
+        // Play a subtle transition sound
         const audio = new Audio('/assets/sounds/transition.webm');
         audio.play().catch(e => console.error("Error playing transition sound:", e));
         
@@ -57,6 +58,8 @@ export function useAudioEngine() {
     }, [isAppStarted, initializeAudioEngine]);
 
     useEffect(() => {
+      // Add a global click/touch listener to resume the AudioContext
+      // This is necessary because many browsers suspend the AudioContext until a user interaction.
       const resumeAudio = async () => {
         if (audioEngine.current?.isInitialized && audioEngine.current.getContext().state === 'suspended') {
           await audioEngine.current.getContext().resume();
@@ -120,7 +123,7 @@ export function useAudioEngine() {
         if (durationMinutes !== null) {
             const id = setTimeout(() => {
                 if (audioEngine.current) {
-                    audioEngine.current.fadeOutAndStop(5);
+                    audioEngine.current.fadeOutAndStop(5); // 5-second fade out
                 }
             }, durationMinutes * 60 * 1000);
             setSleepTimerId(id);

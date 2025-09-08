@@ -11,7 +11,7 @@ export type BassInstrument = 'classicBass' | 'glideBass' | 'ambientDrone' | 'res
 // No Tone.js-specific objects.
 export interface InstrumentPresetParams {
     oscillator: {
-        type: OscillatorType;
+        type: OscillatorType | 'custom'; // 'custom' for multi-layer presets like organ
         detune?: number; 
     };
     envelope: {
@@ -24,20 +24,26 @@ export interface InstrumentPresetParams {
         Q: number;
         frequency: number;
         type: BiquadFilterType;
+        gain?: number;
+    };
+    vibrato?: {
+        frequency: number;
+        depth: number;
     };
     portamento?: number;
     layers?: {
-        oscillator: { type: OscillatorType; detune?: number; };
-        envelope: { attack: number; decay: number, sustain: number, release: number; };
-        gain?: number; // Gain for this layer
+        type: OscillatorType;
+        freqMult: number; // Frequency multiplier
+        level: number; // Volume level
+        detune?: number; // Detune in cents
     }[];
-    stagger?: number; // Delay between layer note ons
+    stagger?: number; // Delay between layer note ons in seconds
 }
 
 
 export interface BassInstrumentPresetParams extends InstrumentPresetParams {
-    distortion?: number;
-    reverbSend?: number;
+    reverbSend: number; // in dBFS, e.g., -12
+    distortion: number; // 0-100
 }
 
 
