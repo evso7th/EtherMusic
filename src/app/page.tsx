@@ -327,6 +327,7 @@ export default function Home() {
     }, [setVolumes, cookieConsent]);
 
     const handleAutopilotSettingsChange = useCallback((newSettings: Partial<AutopilotSettings>) => {
+        console.log('[1. UI] page.tsx: handleAutopilotSettingsChange. Settings changed:', newSettings);
         const updatedSettings = { ...autopilotSettings, ...newSettings };
         setAutopilotSettingsState(updatedSettings);
         setAutopilotSettings(updatedSettings);
@@ -381,11 +382,15 @@ export default function Home() {
     }, [setBassLatch]);
     
     const handleMelodyInstrumentChange = useCallback((instrumentId: Instrument) => {
+        const preset = melodyInstruments.find(p => p.id === instrumentId);
+        console.log('[1. UI] page.tsx: handleMelodyInstrumentChange. Preset selected:', preset);
         setActiveMelodyInstrument(instrumentId);
         setMelodyInstrument(instrumentId);
     }, [setMelodyInstrument]);
 
     const handleBassInstrumentChange = useCallback((instrumentId: BassInstrument) => {
+        const preset = bassInstruments.find(p => p.id === instrumentId);
+        console.log('[1. UI] page.tsx: handleBassInstrumentChange. Preset selected:', preset);
         setActiveBassInstrument(instrumentId);
         setBassInstrument(instrumentId);
     }, [setBassInstrument]);
@@ -395,6 +400,10 @@ export default function Home() {
         updateVolumes({ ...volumes, ...preset.volumes });
     }, [handleAutopilotSettingsChange, updateVolumes, volumes]);
 
+    const handleThereminInteractionCallback = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
+        console.log(`[1. UI] page.tsx: handleThereminInteraction. Type: ${type}, State: ${state}`, data);
+        handleThereminInteraction(type, data, state);
+    }, [handleThereminInteraction]);
 
     if (!isClient) {
         return <Preloader />;
@@ -449,7 +458,7 @@ export default function Home() {
                         {isMobile ? (
                              <Dialog>
                                  <DialogTrigger asChild>
-                                    <Button variant="ghost" className="text-primary text-xl font-bold p-0 h-auto">EtherMusic</Button>
+                                     <Button variant="ghost" className="text-primary text-xl font-bold p-0 h-auto">EtherMusic</Button>
                                  </DialogTrigger>
                                 <DialogContent>
                                     <DialogHeader>
@@ -490,7 +499,7 @@ export default function Home() {
                      <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-2 landscape:grid-cols-2 landscape:gap-1">
                         <MemoizedThereminPad
                             type="bass"
-                            onInteraction={handleThereminInteraction}
+                            onInteraction={handleThereminInteractionCallback}
                             allowedFrequencies={allowedFrequencies.bass}
                             color="hsl(var(--accent))"
                             isLatchOn={isBassLatchOn}
@@ -503,7 +512,7 @@ export default function Home() {
                         />
                         <MemoizedThereminPad
                             type="melody"
-                            onInteraction={handleThereminInteraction}
+                            onInteraction={handleThereminInteractionCallback}
                             allowedFrequencies={allowedFrequencies.melody}
                             color="hsl(var(--primary))"
                             isLatchOn={false}
@@ -550,7 +559,7 @@ export default function Home() {
                         setTempo={handleTempoChange}
                         autopilotSettings={autopilotSettings}
                         onAutopilotSettingsChange={handleAutopilotSettingsChange}
-                        onAutopilotPresetLoad={handleAutopilotPresetLoad}
+                        onAutopilotPresetLoad={onAutopilotPresetLoad}
                     />
                 </div>
             </div>

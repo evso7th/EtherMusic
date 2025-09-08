@@ -13,7 +13,7 @@ export type AutopilotStyle = 'Ambient' | 'Sequence' | 'Water' | 'Air' | 'Toccata
 export interface BaseInstrumentParams {
     oscillator: {
         type: OscillatorType;
-        detune?: number; 
+        // Note: detune is handled per-layer in the new model
     };
     envelope: {
         attack: number;
@@ -29,12 +29,12 @@ export interface BaseInstrumentParams {
         frequency: number;
         gain: number;
         type: BiquadFilterType;
-    };
+    } | null;
     portamento?: number;
     vibrato?: {
         frequency: number;
         depth: number;
-    };
+    } | null;
     layers?: {
         type: OscillatorType;
         freqMult: number; // Frequency multiplier relative to base
@@ -113,28 +113,26 @@ export interface AutopilotSettings {
 
 export interface AutopilotPreset {
     instruments: AutopilotSettings['instruments'];
-    volumes: Omit<Volumes, 'compressor' | 'reverbReturn' | 'drums'> & {
-        compressor: CompressorSettings;
-        reverbReturn: number;
-        drums: ChannelVolumes;
-    };
+    volumes: Volumes;
 }
 
-
-export interface Note {
+export interface SynthNote {
     id: number;
     frequency: number;
     volume: number;
-    duration?: number; // for autopilot and scheduled notes
-    time?: number; // for autopilot and scheduled notes
+    duration?: number;
+    time?: number;
 }
 
+
 export type WorkerMessage = 
-    | { type: 'noteOn', note: Note }
+    | { type: 'noteOn', note: SynthNote }
     | { type: 'noteOff', id: number }
-    | { type: 'noteUpdate', note: Note }
+    | { type: 'noteUpdate', note: SynthNote }
     | { type: 'allNotesOff' }
-    | { type: 'setPreset', preset: InstrumentPresetParams | BassInstrumentPresetParams }
+    | { type: 'setPreset', preset: InstrumentPresetParams | BassInstrumentPresetParams };
+
+export type DrumWorkerMessage =
     | { type: 'start', bpm: number, startTime: number }
     | { type: 'stop' }
     | { type: 'setBpm', bpm: number }
@@ -150,10 +148,10 @@ export type AutopilotWorkerMessage =
     | { type: 'tick', time: number, beatNumber: number };
 
 export type AutopilotScore = {
-    melody: (Note & { x: number, y: number })[];
-    accompaniment: Note[];
-    bass: Note[];
-    sparkle: (Note & { x: number, y: number })[];
+    melody: (SynthNote & { x: number, y: number })[];
+    accompaniment: SynthNote[];
+    bass: SynthNote[];
+    sparkle: (SynthNote & { x: number, y: number })[];
 };
 
 export type AutopilotWorkerResponse = {
