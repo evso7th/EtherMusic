@@ -68,17 +68,17 @@ class Voice {
                 currentFreq: freq,
             };
         };
+        
+        // Add the main oscillator config as the first layer
+        this.layers.push(createLayer({
+            type: preset.oscillator?.type || 'sine',
+            level: 1.0, 
+            freqMult: 1,
+            detune: preset.oscillator?.detune || 0,
+        }, this.baseFrequency));
 
-        // Main oscillator as the first layer, only if no layers are defined or to add it to the stack
-        if (!preset.layers || preset.layers.length === 0) {
-            this.layers.push(createLayer({
-                type: preset.oscillator?.type || 'sine',
-                level: 1.0,
-                freqMult: 1,
-                detune: preset.oscillator?.detune || 0,
-            }, this.baseFrequency));
-        } else {
-             // If layers are defined, they completely define the sound.
+        // Add additional layers if they exist
+        if (preset.layers && preset.layers.length > 0) {
              preset.layers.forEach(layer => this.layers.push(createLayer(layer, this.baseFrequency)));
         }
     }
@@ -154,8 +154,8 @@ class Voice {
                 a1 = -2 * cos_w0;
                 a2 = 1 - alpha / A;
                 break;
-            default:
-                return inputSample;
+            default: // including highpass, bandpass, etc.
+                return inputSample; // Fallback for unimplemented types
         }
     
         const outputSample = (b0/a0) * inputSample + (b1/a0) * this.filter.x1 + (b2/a0) * this.filter.x2 - (a1/a0) * this.filter.y1 - (a2/a0) * this.filter.y2;
@@ -163,9 +163,9 @@ class Voice {
         this.filter.x2 = this.filter.x1;
         this.filter.x1 = inputSample;
         this.filter.y2 = this.filter.y1;
-        this.filter.y1 = outputSample;
+        this.filter.y1 = isNaN(outputSample) ? 0 : outputSample;
         
-        return isNaN(outputSample) ? 0 : outputSample;
+        return this.filter.y1;
     }
 
     processEnvelope() {
@@ -240,13 +240,18 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.preset = this.getDefaultPreset();
         
         this.port.onmessage = this.handleMessage.bind(this);
+        console.log('[3. WORKLET] SynthProcessor created');
     }
 
     handleMessage(event) {
         const { type, note, id, preset } = event.data;
+        // console.log(`[3. WORKLET] Received message: ${type}`);
         switch (type) {
             case 'noteOn':
-                if (note) this.noteOn(note);
+                if (note) {
+                    console.log(`[3. WORKLET] noteOn: id=${note.id}, freq=${note.frequency.toFixed(2)}, vol=${note.volume.toFixed(2)}`);
+                    this.noteOn(note);
+                }
                 break;
             case 'noteOff':
                 if (id !== undefined) this.noteOff(id);
@@ -258,13 +263,17 @@ class SynthProcessor extends AudioWorkletProcessor {
                 this.allNotesOff();
                 break;
             case 'setPreset':
-                if (preset) this.applyPreset(preset);
+                if (preset) {
+                    console.log('[3. WORKLET] Received new preset:', JSON.parse(JSON.stringify(preset)));
+                    this.applyPreset(preset);
+                }
                 break;
         }
     }
 
     applyPreset(preset) {
         this.preset = { ...this.getDefaultPreset(), ...preset };
+        console.log('[3. WORKLET] Preset applied:', this.preset);
     }
 
     noteOn(note) {
@@ -306,15 +315,17 @@ class SynthProcessor extends AudioWorkletProcessor {
         const output = outputs[0];
         const channel = output[0];
         
-        for (let i = 0; i < channel.length; i++) {
-            let mixedSample = 0;
-            this.voices.forEach((voice, id) => {
-                mixedSample += voice.render();
-                if (voice.isFinished) {
-                    this.voices.delete(id);
-                }
-            });
-            channel[i] = mixedSample;
+        if (channel) {
+            for (let i = 0; i < channel.length; i++) {
+                let mixedSample = 0;
+                this.voices.forEach((voice, id) => {
+                    mixedSample += voice.render();
+                    if (voice.isFinished) {
+                        this.voices.delete(id);
+                    }
+                });
+                channel[i] = mixedSample;
+            }
         }
         return true;
     }
