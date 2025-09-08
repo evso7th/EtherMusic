@@ -8,7 +8,6 @@ export type Instrument = 'synth' | 'organ' | 'theremin' | 'mellotron';
 export type BassInstrument = 'classicBass' | 'glideBass' | 'ambientDrone' | 'resonantGliss' | 'hypnoticDrone' | 'livingRiff';
 
 // These presets are sent to the AudioWorklet, so they must contain only serializable data.
-// No Tone.js-specific objects.
 export interface InstrumentPresetParams {
     oscillator: {
         type: OscillatorType;
@@ -26,8 +25,6 @@ export interface InstrumentPresetParams {
         type: BiquadFilterType;
     };
     portamento?: number;
-    distortion: number; // in percent (0-100)
-    reverbSend: number; // in dB (-48 to 6)
     layers?: {
         oscillator: { type: OscillatorType; detune?: number; };
         envelope: { attack: number; decay: number, sustain: number, release: number; };
@@ -59,11 +56,6 @@ export interface BassInstrumentPreset {
     description: string;
     params: BassInstrumentPresetParams;
 }
-
-export type Tempo = {
-    name: string;
-    bpm: number;
-};
 
 export type BeatPattern = {
     name: string;
@@ -100,4 +92,3 @@ export interface Note {
     frequency: number;
     volume: number;
 }
-

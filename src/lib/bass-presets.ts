@@ -61,8 +61,8 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
             oscillator: { type: 'sine' },
             envelope: { attack: 0.2, decay: 0.1, sustain: 1.0, release: 3.0 },
             filter: { Q: 1.0, frequency: 150, type: 'lowpass' },
-            distortion: 0,
             reverbSend: -20,
+            distortion: 0,
             layers: [
                 {
                     oscillator: { type: 'triangle' },
@@ -96,5 +96,3 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
 ];
 
 export const defaultBassInstrument: BassInstrument = 'classicBass';
-
-    

@@ -6,8 +6,6 @@ import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
 import type { Volumes, Instrument, BassInstrument } from '@/types';
-import { melodyInstruments } from '@/lib/melody-presets';
-import { bassInstruments } from '@/lib/bass-presets';
 
 export function useAudioEngine() {
     const { toast } = useToast();
@@ -37,6 +35,7 @@ export function useAudioEngine() {
             
             setIsReady(true);
             setIsPlaying(audioEngine.current.isPlaying);
+            console.log("AudioEngine initialized and ready.");
 
         } catch(e) {
             console.error("Failed to initialize audio engines:", e);

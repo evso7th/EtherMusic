@@ -36,6 +36,15 @@ class ThereminProcessor extends AudioWorkletProcessor {
   
   applyPreset(preset) {
     this.preset = { ...this.preset, ...preset };
+     // When a new preset is applied, update all active voices
+    this.voices.forEach((voice, id) => {
+      const newVoiceData = this.createVoice(voice.frequency, this.preset);
+      // Preserve the current state of the voice
+      newVoiceData.targetVolume = voice.targetVolume;
+      newVoiceData.currentVolume = voice.currentVolume;
+      newVoiceData.isReleasing = voice.isReleasing;
+      this.voices.set(id, newVoiceData);
+    });
   }
 
   noteOn(note) {
@@ -45,7 +54,6 @@ class ThereminProcessor extends AudioWorkletProcessor {
     }
 
     if (this.voices.size >= this.polyphony) {
-       // Simple voice stealing, remove the oldest.
       const oldestVoiceId = this.voices.keys().next().value;
       this.noteOff(oldestVoiceId);
     }
@@ -88,6 +96,7 @@ class ThereminProcessor extends AudioWorkletProcessor {
         currentValue: 0,
         attackSamples: Math.max(1, (layerPreset.envelope?.attack || 0.01) * sampleRate),
         decaySamples: Math.max(1, (layerPreset.envelope?.decay || 0.1) * sampleRate),
+        sustain: layerPreset.envelope?.sustain ?? 0.5,
         releaseSamples: Math.max(1, (layerPreset.envelope?.release || 0.5) * sampleRate),
       }
     });
@@ -100,58 +109,62 @@ class ThereminProcessor extends AudioWorkletProcessor {
       frequency: frequency,
       targetVolume: 0,
       currentVolume: 0,
-      filterState: [0, 0, 0, 0], // for 2nd order Biquad
+      filterState: [0, 0, 0, 0], 
       portamentoTime: preset.portamento ? 0.05 / preset.portamento : 0,
       portamentoTarget: frequency,
       layers: [mainLayer, ...additionalLayers],
       stagger: preset.stagger ? preset.stagger * sampleRate : 0,
       staggerCounter: 0,
-      isReleasing: false
+      isReleasing: false,
+      preset: preset, // Store the preset with the voice
     };
   }
 
   process(inputs, outputs, parameters) {
     const output = outputs[0];
     const channel = output[0];
-    if (!this.preset) return true;
 
     for (let i = 0; i < channel.length; i++) {
       let sample = 0;
       this.voices.forEach((voice, id) => {
         let voiceSample = 0;
 
-        // Portamento
         if (voice.portamentoTime > 0) {
             voice.frequency += (voice.portamentoTarget - voice.frequency) * voice.portamentoTime;
         } else {
             voice.frequency = voice.portamentoTarget;
         }
         
-        // --- Volume Envelope ---
-        const attackSamples = this.preset.envelope.attack * sampleRate;
-        const releaseSamples = this.preset.envelope.release * sampleRate;
+        const attackSamples = (voice.preset.envelope.attack || 0.01) * sampleRate;
+        const releaseSamples = (voice.preset.envelope.release || 0.5) * sampleRate;
 
         if (voice.isReleasing) {
             voice.currentVolume -= (1 / releaseSamples);
             if (voice.currentVolume <= 0) {
                 this.voices.delete(id);
-                return; // skip processing this voice
+                return;
             }
         } else {
-            voice.currentVolume += (1 / attackSamples);
-            if (voice.currentVolume > voice.targetVolume) {
-                voice.currentVolume = voice.targetVolume;
+            if (voice.currentVolume < voice.targetVolume) {
+                voice.currentVolume += (1 / attackSamples);
+                 if(voice.currentVolume > voice.targetVolume) {
+                    voice.currentVolume = voice.targetVolume
+                 }
+            } else if (voice.currentVolume > voice.targetVolume) {
+                voice.currentVolume -= (1 / attackSamples) * 2; // Faster downward adjustment
+                 if(voice.currentVolume < voice.targetVolume) {
+                    voice.currentVolume = voice.targetVolume
+                 }
             }
         }
         
-        // --- Layers & Oscillators ---
         voice.layers.forEach((layer, layerIndex) => {
             if (voice.stagger > 0 && layerIndex > 0 && voice.staggerCounter < voice.stagger * layerIndex) {
                 return; 
             }
             
             let oscSample = 0;
-            const currentFreq = voice.frequency * Math.pow(2, (layer.oscillator?.detune || 0) / 1200);
+            const currentFreq = voice.frequency * Math.pow(2, (layer.detune || 0) / 1200);
             const phaseIncrement = currentFreq / sampleRate;
 
             switch (layer.type) {
@@ -174,9 +187,7 @@ class ThereminProcessor extends AudioWorkletProcessor {
 
         if (voice.stagger > 0) voice.staggerCounter++;
 
-
-        // --- Filter ---
-        const { frequency: cutoff, Q: qValue } = this.preset.filter;
+        const { frequency: cutoff, Q: qValue } = voice.preset.filter;
         const w0 = 2 * Math.PI * cutoff / sampleRate;
         const alpha = Math.sin(w0) / (2 * qValue);
         const b0 = (1 - Math.cos(w0)) / 2;

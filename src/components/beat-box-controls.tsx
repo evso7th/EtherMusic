@@ -23,7 +23,7 @@ interface BeatBoxControlsProps {
     activePattern: BeatPattern;
     onPatternChange: (pattern: BeatPattern) => void;
     volumes: Volumes;
-    handleMixerChange: (volumes: Partial<Volumes>) => void;
+    onMixerChange: (volumes: Partial<Volumes>) => void;
     onCompressorChange: (compressorSettings: CompressorSettings) => void;
     isMobile: boolean;
     isLandscape?: boolean;
@@ -48,7 +48,7 @@ export function BeatBoxControls({
     activePattern,
     onPatternChange,
     volumes,
-    handleMixerChange,
+    onMixerChange,
     onCompressorChange,
     isMobile,
     isLandscape = false,
@@ -164,7 +164,7 @@ export function BeatBoxControls({
                                 <div className="pr-4 py-4">
                                     <MixerControls 
                                         volumes={volumes} 
-                                        onMixerChange={handleMixerChange}
+                                        onMixerChange={onMixerChange}
                                         onCompressorChange={onCompressorChange}
                                     />
                                 </div>
@@ -259,7 +259,7 @@ export function BeatBoxControls({
                                 <div className="pr-4 py-4">
                                     <MixerControls 
                                         volumes={volumes}
-                                        onMixerChange={handleMixerChange}
+                                        onMixerChange={onMixerChange}
                                         onCompressorChange={onCompressorChange}
                                     />
                                 </div>

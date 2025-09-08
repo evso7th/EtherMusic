@@ -27,12 +27,12 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
             layers: [
                 {
                     oscillator: { type: 'sine', detune: 1200 }, // 1st Octave
-                    envelope: { attack: 0.02, decay: 0.1, sustain: 0.9, release: 1.0 },
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 1.0 },
                     gain: 0.75,
                 },
                 {
-                    oscillator: { type: 'sine', detune: 700 }, // A fifth
-                    envelope: { attack: 0.03, decay: 0.1, sustain: 0.9, release: 1.0 },
+                    oscillator: { type: 'sine', detune: 1900 }, // A fifth above the octave
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 1.0 },
                     gain: 0.5, 
                 }
             ],

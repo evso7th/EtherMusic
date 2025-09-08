@@ -145,7 +145,7 @@ export class AudioEngine {
             throw new Error("Could not load core audio components. Please try refreshing the page.");
         }
         
-        await this.loadReverbImpulse();
+        // await this.loadReverbImpulse();
 
         this.createWorkletNode('melody', 'theremin-processor', 4);
         this.createWorkletNode('manualBass', 'theremin-processor', 4);
@@ -196,10 +196,8 @@ export class AudioEngine {
             reverbSend: reverbSendNode,
         });
 
-        // Remove tracing logs after debugging
         workletNode.port.onmessage = (event) => {
             // Optional: handle messages back from the worklet if needed
-            // console.log(`Message from ${part} worklet:`, event.data);
         };
     }
     
@@ -379,7 +377,7 @@ export class AudioEngine {
                     nodeInfo.reverbSend.gain.linearRampToValueAtTime(dbToGain(channelVols.reverbSend), rampTime);
                     
                     const distortionAmount = channelVols.distortion ?? 0;
-                    nodeInfo.distortion.curve = createDistortionCurve(distortionAmount * 0.7); // Scale to a reasonable range
+                    nodeInfo.distortion.curve = createDistortionCurve(distortionAmount);
                  }
             }
         });

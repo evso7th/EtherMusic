@@ -39,6 +39,7 @@ interface ThereminPadProps {
     onLatchToggle?: (checked: boolean) => void;
     orbManager?: OrbManager | null;
     channelVolumes: ChannelVolumes;
+    onChannelVolumeChange: (type: keyof ChannelVolumes, value: number) => void;
 }
 
 const padTitles = {
@@ -106,11 +107,22 @@ export function ThereminPad({
     isLatchOn,
     onLatchToggle,
     orbManager,
-    channelVolumes
+    channelVolumes,
+    onChannelVolumeChange
 }: ThereminPadProps) {
     const padRef = useRef<HTMLDivElement>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const isMobile = useIsMobile();
+    
+    // Local state for sliders to provide smooth UX
+    const [localReverb, setLocalReverb] = useState(channelVolumes.reverbSend);
+    const [localDistortion, setLocalDistortion] = useState(channelVolumes.distortion);
+
+    useEffect(() => {
+        setLocalReverb(channelVolumes.reverbSend);
+        setLocalDistortion(channelVolumes.distortion);
+    }, [channelVolumes]);
+
 
     // Manage orbs for latch mode
     useEffect(() => {
@@ -219,6 +231,26 @@ export function ThereminPad({
                                     </Select>
                                 </div>
                             )}
+                             
+                            <div className="space-y-4">
+                                <h3 className="text-base font-semibold tracking-tight text-foreground">Effects</h3>
+                                <EffectControl
+                                    label="Reverb"
+                                    icon={Blend}
+                                    level={localReverb}
+                                    onLevelChange={setLocalReverb}
+                                    onLevelCommit={(v) => onChannelVolumeChange('reverbSend', v)}
+                                    min={-48} max={6} step={1} unit="dB"
+                                />
+                                <EffectControl
+                                    label="Drive"
+                                    icon={Waves}
+                                    level={localDistortion}
+                                    onLevelChange={setLocalDistortion}
+                                    onLevelCommit={(v) => onChannelVolumeChange('distortion', v)}
+                                    min={0} max={100} step={1} unit="%"
+                                />
+                             </div>
 
                             {(musicKeys || musicScales) && <Separator />}
 
