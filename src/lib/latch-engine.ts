@@ -2,7 +2,7 @@
 import type { Note } from '@/types';
 
 const MAX_LATCH_NOTES = 4;
-const TAP_RADIUS = 30;
+const TAP_RADIUS = 40; // Increased radius for easier tapping
 const TAP_RADIUS_SQUARED = TAP_RADIUS * TAP_RADIUS;
 
 export type LatchToggleResult = {
@@ -92,4 +92,3 @@ export class LatchEngine {
         return this.activeNotes;
     }
 }
-

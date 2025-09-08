@@ -14,12 +14,11 @@ const ORB_COLORS: Record<OrbType, string> = {
 export class OrbManager {
     private orbs = new Map<number, { element: HTMLDivElement; type: OrbType }>();
     private padElements: { [key in 'melody' | 'bass']?: HTMLElement | null } = {};
+    private pendingUpdates = new Map<number, { x: number; y: number }>();
+    private isUpdateScheduled = false;
 
     constructor() {
-        if (typeof document !== 'undefined') {
-            this.padElements['melody'] = document.getElementById('theremin-pad-melody');
-            this.padElements['bass'] = document.getElementById('theremin-pad-bass');
-        }
+        this.applyPendingUpdates = this.applyPendingUpdates.bind(this);
     }
     
     private getPadElement(type: OrbType): HTMLElement | null {
@@ -28,6 +27,25 @@ export class OrbManager {
              this.padElements[padType] = document.getElementById(`theremin-pad-${padType}`);
         }
         return this.padElements[padType];
+    }
+
+    private scheduleUpdate() {
+        if (!this.isUpdateScheduled) {
+            this.isUpdateScheduled = true;
+            requestAnimationFrame(this.applyPendingUpdates);
+        }
+    }
+
+    private applyPendingUpdates() {
+        if (typeof document === 'undefined') return;
+        this.pendingUpdates.forEach(({ x, y }, id) => {
+            const orbData = this.orbs.get(id);
+            if (orbData) {
+                orbData.element.style.transform = `translate(${x}px, ${y}px)`;
+            }
+        });
+        this.pendingUpdates.clear();
+        this.isUpdateScheduled = false;
     }
 
     public addOrb(id: number, type: OrbType, x: number, y: number) {
@@ -42,6 +60,7 @@ export class OrbManager {
         const orbEl = document.createElement('div');
         const color = ORB_COLORS[type];
 
+        orbEl.id = `orb-${id}`; // Assign an ID for direct lookup
         orbEl.className = cn(
             'absolute rounded-full w-8 h-8 md:w-12 md:h-12 -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-opacity duration-300 opacity-0',
              type === 'latch' && 'animate-pulse-accent-glow border-2 border-accent'
@@ -54,20 +73,14 @@ export class OrbManager {
         pad.appendChild(orbEl);
         this.orbs.set(id, { element: orbEl, type });
 
-        // Use requestAnimationFrame to ensure the element is in the DOM before animating opacity
         requestAnimationFrame(() => {
             orbEl.style.opacity = '1';
         });
     }
 
     public updateOrb(id: number, x: number, y: number) {
-        const orb = this.orbs.get(id);
-        if (orb) {
-            // Use requestAnimationFrame for smooth UI updates
-            requestAnimationFrame(() => {
-                 orb.element.style.transform = `translate(${x}px, ${y}px)`;
-            });
-        }
+        this.pendingUpdates.set(id, { x, y });
+        this.scheduleUpdate();
     }
 
     public removeOrb(id: number) {
@@ -76,8 +89,9 @@ export class OrbManager {
             orb.element.style.opacity = '0';
             setTimeout(() => {
                 orb.element.parentElement?.removeChild(orb.element);
-            }, 300); // Wait for transition to finish
+            }, 300);
             this.orbs.delete(id);
+            this.pendingUpdates.delete(id);
         }
     }
     
