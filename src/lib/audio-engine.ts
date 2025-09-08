@@ -53,6 +53,7 @@ export class AudioEngine {
 
     private _isPlaying = false;
     private animationFrameId: number | null = null;
+    private tempo = 90;
 
     constructor(context: AudioContext, orbManager: OrbManager) {
         this.context = context;
@@ -136,7 +137,6 @@ export class AudioEngine {
         this.createWorkletNode('drums', 'drum-processor', 8, reverbBus);
 
         this.setVolumes(this.volumes);
-        this.setTempo(90);
         
         this.isInitialized = true;
         console.log('AudioEngine initialized and ready.');
@@ -148,7 +148,11 @@ export class AudioEngine {
         const gainNode = this.context.createGain();
 
         // Distortion chain
-        const distortionNode = new AudioWorkletNode(this.context, 'distortion-processor');
+        const distortionNode = new AudioWorkletNode(this.context, 'distortion-processor', {
+             processorOptions: {
+                drive: 1, // Default drive
+            }
+        });
         
         // Reverb send
         const reverbSendNode = this.context.createGain();
@@ -176,8 +180,6 @@ export class AudioEngine {
         console.log(`Created worklet node for: ${part}`);
     }
     
-    
-
     private tick() {
         if (!this._isPlaying) return;
         this.animationFrameId = requestAnimationFrame(() => this.tick());
@@ -191,7 +193,7 @@ export class AudioEngine {
         }
 
         this._isPlaying = true;
-        this.nodes.get('drums')?.worklet.port.postMessage({type: 'start'});
+        this.nodes.get('drums')?.worklet.port.postMessage({type: 'start', bpm: this.tempo });
         if (this.animationFrameId === null) {
             this.tick();
         }
@@ -295,23 +297,36 @@ export class AudioEngine {
 
     public setMelodyInstrument(instrumentName: Instrument) {
         const preset = melodyInstruments.find(p => p.id === instrumentName);
-        if (preset && this.nodes.get('melody')) {
+        if (preset && this.nodes.has('melody')) {
             this.nodes.get('melody')?.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
+            // Also update the volume settings for the new preset
+            const channelVolumes: ChannelVolumes = {
+                gain: this.volumes.melody.gain, // Keep current gain
+                reverbSend: preset.params.reverbSend ?? this.volumes.melody.reverbSend,
+                distortion: preset.params.distortion ?? this.volumes.melody.distortion,
+            };
+            this.setVolumes({ ...this.volumes, melody: channelVolumes });
         }
     }
     
     public setBassInstrument(instrumentName: BassInstrument) {
         const preset = bassInstruments.find(p => p.id === instrumentName);
-        if (preset) {
-            const manualBassNode = this.nodes.get('manualBass');
-            if(manualBassNode) {
-                manualBassNode.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
-            }
-
-            const latchNode = this.nodes.get('latch');
-            if (latchNode) {
-                latchNode.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
-            }
+        if (preset && this.nodes.has('manualBass') && this.nodes.has('latch')) {
+            this.nodes.get('manualBass')?.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
+            this.nodes.get('latch')?.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
+            
+            // Also update the volume settings for the new preset
+             const manualBassVolumes: ChannelVolumes = {
+                gain: this.volumes.manualBass.gain, // Keep current gain
+                reverbSend: preset.params.reverbSend ?? this.volumes.manualBass.reverbSend,
+                distortion: preset.params.distortion ?? this.volumes.manualBass.distortion,
+            };
+             const latchVolumes: ChannelVolumes = {
+                gain: this.volumes.latch.gain, // Keep current gain
+                reverbSend: preset.params.reverbSend ?? this.volumes.latch.reverbSend,
+                distortion: preset.params.distortion ?? this.volumes.latch.distortion,
+            };
+            this.setVolumes({ ...this.volumes, manualBass: manualBassVolumes, latch: latchVolumes });
         }
     }
     
@@ -322,8 +337,8 @@ export class AudioEngine {
     
     public setTempo(bpm: number) {
         if (!this.isInitialized) return;
-        // Tempo is fixed for now, but we can re-enable this.
-        // this.nodes.get('drums')?.worklet.port.postMessage({type: 'setTempo', bpm: bpm});
+        this.tempo = bpm;
+        this.nodes.get('drums')?.worklet.port.postMessage({type: 'setTempo', bpm: bpm});
     }
     
     public setVolumes(newVolumes: Volumes) {
@@ -368,11 +383,13 @@ export class AudioEngine {
                         nodeInfo.reverbSend.gain.linearRampToValueAtTime(reverbSendValue, rampTime);
                     }
                     
-                    const driveParam = nodeInfo.distortionNode.parameters.get('drive');
-                    if (driveParam && channelVols.distortion !== undefined) {
-                        // Map 0-100 distortion to a more musical 1-50 drive range
-                        const driveValue = 1.0 + (channelVols.distortion / 100) * 49; 
-                        driveParam.linearRampToValueAtTime(driveValue, rampTime);
+                    if (channelVols.distortion !== undefined) {
+                        const driveParam = nodeInfo.distortionNode.parameters.get('drive');
+                        if (driveParam) {
+                             // Map 0-100 distortion to a more musical 1.0-50.0 drive range
+                            const driveValue = 1.0 + (channelVols.distortion / 100) * 49;
+                            driveParam.linearRampToValueAtTime(driveValue, rampTime);
+                        }
                     }
                  }
             }
