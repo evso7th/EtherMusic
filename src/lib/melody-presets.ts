@@ -21,7 +21,7 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
     },
     {
         id: "organ",
-        name: "Орган",
+        name: "Organ",
         params: {
             oscillator: { type: 'sine' },
             envelope: { attack: 0.1, decay: 0.2, sustain: 0.8, release: 2.5 },
