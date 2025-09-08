@@ -148,11 +148,7 @@ export class AudioEngine {
         const gainNode = this.context.createGain();
 
         // Distortion chain
-        const distortionNode = new AudioWorkletNode(this.context, 'distortion-processor', {
-             processorOptions: {
-                drive: 1, // Default drive
-            }
-        });
+        const distortionNode = new AudioWorkletNode(this.context, 'distortion-processor');
         
         // Reverb send
         const reverbSendNode = this.context.createGain();
@@ -298,10 +294,13 @@ export class AudioEngine {
     public setMelodyInstrument(instrumentName: Instrument) {
         const preset = melodyInstruments.find(p => p.id === instrumentName);
         if (preset && this.nodes.has('melody')) {
-            this.nodes.get('melody')?.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
-            // Also update the volume settings for the new preset
+            const worklet = this.nodes.get('melody')?.worklet;
+            if(worklet) {
+                worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
+            }
+            
             const channelVolumes: ChannelVolumes = {
-                gain: this.volumes.melody.gain, // Keep current gain
+                gain: this.volumes.melody.gain,
                 reverbSend: preset.params.reverbSend ?? this.volumes.melody.reverbSend,
                 distortion: preset.params.distortion ?? this.volumes.melody.distortion,
             };
@@ -311,18 +310,23 @@ export class AudioEngine {
     
     public setBassInstrument(instrumentName: BassInstrument) {
         const preset = bassInstruments.find(p => p.id === instrumentName);
-        if (preset && this.nodes.has('manualBass') && this.nodes.has('latch')) {
-            this.nodes.get('manualBass')?.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
-            this.nodes.get('latch')?.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
+        if (preset) {
+            const manualBassNode = this.nodes.get('manualBass');
+            const latchNode = this.nodes.get('latch');
+            if (manualBassNode) {
+                manualBassNode.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
+            }
+            if (latchNode) {
+                latchNode.worklet.port.postMessage({ type: 'setPreset', preset: preset.params });
+            }
             
-            // Also update the volume settings for the new preset
              const manualBassVolumes: ChannelVolumes = {
-                gain: this.volumes.manualBass.gain, // Keep current gain
+                gain: this.volumes.manualBass.gain,
                 reverbSend: preset.params.reverbSend ?? this.volumes.manualBass.reverbSend,
                 distortion: preset.params.distortion ?? this.volumes.manualBass.distortion,
             };
              const latchVolumes: ChannelVolumes = {
-                gain: this.volumes.latch.gain, // Keep current gain
+                gain: this.volumes.latch.gain, 
                 reverbSend: preset.params.reverbSend ?? this.volumes.latch.reverbSend,
                 distortion: preset.params.distortion ?? this.volumes.latch.distortion,
             };
@@ -383,13 +387,12 @@ export class AudioEngine {
                         nodeInfo.reverbSend.gain.linearRampToValueAtTime(reverbSendValue, rampTime);
                     }
                     
-                    if (channelVols.distortion !== undefined) {
-                        const driveParam = nodeInfo.distortionNode.parameters.get('drive');
-                        if (driveParam) {
-                             // Map 0-100 distortion to a more musical 1.0-50.0 drive range
-                            const driveValue = 1.0 + (channelVols.distortion / 100) * 49;
-                            driveParam.linearRampToValueAtTime(driveValue, rampTime);
-                        }
+                    const driveParam = nodeInfo.distortionNode.parameters.get('drive');
+                    if (driveParam) {
+                        // Map 0-100 distortion to a more musical 1.0-50.0 drive range
+                        const distortion = channelVols.distortion ?? 0;
+                        const driveValue = 1.0 + (distortion / 100) * 49;
+                        driveParam.linearRampToValueAtTime(driveValue, rampTime);
                     }
                  }
             }
@@ -434,3 +437,5 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
+
+    

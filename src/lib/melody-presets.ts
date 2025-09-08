@@ -17,7 +17,6 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
         id: "organ",
         name: "Organ",
         params: {
-            // Hammond-like sound using additive synthesis (summing sine waves)
             oscillator: { type: 'sine' },
             envelope: { attack: 0.02, decay: 0.1, sustain: 0.9, release: 1.0 },
             filter: { Q: 0.7, frequency: 1200, type: 'lowpass' },
@@ -26,16 +25,14 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
             reverbSend: -18,
             layers: [
                 {
-                    // 2nd Harmonic (Octave Up)
-                    oscillator: { type: 'sine', detune: 1200 }, // +12 semitones
+                    oscillator: { type: 'sine', detune: 1200 }, // 2nd Harmonic (Octave Up)
                     envelope: { attack: 0.03, decay: 0.1, sustain: 0.9, release: 1.0 },
-                    gain: 0.75, // Slightly lower volume
+                    gain: 0.75,
                 },
                 {
-                    // 3rd Harmonic (Octave + Fifth Up)
-                    oscillator: { type: 'sine', detune: 1900 }, // +19 semitones
+                    oscillator: { type: 'sine', detune: 2400 }, // 4th Harmonic (2 Octaves Up)
                     envelope: { attack: 0.04, decay: 0.1, sustain: 0.9, release: 1.0 },
-                    gain: 0.5, // Lower volume
+                    gain: 0.5, 
                 }
             ],
         }
@@ -44,7 +41,6 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
         id: "mellotron",
         name: "Mellotron",
         params: {
-            // A 'fat' sawtooth gives a nice, slightly detuned/chorused feel
             oscillator: { type: 'sawtooth' },
             envelope: { attack: 0.3, decay: 0.2, sustain: 0.6, release: 1.5 },
             filter: { Q: 1.5, frequency: 500, type: 'lowpass' },
@@ -68,3 +64,5 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
 ];
 
 export const defaultMelodyInstrument: Instrument = 'synth';
+
+    

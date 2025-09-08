@@ -12,6 +12,7 @@ export type BassInstrument = 'classicBass' | 'glideBass' | 'ambientDrone' | 'res
 export interface InstrumentPresetParams {
     oscillator: {
         type: OscillatorType;
+        detune?: number; // Added for harmonics
     };
     envelope: {
         attack: number;
@@ -26,13 +27,21 @@ export interface InstrumentPresetParams {
     };
     portamento?: number;
     distortion?: number;
-    reverbSend?: number; // Added to individual presets
+    reverbSend?: number;
+    layers?: {
+        oscillator: { type: OscillatorType; detune?: number; };
+        envelope: { attack: number; decay: number, sustain: number, release: number; };
+        gain?: number; // Gain for this layer
+    }[];
+    stagger?: number;
 }
+
 
 export interface BassInstrumentPresetParams extends InstrumentPresetParams {
     layers?: {
-        oscillator: { type: OscillatorType };
+        oscillator: { type: OscillatorType; detune?: number; };
         envelope: { attack: number; decay: number, sustain: number, release: number; };
+        gain?: number;
     }[];
     stagger?: number;
 }
@@ -91,3 +100,5 @@ export interface Note {
     frequency: number;
     volume: number;
 }
+
+    
