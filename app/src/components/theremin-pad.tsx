@@ -205,12 +205,14 @@ export function ThereminPad({
             </Tooltip>
         );
         
+        const fullTitle = padTitles[type];
+
         return (
             <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
                 {sheetTrigger}
                 <SheetContent side={isMobile ? "bottom" : "right"}>
                     <SheetHeader>
-                        <SheetTitle>{padTitles[type]} Settings</SheetTitle>
+                        <SheetTitle>{fullTitle} Settings</SheetTitle>
                         <SheetDescription>Configure the sound and behavior of the instrument.</SheetDescription>
                     </SheetHeader>
                      <ScrollArea className="h-[85vh]">
@@ -302,7 +304,7 @@ export function ThereminPad({
         return instruments?.find(i => i.id === activeInstrument)?.name || '...';
     }, [instruments, activeInstrument]);
 
-    const [title, subtitle] = padTitles[type].split(' ');
+    const padTitle = padTitles[type];
 
 
     return (
@@ -345,14 +347,10 @@ export function ThereminPad({
                         backgroundImage: `linear-gradient(to top, transparent 30%, ${color}20)`,
                     }}
                 >
-                    <div className="absolute inset-0 flex items-center justify-center text-5xl md:text-7xl font-bold text-foreground/10 pointer-events-none uppercase tracking-widest text-center">
-                        <div className="md:hidden">
-                           <span>{title}</span>
-                           <br />
-                           <span>{subtitle}</span>
-                        </div>
+                    <div className="absolute inset-0 flex items-center justify-center text-5xl md:text-7xl font-bold text-foreground/10 pointer-events-none uppercase tracking-widest text-center leading-tight">
+                        <div className="md:hidden" dangerouslySetInnerHTML={{ __html: padTitle.replace(' ', '<br/>') }} />
                         <div className="hidden md:block">
-                           <span>{title} {subtitle}</span>
+                           <span>{padTitle}</span>
                         </div>
                     </div>
                 </div>
