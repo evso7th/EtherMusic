@@ -161,8 +161,8 @@ export class AudioEngine {
 
         try {
              await Promise.all([
-                this.context.audioWorklet.addModule('workers/synth-processor.js').then(() => console.log('[AudioEngine] synth-processor.js module loaded.')).catch(err => console.error('[AudioEngine] FAILED to load synth-processor.js', err)),
-                this.context.audioWorklet.addModule('workers/drum-processor.js').then(() => console.log('[AudioEngine] drum-processor.js module loaded.')).catch(err => console.error('[AudioEngine] FAILED to load drum-processor.js', err)),
+                this.context.audioWorklet.addModule('/workers/synth-processor.js').then(() => console.log('[AudioEngine] synth-processor.js module loaded.')).catch(err => console.error('[AudioEngine] FAILED to load synth-processor.js', err)),
+                this.context.audioWorklet.addModule('/workers/drum-processor.js').then(() => console.log('[AudioEngine] drum-processor.js module loaded.')).catch(err => console.error('[AudioEngine] FAILED to load drum-processor.js', err)),
              ]);
              console.log("[AudioEngine] AudioWorklet modules added.");
         } catch (e) {
@@ -202,12 +202,10 @@ export class AudioEngine {
         const gain = this.context.createGain();
         const reverbSend = this.context.createGain();
         
-        // Correct signal flow: worklet -> distortion -> gain -> main out & reverb send
         worklet.connect(distortion);
         distortion.connect(gain);
         gain.connect(this.preCompressorOut);
-        gain.connect(reverbSend);
-        reverbSend.connect(this.reverbSend);
+        gain.connect(reverbSend).connect(this.reverbSend);
         
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
@@ -222,16 +220,13 @@ export class AudioEngine {
         if (!this.context) return;
         console.log('[AudioEngine] Creating drum channel.');
 
-        // The drum worklet has no specific options to pass
         this.drumWorklet = new AudioWorkletNode(this.context, 'drum-processor');
         const gain = this.context.createGain();
         const reverbSend = this.context.createGain();
 
-        // Correct signal flow: worklet -> gain -> main out & reverb send
         this.drumWorklet.connect(gain);
         gain.connect(this.preCompressorOut);
-        gain.connect(reverbSend);
-        reverbSend.connect(this.reverbSend);
+        gain.connect(reverbSend).connect(this.reverbSend);
         
         this.drumWorklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
@@ -247,9 +242,7 @@ export class AudioEngine {
     private async loadReverbImpulse() {
         console.log("[AudioEngine] Loading reverb impulse...");
         try {
-            // There are no impulse files in the project, so we will always use the fallback.
-            // This path is intentionally incorrect to force the fallback.
-            const response = await fetch('/assets/sounds/impulses/non-existent-file.wav');
+            const response = await fetch('/assets/sounds/impulses/space.wav');
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -424,10 +417,7 @@ export class AudioEngine {
     
     public setBeatPattern(patternName: string) {
         console.log(`[AudioEngine] setBeatPattern called with: ${patternName}`);
-        const wasPlaying = this.isPlaying;
-        if(wasPlaying) this.drumMachine.stop();
         this.drumMachine.setPattern(patternName);
-        if(wasPlaying || patternName !== 'Off') this.drumMachine.play();
     }
 
     public setTempo(newTempo: number) {
@@ -442,46 +432,40 @@ export class AudioEngine {
             return;
         }
         const message: DrumWorkerMessage = { type: 'playSample', sampleName, volume };
-        // console.log(`[AudioEngine] playDrumSample: posting message to 'drum-processor' worklet`, message);
         drumNode.worklet.port.postMessage(message);
     }
     
     private async loadDrumSamples(): Promise<void> {
         console.log("[AudioEngine] Loading drum samples...");
-        
-        const samplePromises = Object.entries(DRUM_SAMPLES).map(async ([key, path]) => {
+        const drumWorklet = this.nodes.get('drums')?.worklet;
+        if (!drumWorklet) {
+            console.error("[AudioEngine] Drum worklet node not available for loading samples.");
+            return;
+        }
+
+        for (const [name, url] of Object.entries(DRUM_SAMPLES)) {
             try {
-                const response = await fetch(path);
+                const response = await fetch(url);
                 if (!response.ok) {
-                    const filename = path.split('/').pop();
-                    throw new Error(`HTTP error! status: ${response.status} for ${filename}`);
+                    throw new Error(`HTTP error! status: ${response.status} for ${url.split('/').pop()}`);
                 }
                 const arrayBuffer = await response.arrayBuffer();
-                // We must decode the audio data here in the main thread
                 const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
-                console.log(`[AudioEngine] Loaded and decoded sample: ${key}`);
-                // And we send the Float32Array of the raw channel data
-                const channelData = audioBuffer.getChannelData(0);
-                return { key, buffer: channelData };
-            } catch (error) {
-                console.error(`[AudioEngine] Failed to load or decode drum sample: ${path}`, error);
-                return null;
-            }
-        });
+                const channelData = audioBuffer.getChannelData(0); // Float32Array
 
-        const loadedSamples = await Promise.all(samplePromises);
-        const drumNode = this.nodes.get('drums');
-        if (drumNode) {
-             console.log('[AudioEngine] Posting loaded samples to drum worklet.');
-             loadedSamples.forEach(sample => {
-                 if (sample && sample.buffer) {
-                     const message: DrumWorkerMessage = { type: 'loadSample', name: sample.key, buffer: sample.buffer };
-                     // The second argument is an array of Transferable objects
-                     drumNode.worklet.port.postMessage(message, [sample.buffer.buffer]);
-                 }
-             });
+                const message: DrumWorkerMessage = {
+                    type: 'loadSample',
+                    name,
+                    buffer: channelData.buffer
+                };
+                drumWorklet.port.postMessage(message, [channelData.buffer]);
+                console.log(`[AudioEngine] Loaded and sent sample: ${name}`);
+
+            } catch (error) {
+                console.error(`[AudioEngine] Failed to load or process drum sample: ${name}`, error);
+            }
         }
-         console.log("[AudioEngine] All drum samples processed.");
+        console.log("[AudioEngine] All drum samples processed.");
     }
 
     private applyVolumeForPart(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn' >, volumes: ChannelVolumes) {
@@ -516,10 +500,10 @@ export class AudioEngine {
         this.volumes.compressor = compressorSettings;
         const rampTime = this.context.currentTime + 0.05;
 
-        this.compressor.threshold.linearRampToValueAtTime(compressorSettings.threshold, rampTime);
-        this.compressor.ratio.linearRampToValueAtTime(compressorSettings.ratio, rampTime);
-        this.compressor.attack.linearRampToValueAtTime(compressorSettings.attack, rampTime);
-        this.compressor.release.linearRampToValueAtTime(compressorSettings.release, rampTime);
+        if (this.compressor.threshold) this.compressor.threshold.linearRampToValueAtTime(compressorSettings.threshold, rampTime);
+        if (this.compressor.ratio) this.compressor.ratio.linearRampToValueAtTime(compressorSettings.ratio, rampTime);
+        if (this.compressor.attack) this.compressor.attack.linearRampToValueAtTime(compressorSettings.attack, rampTime);
+        if (this.compressor.release) this.compressor.release.linearRampToValueAtTime(compressorSettings.release, rampTime);
 
         this.preCompressorOut.disconnect();
         if (compressorSettings.enabled) {
@@ -533,7 +517,6 @@ export class AudioEngine {
     public stopAllSounds() {
         if (!this.isInitialized) return;
         this.nodes.forEach((node, name) => {
-             // We don't want to stop the drum worklet, just the synth voices
             if (name !== 'drums') {
                 node.worklet.port.postMessage({ type: 'allNotesOff' });
             }
@@ -572,3 +555,5 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
+
+    

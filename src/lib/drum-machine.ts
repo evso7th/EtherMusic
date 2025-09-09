@@ -36,7 +36,7 @@ export class DrumMachine {
     private audioEngine: AudioEngine;
     private _tempo: number = 90;
     private _pattern: BeatPattern;
-    private intervalId: number | null = null;
+    private intervalId: ReturnType<typeof setInterval> | null = null;
     private step: number = 0;
     
     constructor(audioEngine: AudioEngine) {
@@ -50,7 +50,6 @@ export class DrumMachine {
     }
 
     public setTempo(bpm: number) {
-        console.log(`[DrumMachine] setTempo called with: ${bpm}`);
         this._tempo = bpm;
         if (this.isPlaying) {
             this.stop();
@@ -76,19 +75,16 @@ export class DrumMachine {
     }
 
     public play() {
-        console.log(`[DrumMachine] play() called. Pattern: "${this._pattern?.name}", sequence length: ${this._pattern?.sequence?.length}`);
         if (this.isPlaying || !this._pattern || this._pattern.sequence.length === 0) {
-            console.log(`[DrumMachine] Play command ignored. isPlaying: ${this.isPlaying}, pattern: ${this._pattern?.name}`);
             return;
         }
         
         this.step = 0; 
         const sixteenthNoteDurationMs = (60 / this._tempo / 4) * 1000; 
-        console.log(`[DrumMachine] Starting loop with interval ${sixteenthNoteDurationMs.toFixed(2)}ms for tempo ${this._tempo} BPM.`);
         
         if (typeof window !== 'undefined') {
             this.scheduler(); 
-            this.intervalId = window.setInterval(() => {
+            this.intervalId = setInterval(() => {
                 this.scheduler();
             }, sixteenthNoteDurationMs);
         } else {
@@ -101,12 +97,10 @@ export class DrumMachine {
     }
 
     public stop() {
-        console.log("[DrumMachine] stop() called.");
         if (this.intervalId !== null) {
             clearInterval(this.intervalId);
             this.intervalId = null;
             this.step = 0;
-            console.log("[DrumMachine] Loop stopped.");
         }
     }
 
@@ -115,11 +109,8 @@ export class DrumMachine {
         
         const totalSteps = this._pattern.length * 16;
         
-        console.log(`[DrumMachine] Scheduler tick. Step: ${this.step}`);
-
         this._pattern.sequence.forEach(note => {
             if (note.time === this.step) {
-                console.log(`[DrumMachine] scheduling note: ${note.note} at step ${this.step}`);
                 this.audioEngine.playDrumSample(note.note, note.vol);
             }
         });
@@ -127,3 +118,5 @@ export class DrumMachine {
         this.step = (this.step + 1) % totalSteps;
     }
 }
+
+    
