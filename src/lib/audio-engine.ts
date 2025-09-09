@@ -30,7 +30,7 @@ function createDistortionCurve(amount: number): Float32Array {
     return curve;
 }
 
-type SynthPartName = 'melody' | 'manualBass' | 'latch' | 'drums';
+type SynthPartName = 'melody' | 'manualBass' | 'latch';
 
 const DRUM_SAMPLES: Record<string, string> = {
     'k': '/assets/sounds/drums/kick_drum.wav',
@@ -62,12 +62,14 @@ export class AudioEngine {
     
     private drumMachine: DrumMachine;
     private drumWorklet: AudioWorkletNode | null = null;
-    
+    private drumGain: GainNode | null = null;
+    private drumReverbSend: GainNode | null = null;
+
     private nodes = new Map<SynthPartName, { 
         worklet: AudioWorkletNode, 
         gain: GainNode,
         reverbSend: GainNode,
-        distortion?: WaveShaperNode,
+        distortion: WaveShaperNode,
     }>();
         
     private volumes: Volumes = { 
@@ -179,6 +181,7 @@ export class AudioEngine {
         console.log("[AudioEngine] Synth channels created.");
         
         this.createDrumChannel();
+        console.log("[AudioEngine] Drum channel created.");
         
         this.setVolumes(this.volumes);
         
@@ -186,7 +189,7 @@ export class AudioEngine {
         console.log("[AudioEngine] Initialization complete.");
     }
 
-    private createSynthChannel(part: 'melody' | 'manualBass' | 'latch', polyphony: number) {
+    private createSynthChannel(part: SynthPartName, polyphony: number) {
         if (!this.context) return;
         const worklet = new AudioWorkletNode(this.context, 'synth-processor', {
             processorOptions: { sampleRate: this.context.sampleRate, polyphony },
@@ -217,20 +220,20 @@ export class AudioEngine {
         console.log('[AudioEngine] Creating drum channel.');
 
         this.drumWorklet = new AudioWorkletNode(this.context, 'drum-processor');
-        const gain = this.context.createGain();
-        const reverbSend = this.context.createGain();
+        this.drumGain = this.context.createGain();
+        this.drumReverbSend = this.context.createGain();
 
-        this.drumWorklet.connect(gain).connect(this.preCompressorOut);
-        gain.connect(reverbSend).connect(this.reverbSend);
+        this.drumWorklet.connect(this.drumGain).connect(this.preCompressorOut);
+        this.drumGain.connect(this.drumReverbSend).connect(this.reverbSend);
         
         this.drumWorklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error('[DRUM WORKLET ERROR]', e.data.message);
+            } else if (e.data.type === 'debug') {
+                console.log('[DRUM WORKLET DEBUG]', e.data.message);
             }
         };
         
-        this.nodes.set('drums', { worklet: this.drumWorklet, gain, reverbSend });
-
         this.loadDrumSamples().then(samples => {
             if (this.drumWorklet) {
                 console.log('[AudioEngine] Posting loaded samples to drum worklet.');
@@ -245,12 +248,22 @@ export class AudioEngine {
         });
     }
     
-    private async loadReverbImpulse() {
+    private loadReverbImpulse() {
         console.log("[AudioEngine] Loading reverb impulse...");
-        this.convolver.buffer = this.createFallbackReverb();
-        console.log("[AudioEngine] Fallback reverb created and assigned.");
+        fetch('/assets/impulses/space.wav')
+            .then(response => response.arrayBuffer())
+            .then(buffer => this.context.decodeAudioData(buffer))
+            .then(audioBuffer => {
+                this.convolver.buffer = audioBuffer;
+                console.log("[AudioEngine] Reverb impulse loaded and assigned.");
+            })
+            .catch(e => {
+                console.warn("[AudioEngine] Could not load reverb impulse, using fallback.", e);
+                this.convolver.buffer = this.createFallbackReverb();
+                console.log("[AudioEngine] Fallback reverb created and assigned.");
+            });
     }
-    
+
     private createFallbackReverb(): AudioBuffer {
         const sampleRate = this.context.sampleRate;
         const length = sampleRate * 1.5; 
@@ -267,7 +280,7 @@ export class AudioEngine {
     
     public play() {
         console.log("[AudioEngine] Play requested.");
-        if (!this.isInitialized || this.isPlaying || !this.context) return;
+        if (!this.isInitialized || !this.context) return;
         if (this.context.state === 'suspended') {
             this.context.resume();
         }
@@ -276,11 +289,12 @@ export class AudioEngine {
 
     public pause() {
         console.log("[AudioEngine] Pause requested.");
-        if (!this.isInitialized || !this.isPlaying) return;
+        if (!this.isInitialized) return;
         this.drumMachine.pause();
     }
 
     public stop() {
+        if (!this.isInitialized) return;
         this.drumMachine.stop();
         this.stopAllSounds();
     }
@@ -453,10 +467,9 @@ export class AudioEngine {
         return samples;
     }
 
-    private applyVolume(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn'>, volumes: ChannelVolumes) {
+    private applyVolume(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn'| 'drums' >, volumes: ChannelVolumes) {
         const rampTime = this.context.currentTime + 0.05;
         const nodeInfo = this.nodes.get(partName);
-
         if (nodeInfo) {
             nodeInfo.gain.gain.linearRampToValueAtTime(dbToGain(volumes.gain), rampTime);
             nodeInfo.reverbSend.gain.linearRampToValueAtTime(dbToGain(volumes.reverbSend), rampTime);
@@ -474,7 +487,13 @@ export class AudioEngine {
         this.applyVolume('melody', newVolumes.melody);
         this.applyVolume('manualBass', newVolumes.manualBass);
         this.applyVolume('latch', newVolumes.latch);
-        this.applyVolume('drums', newVolumes.drums);
+        
+        if (this.drumGain) {
+            this.drumGain.gain.linearRampToValueAtTime(dbToGain(newVolumes.drums.gain), rampTime);
+        }
+        if (this.drumReverbSend) {
+            this.drumReverbSend.gain.linearRampToValueAtTime(dbToGain(newVolumes.drums.reverbSend), rampTime);
+        }
         
         this.reverbReturnGain.gain.linearRampToValueAtTime(dbToGain(this.volumes.reverbReturn), rampTime);
         this.setCompressorSettings(this.volumes.compressor);
@@ -501,10 +520,8 @@ export class AudioEngine {
     
     public stopAllSounds() {
         if (!this.isInitialized) return;
-        this.nodes.forEach((node, name) => {
-            if (name !== 'drums') {
-                node.worklet.port.postMessage({ type: 'allNotesOff' });
-            }
+        this.nodes.forEach((node) => {
+            node.worklet.port.postMessage({ type: 'allNotesOff' });
         });
         
         const notesToTurnOff = this.latchEngine.clear();

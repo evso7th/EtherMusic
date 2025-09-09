@@ -63,11 +63,9 @@ export class DrumMachine {
         if (newPattern) {
             console.log(`[DrumMachine] Pattern set to "${patternName}"`);
             const wasPlaying = this.isPlaying;
-            if (wasPlaying) {
-                this.stop();
-            }
+            this.stop(); // Stop any existing pattern
             this._pattern = newPattern;
-             if (wasPlaying || newPattern.name !== 'Off') {
+             if (wasPlaying) {
                 this.play();
             }
         } else {
@@ -82,10 +80,11 @@ export class DrumMachine {
             return;
         }
         
-        this.step = 0; 
+        this.step = 0;
         const sixteenthNoteDurationMs = (60 / this._tempo / 4) * 1000; 
         console.log(`[DrumMachine] Starting loop with interval ${sixteenthNoteDurationMs.toFixed(2)}ms for tempo ${this._tempo} BPM.`);
         
+        // Ensure we are in a browser context before using window
         if (typeof window !== 'undefined') {
             this.intervalId = window.setInterval(() => {
                 this.scheduler();
@@ -95,10 +94,6 @@ export class DrumMachine {
         }
     }
     
-    public pause() {
-        this.stop();
-    }
-
     public stop() {
         console.log("[DrumMachine] stop() called.");
         if (this.intervalId !== null) {

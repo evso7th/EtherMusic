@@ -1,5 +1,3 @@
-
-
 // A class representing a single oscillator with its own phase.
 class Oscillator {
     constructor(type, sampleRate) {
@@ -31,6 +29,32 @@ class Oscillator {
         return sample;
     }
 }
+
+// A class representing a single sample-based voice for one-shot sounds (like drums)
+class SampleVoice {
+    constructor(buffer, volume) {
+        this.buffer = buffer;
+        this.volume = volume;
+        this.position = 0;
+        this.isFinished = false;
+    }
+
+    render() {
+        if (this.isFinished) {
+            return 0;
+        }
+
+        const sample = this.buffer[this.position] * this.volume;
+        this.position++;
+
+        if (this.position >= this.buffer.length) {
+            this.isFinished = true;
+        }
+
+        return sample;
+    }
+}
+
 
 // A class representing a single synth voice
 class Voice {
@@ -201,12 +225,11 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.voices = new Map();
         this.polyphony = options.processorOptions?.polyphony || 8;
         this.preset = this.getDefaultPreset();
-        console.log(`[synth-processor] Initialized with polyphony: ${this.polyphony}`);
+        
         this.port.onmessage = this.handleMessage.bind(this);
     }
 
     handleMessage(event) {
-        console.log('[synth-processor] Received message:', event.data);
         const { type, note, id, preset } = event.data;
         switch (type) {
             case 'noteOn':
@@ -240,7 +263,6 @@ class SynthProcessor extends AudioWorkletProcessor {
         }
 
         if (this.voices.size >= this.polyphony) {
-            // Find the oldest voice that is releasing, or just the oldest if none are.
             let oldestId = this.voices.keys().next().value;
             let oldestVoice = this.voices.get(oldestId);
             let foundReleasing = oldestVoice?.isReleasing;
@@ -275,15 +297,14 @@ class SynthProcessor extends AudioWorkletProcessor {
         }
     }
 
-allNotesOff() {
-    this.voices.forEach(voice => {
-        voice.isReleasing = true;
-        voice.layers.forEach(l => {
-            l.envelope.releaseSamples = Math.min(l.envelope.releaseSamples, sampleRate * 0.05); // 50ms fade
+    allNotesOff() {
+        this.voices.forEach(voice => {
+            voice.isReleasing = true;
+            voice.layers.forEach(l => {
+                l.envelope.releaseSamples = Math.min(l.envelope.releaseSamples, sampleRate * 0.05); // 50ms fade
+            });
         });
-    });
-}
-
+    }
 
     process(inputs, outputs, parameters) {
         const output = outputs[0];
