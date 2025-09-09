@@ -1,5 +1,4 @@
 
-
 // UI Component Props
 export type MusicKey = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B';
 
@@ -71,9 +70,9 @@ export interface BassInstrumentPreset {
 export type BeatPattern = {
     name: string;
     type: 'Meditative' | 'Classic' | 'System';
-    length: number; // in measures
+    length: number;
     sequence: {
-        time: number; // in measures (e.g., 0, 0.25, 0.5, 0.75 for 16th notes in a 4/4 measure)
+        time: number;
         note: string;
         vol?: number;
     }[];
@@ -118,7 +117,6 @@ export type DrumSampleMessage = {
 } | {
     type: 'playSample';
     sampleName: string;
-    time: number;
     volume?: number;
 };
 

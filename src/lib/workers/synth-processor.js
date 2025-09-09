@@ -250,6 +250,29 @@ class Voice {
     }
 }
 
+// A class representing a simple sample player voice
+class SampleVoice {
+    constructor(id, buffer, volume, sampleRate) {
+        this.id = id;
+        this.buffer = buffer;
+        this.volume = volume;
+        this.sampleRate = sampleRate;
+        this.position = 0;
+        this.isFinished = false;
+    }
+
+    render() {
+        if (this.isFinished || this.position >= this.buffer.length) {
+            this.isFinished = true;
+            return 0;
+        }
+        const sample = this.buffer[this.position] * this.volume;
+        this.position++;
+        return sample;
+    }
+}
+
+
 class SynthProcessor extends AudioWorkletProcessor {
     constructor(options) {
         super();
@@ -257,16 +280,14 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.polyphony = options.processorOptions?.polyphony || 8;
         this.preset = this.getDefaultPreset();
         this.samples = new Map();
-        this.activeSamples = [];
+        this.activeSamples = new Map();
         this.nextSampleId = 0;
         
         this.port.onmessage = this.handleMessage.bind(this);
-        console.log(`[SynthProcessor] Worklet created for ${options.processorOptions.polyphony} voices.`);
     }
 
     handleMessage(event) {
-        const { type, note, id, preset, samples, sampleName, time, volume } = event.data;
-        // console.log(`[SynthProcessor] Received message:`, event.data);
+        const { type, note, id, preset, samples, sampleName, volume } = event.data;
         switch (type) {
             case 'noteOn':
                 if (note) this.noteOn(note);
@@ -288,8 +309,7 @@ class SynthProcessor extends AudioWorkletProcessor {
                 break;
             case 'playSample':
                 if (sampleName) {
-                    // console.log(`[SynthProcessor] playSample message received: ${sampleName}`);
-                    this.playSample(sampleName, time, volume);
+                    this.playSample(sampleName, volume);
                 }
                 break;
         }
@@ -297,30 +317,20 @@ class SynthProcessor extends AudioWorkletProcessor {
 
     loadSamples(samples) {
         try {
-            console.log('[SynthProcessor] Loading samples...', samples);
             samples.forEach(sample => {
                 this.samples.set(sample.name, sample.data);
             });
-            console.log('[SynthProcessor] Samples loaded:', Array.from(this.samples.keys()));
         } catch(e) {
           this.port.postMessage({ type: 'error', message: `Sample loading failed in worklet: ${e.message}` });
         }
     }
 
-    playSample(name, time, volume = 1.0) {
+    playSample(name, volume = 1.0) {
         const buffer = this.samples.get(name);
         if (buffer) {
-            // console.log(`[SynthProcessor] Playing sample: ${name} at time: ${time}`);
-            if (this.activeSamples.length < 32) { // Polyphony for samples
-                const startTime = time > currentTime ? time : currentTime;
-                this.activeSamples.push({
-                    id: this.nextSampleId++,
-                    buffer,
-                    position: 0,
-                    startTime,
-                    volume
-                });
-            }
+             const sampleId = this.nextSampleId++;
+             const sampleVoice = new SampleVoice(sampleId, buffer, volume, sampleRate);
+             this.activeSamples.set(sampleId, sampleVoice);
         } else {
             this.port.postMessage({type: 'error', message: `Sample not found: ${name}`});
         }
@@ -368,11 +378,9 @@ class SynthProcessor extends AudioWorkletProcessor {
     process(inputs, outputs, parameters) {
         const output = outputs[0];
         const channel = output[0];
-        const sampleTime = 1.0 / sampleRate;
         
         if (channel) {
             for (let i = 0; i < channel.length; i++) {
-                const frameTime = currentTime + i * sampleTime;
                 let mixedSample = 0;
                 
                 // Process synth voices
@@ -383,18 +391,13 @@ class SynthProcessor extends AudioWorkletProcessor {
                     }
                 });
 
-                // Process scheduled drum samples
-                for (let j = this.activeSamples.length - 1; j >= 0; j--) {
-                    const sampleVoice = this.activeSamples[j];
-                    if (frameTime >= sampleVoice.startTime) {
-                        if (sampleVoice.position < sampleVoice.buffer.length) {
-                            mixedSample += sampleVoice.buffer[sampleVoice.position] * sampleVoice.volume;
-                            sampleVoice.position++;
-                        } else {
-                            this.activeSamples.splice(j, 1);
-                        }
+                // Process drum samples
+                this.activeSamples.forEach((sample, id) => {
+                    mixedSample += sample.render();
+                    if (sample.isFinished) {
+                        this.activeSamples.delete(id);
                     }
-                }
+                });
 
                 channel[i] = mixedSample;
             }
