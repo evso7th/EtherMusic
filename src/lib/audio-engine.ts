@@ -196,8 +196,8 @@ export class AudioEngine {
         gain.connect(reverbSend).connect(this.reverbSend);
         
         worklet.port.onmessage = (e) => {
-            if (e.data.type === 'log') {
-                console.log(`[SYNTH-WORKLET-${part}]`, ...e.data.message);
+            if (e.data.type === 'error') {
+                console.error(`[SYNTH-WORKLET-${part}]`, e.data.message);
             }
         };
 
@@ -218,7 +218,6 @@ export class AudioEngine {
 
         this.loadDrumSamples().then(samples => {
             if (this.drumWorklet) {
-                console.log("[AudioEngine] Loaded drum samples, transferring to worklet.", Object.keys(samples));
                 const transferableSamples = Object.entries(samples).map(([name, data]) => ({
                     name,
                     data: data
@@ -236,8 +235,6 @@ export class AudioEngine {
         this.drumWorklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error('[DRUM WORKLET ERROR]', e.data.message);
-            } else if (e.data.type === 'log') {
-                console.log('[DRUM WORKLET LOG]', ...e.data.message);
             }
         };
     }
@@ -268,14 +265,12 @@ export class AudioEngine {
         }
 
         this._isPlaying = true;
-        console.log(`[AudioEngine] play() called. BPM: ${this.tempo}, Start Time: ${this.context.currentTime}`);
         this.drumWorklet?.port.postMessage({type: 'start', bpm: this.tempo, startTime: this.context.currentTime });
     }
 
     public pause() {
         if (!this.isInitialized || !this._isPlaying) return;
         this._isPlaying = false;
-        console.log("[AudioEngine] pause() called.");
         this.drumWorklet?.port.postMessage({type: 'stop'});
     }
 
@@ -431,7 +426,6 @@ export class AudioEngine {
                 const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
                 // We use only the left channel for simplicity, as drum samples are often mono.
                 samples[key] = audioBuffer.getChannelData(0);
-                console.log(`[AudioEngine] Successfully decoded ${filename}`);
             } catch (error) {
                 console.error(`[AudioEngine] Failed to load or decode drum sample: ${path}`, error);
                 throw error; // Re-throw to be caught by the outer promise chain
@@ -439,7 +433,6 @@ export class AudioEngine {
         });
 
         await Promise.all(promises);
-        console.log("[AudioEngine] All drum samples loaded successfully.");
         return samples;
     }
 
@@ -531,3 +524,5 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
+
+    

@@ -25,7 +25,7 @@ class DrumProcessor extends AudioWorkletProcessor {
 
   handleMessage(event) {
     const { type, samples, bpm, startTime, pattern } = event.data;
-    this.log(`Received message: ${type}`);
+
     switch(type) {
         case 'loadSamples':
             this.loadSamples(samples);
@@ -53,7 +53,6 @@ class DrumProcessor extends AudioWorkletProcessor {
       samples.forEach(sample => {
         this.samples[sample.name] = sample.data;
       });
-      this.log('Samples loaded:', Object.keys(this.samples));
     } catch(e) {
       this.port.postMessage({ type: 'error', message: `Sample loading failed in worklet: ${e.message}` });
     }
@@ -88,15 +87,12 @@ class DrumProcessor extends AudioWorkletProcessor {
 
   setPattern(patternName) {
     if (this.patterns[patternName]) {
-      this.log('Setting pattern to', patternName);
       this.pattern = this.patterns[patternName];
       this.updateBeatLength();
       if (this.isPlaying) {
           // Reset the beat time to the current time to start the new pattern immediately
           this.nextBeatTime = currentTime; 
       }
-    } else {
-        this.log('Pattern not found:', patternName);
     }
   }
 
@@ -111,13 +107,11 @@ class DrumProcessor extends AudioWorkletProcessor {
     // Align start time to the next processing block to ensure sync
     this.nextBeatTime = Math.max(startTime, currentTime);
     this.updateBeatLength();
-    this.log(`Drum machine started. BPM: ${this.bpm}, StartTime: ${startTime}, NextBeatTime: ${this.nextBeatTime}`);
   }
 
   stop() {
     this.isPlaying = false;
     this.activeVoices = [];
-    this.log('Drum machine stopped.');
   }
 
   process(inputs, outputs, parameters) {
@@ -169,3 +163,5 @@ class DrumProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('drum-processor', DrumProcessor);
+
+    

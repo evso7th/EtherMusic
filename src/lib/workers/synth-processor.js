@@ -264,14 +264,9 @@ class SynthProcessor extends AudioWorkletProcessor {
         
         this.port.onmessage = this.handleMessage.bind(this);
     }
-    
-    log(...args) {
-        this.port.postMessage({ type: 'log', message: args });
-    }
 
     handleMessage(event) {
         const { type, note, id, preset } = event.data;
-        this.log(`Synth ${this.polyphony} received:`, type, id);
         switch (type) {
             case 'noteOn':
                 if (note) this.noteOn(note);
@@ -292,13 +287,11 @@ class SynthProcessor extends AudioWorkletProcessor {
     }
 
     applyPreset(preset) {
-        this.log('Synth applying preset', preset);
         this.preset = { ...this.getDefaultPreset(), ...preset };
         this.allNotesOff();
     }
 
     noteOn(note) {
-        this.log('Synth noteOn:', note);
         if (this.voices.has(note.id)) {
             const voice = this.voices.get(note.id);
             voice.noteUpdate(note.frequency, note.volume);
@@ -322,7 +315,6 @@ class SynthProcessor extends AudioWorkletProcessor {
     }
 
     noteOff(id) {
-        this.log('Synth noteOff:', id);
         const voice = this.voices.get(id);
         if (voice) {
             voice.release();
@@ -330,7 +322,6 @@ class SynthProcessor extends AudioWorkletProcessor {
     }
 
     allNotesOff() {
-        this.log('Synth allNotesOff');
         this.voices.forEach(voice => voice.release());
     }
 
@@ -366,3 +357,5 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
+
+    
