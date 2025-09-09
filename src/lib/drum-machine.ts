@@ -62,7 +62,14 @@ export class DrumMachine {
         const newPattern = beatPatterns.find(p => p.name === patternName);
         if (newPattern) {
             console.log(`[DrumMachine] Pattern set to "${patternName}"`);
+            const wasPlaying = this.isPlaying;
+            if (wasPlaying) {
+                this.stop();
+            }
             this._pattern = newPattern;
+             if (newPattern.name !== 'Off' && wasPlaying) {
+                this.play();
+            }
         } else {
              console.warn(`[DrumMachine] Pattern "${patternName}" not found.`);
         }
@@ -80,7 +87,7 @@ export class DrumMachine {
         console.log(`[DrumMachine] Starting loop with interval ${sixteenthNoteDurationMs.toFixed(2)}ms for tempo ${this._tempo} BPM.`);
         
         if (typeof window !== 'undefined') {
-            this.scheduler(); // Play the first beat immediately
+            this.scheduler(); 
             this.intervalId = window.setInterval(() => {
                 this.scheduler();
             }, sixteenthNoteDurationMs);
@@ -120,5 +127,3 @@ export class DrumMachine {
         this.step = (this.step + 1) % totalSteps;
     }
 }
-
-    

@@ -133,15 +133,12 @@ export function BeatBoxControls({
                                             <Separator className="my-3" />
                                             <Button
                                                 key={offPattern.name}
-                                                variant={'outline'}
+                                                variant={activePattern.name === 'Off' ? 'default' : 'outline'}
                                                 onClick={() => {
                                                     onPatternChange(offPattern);
                                                     setIsBeatsOpen(false);
                                                 }}
-                                                className={cn(
-                                                    "w-full",
-                                                    activePattern.name === offPattern.name && "border-primary text-primary"
-                                                )}
+                                                className="w-full"
                                             >
                                                 {offPattern.name}
                                             </Button>

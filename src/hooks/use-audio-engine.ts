@@ -39,7 +39,7 @@ export function useAudioEngine() {
             
             setIsReady(true);
             setIsPlaying(audioEngine.current.isPlaying);
-             console.log("[useAudioEngine] AudioEngine initialized.");
+            console.log("[useAudioEngine] AudioEngine initialized.");
             
         } catch(e) {
             console.error("Failed to initialize audio engine:", e);
@@ -57,7 +57,7 @@ export function useAudioEngine() {
         console.log("[useAudioEngine] Starting app...");
         setIsAppStarted(true);
         // Play a subtle transition sound
-        const audio = new Audio('assets/sounds/transition.webm');
+        const audio = new Audio('/assets/sounds/transition.webm');
         audio.play().catch(e => console.error("Error playing transition sound:", e));
         
         await initializeAudioEngine();
@@ -111,16 +111,22 @@ export function useAudioEngine() {
     const setBeatPattern = useCallback((patternName: string) => {
         if (!audioEngine.current) return;
         console.log(`[useAudioEngine] Setting beat pattern to: ${patternName}`);
-        const wasPlaying = audioEngine.current.isPlaying;
         audioEngine.current.setBeatPattern(patternName);
 
-        // This logic now correctly reflects the DrumMachine's new behavior
         if (patternName !== 'Off') {
-            setIsPlaying(true);
+            if (!audioEngine.current.isPlaying) {
+                 console.log("[useAudioEngine] Pattern set to ON, calling play().");
+                 play();
+            }
+             setIsPlaying(true);
         } else {
-            setIsPlaying(false);
+            if (audioEngine.current.isPlaying) {
+                console.log("[useAudioEngine] Pattern set to OFF, calling pause().");
+                pause();
+            }
+             setIsPlaying(false);
         }
-    }, []);
+    }, [play, pause]);
     
     const setBassLatch = useCallback((isOn: boolean) => {
         audioEngine.current?.setBassLatch(isOn);
@@ -190,5 +196,3 @@ export function useAudioEngine() {
         handleCompressorChange,
     };
 }
-
-    

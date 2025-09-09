@@ -70,12 +70,8 @@ export interface BassInstrumentPreset {
 export type BeatPattern = {
     name: string;
     type: 'Meditative' | 'Classic' | 'System';
-    length: number; // in measures
-    sequence: {
-        time: number; // in 16th note steps (0-15 for a 1-bar loop in 4/4)
-        note: string;
-        vol?: number;
-    }[];
+    length: number;
+    sequence: { time: number; note: string; vol?: number }[];
 };
 
 
@@ -134,5 +130,3 @@ export interface Note {
     duration?: number; // for autopilot and scheduled notes
     time?: number; // for autopilot and scheduled notes
 }
-
-    
