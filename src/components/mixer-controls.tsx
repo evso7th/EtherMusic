@@ -50,47 +50,6 @@ const VolumeControl = ({
     </div>
 );
 
-const EffectControl = ({
-    label,
-    icon: Icon,
-    level,
-    onLevelChange,
-    onLevelCommit,
-    min,
-    max,
-    step,
-    unit,
-}: {
-    label: string,
-    icon: React.ElementType,
-    level: number,
-    onLevelChange: (v: number) => void,
-    onLevelCommit: (v: number) => void,
-    min: number,
-    max: number,
-    step: number,
-    unit: string,
-}) => (
-     <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-            <Icon className="w-5 h-5 text-accent flex-shrink-0" />
-            <Label className="text-sm font-medium flex-1 truncate">{label}</Label>
-            <span className="text-xs text-muted-foreground w-12 text-right">{(level ?? 0).toFixed(1)}{unit}</span>
-        </div>
-        <div className="flex items-center gap-4 pl-7">
-            <Slider
-                min={min}
-                max={max}
-                step={step}
-                value={[level ?? 0]}
-                onValueChange={(v) => onLevelChange(v[0])}
-                onValueCommit={(v) => onLevelCommit(v[0])}
-            />
-        </div>
-    </div>
-);
-
-
 type VolumeChannel = keyof Omit<Volumes, 'compressor' | 'reverbReturn' >;
 
 export function MixerControls({ 
@@ -119,19 +78,16 @@ export function MixerControls({
         setLocalTempo(tempo);
     }, [initialVolumes, tempo]);
 
-    const handleChannelVolumeChange = (part: VolumeChannel, key: keyof ChannelVolumes, value: number) => {
-        setLocalVolumes(prev => {
-            const channel = prev[part] as ChannelVolumes;
-            return {
-                ...prev,
-                [part]: { ...channel, [key]: value }
-            }
-        });
+    const handleChannelVolumeChange = (part: VolumeChannel, value: number) => {
+        setLocalVolumes(prev => ({
+            ...prev,
+            [part]: { ...prev[part], gain: value }
+        }));
     }
 
-    const handleChannelVolumeCommit = (part: VolumeChannel, key: keyof ChannelVolumes, value: number) => {
+    const handleChannelVolumeCommit = (part: VolumeChannel, value: number) => {
         const currentPartVolume = localVolumes[part] as ChannelVolumes;
-        onMixerChange({ [part]: { ...currentPartVolume, [key]: value } });
+        onMixerChange({ [part]: { ...currentPartVolume, gain: value } });
     };
 
     const handleReverbReturnCommit = (value: number) => {
@@ -186,29 +142,29 @@ export function MixerControls({
                     label="Melody"
                     icon={Music}
                     volume={localVolumes.melody.gain}
-                    onVolumeChange={(v) => handleChannelVolumeChange('melody', 'gain', v)}
-                    onVolumeCommit={(v) => handleChannelVolumeCommit('melody', 'gain', v)}
+                    onVolumeChange={(v) => handleChannelVolumeChange('melody', v)}
+                    onVolumeCommit={(v) => handleChannelVolumeCommit('melody', v)}
                 />
                  <VolumeControl 
                     label="Bass"
                     icon={Waves}
                     volume={localVolumes.manualBass.gain}
-                    onVolumeChange={(v) => handleChannelVolumeChange('manualBass', 'gain', v)}
-                    onVolumeCommit={(v) => handleChannelVolumeCommit('manualBass', 'gain', v)}
+                    onVolumeChange={(v) => handleChannelVolumeChange('manualBass', v)}
+                    onVolumeCommit={(v) => handleChannelVolumeCommit('manualBass', v)}
                 />
                 <VolumeControl 
                     label="Latch"
                     icon={Anchor}
                     volume={localVolumes.latch.gain}
-                    onVolumeChange={(v) => handleChannelVolumeChange('latch', 'gain', v)}
-                    onVolumeCommit={(v) => handleChannelVolumeCommit('latch', 'gain', v)}
+                    onVolumeChange={(v) => handleChannelVolumeChange('latch', v)}
+                    onVolumeCommit={(v) => handleChannelVolumeCommit('latch', v)}
                 />
                 <VolumeControl 
                     label="Drums"
                     icon={Drum}
                     volume={localVolumes.drums.gain}
-                    onVolumeChange={(v) => handleChannelVolumeChange('drums', 'gain', v)}
-                    onVolumeCommit={(v) => handleChannelVolumeCommit('drums', 'gain', v)}
+                    onVolumeChange={(v) => handleChannelVolumeChange('drums', v)}
+                    onVolumeCommit={(v) => handleChannelVolumeCommit('drums', v)}
                 />
             </div>
             
@@ -216,12 +172,12 @@ export function MixerControls({
             
             <div className="space-y-4">
                 <h3 className="text-lg font-semibold tracking-tight text-foreground">Master Effects</h3>
-                <EffectControl
+                <VolumeControl
                     label="Reverb Level"
                     icon={Blend}
-                    level={localVolumes.reverbReturn}
-                    onLevelChange={(v) => setLocalVolumes(p => ({...p, reverbReturn: v}))}
-                    onLevelCommit={handleReverbReturnCommit}
+                    volume={localVolumes.reverbReturn}
+                    onVolumeChange={(v) => setLocalVolumes(p => ({...p, reverbReturn: v}))}
+                    onVolumeCommit={handleReverbReturnCommit}
                     min={-48} max={6} step={1} unit="dB"
                 />
             </div>
@@ -271,3 +227,5 @@ export function MixerControls({
         </div>
     );
 }
+
+    

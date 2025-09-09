@@ -14,7 +14,7 @@ import { HelpGuide } from "@/components/help-guide";
 import { beatPatterns } from '@/lib/drum-machine';
 import { CookieConsent } from '@/components/cookie-consent';
 import { useAudioEngine } from '@/hooks/use-audio-engine';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { SleepTimer } from '@/components/sleep-timer';
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
 import { melodyInstruments, defaultMelodyInstrument } from '@/lib/melody-presets';
@@ -268,13 +268,12 @@ export default function Home() {
         effect: 'reverbSend' | 'distortion', 
         value: number
     ) => {
-        const newVolumes = { ...volumes };
+        const newVolumes = JSON.parse(JSON.stringify(volumes));
         (newVolumes[channel] as ChannelVolumes)[effect] = value;
         // Since latch and manual bass share effects, update both
-        if (channel === 'manualBass') {
-            newVolumes.latch[effect] = value;
-        } else if (channel === 'latch') {
+        if (channel === 'manualBass' || channel === 'latch') {
             newVolumes.manualBass[effect] = value;
+            newVolumes.latch[effect] = value;
         }
         updateVolumes(newVolumes);
     }, [volumes, updateVolumes]);
@@ -497,3 +496,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
