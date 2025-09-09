@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { SlidersHorizontal, Drum } from 'lucide-react';
+import { SlidersHorizontal, Drum, Bot } from 'lucide-react';
 import { useState, useMemo, useCallback, memo } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
@@ -17,6 +17,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/t
 import type { BeatPattern, Volumes, CompressorSettings } from '@/types';
 import { MixerControls } from "./mixer-controls";
 import { beatPatterns } from "@/lib/drum-machine";
+// import { AutopilotControls } from "./autopilot-controls"; // Keep this commented out
 
 interface BeatBoxControlsProps {
     activePattern: BeatPattern;
@@ -26,6 +27,8 @@ interface BeatBoxControlsProps {
     onCompressorChange: (compressorSettings: CompressorSettings) => void;
     tempo: number;
     setTempo: (tempo: number) => void;
+    swing: number;
+    setSwing: (swing: number) => void;
     isMobile: boolean;
     isLandscape?: boolean;
 }
@@ -54,6 +57,8 @@ export function BeatBoxControls({
     onCompressorChange,
     tempo,
     setTempo,
+    swing,
+    setSwing,
     isMobile,
     isLandscape = false,
 }: BeatBoxControlsProps) {
@@ -158,7 +163,7 @@ export function BeatBoxControls({
                         <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>Mixer</DialogTitle>
-                                <DialogDescription>Adjust volume, effects, and tempo.</DialogDescription>
+                                <DialogDescription>Adjust volume, effects, tempo, and swing.</DialogDescription>
                             </DialogHeader>
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="pr-4 py-4">
@@ -168,6 +173,8 @@ export function BeatBoxControls({
                                         onCompressorChange={onCompressorChange}
                                         tempo={tempo}
                                         setTempo={setTempo}
+                                        swing={swing}
+                                        setSwing={setSwing}
                                     />
                                 </div>
                             </ScrollArea>
@@ -254,7 +261,7 @@ export function BeatBoxControls({
                         <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>Mixer</DialogTitle>
-                                <DialogDescription>Adjust volume, effects, and tempo.</DialogDescription>
+                                <DialogDescription>Adjust volume, effects, tempo, and swing.</DialogDescription>
                             </DialogHeader>
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="pr-4 py-4">
@@ -264,6 +271,8 @@ export function BeatBoxControls({
                                         onCompressorChange={onCompressorChange}
                                         tempo={tempo}
                                         setTempo={setTempo}
+                                        swing={swing}
+                                        setSwing={setSwing}
                                     />
                                 </div>
                             </ScrollArea>
