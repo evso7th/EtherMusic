@@ -434,6 +434,7 @@ export class AudioEngine {
             return;
         }
         const message: DrumWorkerMessage = { type: 'playSample', sampleName, volume };
+        // console.log(`[AudioEngine] playDrumSample: posting message to 'drum-processor' worklet`, message);
         drumNode.worklet.port.postMessage(message);
     }
     
@@ -448,8 +449,9 @@ export class AudioEngine {
                     throw new Error(`HTTP error! status: ${response.status} for ${filename}`);
                 }
                 const arrayBuffer = await response.arrayBuffer();
-                console.log(`[AudioEngine] Loaded sample: ${key}`);
-                return { key, buffer: arrayBuffer };
+                const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+                console.log(`[AudioEngine] Loaded and decoded sample: ${key}`);
+                return { key, buffer: audioBuffer.getChannelData(0).buffer };
             } catch (error) {
                 console.error(`[AudioEngine] Failed to load or decode drum sample: ${path}`, error);
                 return null;
@@ -460,10 +462,8 @@ export class AudioEngine {
         const drumNode = this.nodes.get('drums');
         if (drumNode) {
              console.log('[AudioEngine] Posting loaded samples to drum worklet.');
-             const transferableBuffers: ArrayBuffer[] = [];
              loadedSamples.forEach(sample => {
                  if (sample && sample.buffer) {
-                     transferableBuffers.push(sample.buffer);
                      const message: DrumWorkerMessage = { type: 'loadSample', name: sample.key, buffer: sample.buffer };
                      drumNode.worklet.port.postMessage(message, [sample.buffer]);
                  }
