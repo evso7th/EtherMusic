@@ -11,9 +11,17 @@ class SampleVoice {
         if (this.isFinished) {
             return 0;
         }
+
+        // Using linear interpolation for smoother playback
+        const floor = Math.floor(this.position);
+        const ceil = Math.ceil(this.position);
+        const fract = this.position - floor;
+
+        const sample1 = this.buffer[floor] || 0;
+        const sample2 = this.buffer[ceil] || 0;
         
-        // Simple playback, no interpolation
-        const sample = this.buffer[this.position] || 0;
+        const sample = sample1 + (sample2 - sample1) * fract;
+
         this.position++;
 
         if (this.position >= this.buffer.length) {
@@ -25,51 +33,43 @@ class SampleVoice {
 }
 
 class DrumProcessor extends AudioWorkletProcessor {
-    constructor(options) {
-        super(options);
-        this.samples = new Map();
-        this.activeVoices = [];
+    constructor() {
+        super();
+        this.buffers = new Map();
+        this.voices = [];
         
-        console.log('[DrumProcessor] Initialized.');
+        console.log('[DrumProcessor] Initialized');
+
         this.port.onmessage = this.handleMessage.bind(this);
     }
 
     handleMessage(event) {
-        console.log('[DrumProcessor] Received message:', event.data);
-        const { type, samples, sampleName, volume } = event.data;
+        // console.log('[DrumProcessor] Received message:', event.data);
+        const { type, name, buffer, sampleName, volume } = event.data;
 
         switch (type) {
-            case 'loadSamples':
-                if (samples) this.loadSamples(samples);
+            case 'loadSample':
+                if (name && buffer) {
+                    this.buffers.set(name, new Float32Array(buffer));
+                    // console.log(`[DrumProcessor] Sample loaded: ${name}, size: ${buffer.byteLength}`);
+                }
                 break;
             case 'playSample':
                 if (sampleName) this.playSample(sampleName, volume);
                 break;
             default:
-                this.port.postMessage({ type: 'error', message: `Unknown message type: ${type}` });
-        }
-    }
-
-    loadSamples(samples) {
-        try {
-            console.log('[DrumProcessor] Loading samples:', samples.map(s => s.name));
-            samples.forEach(sample => {
-                // The buffer received is an ArrayBuffer, needs to be converted to Float32Array
-                this.samples.set(sample.name, new Float32Array(sample.buffer));
-            });
-            console.log('[DrumProcessor] Samples loaded successfully. Available samples:', ...this.samples.keys());
-        } catch (e) {
-            this.port.postMessage({ type: 'error', message: `Sample loading failed in DrumProcessor: ${e.message}` });
+                this.port.postMessage({ type: 'error', message: `[DrumProcessor] Unknown message type: ${type}` });
         }
     }
 
     playSample(name, volume = 1.0) {
-        const buffer = this.samples.get(name);
+        const buffer = this.buffers.get(name);
+        // console.log(`[DrumProcessor] playSample called for '${name}'. Buffer found:`, !!buffer);
         if (buffer) {
             const voice = new SampleVoice(buffer, volume);
-            this.activeVoices.push(voice);
+            this.voices.push(voice);
         } else {
-            this.port.postMessage({ type: 'error', message: `Sample not found in worklet: ${name}` });
+            this.port.postMessage({ type: 'error', message: `[DrumProcessor] Sample not found: ${name}` });
         }
     }
 
@@ -79,25 +79,21 @@ class DrumProcessor extends AudioWorkletProcessor {
             return true;
         }
 
-        // Ensure the buffer is always cleared
         outputChannel.fill(0);
 
-        if (this.activeVoices.length === 0) {
+        if (this.voices.length === 0) {
             return true;
         }
         
         for (let i = 0; i < outputChannel.length; i++) {
             let frameSample = 0;
-
-            for (let j = this.activeVoices.length - 1; j >= 0; j--) {
-                const voice = this.activeVoices[j];
+            for (let j = this.voices.length - 1; j >= 0; j--) {
+                const voice = this.voices[j];
                 frameSample += voice.render();
                 if (voice.isFinished) {
-                    this.activeVoices.splice(j, 1);
+                    this.voices.splice(j, 1);
                 }
             }
-            
-            // Basic clipping to prevent audio artifacts. A limiter would be better.
             outputChannel[i] = Math.max(-1, Math.min(1, frameSample));
         }
 
@@ -106,3 +102,5 @@ class DrumProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('drum-processor', DrumProcessor);
+
+    

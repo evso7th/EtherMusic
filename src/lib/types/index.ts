@@ -119,9 +119,8 @@ export type WorkerMessage =
     | { type: 'allNotesOff' }
     | { type: 'setPreset', preset: InstrumentPresetParams | BassInstrumentPresetParams };
 
-
 export type DrumWorkerMessage =
-    | { type: 'loadSamples'; samples: { name: string; buffer: ArrayBuffer }[] }
+    | { type: 'loadSample'; name: string; buffer: ArrayBuffer }
     | { type: 'playSample'; sampleName: string; volume: number };
 
 
@@ -135,3 +134,5 @@ export interface Note {
     duration?: number; // for autopilot and scheduled notes
     time?: number; // for autopilot and scheduled notes
 }
+
+    

@@ -70,9 +70,9 @@ export interface BassInstrumentPreset {
 export type BeatPattern = {
     name: string;
     type: 'Meditative' | 'Classic' | 'System';
-    length: number;
+    length: number; // in measures
     sequence: {
-        time: number;
+        time: number; // in 16th note steps (0-15 for a 1-bar loop in 4/4)
         note: string;
         vol?: number;
     }[];
@@ -117,10 +117,11 @@ export type WorkerMessage =
     | { type: 'noteOff', id: number }
     | { type: 'noteUpdate', note: SynthNote }
     | { type: 'allNotesOff' }
-    | { type: 'setPreset', preset: InstrumentPresetParams | BassInstrumentPresetParams };
+    | { type: 'setPreset', preset: InstrumentPresetParams | BassInstrumentPresetParams }
+    | { type: 'playSample'; sampleName: string; volume?: number; time?: number };
 
 export type DrumWorkerMessage =
-    | { type: 'loadSamples'; samples: { name: string; buffer: ArrayBuffer }[] }
+    | { type: 'loadSample'; name: string; buffer: ArrayBuffer }
     | { type: 'playSample'; sampleName: string; volume: number };
 
 

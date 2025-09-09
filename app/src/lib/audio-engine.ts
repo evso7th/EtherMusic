@@ -115,7 +115,6 @@ export class AudioEngine {
 
         this.drumMachine = new DrumMachine(this);
         console.log("[AudioEngine] DrumMachine instantiated.");
-
     }
     
     getContext() {
@@ -164,10 +163,10 @@ export class AudioEngine {
 
         try {
              await Promise.all([
-                this.context.audioWorklet.addModule('workers/synth-processor.js'),
-                this.context.audioWorklet.addModule('workers/drum-processor.js'),
+                this.context.audioWorklet.addModule('workers/synth-processor.js').then(() => console.log('[AudioEngine] synth-processor.js module loaded.')).catch(err => console.error('[AudioEngine] FAILED to load synth-processor.js', err)),
+                this.context.audioWorklet.addModule('workers/drum-processor.js').then(() => console.log('[AudioEngine] drum-processor.js module loaded.')).catch(err => console.error('[AudioEngine] FAILED to load drum-processor.js', err)),
              ]);
-             console.log("[AudioEngine] synth-processor.js & drum-processor.js worklets added.");
+             console.log("[AudioEngine] AudioWorklet modules added.");
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
             throw new Error("Could not load core audio components. Please try refreshing the page.");
@@ -219,57 +218,55 @@ export class AudioEngine {
         if (!this.context) return;
         console.log('[AudioEngine] Creating drum channel.');
 
-        // Pass empty processorOptions as drum-processor doesn't need any
-        this.drumWorklet = new AudioWorkletNode(this.context, 'drum-processor', { processorOptions: {} });
+        this.drumWorklet = new AudioWorkletNode(this.context, 'drum-processor');
         this.drumGain = this.context.createGain();
         this.drumReverbSend = this.context.createGain();
 
-        this.drumWorklet.connect(this.drumGain).connect(this.preCompressorOut);
-        this.drumGain.connect(this.drumReverbSend).connect(this.reverbSend);
+        if (this.drumGain && this.drumReverbSend) {
+            this.drumWorklet.connect(this.drumGain).connect(this.preCompressorOut);
+            this.drumGain.connect(this.drumReverbSend).connect(this.reverbSend);
+        }
         
         this.drumWorklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error('[DRUM WORKLET ERROR]', e.data.message);
-            } else {
-                console.log('[DRUM WORKLET MESSAGE]', e.data);
+            } else if (e.data.type === 'log') {
+                console.log('[DRUM WORKLET]', e.data.message);
             }
         };
         
         this.loadDrumSamples().then(samples => {
             if (this.drumWorklet) {
                 console.log('[AudioEngine] Posting loaded samples to drum worklet.');
-                const transferableSamples = Object.entries(samples).map(([name, data]) => {
-                    return { name, buffer: data.buffer };
+                Object.entries(samples).forEach(([name, data]) => {
+                    const message: DrumWorkerMessage = { type: 'loadSample', name, buffer: data.buffer };
+                    this.drumWorklet!.port.postMessage(message, [data.buffer]);
                 });
-                const transferList = transferableSamples.map(s => s.buffer);
-                this.drumWorklet.port.postMessage({ type: 'loadSamples', samples: transferableSamples }, transferList);
             }
         }).catch(err => {
             console.error("[AudioEngine] Error in loadDrumSamples promise chain:", err);
         });
     }
     
-    private loadReverbImpulse() {
+    private async loadReverbImpulse() {
         console.log("[AudioEngine] Loading reverb impulse...");
-        // This file doesn't exist, so we will always use the fallback.
-        // In the future, a real impulse response file can be placed at this path.
-        fetch('/assets/sounds/impulses/space.wav')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.arrayBuffer();
-            })
-            .then(buffer => this.context.decodeAudioData(buffer))
-            .then(audioBuffer => {
-                this.convolver.buffer = audioBuffer;
-                console.log("[AudioEngine] Reverb impulse loaded and assigned.");
-            })
-            .catch(e => {
-                console.warn("[AudioEngine] Could not load reverb impulse, using fallback.", e);
-                this.convolver.buffer = this.createFallbackReverb();
-                console.log("[AudioEngine] Fallback reverb created and assigned.");
-            });
+        try {
+            // There are no impulse files in the project, so we will always use the fallback.
+            // In the future, a real impulse response file can be placed at this path.
+            // const response = await fetch('/assets/sounds/impulses/space.wav');
+            // if (!response.ok) {
+            //     throw new Error(`HTTP error! status: ${response.status}`);
+            // }
+            // const buffer = await response.arrayBuffer();
+            // const audioBuffer = await this.context.decodeAudioData(buffer);
+            // this.convolver.buffer = audioBuffer;
+            // console.log("[AudioEngine] Reverb impulse loaded and assigned.");
+            throw new Error("No impulse file available.");
+        } catch (e) {
+            console.warn("[AudioEngine] Could not load reverb impulse, using fallback.", e);
+            this.convolver.buffer = this.createFallbackReverb();
+            console.log("[AudioEngine] Fallback reverb created and assigned.");
+        }
     }
 
     private createFallbackReverb(): AudioBuffer {
@@ -432,7 +429,10 @@ export class AudioEngine {
     
     public setBeatPattern(patternName: string) {
         console.log(`[AudioEngine] setBeatPattern called with: ${patternName}`);
+        const wasPlaying = this.isPlaying;
+        if(wasPlaying) this.drumMachine.stop();
         this.drumMachine.setPattern(patternName);
+        if(wasPlaying || patternName !== 'Off') this.drumMachine.play();
     }
 
     public setTempo(newTempo: number) {
@@ -446,7 +446,7 @@ export class AudioEngine {
             return;
         }
         const message: DrumWorkerMessage = { type: 'playSample', sampleName, volume };
-        console.log(`[AudioEngine] playDrumSample: posting message to drum worklet`, message);
+        console.log(`[AudioEngine] playDrumSample: posting message to 'drum-processor' worklet`, message);
         this.drumWorklet.port.postMessage(message);
     }
     
@@ -475,22 +475,24 @@ export class AudioEngine {
         return samples;
     }
 
-    private applyVolume(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn' >, volumes: ChannelVolumes) {
+    private applyVolumeForPart(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'autopilot'>, volumes: ChannelVolumes) {
         const rampTime = this.context.currentTime + 0.05;
-
+    
         if (partName === 'drums') {
-             if (this.drumGain) {
+            if (this.drumGain) {
                 this.drumGain.gain.linearRampToValueAtTime(dbToGain(volumes.gain), rampTime);
-             }
-             if (this.drumReverbSend) {
+            }
+            if (this.drumReverbSend) {
                 this.drumReverbSend.gain.linearRampToValueAtTime(dbToGain(volumes.reverbSend), rampTime);
-             }
+            }
         } else {
             const nodeInfo = this.nodes.get(partName);
             if (nodeInfo) {
-                nodeInfo.gain.gain.linearRampToValueAtTime(dbToGain(volumes.gain), rampTime);
+                nodeInfo.gain.gain.linearRampToValueAtTime(dbtoGain(volumes.gain), rampTime);
                 nodeInfo.reverbSend.gain.linearRampToValueAtTime(dbToGain(volumes.reverbSend), rampTime);
-                nodeInfo.distortion.curve = createDistortionCurve(volumes.distortion);
+                if (nodeInfo.distortion) {
+                    nodeInfo.distortion.curve = createDistortionCurve(volumes.distortion);
+                }
             }
         }
     }
@@ -500,10 +502,10 @@ export class AudioEngine {
         this.volumes = newVolumes;
         const rampTime = this.context.currentTime + 0.05;
 
-        this.applyVolume('melody', newVolumes.melody);
-        this.applyVolume('manualBass', newVolumes.manualBass);
-        this.applyVolume('latch', newVolumes.latch);
-        this.applyVolume('drums', newVolumes.drums);
+        this.applyVolumeForPart('melody', newVolumes.melody);
+        this.applyVolumeForPart('manualBass', newVolumes.manualBass);
+        this.applyVolumeForPart('latch', newVolumes.latch);
+        this.applyVolumeForPart('drums', newVolumes.drums);
         
         this.reverbReturnGain.gain.linearRampToValueAtTime(dbToGain(this.volumes.reverbReturn), rampTime);
         this.setCompressorSettings(this.volumes.compressor);

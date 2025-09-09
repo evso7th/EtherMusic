@@ -62,12 +62,7 @@ export class DrumMachine {
         const newPattern = beatPatterns.find(p => p.name === patternName);
         if (newPattern) {
             console.log(`[DrumMachine] Pattern set to "${patternName}"`);
-            const wasPlaying = this.isPlaying;
-            this.stop(); // Stop any existing pattern
             this._pattern = newPattern;
-             if (wasPlaying) {
-                this.play();
-            }
         } else {
              console.warn(`[DrumMachine] Pattern "${patternName}" not found.`);
         }
@@ -80,12 +75,12 @@ export class DrumMachine {
             return;
         }
         
-        this.step = 0;
+        this.step = 0; 
         const sixteenthNoteDurationMs = (60 / this._tempo / 4) * 1000; 
         console.log(`[DrumMachine] Starting loop with interval ${sixteenthNoteDurationMs.toFixed(2)}ms for tempo ${this._tempo} BPM.`);
         
-        // Ensure we are in a browser context before using window
         if (typeof window !== 'undefined') {
+            this.scheduler(); // Play the first beat immediately
             this.intervalId = window.setInterval(() => {
                 this.scheduler();
             }, sixteenthNoteDurationMs);
@@ -94,6 +89,10 @@ export class DrumMachine {
         }
     }
     
+    public pause() {
+        this.stop();
+    }
+
     public stop() {
         console.log("[DrumMachine] stop() called.");
         if (this.intervalId !== null) {
@@ -107,6 +106,8 @@ export class DrumMachine {
     private scheduler() {
         if (!this.audioEngine || !this._pattern) return;
         
+        const totalSteps = this._pattern.length * 16;
+        
         console.log(`[DrumMachine] Scheduler tick. Step: ${this.step}`);
 
         this._pattern.sequence.forEach(note => {
@@ -116,7 +117,8 @@ export class DrumMachine {
             }
         });
 
-        const totalSteps = this._pattern.length * 16;
         this.step = (this.step + 1) % totalSteps;
     }
 }
+
+    
