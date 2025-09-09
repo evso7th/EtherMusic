@@ -20,3 +20,5 @@ export const beatPatterns = [
 ];
 
 export type BeatPattern = typeof beatPatterns[number];
+
+    
