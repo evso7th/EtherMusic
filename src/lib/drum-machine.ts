@@ -76,19 +76,17 @@ export class DrumMachine {
     }
 
     public play() {
-        console.log("[DrumMachine] play() called.");
+        console.log(`[DrumMachine] play() called. Pattern: "${this._pattern?.name}", sequence length: ${this._pattern?.sequence?.length}`);
         if (this.isPlaying || !this._pattern || this._pattern.sequence.length === 0) {
             console.log(`[DrumMachine] Play command ignored. isPlaying: ${this.isPlaying}, pattern: ${this._pattern?.name}`);
             return;
         }
         
-        this.step = -1; // Start at -1 so the first tick is 0
+        this.step = 0; 
         const sixteenthNoteDurationMs = (60 / this._tempo / 4) * 1000; 
         console.log(`[DrumMachine] Starting loop with interval ${sixteenthNoteDurationMs.toFixed(2)}ms for tempo ${this._tempo} BPM.`);
         
         if (typeof window !== 'undefined') {
-            // Trigger first beat immediately and then set interval
-            this.scheduler(); 
             this.intervalId = window.setInterval(() => {
                 this.scheduler();
             }, sixteenthNoteDurationMs);
@@ -114,9 +112,6 @@ export class DrumMachine {
     private scheduler() {
         if (!this.audioEngine || !this._pattern) return;
         
-        const totalSteps = this._pattern.length * 16;
-        this.step = (this.step + 1) % totalSteps;
-        
         console.log(`[DrumMachine] Scheduler tick. Step: ${this.step}`);
 
         this._pattern.sequence.forEach(note => {
@@ -125,5 +120,8 @@ export class DrumMachine {
                 this.audioEngine.playDrumSample(note.note, note.vol);
             }
         });
+
+        const totalSteps = this._pattern.length * 16;
+        this.step = (this.step + 1) % totalSteps;
     }
 }
