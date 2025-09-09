@@ -202,8 +202,12 @@ export class AudioEngine {
         const gain = this.context.createGain();
         const reverbSend = this.context.createGain();
         
-        worklet.connect(distortion).connect(gain).connect(this.preCompressorOut);
-        gain.connect(reverbSend).connect(this.reverbSend);
+        // Correct signal flow: worklet -> distortion -> gain -> main out & reverb send
+        worklet.connect(distortion);
+        distortion.connect(gain);
+        gain.connect(this.preCompressorOut);
+        gain.connect(reverbSend);
+        reverbSend.connect(this.reverbSend);
         
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
@@ -218,12 +222,16 @@ export class AudioEngine {
         if (!this.context) return;
         console.log('[AudioEngine] Creating drum channel.');
 
+        // The drum worklet has no specific options to pass
         this.drumWorklet = new AudioWorkletNode(this.context, 'drum-processor');
         const gain = this.context.createGain();
         const reverbSend = this.context.createGain();
 
-        this.drumWorklet.connect(gain).connect(this.preCompressorOut);
-        gain.connect(reverbSend).connect(this.reverbSend);
+        // Correct signal flow: worklet -> gain -> main out & reverb send
+        this.drumWorklet.connect(gain);
+        gain.connect(this.preCompressorOut);
+        gain.connect(reverbSend);
+        reverbSend.connect(this.reverbSend);
         
         this.drumWorklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
@@ -449,9 +457,12 @@ export class AudioEngine {
                     throw new Error(`HTTP error! status: ${response.status} for ${filename}`);
                 }
                 const arrayBuffer = await response.arrayBuffer();
+                // We must decode the audio data here in the main thread
                 const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
                 console.log(`[AudioEngine] Loaded and decoded sample: ${key}`);
-                return { key, buffer: audioBuffer.getChannelData(0).buffer };
+                // And we send the Float32Array of the raw channel data
+                const channelData = audioBuffer.getChannelData(0);
+                return { key, buffer: channelData };
             } catch (error) {
                 console.error(`[AudioEngine] Failed to load or decode drum sample: ${path}`, error);
                 return null;
@@ -465,7 +476,8 @@ export class AudioEngine {
              loadedSamples.forEach(sample => {
                  if (sample && sample.buffer) {
                      const message: DrumWorkerMessage = { type: 'loadSample', name: sample.key, buffer: sample.buffer };
-                     drumNode.worklet.port.postMessage(message, [sample.buffer]);
+                     // The second argument is an array of Transferable objects
+                     drumNode.worklet.port.postMessage(message, [sample.buffer.buffer]);
                  }
              });
         }
