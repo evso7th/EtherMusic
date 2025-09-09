@@ -239,9 +239,7 @@ export class AudioEngine {
     private async loadReverbImpulse() {
         console.log("[AudioEngine] Loading reverb impulse...");
         try {
-            // There are no impulse files in the project, so we will always use the fallback.
-            // This path is intentionally incorrect to force the fallback.
-            const response = await fetch('/assets/sounds/impulses/non-existent-file.wav');
+            const response = await fetch('/assets/sounds/impulses/space.wav');
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -434,45 +432,47 @@ export class AudioEngine {
             return;
         }
         const message: DrumWorkerMessage = { type: 'playSample', sampleName, volume };
-        console.log(`[AudioEngine] playDrumSample: posting message to 'drum-processor' worklet`, message);
+        // console.log(`[AudioEngine] playDrumSample: posting message to 'drum-processor' worklet`, message);
         drumNode.worklet.port.postMessage(message);
     }
     
     private async loadDrumSamples(): Promise<void> {
         console.log("[AudioEngine] Loading drum samples...");
-        
-        const samplePromises = Object.entries(DRUM_SAMPLES).map(async ([key, path]) => {
+        const drumNode = this.nodes.get('drums');
+        if (!drumNode) {
+            console.error("[AudioEngine] Drum worklet node not available for loading samples.");
+            return;
+        }
+
+        for (const [name, url] of Object.entries(DRUM_SAMPLES)) {
             try {
-                const response = await fetch(path);
+                const response = await fetch(url);
                 if (!response.ok) {
-                    const filename = path.split('/').pop();
-                    throw new Error(`HTTP error! status: ${response.status} for ${filename}`);
+                    throw new Error(`HTTP error! status: ${response.status} for ${url.split('/').pop()}`);
                 }
                 const arrayBuffer = await response.arrayBuffer();
-                console.log(`[AudioEngine] Loaded sample: ${key}`);
-                return { key, buffer: arrayBuffer };
-            } catch (error) {
-                console.error(`[AudioEngine] Failed to load or decode drum sample: ${path}`, error);
-                return null;
-            }
-        });
+                // We must decode the audio data here in the main thread
+                const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+                // And we send the Float32Array of the raw channel data
+                const channelData = audioBuffer.getChannelData(0); // Using only the first channel for mono
 
-        const loadedSamples = await Promise.all(samplePromises);
-        const drumNode = this.nodes.get('drums');
-        if (drumNode) {
-             console.log('[AudioEngine] Posting loaded samples to drum worklet.');
-             const transferableBuffers: ArrayBuffer[] = [];
-             loadedSamples.forEach(sample => {
-                 if (sample && sample.buffer) {
-                     const message: DrumWorkerMessage = { type: 'loadSample', name: sample.key, buffer: sample.buffer };
-                     drumNode.worklet.port.postMessage(message, [sample.buffer]);
-                 }
-             });
+                const message: DrumWorkerMessage = {
+                    type: 'loadSample',
+                    name,
+                    buffer: channelData,
+                };
+                // The second argument is an array of Transferable objects
+                drumNode.worklet.port.postMessage(message, [channelData.buffer]);
+                console.log(`[AudioEngine] Loaded and sent sample: ${name}`);
+
+            } catch (error) {
+                console.error(`[AudioEngine] Failed to load or process drum sample: ${name}`, error);
+            }
         }
-         console.log("[AudioEngine] All drum samples processed.");
+        console.log("[AudioEngine] All drum samples processed.");
     }
 
-    private applyVolumeForPart(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn'>, volumes: ChannelVolumes) {
+    private applyVolumeForPart(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn' >, volumes: ChannelVolumes) {
         const rampTime = this.context.currentTime + 0.05;
     
         const nodeInfo = this.nodes.get(partName);
@@ -560,3 +560,5 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
+
+    

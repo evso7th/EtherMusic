@@ -1,3 +1,4 @@
+
 // A class representing a single oscillator with its own phase.
 class Oscillator {
     constructor(type, sampleRate) {
@@ -29,32 +30,6 @@ class Oscillator {
         return sample;
     }
 }
-
-// A class representing a single sample-based voice for one-shot sounds (like drums)
-class SampleVoice {
-    constructor(buffer, volume) {
-        this.buffer = buffer;
-        this.volume = volume;
-        this.position = 0;
-        this.isFinished = false;
-    }
-
-    render() {
-        if (this.isFinished) {
-            return 0;
-        }
-
-        const sample = this.buffer[this.position] * this.volume;
-        this.position++;
-
-        if (this.position >= this.buffer.length) {
-            this.isFinished = true;
-        }
-
-        return sample;
-    }
-}
-
 
 // A class representing a single synth voice
 class Voice {
@@ -311,7 +286,6 @@ class SynthProcessor extends AudioWorkletProcessor {
         const channel = output[0];
         
         if (channel) {
-            // Initialize buffer to zeros
             channel.fill(0);
             
             if (this.voices.size > 0) {
@@ -342,3 +316,5 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
+
+    
