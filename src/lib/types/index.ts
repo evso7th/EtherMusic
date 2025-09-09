@@ -5,8 +5,7 @@ export type MusicKey = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' |
 export type MusicScale = 'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentatonic';
 
 export type Instrument = 'synth' | 'organ' | 'theremin' | 'mellotron';
-export type BassInstrument = 'classicBass' | 'glideBass' | 'ambientDrone' | 'resonantGliss' | 'hypnoticDrone' | 'livingRiff';
-
+export type BassInstrument = 'classicBass' | 'organ' | 'mellotron' | 'synth' | 'ambientDrone' | 'hypnoticDrone';
 
 // These presets are sent to the AudioWorklet, so they must contain only serializable data.
 export interface BaseInstrumentParams {
@@ -39,8 +38,11 @@ export interface BaseInstrumentParams {
         freqMult: number; // Frequency multiplier relative to base
         level: number; // Volume level (0-1)
         detune?: number; // Detune in cents
+        envelope?: Partial<BaseInstrumentParams['envelope']>;
     }[];
     stagger?: number; // Delay between layer note ons in seconds
+    reverbSend?: number;
+    distortion?: number;
 }
 
 export interface InstrumentPresetParams extends BaseInstrumentParams {}
@@ -68,6 +70,12 @@ export interface BassInstrumentPreset {
 export type BeatPattern = {
     name: string;
     type: 'Meditative' | 'Classic' | 'System';
+    length: number;
+    sequence: {
+        time: number;
+        note: string;
+        vol?: number;
+    }[];
 };
 
 // Volume settings for a single channel (instrument)
@@ -102,19 +110,25 @@ export interface SynthNote {
     time?: number;
 }
 
+export type DrumSampleMessage = {
+    type: 'loadSamples';
+    samples: { name: string; data: Float32Array }[];
+} | {
+    type: 'playSample';
+    sampleName: string;
+    time: number;
+    volume: number;
+};
+
 
 export type WorkerMessage = 
     | { type: 'noteOn', note: SynthNote }
     | { type: 'noteOff', id: number }
     | { type: 'noteUpdate', note: SynthNote }
     | { type: 'allNotesOff' }
-    | { type: 'setPreset', preset: InstrumentPresetParams | BassInstrumentPresetParams };
+    | { type: 'setPreset', preset: InstrumentPresetParams | BassInstrumentPresetParams }
+    | DrumSampleMessage;
 
-export type DrumWorkerMessage =
-    | { type: 'start', bpm: number, startTime: number }
-    | { type: 'stop' }
-    | { type: 'setBpm', bpm: number }
-    | { type: 'setPattern', pattern: string };
 
 export type EnvelopeCurve = "linear" | "exponential";
 

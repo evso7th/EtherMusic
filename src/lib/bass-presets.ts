@@ -1,5 +1,5 @@
 
-import type { BassInstrumentPreset, BassInstrument, InstrumentPreset, InstrumentPresetParams } from "@/types";
+import type { BassInstrumentPreset, BassInstrument, InstrumentPreset, BassInstrumentPresetParams } from "@/types";
 import { melodyInstruments } from "./melody-presets";
 
 const adaptMelodyPresetForBass = (preset: InstrumentPreset): BassInstrumentPreset => {
@@ -23,7 +23,7 @@ const adaptMelodyPresetForBass = (preset: InstrumentPreset): BassInstrumentPrese
     }
 
     // Ensure a sub-octave for body
-    const hasSub = bassParams.layers.some(l => l.freqMult < 1);
+    const hasSub = bassParams.layers.some(l => l.freqMult && l.freqMult < 1);
     if (!hasSub) {
         bassParams.layers.unshift({ type: 'sine', freqMult: 0.5, level: 0.8, detune: -5 });
     }
@@ -43,7 +43,7 @@ const classicBassPreset: BassInstrumentPreset = {
     params: {
         oscillator: { type: 'sawtooth' },
         envelope: { attack: 0.01, decay: 0.3, sustain: 0.9, release: 0.9 },
-        filter: { Q: 2, frequency: 600, type: 'lowpass', gain: 6 }, // Increased gain
+        filter: { Q: 2, frequency: 600, type: 'lowpass', gain: 6 },
         reverbSend: -48,
         distortion: 15,
         layers: [
@@ -56,24 +56,30 @@ const organBass = adaptMelodyPresetForBass(melodyInstruments.find(i => i.id === 
 organBass.id = 'organ';
 organBass.params.reverbSend = -30;
 organBass.params.distortion = 5;
-organBass.params.filter!.frequency=1200;
-organBass.params.filter!.gain = 4;
+if (organBass.params.filter) {
+    organBass.params.filter.frequency=1200;
+    organBass.params.filter.gain = 4;
+}
 
 
 const mellotronBass = adaptMelodyPresetForBass(melodyInstruments.find(i => i.id === 'mellotron')!);
 mellotronBass.id = 'mellotron';
 mellotronBass.params.reverbSend = -24;
 mellotronBass.params.distortion = 25; 
-mellotronBass.params.filter!.frequency=1000;
-mellotronBass.params.filter!.gain = 3;
+if (mellotronBass.params.filter) {
+    mellotronBass.params.filter.frequency=1000;
+    mellotronBass.params.filter.gain = 3;
+}
 
 
 const synthBass = adaptMelodyPresetForBass(melodyInstruments.find(i => i.id === 'synth')!);
 synthBass.id = 'synth';
 synthBass.params.reverbSend = -36;
 synthBass.params.distortion = 5;
-synthBass.params.filter!.frequency=900;
-synthBass.params.filter!.gain = 5;
+if (synthBass.params.filter) {
+    synthBass.params.filter.frequency=900;
+    synthBass.params.filter.gain = 5;
+}
 
 const ambientDronePreset: BassInstrumentPreset = {
     id: "ambientDrone",

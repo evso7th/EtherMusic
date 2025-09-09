@@ -1,5 +1,5 @@
 
-import type { InstrumentPreset, Instrument, BassInstrumentPresetParams } from "@/types";
+import type { InstrumentPreset, Instrument } from "@/types";
 
 export const melodyInstruments: readonly InstrumentPreset[] = [
     {
@@ -29,12 +29,11 @@ export const melodyInstruments: readonly InstrumentPreset[] = [
             vibrato: { frequency: 5.5, depth: 2 },
             portamento: 0,
             layers: [
-                { type: 'sine', freqMult: 1, level: 1.0, detune: 0 },
-                { type: 'sine', freqMult: 0.5, level: 0.8, detune: -2 },
-                { type: 'sine', freqMult: 2, level: 0.7, detune: 2 },
-                { type: 'triangle', freqMult: 1.5, level: 0.5, detune: -3 },
-                { type: 'sine', freqMult: 4.0, level: 0.4, detune: 3 },
-                { type: 'triangle', freqMult: 6.0, level: 0.2, detune: -4}, 
+                { type: 'sine', freqMult: 0.5, level: 0.8, detune: -2, envelope: { attack: 0.05, decay: 0.1, sustain: 0.9, release: 1.8 } },
+                { type: 'sine', freqMult: 2, level: 0.7, detune: 2, envelope: { attack: 0.06, decay: 0.15, sustain: 0.8, release: 1.9 } },
+                { type: 'triangle', freqMult: 1.5, level: 0.5, detune: -3, envelope: { attack: 0.07, decay: 0.2, sustain: 0.7, release: 2.0 } },
+                { type: 'sawtooth', freqMult: 4.0, level: 0.4, detune: 3, envelope: { attack: 0.08, decay: 0.25, sustain: 0.6, release: 2.2 } },
+                { type: 'square', freqMult: 6.0, level: 0.2, detune: -4, envelope: { attack: 0.09, decay: 0.3, sustain: 0.5, release: 2.3 } }, 
             ],
             reverbSend: -12,
             distortion: 0,

@@ -19,7 +19,7 @@ import { SleepTimer } from '@/components/sleep-timer';
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
 import { melodyInstruments, defaultMelodyInstrument } from '@/lib/melody-presets';
 import { bassInstruments, defaultBassInstrument } from '@/lib/bass-presets';
-import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, ChannelVolumes, CompressorSettings } from '@/types';
+import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, ChannelVolumes, CompressorSettings, BeatPattern } from '@/types';
 import { cn } from '@/lib/utils';
 
 
@@ -157,7 +157,7 @@ export default function Home() {
     } = useAudioEngine();
     
     const [isRecording, setIsRecording] = useState(false);
-    const [activePattern, setActivePattern] = useState<(typeof beatPatterns)[number]>(beatPatterns.find(p => p.name === 'Off')!);
+    const [activePattern, setActivePattern] = useState<BeatPattern>(beatPatterns.find(p => p.name === 'Off')!);
     const [musicKey, setMusicKey] = useState<MusicKey>('G');
     const [musicScale, setMusicScale] = useState<MusicScale>('Minor');
     const [allowedFrequencies, setAllowedFrequencies] = useState<{melody: number[], bass: number[]}>({melody: [], bass: []});
@@ -291,13 +291,10 @@ export default function Home() {
         setIsRecording(!isRecording);
     }, [isRecording, toast, startRecording, stopRecording]);
 
-    const handlePatternChange = useCallback((pattern: (typeof beatPatterns)[number]) => {
+    const handlePatternChange = useCallback((pattern: BeatPattern) => {
         setActivePattern(pattern);
         setBeatPattern(pattern.name);
-        if (pattern.name !== 'Off' && !isPlaying) {
-            play();
-        }
-    }, [setBeatPattern, isPlaying, play]);
+    }, [setBeatPattern]);
 
     const handleLatchToggle = useCallback((isOn: boolean) => {
         setIsBassLatchOn(isOn);

@@ -100,7 +100,12 @@ export function useAudioEngine() {
     
     const setBeatPattern = useCallback((patternName: string) => {
         audioEngine.current?.setBeatPattern(patternName);
-    }, []);
+        if (patternName !== 'Off' && !isPlaying) {
+            play();
+        } else if (patternName === 'Off' && isPlaying) {
+            pause();
+        }
+    }, [isPlaying, play, pause]);
     
     const setBassLatch = useCallback((isOn: boolean) => {
         audioEngine.current?.setBassLatch(isOn);
