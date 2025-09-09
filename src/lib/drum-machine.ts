@@ -1,6 +1,16 @@
 
 import type { AudioEngine } from './audio-engine';
-import type { BeatPattern } from '@/types';
+
+export type BeatPattern = {
+    name: string;
+    type: 'Meditative' | 'Classic' | 'System';
+    length: number; // in measures
+    sequence: {
+        time: number; // in measures (e.g., 0, 0.25, 0.5, 0.75 for 16th notes in a 4/4 measure)
+        note: string;
+        vol?: number;
+    }[];
+};
 
 export const beatPatterns: Readonly<BeatPattern[]> = [
     { name: 'Air', type: 'Meditative', length: 1, sequence: [{ time: 0, note: 'k' }, { time: 0.5, note: 'h' }] },
@@ -24,16 +34,14 @@ export const beatPatterns: Readonly<BeatPattern[]> = [
 
 export class DrumMachine {
     private audioEngine: AudioEngine;
-    private _tempo: number = 120;
+    private _tempo: number = 90;
     private _pattern: BeatPattern = beatPatterns.find(p => p.name === 'Off')!;
     private intervalId: number | null = null;
     private step: number = 0;
-    private nextNoteTime: number = 0.0;
-    private readonly lookahead: number = 25.0; // ms
-    private readonly scheduleAheadTime: number = 0.1; // seconds
-
+    
     constructor(audioEngine: AudioEngine) {
         this.audioEngine = audioEngine;
+        console.log('[DrumMachine] Initialized');
     }
 
     public get isPlaying(): boolean {
@@ -42,69 +50,73 @@ export class DrumMachine {
 
     public setTempo(bpm: number) {
         this._tempo = bpm;
+        console.log(`[DrumMachine] Tempo set to ${bpm}`);
+        if (this.isPlaying) {
+            this.stop();
+            this.play();
+        }
     }
 
     public setPattern(patternName: string) {
         const newPattern = beatPatterns.find(p => p.name === patternName);
         if (newPattern) {
+            console.log(`[DrumMachine] Pattern set to "${patternName}"`);
+            const wasPlaying = this.isPlaying;
+            if (wasPlaying) {
+                this.stop();
+            }
             this._pattern = newPattern;
-            this.step = 0; // Reset step on pattern change
+            if (wasPlaying || newPattern.name !== 'Off') {
+                this.play();
+            }
         }
     }
 
     public play() {
-        if (this.isPlaying || this._pattern.name === 'Off') return;
+        if (this.isPlaying || this._pattern.name === 'Off') {
+            console.log(`[DrumMachine] Play command ignored. isPlaying: ${this.isPlaying}, pattern: ${this._pattern.name}`);
+            return;
+        }
 
+        console.log('[DrumMachine] play() called.');
         this.step = 0;
-        this.nextNoteTime = this.audioEngine.getContext().currentTime;
-        this.intervalId = window.setInterval(() => this.scheduler(), this.lookahead);
+        const intervalMs = (60 / this._tempo) * 1000 / 4; // Schedule 16th notes
+        
+        console.log(`[DrumMachine] Starting loop with interval ${intervalMs.toFixed(2)}ms for tempo ${this._tempo} BPM.`);
+        
+        this.intervalId = window.setInterval(() => {
+            this.scheduler();
+        }, intervalMs);
     }
     
     public pause() {
-        if (this.intervalId !== null) {
-            clearInterval(this.intervalId);
-            this.intervalId = null;
-        }
+        this.stop();
     }
 
     public stop() {
-        this.pause();
-        this.step = 0;
+        if (this.intervalId !== null) {
+            console.log('[DrumMachine] stop() called, clearing interval.');
+            clearInterval(this.intervalId);
+            this.intervalId = null;
+            this.step = 0;
+        }
     }
 
     private scheduler() {
-        const audioCtxTime = this.audioEngine.getContext().currentTime;
-        while (this.nextNoteTime < audioCtxTime + this.scheduleAheadTime) {
-            this.scheduleNote(this.step, this.nextNoteTime);
-            this.nextNote();
-        }
-    }
+        const time = this.audioEngine.getContext().currentTime;
+        const sixteenthNoteInBar = this.step % (this._pattern.length * 16);
+        const timeInMeasure = (sixteenthNoteInBar / 16) / this._pattern.length;
 
-    private nextNote() {
-        const secondsPerBeat = 60.0 / this._tempo;
-        const totalSteps = this._pattern.sequence.reduce((max, note) => Math.max(max, note.time), 0) * 4 + 1;
-        const stepsPerMeasure = this._pattern.length * 4; // Assuming 4 beats per measure
-        
-        this.step++;
-        if (this.step >= (this._pattern.length * 16)) { // 16th notes
-            this.step = 0;
-        }
-        
-        const sixteenthNoteDuration = secondsPerBeat / 4;
-        this.nextNoteTime += sixteenthNoteDuration;
-    }
-
-    private scheduleNote(beatNumber: number, time: number) {
-        if (this._pattern.sequence.length === 0) return;
-
-        const sixteenthNoteInBar = beatNumber % (this._pattern.length * 16);
-        const timeInBar = sixteenthNoteInBar / 16.0;
+        console.log(`[DrumMachine] Scheduler tick. Step: ${this.step}, Time in Measure: ${timeInMeasure.toFixed(3)}`);
 
         this._pattern.sequence.forEach(note => {
-            // Use a small tolerance for floating point comparison
-            if (Math.abs(note.time - timeInBar) < 0.001) {
-                 this.audioEngine.playDrumSample(note.note, time, note.vol);
+            // Using a tolerance for float comparison
+            if (Math.abs(note.time - timeInMeasure) < 0.01) {
+                console.log(`[DrumMachine] scheduling note: ${note.note} at step ${this.step}`);
+                this.audioEngine.playDrumSample(note.note, time, note.vol);
             }
         });
+
+        this.step++;
     }
 }

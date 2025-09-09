@@ -1,4 +1,5 @@
 
+
 // UI Component Props
 export type MusicKey = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B';
 
@@ -38,7 +39,7 @@ export interface BaseInstrumentParams {
         freqMult: number; // Frequency multiplier relative to base
         level: number; // Volume level (0-1)
         detune?: number; // Detune in cents
-        envelope?: Partial<BaseInstrumentParams['envelope']>;
+        envelope?: Partial<Omit<BaseInstrumentParams['envelope'], 'attackCurve' | 'decayCurve' | 'releaseCurve'>>;
     }[];
     stagger?: number; // Delay between layer note ons in seconds
     reverbSend?: number;
@@ -70,13 +71,14 @@ export interface BassInstrumentPreset {
 export type BeatPattern = {
     name: string;
     type: 'Meditative' | 'Classic' | 'System';
-    length: number;
+    length: number; // in measures
     sequence: {
-        time: number;
+        time: number; // in measures (e.g., 0, 0.25, 0.5, 0.75 for 16th notes in a 4/4 measure)
         note: string;
         vol?: number;
     }[];
 };
+
 
 // Volume settings for a single channel (instrument)
 export interface ChannelVolumes {
@@ -117,7 +119,7 @@ export type DrumSampleMessage = {
     type: 'playSample';
     sampleName: string;
     time: number;
-    volume: number;
+    volume?: number;
 };
 
 

@@ -261,10 +261,12 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.nextSampleId = 0;
         
         this.port.onmessage = this.handleMessage.bind(this);
+        console.log(`[SynthProcessor] Worklet created for ${options.processorOptions.polyphony} voices.`);
     }
 
     handleMessage(event) {
         const { type, note, id, preset, samples, sampleName, time, volume } = event.data;
+        // console.log(`[SynthProcessor] Received message:`, event.data);
         switch (type) {
             case 'noteOn':
                 if (note) this.noteOn(note);
@@ -285,16 +287,21 @@ class SynthProcessor extends AudioWorkletProcessor {
                 if (samples) this.loadSamples(samples);
                 break;
             case 'playSample':
-                if (sampleName) this.playSample(sampleName, time, volume);
+                if (sampleName) {
+                    // console.log(`[SynthProcessor] playSample message received: ${sampleName}`);
+                    this.playSample(sampleName, time, volume);
+                }
                 break;
         }
     }
 
     loadSamples(samples) {
         try {
+            console.log('[SynthProcessor] Loading samples...', samples);
             samples.forEach(sample => {
                 this.samples.set(sample.name, sample.data);
             });
+            console.log('[SynthProcessor] Samples loaded:', Array.from(this.samples.keys()));
         } catch(e) {
           this.port.postMessage({ type: 'error', message: `Sample loading failed in worklet: ${e.message}` });
         }
@@ -302,15 +309,20 @@ class SynthProcessor extends AudioWorkletProcessor {
 
     playSample(name, time, volume = 1.0) {
         const buffer = this.samples.get(name);
-        if (buffer && this.activeSamples.length < 32) { // Polyphony for samples
-            const startTime = time > currentTime ? time : currentTime;
-            this.activeSamples.push({
-                id: this.nextSampleId++,
-                buffer,
-                position: 0,
-                startTime,
-                volume
-            });
+        if (buffer) {
+            // console.log(`[SynthProcessor] Playing sample: ${name} at time: ${time}`);
+            if (this.activeSamples.length < 32) { // Polyphony for samples
+                const startTime = time > currentTime ? time : currentTime;
+                this.activeSamples.push({
+                    id: this.nextSampleId++,
+                    buffer,
+                    position: 0,
+                    startTime,
+                    volume
+                });
+            }
+        } else {
+            this.port.postMessage({type: 'error', message: `Sample not found: ${name}`});
         }
     }
 
