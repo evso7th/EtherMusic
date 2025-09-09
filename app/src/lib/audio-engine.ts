@@ -239,18 +239,8 @@ export class AudioEngine {
         };
     }
     
-    private async loadReverbImpulse() {
-        try {
-            const response = await fetch('assets/sounds/impulse/reverb.wav');
-            if (!response.ok) {
-                throw new Error(`Failed to load reverb impulse: ${response.statusText}`);
-            }
-            const arrayBuffer = await response.arrayBuffer();
-            this.convolver.buffer = await this.context.decodeAudioData(arrayBuffer);
-        } catch (e) {
-            console.warn("Could not load reverb impulse, using generated one instead.", e);
-            this.convolver.buffer = this.createFallbackReverb();
-        }
+    private loadReverbImpulse() {
+        this.convolver.buffer = this.createFallbackReverb();
     }
 
     private createFallbackReverb(): AudioBuffer {
@@ -412,9 +402,9 @@ export class AudioEngine {
         }
     }
     
-    public setBeatPattern(patternName: string) {
-        if (!this.isInitialized) return;
-        this.drumWorklet?.port.postMessage({type: 'setPattern', pattern: patternName});
+    public setBeatPattern(pattern: any) {
+        if (!this.isInitialized || !this.drumWorklet) return;
+        this.drumWorklet.port.postMessage({ type: 'setPattern', pattern: pattern });
     }
 
     public setTempo(newTempo: number) {
@@ -426,7 +416,6 @@ export class AudioEngine {
         const samples: Record<string, Float32Array> = {};
         const promises = Object.entries(DRUM_SAMPLES).map(async ([key, path]) => {
             try {
-                const filename = path.split('/').pop() || path;
                 const response = await fetch(path);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status} for ${path}`);
@@ -533,3 +522,5 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
+
+    
