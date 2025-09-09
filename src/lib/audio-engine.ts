@@ -34,10 +34,13 @@ type SynthPartName = 'melody' | 'manualBass' | 'latch';
 
 const DRUM_SAMPLES: Record<string, string> = {
     'k': '/assets/sounds/drums/kick_drum.wav',
+    'K': '/assets/sounds/drums/kick_drum8.wav',
     's': '/assets/sounds/drums/snare.wav',
+    'S': '/assets/sounds/drums/snarepress.wav',
     'h': '/assets/sounds/drums/closed_hi_hat_accented.wav',
     'H': '/assets/sounds/drums/closed_hi_hat_ghost.wav',
     'o': '/assets/sounds/drums/open_hh_top2.wav',
+    'O': '/assets/sounds/drums/open_hh_bottom.wav',
     'g': '/assets/sounds/drums/snare_ghost_note.wav',
     'c': '/assets/sounds/drums/crash.wav',
     'y': '/assets/sounds/drums/cymbal.wav',
@@ -456,8 +459,10 @@ export class AudioEngine {
             return;
         }
 
-        console.log("[AudioEngine] Posting loaded samples to drum worklet.");
-        for (const [name, url] of Object.entries(DRUM_SAMPLES)) {
+        const sampleEntries = Object.entries(DRUM_SAMPLES);
+        console.log(`[AudioEngine] Found ${sampleEntries.length} samples to load.`);
+
+        for (const [name, url] of sampleEntries) {
             try {
                 const response = await fetch(url);
                 if (!response.ok) {
@@ -509,7 +514,7 @@ export class AudioEngine {
         
         this.reverbReturnGain.gain.linearRampToValueAtTime(dbToGain(this.volumes.reverbReturn), rampTime);
         this.setCompressorSettings(this.volumes.compressor);
-        this.setSwing(this.volumes.swing);
+        this.setSwing(this.volumes.swing ?? 0);
     }
     
     public setCompressorSettings(compressorSettings: CompressorSettings) {

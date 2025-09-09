@@ -29,6 +29,9 @@ export const beatPatterns: Readonly<BeatPattern[]> = [
      { name: 'Airy', type: 'Classic', length: 1, sequence: [
         { time: 0, note: 'k' }, { time: 4, note: 'h' }, {time: 6, note: 'o'}, { time: 8, note: 'g' }, { time: 12, note: 'h' },
     ]},
+    { name: 'Groove', type: 'Classic', length: 1, sequence: [
+        { time: 0, note: 'K' }, { time: 4, note: 'h' }, { time: 8, note: 'S' }, { time: 12, note: 'h' },
+    ]},
 
     // Fills
     { name: 'Fill A', type: 'Fill', length: 1, sequence: [
