@@ -20,15 +20,18 @@ export function useAudioEngine() {
     
     const initializeAudioEngine = useCallback(async () => {
         try {
+            console.log("[useAudioEngine] Initializing...");
             if (!orbManager.current) {
                 const padContainer = document.querySelector('main');
                 orbManager.current = new OrbManager(padContainer);
+                console.log("[useAudioEngine] OrbManager created.");
             }
 
             if (!audioEngine.current) {
                 const context = new (window.AudioContext || (window as any).webkitAudioContext)();
                 if (context.state === 'suspended') {
                     await context.resume();
+                    console.log("[useAudioEngine] AudioContext resumed.");
                 }
                 audioEngine.current = new AudioEngine(context, orbManager.current);
                 await audioEngine.current.initialize();
@@ -36,6 +39,7 @@ export function useAudioEngine() {
             
             setIsReady(true);
             setIsPlaying(audioEngine.current.isPlaying);
+             console.log("[useAudioEngine] AudioEngine initialized.");
             
         } catch(e) {
             console.error("Failed to initialize audio engine:", e);
@@ -50,6 +54,7 @@ export function useAudioEngine() {
     const startApp = useCallback(async () => {
         if (isAppStarted) return;
         
+        console.log("[useAudioEngine] Starting app...");
         setIsAppStarted(true);
         // Play a subtle transition sound
         const audio = new Audio('assets/sounds/transition.webm');
@@ -73,6 +78,7 @@ export function useAudioEngine() {
     }, []);
 
     const play = useCallback(() => {
+        console.log("[useAudioEngine] Play requested.");
         if (!isReady || !audioEngine.current) {
             return;
         }
@@ -81,6 +87,7 @@ export function useAudioEngine() {
     }, [isReady]);
 
     const pause = useCallback(() => {
+        console.log("[useAudioEngine] Pause requested.");
         if (!isReady || !audioEngine.current) return;
         audioEngine.current.pause();
         setIsPlaying(false);
@@ -97,23 +104,23 @@ export function useAudioEngine() {
     }, []);
 
     const setTempo = useCallback((tempo: number) => {
+        console.log("[useAudioEngine] Setting tempo to:", tempo);
         audioEngine.current?.setTempo(tempo);
     }, []);
     
     const setBeatPattern = useCallback((patternName: string) => {
         if (!audioEngine.current) return;
+        console.log(`[useAudioEngine] Setting beat pattern to: ${patternName}`);
         const wasPlaying = audioEngine.current.isPlaying;
         audioEngine.current.setBeatPattern(patternName);
 
-        if (patternName !== 'Off' && !wasPlaying) {
-            play();
-        } else if (patternName === 'Off' && wasPlaying) {
-            pause();
+        // This logic now correctly reflects the DrumMachine's new behavior
+        if (patternName !== 'Off') {
+            setIsPlaying(true);
         } else {
-             // If already playing and pattern is changed, the state should reflect that
-             setIsPlaying(audioEngine.current.isPlaying);
+            setIsPlaying(false);
         }
-    }, [isPlaying, play, pause]);
+    }, []);
     
     const setBassLatch = useCallback((isOn: boolean) => {
         audioEngine.current?.setBassLatch(isOn);
@@ -183,3 +190,5 @@ export function useAudioEngine() {
         handleCompressorChange,
     };
 }
+
+    

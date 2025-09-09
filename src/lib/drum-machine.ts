@@ -35,12 +35,14 @@ export const beatPatterns: Readonly<BeatPattern[]> = [
 export class DrumMachine {
     private audioEngine: AudioEngine;
     private _tempo: number = 90;
-    private _pattern: BeatPattern = beatPatterns.find(p => p.name === 'Off')!;
+    private _pattern: BeatPattern;
     private intervalId: number | null = null;
     private step: number = 0;
     
     constructor(audioEngine: AudioEngine) {
         this.audioEngine = audioEngine;
+        this._pattern = beatPatterns.find(p => p.name === 'Off')!;
+        console.log("[DrumMachine] Initialized");
     }
 
     public get isPlaying(): boolean {
@@ -48,6 +50,7 @@ export class DrumMachine {
     }
 
     public setTempo(bpm: number) {
+        console.log(`[DrumMachine] setTempo called with: ${bpm}`);
         this._tempo = bpm;
         if (this.isPlaying) {
             this.stop();
@@ -58,28 +61,40 @@ export class DrumMachine {
     public setPattern(patternName: string) {
         const newPattern = beatPatterns.find(p => p.name === patternName);
         if (newPattern) {
+            console.log(`[DrumMachine] Pattern set to "${patternName}"`);
             const wasPlaying = this.isPlaying;
             if (wasPlaying) {
                 this.stop();
             }
             this._pattern = newPattern;
-            if (wasPlaying || newPattern.name !== 'Off') {
+             if (wasPlaying || newPattern.name !== 'Off') {
                 this.play();
             }
+        } else {
+             console.warn(`[DrumMachine] Pattern "${patternName}" not found.`);
         }
     }
 
     public play() {
-        if (this.isPlaying || this._pattern.name === 'Off') {
+        console.log("[DrumMachine] play() called.");
+        if (this.isPlaying || !this._pattern || this._pattern.sequence.length === 0) {
+            console.log(`[DrumMachine] Play command ignored. isPlaying: ${this.isPlaying}, pattern: ${this._pattern?.name}`);
             return;
         }
-        this.step = 0;
-        // A "beat" is a quarter note.
-        const sixteenthNoteDurationMs = (60 / this._tempo / 4) * 1000; 
         
-        this.intervalId = window.setInterval(() => {
-            this.scheduler();
-        }, sixteenthNoteDurationMs);
+        this.step = 0;
+        const sixteenthNoteDurationMs = (60 / this._tempo / 4) * 1000; 
+        console.log(`[DrumMachine] Starting loop with interval ${sixteenthNoteDurationMs.toFixed(2)}ms for tempo ${this._tempo} BPM.`);
+        
+        // This is a safety check for the browser environment
+        if (typeof window !== 'undefined') {
+            this.scheduler(); // Trigger first beat immediately
+            this.intervalId = window.setInterval(() => {
+                this.scheduler();
+            }, sixteenthNoteDurationMs);
+        } else {
+            console.error("[DrumMachine] Cannot start: 'window' is not defined. This should only run in a browser.");
+        }
     }
     
     public pause() {
@@ -87,19 +102,25 @@ export class DrumMachine {
     }
 
     public stop() {
+        console.log("[DrumMachine] stop() called.");
         if (this.intervalId !== null) {
             clearInterval(this.intervalId);
             this.intervalId = null;
             this.step = 0;
+             console.log("[DrumMachine] Loop stopped.");
         }
     }
 
     private scheduler() {
+        if (!this.audioEngine || !this._pattern) return;
         const totalSteps = this._pattern.length * 16;
         const currentStep = this.step % totalSteps;
 
+        console.log(`[DrumMachine] Scheduler tick. Step: ${currentStep}`);
+
         this._pattern.sequence.forEach(note => {
             if (note.time === currentStep) {
+                console.log(`[DrumMachine] scheduling note: ${note.note} at step ${currentStep}`);
                 this.audioEngine.playDrumSample(note.note, note.vol);
             }
         });
@@ -107,3 +128,5 @@ export class DrumMachine {
         this.step++;
     }
 }
+
+    
