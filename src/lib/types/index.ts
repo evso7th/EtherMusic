@@ -116,8 +116,8 @@ export type WorkerMessage =
     | { type: 'setPreset', preset: InstrumentPresetParams | BassInstrumentPresetParams };
 
 export type DrumWorkerMessage =
-    | { type: 'loadSample'; name: string; buffer: ArrayBuffer }
-    | { type: 'playSample'; sampleName: string; volume?: number };
+    | { type: 'loadSample'; name: string; buffer: ArrayBuffer; }
+    | { type: 'playSample'; sampleName: string; volume?: number; };
 
 
 export type EnvelopeCurve = "linear" | "exponential";
@@ -131,6 +131,3 @@ export interface Note {
     time?: number; // for autopilot and scheduled notes
 }
 
-    
-
-    

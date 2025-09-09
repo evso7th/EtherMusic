@@ -180,7 +180,7 @@ export class AudioEngine {
         
         this.loadReverbImpulse();
         
-        await this.loadDrumSamples().catch(err => console.error("Error during drum sample loading chain:", err));
+        await this.loadDrumSamples();
         
         this.setVolumes(this.volumes);
         
@@ -225,8 +225,7 @@ export class AudioEngine {
 
         this.drumWorklet.connect(gain);
         gain.connect(this.preCompressorOut);
-        gain.connect(reverbSend);
-        reverbSend.connect(this.reverbSend);
+        gain.connect(reverbSend).connect(this.reverbSend);
         
         this.drumWorklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
@@ -243,8 +242,6 @@ export class AudioEngine {
     private async loadReverbImpulse() {
         console.log("[AudioEngine] Loading reverb impulse...");
         try {
-            // NOTE: The 'space.wav' file was not found, so we are using a fallback.
-            // If a real impulse response is added, the fetch can be reinstated.
             // const response = await fetch('/assets/sounds/impulses/space.wav');
             // if (!response.ok) {
             //     throw new Error(`HTTP error! status: ${response.status}`);
@@ -253,7 +250,7 @@ export class AudioEngine {
             // const audioBuffer = await this.context.decodeAudioData(buffer);
             // this.convolver.buffer = audioBuffer;
             // console.log("[AudioEngine] Reverb impulse loaded and assigned.");
-            throw new Error("Reverb impulse file not available.");
+            throw new Error("Reverb impulse file not available, using fallback.");
         } catch (e) {
             console.warn("[AudioEngine] Could not load reverb impulse, using fallback.", e);
             this.convolver.buffer = this.createFallbackReverb();
@@ -439,6 +436,7 @@ export class AudioEngine {
             return;
         }
         const message: DrumWorkerMessage = { type: 'playSample', sampleName, volume };
+        // console.log(`[AudioEngine] playDrumSample: posting message to 'drum-processor' worklet`, message);
         drumNode.worklet.port.postMessage(message);
     }
     
@@ -568,5 +566,3 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
-
-    
