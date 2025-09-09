@@ -1,11 +1,13 @@
 
 'use client';
 
-import type { Volumes, Instrument, BassInstrument, CompressorSettings, InstrumentPreset, BassInstrumentPreset, ChannelVolumes, SynthNote, WorkerMessage } from '@/types';
+import type { Volumes, Instrument, BassInstrument, CompressorSettings, InstrumentPreset, BassInstrumentPreset, ChannelVolumes, SynthNote, WorkerMessage, DrumWorkerMessage } from '@/types';
 import { OrbManager } from './orb-manager';
 import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
 import { bassInstruments } from './bass-presets';
+import { DrumMachine } from './drum-machine';
+
 
 function dbToGain(db: number): number {
     if (db <= -48) return 0;
@@ -31,16 +33,16 @@ function createDistortionCurve(amount: number): Float32Array {
 type SynthPartName = 'melody' | 'manualBass' | 'latch';
 
 const DRUM_SAMPLES: Record<string, string> = {
-    'k': 'assets/sounds/drums/kick_drum.wav',
-    's': 'assets/sounds/drums/snare.wav',
-    'h': 'assets/sounds/drums/closed_hi_hat_accented.wav',
-    'H': 'assets/sounds/drums/closed_hi_hat_ghost.wav',
-    'c': 'assets/sounds/drums/crash.wav',
-    'y': 'assets/sounds/drums/cymbal.wav',
-    't': 'assets/sounds/drums/high_tom.wav',
-    'T': 'assets/sounds/drums/mid_tom.wav',
-    'l': 'assets/sounds/drums/low_tom.wav',
-    'b': 'assets/sounds/drums/hh_bark_short.wav'
+    'k': '/assets/sounds/drums/kick_drum.wav',
+    's': '/assets/sounds/drums/snare.wav',
+    'h': '/assets/sounds/drums/closed_hi_hat_accented.wav',
+    'H': '/assets/sounds/drums/closed_hi_hat_ghost.wav',
+    'c': '/assets/sounds/drums/crash.wav',
+    'y': '/assets/sounds/drums/cymbal.wav',
+    't': '/assets/sounds/drums/high_tom.wav',
+    'T': '/assets/sounds/drums/mid_tom.wav',
+    'l': '/assets/sounds/drums/low_tom.wav',
+    'b': '/assets/sounds/drums/hh_bark_short.wav'
 };
 
 export class AudioEngine {
@@ -58,6 +60,7 @@ export class AudioEngine {
     private reverbReturnGain: GainNode;
     private convolver: ConvolverNode;
     
+    private drumMachine: DrumMachine;
     private drumWorklet: AudioWorkletNode | null = null;
     private drumGain: GainNode | null = null;
     private drumReverbSend: GainNode | null = null;
@@ -88,11 +91,9 @@ export class AudioEngine {
     
     private activePointers = new Map<number, { type: 'melody' | 'bass', noteId: number }>();
     private nextNoteId = 0;
-
-    private _isPlaying = false;
-    private tempo = 90;
-
+    
     constructor(context: AudioContext, orbManager: OrbManager) {
+        console.log("[AudioEngine] Constructor called.");
         this.context = context;
         this.orbManager = orbManager;
         
@@ -111,6 +112,10 @@ export class AudioEngine {
         this.reverbSend.connect(this.convolver);
         this.convolver.connect(this.reverbReturnGain);
         this.reverbReturnGain.connect(this.preCompressorOut);
+
+        this.drumMachine = new DrumMachine(this);
+        console.log("[AudioEngine] DrumMachine instantiated.");
+
     }
     
     getContext() {
@@ -118,7 +123,7 @@ export class AudioEngine {
     }
 
     public get isPlaying(): boolean {
-        return this._isPlaying;
+        return this.drumMachine.isPlaying;
     }
     
     public getVolumes(): Volumes {
@@ -127,6 +132,7 @@ export class AudioEngine {
     
     public async initialize() {
         if (this.isInitialized) return;
+        console.log("[AudioEngine] Initializing...");
 
         if (this.context.state === 'suspended') {
             await this.context.resume();
@@ -161,6 +167,7 @@ export class AudioEngine {
                 this.context.audioWorklet.addModule('workers/synth-processor.js'),
                 this.context.audioWorklet.addModule('workers/drum-processor.js'),
              ]);
+             console.log("[AudioEngine] synth-processor.js & drum-processor.js worklets added.");
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
             throw new Error("Could not load core audio components. Please try refreshing the page.");
@@ -172,10 +179,12 @@ export class AudioEngine {
         this.createSynthChannel('manualBass', 4);
         this.createSynthChannel('latch', 4);
         this.createDrumChannel();
-
+        console.log("[AudioEngine] Synth and Drum channels created.");
+        
         this.setVolumes(this.volumes);
         
         this.isInitialized = true;
+        console.log("[AudioEngine] Initialization complete.");
     }
 
     private createSynthChannel(part: SynthPartName, polyphony: number) {
@@ -206,41 +215,43 @@ export class AudioEngine {
     
     private createDrumChannel() {
         if (!this.context) return;
+        console.log('[AudioEngine] Creating drum channel.');
 
         this.drumWorklet = new AudioWorkletNode(this.context, 'drum-processor', {
-            processorOptions: { sampleRate: this.context.sampleRate, polyphony: 16 }
+            processorOptions: { sampleRate: this.context.sampleRate }
         });
         this.drumGain = this.context.createGain();
         this.drumReverbSend = this.context.createGain();
 
         this.drumWorklet.connect(this.drumGain).connect(this.preCompressorOut);
         this.drumGain.connect(this.drumReverbSend).connect(this.reverbSend);
-
+        
+        this.drumWorklet.port.onmessage = (e) => {
+            if (e.data.type === 'error') {
+                console.error('[DRUM WORKLET ERROR]', e.data.message);
+            } else {
+                console.log('[DRUM WORKLET MESSAGE]', e.data);
+            }
+        };
+        
         this.loadDrumSamples().then(samples => {
             if (this.drumWorklet) {
-                const transferableSamples = Object.entries(samples).map(([name, data]) => ({
-                    name,
-                    data: data
-                }));
-                const transferList = transferableSamples.map(s => s.data.buffer);
+                console.log('[AudioEngine] Posting loaded samples to drum worklet.');
+                const transferableSamples = Object.entries(samples).map(([name, data]) => {
+                    return { name, buffer: data.buffer };
+                });
+                const transferList = transferableSamples.map(s => s.buffer);
                 this.drumWorklet.port.postMessage({ type: 'loadSamples', samples: transferableSamples }, transferList);
             }
         }).catch(err => {
             console.error("[AudioEngine] Error in loadDrumSamples promise chain:", err);
-            if (this.drumWorklet) {
-                this.drumWorklet.port.postMessage({ type: 'error', message: `Failed to load drum samples: ${err.message}` });
-            }
         });
-
-        this.drumWorklet.port.onmessage = (e) => {
-            if (e.data.type === 'error') {
-                console.error('[DRUM WORKLET ERROR]', e.data.message);
-            }
-        };
     }
     
     private loadReverbImpulse() {
+        console.log("[AudioEngine] Loading reverb impulse...");
         this.convolver.buffer = this.createFallbackReverb();
+        console.log("[AudioEngine] Fallback reverb created and assigned.");
     }
 
     private createFallbackReverb(): AudioBuffer {
@@ -258,23 +269,22 @@ export class AudioEngine {
     }
     
     public play() {
-        if (!this.isInitialized || this._isPlaying || !this.context) return;
+        console.log("[AudioEngine] Play requested.");
+        if (!this.isInitialized || this.isPlaying || !this.context) return;
         if (this.context.state === 'suspended') {
             this.context.resume();
         }
-
-        this._isPlaying = true;
-        this.drumWorklet?.port.postMessage({type: 'start', bpm: this.tempo, startTime: this.context.currentTime });
+        this.drumMachine.play();
     }
 
     public pause() {
-        if (!this.isInitialized || !this._isPlaying) return;
-        this._isPlaying = false;
-        this.drumWorklet?.port.postMessage({type: 'stop'});
+        console.log("[AudioEngine] Pause requested.");
+        if (!this.isInitialized || !this.isPlaying) return;
+        this.drumMachine.pause();
     }
 
     public stop() {
-        this.pause();
+        this.drumMachine.stop();
         this.stopAllSounds();
     }
     
@@ -387,7 +397,6 @@ export class AudioEngine {
             this.nodes.get('manualBass')?.worklet.port.postMessage(message);
             this.nodes.get('latch')?.worklet.port.postMessage(message);
             
-            // Also update the volume settings associated with the preset
             const newVolumes = { ...this.volumes };
             if (bassPresetParams.reverbSend !== undefined) {
                 newVolumes.manualBass.reverbSend = bassPresetParams.reverbSend;
@@ -402,51 +411,68 @@ export class AudioEngine {
         }
     }
     
-    public setBeatPattern(pattern: any) {
-        if (!this.isInitialized || !this.drumWorklet) return;
-        this.drumWorklet.port.postMessage({ type: 'setPattern', pattern: pattern });
+    public setBeatPattern(patternName: string) {
+        console.log(`[AudioEngine] setBeatPattern called with: ${patternName}`);
+        this.drumMachine.setPattern(patternName);
     }
 
     public setTempo(newTempo: number) {
-        this.tempo = newTempo;
-        this.drumWorklet?.port.postMessage({type: 'setBpm', bpm: this.tempo });
+        console.log(`[AudioEngine] setTempo called with: ${newTempo}`);
+        this.drumMachine.setTempo(newTempo);
+    }
+    
+    public playDrumSample(sampleName: string, volume: number = 1.0) {
+        if (!this.drumWorklet) {
+            console.error(`[AudioEngine] playDrumSample: drumWorklet is not available.`);
+            return;
+        }
+        const message: DrumWorkerMessage = { type: 'playSample', sampleName, volume };
+        console.log(`[AudioEngine] playDrumSample: posting message to 'drum-processor' worklet`, message);
+        this.drumWorklet.port.postMessage(message);
     }
     
     private async loadDrumSamples(): Promise<Record<string, Float32Array>> {
+        console.log("[AudioEngine] Loading drum samples...");
+        
         const samples: Record<string, Float32Array> = {};
         const promises = Object.entries(DRUM_SAMPLES).map(async ([key, path]) => {
             try {
                 const response = await fetch(path);
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status} for ${path}`);
+                    const filename = path.split('/').pop();
+                    throw new Error(`HTTP error! status: ${response.status} for ${filename}`);
                 }
                 const arrayBuffer = await response.arrayBuffer();
                 const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
-                // We use only the left channel for simplicity, as drum samples are often mono.
                 samples[key] = audioBuffer.getChannelData(0);
+                console.log(`[AudioEngine] Loaded sample: ${key}`);
             } catch (error) {
                 console.error(`[AudioEngine] Failed to load or decode drum sample: ${path}`, error);
-                throw error; // Re-throw to be caught by the outer promise chain
             }
         });
 
         await Promise.all(promises);
+        console.log("[AudioEngine] All drum samples processed.");
         return samples;
     }
 
-    private applyVolume(partName: keyof Volumes, volumes: ChannelVolumes) {
-        const nodeInfo = this.nodes.get(partName as any);
+    private applyVolume(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn'>, volumes: ChannelVolumes) {
         const rampTime = this.context.currentTime + 0.05;
 
         if (partName === 'drums') {
-             if (this.drumGain && this.drumReverbSend) {
+             if (this.drumGain) {
                 this.drumGain.gain.linearRampToValueAtTime(dbToGain(volumes.gain), rampTime);
+             }
+             if (this.drumReverbSend) {
                 this.drumReverbSend.gain.linearRampToValueAtTime(dbToGain(volumes.reverbSend), rampTime);
+             }
+        } else {
+            const nodeInfo = this.nodes.get(partName);
+            if (nodeInfo) {
+                nodeInfo.gain.gain.linearRampToValueAtTime(dbToGain(volumes.gain), rampTime);
+                nodeInfo.reverbSend.gain.linearRampToValueAtTime(dbToGain(volumes.reverbSend), rampTime);
+                nodeInfo.distortion.curve = createDistortionCurve(volumes.distortion);
             }
-        } else if (nodeInfo) {
-            nodeInfo.gain.gain.linearRampToValueAtTime(dbToGain(volumes.gain), rampTime);
-            nodeInfo.reverbSend.gain.linearRampToValueAtTime(dbToGain(volumes.reverbSend), rampTime);
-            nodeInfo.distortion.curve = createDistortionCurve(volumes.distortion);
         }
     }
     
@@ -488,7 +514,7 @@ export class AudioEngine {
         this.nodes.forEach((node) => {
             node.worklet.port.postMessage({ type: 'allNotesOff' });
         });
-        this.drumWorklet?.port.postMessage({type: 'stop'});
+        
         const notesToTurnOff = this.latchEngine.clear();
         notesToTurnOff.forEach(note => this.orbManager.removeOrb(note.id));
         this.orbManager?.removeAllOrbs();
@@ -522,5 +548,3 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
-
-    

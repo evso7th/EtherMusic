@@ -1,140 +1,117 @@
+// A simple sample player voice
+class SampleVoice {
+    constructor(buffer, volume) {
+        this.buffer = buffer;
+        this.volume = volume;
+        this.position = 0;
+        this.isFinished = false;
+    }
 
+    render() {
+        if (this.isFinished) {
+            return 0;
+        }
+
+        // Using linear interpolation for smoother playback
+        const floor = Math.floor(this.position);
+        const ceil = Math.ceil(this.position);
+        const fract = this.position - floor;
+
+        const sample1 = this.buffer[floor] || 0;
+        const sample2 = this.buffer[ceil] || 0;
+        
+        const sample = sample1 + (sample2 - sample1) * fract;
+
+        this.position++;
+
+        if (this.position >= this.buffer.length) {
+            this.isFinished = true;
+        }
+
+        return sample * this.volume;
+    }
+}
 
 class DrumProcessor extends AudioWorkletProcessor {
-  constructor(options) {
-    super();
-    this.samples = {};
-    this.polyphony = options.processorOptions?.polyphony || 16;
-    this.activeVoices = [];
-
-    this.bpm = 120;
-    this.pattern = { sequence: [], length: 1 };
-    this.isPlaying = false;
-    this.nextBeatTime = 0;
-    this.secondsPerBeat = 60.0 / this.bpm;
-    this.beatLengthSeconds = this.pattern.length * 4 * this.secondsPerBeat;
-
-    this.port.onmessage = this.handleMessage.bind(this);
-  }
-
-  handleMessage(event) {
-    const { type, payload } = event.data;
-
-    switch(type) {
-        case 'loadSamples':
-            this.loadSamples(payload);
-            break;
-        case 'start':
-            this.start(payload.bpm, payload.startTime);
-            break;
-        case 'stop':
-            this.stop();
-            break;
-        case 'setBpm':
-            this.setBpm(payload.bpm);
-            break;
-        case 'setPattern':
-            this.setPattern(payload.pattern);
-            break;
-        case 'error': // For completeness, though we send errors from here
-            console.error('[DRUM WORKLET] Received error from main thread:', payload.message);
-            break;
+    constructor(options) {
+        super(options);
+        this.samples = new Map();
+        this.activeVoices = [];
+        this.nextVoiceId = 0;
+        
+        console.log('[drum-processor] Initialized.');
+        this.port.onmessage = this.handleMessage.bind(this);
     }
-  }
 
-  loadSamples(samples) {
-    try {
-      samples.forEach(sample => {
-        this.samples[sample.name] = sample.data;
-      });
-    } catch(e) {
-      this.port.postMessage({ type: 'error', message: `Sample loading failed in worklet: ${e.message}` });
+    handleMessage(event) {
+        const { type, samples, sampleName, volume } = event.data;
+        // console.log('[drum-processor] Received message:', event.data);
+
+        switch (type) {
+            case 'loadSamples':
+                if (samples) this.loadSamples(samples);
+                break;
+            case 'playSample':
+                if (sampleName) this.playSample(sampleName, volume);
+                break;
+            default:
+                // console.warn('[drum-processor] Unknown message type:', type);
+        }
     }
-  }
 
-  updateBeatLength() {
-      this.secondsPerBeat = 60.0 / this.bpm;
-      this.beatLengthSeconds = this.pattern.length * 4 * this.secondsPerBeat;
-  }
-
-  setPattern(newPattern) {
-    if (newPattern) {
-      this.pattern = newPattern;
-      this.updateBeatLength();
-      if (this.isPlaying) {
-          // Reset the beat time to the current time to start the new pattern immediately
-          this.nextBeatTime = currentTime; 
-      }
+    loadSamples(samples) {
+        try {
+            console.log('[drum-processor] Loading samples:', samples.map(s => s.name));
+            samples.forEach(sample => {
+                this.samples.set(sample.name, new Float32Array(sample.buffer));
+            });
+            console.log('[drum-processor] Samples loaded successfully. Available samples:', ...this.samples.keys());
+        } catch (e) {
+            this.port.postMessage({ type: 'error', message: `Sample loading failed in DrumProcessor: ${e.message}` });
+        }
     }
-  }
 
-  setBpm(newBpm) {
-    this.bpm = newBpm;
-    this.updateBeatLength();
-  }
+    playSample(name, volume = 1.0) {
+        const buffer = this.samples.get(name);
+        // console.log(`[drum-processor] playSample called for '${name}'. Buffer found:`, !!buffer);
+        if (buffer) {
+            const voice = new SampleVoice(buffer, volume);
+            this.activeVoices.push(voice);
+        } else {
+            this.port.postMessage({ type: 'error', message: `Sample not found in worklet: ${name}` });
+        }
+    }
 
-  start(bpm, startTime) {
-    this.isPlaying = true;
-    this.bpm = bpm;
-    // Align start time to the next processing block to ensure sync
-    this.nextBeatTime = Math.max(startTime, currentTime);
-    this.updateBeatLength();
-  }
+    process(inputs, outputs, parameters) {
+        const outputChannel = outputs[0]?.[0];
+        if (!outputChannel) {
+            return true;
+        }
 
-  stop() {
-    this.isPlaying = false;
-    this.activeVoices = [];
-  }
+        // Ensure the buffer is always cleared
+        outputChannel.fill(0);
 
-  process(inputs, outputs, parameters) {
-    const outputChannel = outputs[0][0];
-    outputChannel.fill(0);
-    
-    if (!this.isPlaying || !this.pattern || !this.pattern.sequence || this.pattern.sequence.length === 0) {
-        if(this.activeVoices.length > 0) this.activeVoices = []; // Clear voices if stopped
+        if (this.activeVoices.length === 0) {
+            return true;
+        }
+        
+        for (let i = 0; i < outputChannel.length; i++) {
+            let frameSample = 0;
+
+            for (let j = this.activeVoices.length - 1; j >= 0; j--) {
+                const voice = this.activeVoices[j];
+                frameSample += voice.render();
+                if (voice.isFinished) {
+                    this.activeVoices.splice(j, 1);
+                }
+            }
+            
+            // Basic clipping to prevent audio artifacts. A limiter would be better.
+            outputChannel[i] = Math.max(-1, Math.min(1, frameSample));
+        }
+
         return true;
     }
-
-    const sampleTime = 1.0 / sampleRate;
-
-    for (let i = 0; i < outputChannel.length; ++i) {
-        const frameTime = currentTime + i * sampleTime;
-        let sampleValue = 0;
-
-        if (frameTime >= this.nextBeatTime) {
-            this.pattern.sequence.forEach(patternNote => {
-                const noteTime = this.nextBeatTime + (patternNote.time * 4 * this.secondsPerBeat);
-                const sample = this.samples[patternNote.note];
-                if (sample && this.activeVoices.length < this.polyphony) {
-                    this.activeVoices.push({
-                        sample: sample,
-                        position: 0,
-                        startTime: noteTime,
-                        volume: patternNote.vol || 1.0,
-                    });
-                }
-            });
-            this.nextBeatTime += this.beatLengthSeconds;
-        }
-
-        for (let j = this.activeVoices.length - 1; j >= 0; j--) {
-            const voice = this.activeVoices[j];
-              // This logic for playing back the sample needs to be frame-accurate.
-              // A simple counter is sufficient here as we're not dealing with pitch.
-              if (voice.position < voice.sample.length) {
-                  sampleValue += voice.sample[voice.position] * voice.volume;
-                  voice.position++;
-              } else {
-                  this.activeVoices.splice(j, 1);
-              }
-        }
-        outputChannel[i] = sampleValue;
-    }
-
-    return true;
-  }
 }
 
 registerProcessor('drum-processor', DrumProcessor);
-
-    
