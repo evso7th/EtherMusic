@@ -4,8 +4,7 @@ import WorkboxWebpackPlugin from 'workbox-webpack-plugin';
 import path from 'path';
 
 const nextConfig: NextConfig = {
-  // This option includes the static export mode.
-  // Next.js will automatically create an `out` folder with the finished files.
+  // This option includes the static export mode, but only for production builds.
   output: process.env.NODE_ENV === 'production' ? 'export' : undefined,
   
   // Disables Next.js image optimization, which is required for static export.
