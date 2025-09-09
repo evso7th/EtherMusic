@@ -14,7 +14,7 @@ import { HelpGuide } from "@/components/help-guide";
 import { beatPatterns } from '@/lib/drum-machine';
 import { CookieConsent } from '@/components/cookie-consent';
 import { useAudioEngine } from '@/hooks/use-audio-engine';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { SleepTimer } from '@/components/sleep-timer';
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
 import { melodyInstruments, defaultMelodyInstrument } from '@/lib/melody-presets';
@@ -263,6 +263,22 @@ export default function Home() {
         updateVolumes({ ...volumes, ...changedMixerVolumes });
     }, [volumes, updateVolumes]);
     
+    const handleChannelEffectChange = useCallback((
+        channel: 'melody' | 'manualBass' | 'latch', 
+        effect: 'reverbSend' | 'distortion', 
+        value: number
+    ) => {
+        const newVolumes = { ...volumes };
+        (newVolumes[channel] as ChannelVolumes)[effect] = value;
+        // Since latch and manual bass share effects, update both
+        if (channel === 'manualBass') {
+            newVolumes.latch[effect] = value;
+        } else if (channel === 'latch') {
+            newVolumes.manualBass[effect] = value;
+        }
+        updateVolumes(newVolumes);
+    }, [volumes, updateVolumes]);
+    
     const handleCompressorChangeCallback = useCallback((compressorSettings: CompressorSettings) => {
         const newVolumes: Volumes = { ...volumes, compressor: compressorSettings };
         updateVolumes(newVolumes);
@@ -420,6 +436,11 @@ export default function Home() {
                             activeInstrument={activeBassInstrument}
                             onInstrumentChange={handleBassInstrumentChange}
                             orbManager={orbManager}
+                            effects={{
+                                reverbSend: volumes.manualBass.reverbSend,
+                                distortion: volumes.manualBass.distortion,
+                            }}
+                            onEffectChange={(effect, value) => handleChannelEffectChange('manualBass', effect, value)}
                         />
                         <MemoizedThereminPad
                             type="melody"
@@ -438,6 +459,11 @@ export default function Home() {
                             onInstrumentChange={handleMelodyInstrumentChange}
                             isPolyphonic
                             orbManager={orbManager}
+                            effects={{
+                                reverbSend: volumes.melody.reverbSend,
+                                distortion: volumes.melody.distortion,
+                            }}
+                            onEffectChange={(effect, value) => handleChannelEffectChange('melody', effect, value)}
                         />
                     </div>
                     <div className="flex-shrink-0 portrait:block landscape:hidden">
