@@ -30,6 +30,21 @@ function createDistortionCurve(amount: number): Float32Array {
 
 type SynthPartName = 'melody' | 'manualBass' | 'latch';
 
+const DRUM_SAMPLES: Record<string, string> = {
+    'k': 'kick_drum.wav',
+    's': 'snare.wav',
+    'h': 'closed_hi_hat_accented.wav',
+    'H': 'closed_hi_hat_ghost.wav',
+    'c': 'crash.wav',
+    'y': 'cymbal.wav',
+    't': 'high_tom.wav',
+    'T': 'mid_tom.wav',
+    'l': 'low_tom.wav',
+    'b': 'hh_bark_short.wav',
+    'loop1': 'loop_1_92bpm.wav',
+    'loop2': 'loop_2_110bpm.wav',
+    'loop3': 'loop_3_80bpm.wav'
+};
 
 export class AudioEngine {
     public isInitialized = false;
@@ -146,8 +161,8 @@ export class AudioEngine {
 
         try {
              await Promise.all([
-                this.context.audioWorklet.addModule('/workers/synth-processor.js'),
-                this.context.audioWorklet.addModule('/workers/drum-processor.js'),
+                this.context.audioWorklet.addModule('workers/synth-processor.js'),
+                this.context.audioWorklet.addModule('workers/drum-processor.js'),
              ]);
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
@@ -190,13 +205,35 @@ export class AudioEngine {
         if (!this.context) return;
 
         this.drumWorklet = new AudioWorkletNode(this.context, 'drum-processor', {
-            processorOptions: { sampleRate: this.context.sampleRate, polyphony: 8 }
+            processorOptions: { sampleRate: this.context.sampleRate, polyphony: 16 }
         });
         this.drumGain = this.context.createGain();
         this.drumReverbSend = this.context.createGain();
 
         this.drumWorklet.connect(this.drumGain).connect(this.preCompressorOut);
         this.drumGain.connect(this.drumReverbSend).connect(this.reverbSend);
+
+        this.loadDrumSamples().then(samples => {
+            if (this.drumWorklet) {
+                const transferableSamples = Object.entries(samples).map(([name, data]) => ({
+                    name,
+                    data: data
+                }));
+                // We need to transfer the ArrayBuffer, not the Float32Array directly
+                const transferList = transferableSamples.map(s => s.data.buffer);
+                this.drumWorklet.port.postMessage({ type: 'loadSamples', samples: transferableSamples }, transferList);
+            }
+        }).catch(err => {
+            if (this.drumWorklet) {
+                this.drumWorklet.port.postMessage({ type: 'error', message: `Failed to load drum samples: ${err.message}` });
+            }
+        });
+
+        this.drumWorklet.port.onmessage = (e) => {
+            if (e.data.type === 'error') {
+                console.error('[DRUM WORKLET ERROR]', e.data.message);
+            }
+        };
     }
     
     private async loadReverbImpulse() {
@@ -348,7 +385,7 @@ export class AudioEngine {
     }
     
     public setBassInstrument(instrumentName: BassInstrument) {
-        const preset = bassInstruments.find(p => p.id === instrumentName);
+        const preset = bassInstruments.find(i => i.id === instrumentName);
         if (preset) {
             const bassPresetParams = preset.params;
             const message: WorkerMessage = { type: 'setPreset', preset: bassPresetParams };
@@ -381,6 +418,30 @@ export class AudioEngine {
         this.drumWorklet?.port.postMessage({type: 'setBpm', bpm: this.tempo });
     }
     
+    private async loadDrumSamples(): Promise<Record<string, Float32Array>> {
+        const samples: Record<string, Float32Array> = {};
+        const promises = Object.entries(DRUM_SAMPLES).map(async ([key, filename]) => {
+            try {
+                const path = `/assets/sounds/drums/${filename}`;
+                const response = await fetch(path);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status} for ${filename}`);
+                }
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+                // We use only the left channel for simplicity, as drum samples are often mono.
+                samples[key] = audioBuffer.getChannelData(0);
+            } catch (error) {
+                console.error(`Failed to load or decode drum sample: ${filename}`, error);
+                // We can either throw here to stop everything, or continue with missing samples.
+                // For a more resilient app, we'll log the error and continue.
+            }
+        });
+
+        await Promise.all(promises);
+        return samples;
+    }
+
     private applyVolume(partName: keyof Volumes, volumes: ChannelVolumes) {
         const nodeInfo = this.nodes.get(partName as any);
         const rampTime = this.context.currentTime + 0.05;
@@ -469,3 +530,5 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
+
+    

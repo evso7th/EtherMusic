@@ -6,7 +6,6 @@ export const beatPatterns = [
     { name: 'Tibet', type: 'Meditative' },
     { name: 'Space', type: 'Meditative' },
     { name: 'Toccata', type: 'Classic' },
-    { name: 'Promenade', type: 'Classic' },
     { name: 'Nocturne', type: 'Classic' },
     { name: 'Scherzo', type: 'Classic' },
     { name: 'Aria', type: 'Classic' },
@@ -14,3 +13,5 @@ export const beatPatterns = [
 ];
 
 export type BeatPattern = typeof beatPatterns[number];
+
+    
