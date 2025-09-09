@@ -180,7 +180,7 @@ export class AudioEngine {
         
         this.loadReverbImpulse();
         
-        await this.loadDrumSamples().catch(err => console.error("Error during drum sample loading chain:", err));;
+        await this.loadDrumSamples().catch(err => console.error("Error during drum sample loading chain:", err));
         
         this.setVolumes(this.volumes);
         
@@ -463,7 +463,7 @@ export class AudioEngine {
              console.log('[AudioEngine] Posting loaded samples to drum worklet.');
              const transferableBuffers: ArrayBuffer[] = [];
              loadedSamples.forEach(sample => {
-                 if (sample) {
+                 if (sample && sample.buffer) {
                      const message: DrumWorkerMessage = { type: 'loadSample', name: sample.key, buffer: sample.buffer };
                      drumNode.worklet.port.postMessage(message, [sample.buffer]);
                  }
@@ -560,5 +560,3 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
-
-    
