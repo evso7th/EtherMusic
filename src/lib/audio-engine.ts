@@ -421,7 +421,10 @@ export class AudioEngine {
     
     public setBeatPattern(patternName: string) {
         console.log(`[AudioEngine] setBeatPattern called with: ${patternName}`);
+        const wasPlaying = this.isPlaying;
+        if(wasPlaying) this.drumMachine.stop();
         this.drumMachine.setPattern(patternName);
+        if(wasPlaying || patternName !== 'Off') this.drumMachine.play();
     }
 
     public setTempo(newTempo: number) {
