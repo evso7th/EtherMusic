@@ -3,7 +3,7 @@ import type { AudioEngine } from './audio-engine';
 
 export type BeatPattern = {
     name: string;
-    type: 'Meditative' | 'Classic' | 'System' | 'Fill';
+    type: 'Meditative' | 'Classic' | 'System';
     length: number; // in measures
     sequence: {
         time: number; // in 16th note steps (0-15 for a 1-bar loop in 4/4)
@@ -13,13 +13,11 @@ export type BeatPattern = {
 };
 
 export const beatPatterns: Readonly<BeatPattern[]> = [
-    // Meditative
     { name: 'Air', type: 'Meditative', length: 1, sequence: [{ time: 0, note: 'k' }, { time: 8, note: 'h' }] },
     { name: 'Earth', type: 'Meditative', length: 1, sequence: [{ time: 0, note: 'k' }, { time: 8, note: 's' }] },
     { name: 'Water', type: 'Meditative', length: 1, sequence: [{ time: 0, note: 't' }, { time: 4, note: 'H' }, { time: 8, note: 'T' }, { time: 12, note: 'H' }] },
     { name: 'Tibet', type: 'Meditative', length: 1, sequence: [{ time: 0, note: 'l' }, { time: 8, note: 'y' }] },
     { name: 'Space', type: 'Meditative', length: 2, sequence: [{ time: 0, note: 'k' }, { time: 10, note: 'h' }, { time: 22, note: 'y' }] },
-    // Classic
     { name: 'Toccata', type: 'Classic', length: 1, sequence: [
         { time: 0, note: 'k' }, { time: 2, note: 'H' }, { time: 4, note: 'k' }, { time: 6, note: 'H' },
         { time: 8, note: 's' }, { time: 10, note: 'H' }, { time: 12, note: 'k' }, { time: 14, note: 'H' },
@@ -31,35 +29,20 @@ export const beatPatterns: Readonly<BeatPattern[]> = [
         { time: 0, note: 'k' }, { time: 4, note: 't' }, { time: 8, note: 's' }, { time: 10, note: 'H' }, { time: 12, note: 'T' },
     ]},
     { name: 'Aria', type: 'Classic', length: 1, sequence: [{ time: 0, note: 'c', vol: 0.7 }, { time: 8, note: 'b', vol: 0.9 }] },
-    // System
     { name: 'Off', type: 'System', length: 1, sequence: [] },
-    // Fills
-    { name: 'Tom Fill 1', type: 'Fill', length: 1, sequence: [
-        { time: 8, note: 't', vol: 0.6 }, { time: 10, note: 't', vol: 0.7 }, { time: 12, note: 'T', vol: 0.8 }, { time: 14, note: 'T', vol: 0.9 },
-    ]},
-    { name: 'Tom Fill 2', type: 'Fill', length: 1, sequence: [
-        { time: 12, note: 't', vol: 0.7 }, { time: 13, note: 'T', vol: 0.8 }, { time: 14, note: 'l', vol: 0.9 }, { time: 15, note: 'l', vol: 1.0 },
-    ]},
-     { name: 'Slow Toms', type: 'Fill', length: 1, sequence: [
-        { time: 8, note: 't', vol: 0.6 }, { time: 10, note: 'T', vol: 0.7 }, { time: 12, note: 'l', vol: 0.8 }, { time: 14, note: 'l', vol: 0.9 },
-    ]},
 ];
 
 export class DrumMachine {
     private audioEngine: AudioEngine;
-    private _tempo: number = 60;
-    private _swing: number = 0;
+    private _tempo: number = 90;
+    private _swing: number = 0; // 0 = no swing, 1 = max swing
     private _pattern: BeatPattern;
     private timeoutId: NodeJS.Timeout | null = null;
     private step: number = 0;
-    private measureCount: number = 0;
-    private isPlayingFill: boolean = false;
-    private fillPatterns: BeatPattern[];
-
+    
     constructor(audioEngine: AudioEngine) {
         this.audioEngine = audioEngine;
         this._pattern = beatPatterns.find(p => p.name === 'Off')!;
-        this.fillPatterns = beatPatterns.filter(p => p.type === 'Fill');
     }
 
     public get isPlaying(): boolean {
@@ -75,7 +58,7 @@ export class DrumMachine {
     }
     
     public setSwing(swing: number) {
-        this._swing = Math.max(0, Math.min(0.75, swing));
+        this._swing = Math.max(0, Math.min(0.75, swing)); // Clamp swing between 0 and 0.75
          if (this.isPlaying) {
             this.stop();
             this.play();
@@ -99,12 +82,11 @@ export class DrumMachine {
     }
 
     public play() {
-        if (this.isPlaying || !this._pattern || this._pattern.name === 'Off') {
+        if (this.isPlaying || !this._pattern || this._pattern.sequence.length === 0) {
             return;
         }
-        this.step = 0;
-        this.measureCount = 0;
-        this.isPlayingFill = false;
+        
+        this.step = 0; 
         this.scheduler();
     }
     
@@ -117,57 +99,30 @@ export class DrumMachine {
             clearTimeout(this.timeoutId);
             this.timeoutId = null;
             this.step = 0;
-            this.measureCount = 0;
-            this.isPlayingFill = false;
         }
     }
 
     private scheduler() {
+        const totalSteps = this._pattern.length * 16;
         const sixteenthNoteDuration = 60 / this._tempo / 4;
-        
-        // Decide whether to play a fill
-        // Every 4th measure (but not the first), if we are not already in a fill, 50% chance to play one.
-        if (this.measureCount > 0 && this.measureCount % 4 === 3 && !this.isPlayingFill && Math.random() < 0.5) {
-            this.isPlayingFill = true;
-        }
-        
-        let currentPattern = this.isPlayingFill ? 
-            this.fillPatterns[Math.floor(Math.random() * this.fillPatterns.length)] : 
-            this._pattern;
 
-        const totalStepsInPattern = currentPattern.length * 16;
-        const currentStepInPattern = this.step % totalStepsInPattern;
-        
-        currentPattern.sequence.forEach(note => {
-            if (note.time === currentStepInPattern) {
+        this._pattern.sequence.forEach(note => {
+            if (note.time === this.step) {
                 this.audioEngine.playDrumSample(note.note, note.vol);
             }
         });
 
         // Determine delay until next step, incorporating swing
         let delay;
-        if (this.step % 2 !== 0) { // Off-beat (swing it)
+        if (this.step % 2 !== 0) {
+            // Off-beat (swing)
             delay = sixteenthNoteDuration * (1 + this._swing);
-        } else { // On-beat
+        } else {
+            // On-beat (no swing)
             delay = sixteenthNoteDuration * (1 - this._swing);
         }
         
-        this.step = (this.step + 1);
-
-        if (this.step % 16 === 0) { // A measure has passed
-            if (this.isPlayingFill) {
-                this.isPlayingFill = false; // Fill is over, go back to main pattern
-            }
-            this.measureCount++;
-        }
-        
-        // Reset step to avoid it growing indefinitely, respecting pattern length
-        const totalStepsInMainPattern = this._pattern.length * 16;
-        if (this.step >= totalStepsInMainPattern && !this.isPlayingFill) {
-            this.step = 0;
-            // The measure count continues to increment, determining when to play the next fill
-        }
-
+        this.step = (this.step + 1) % totalSteps;
 
         this.timeoutId = setTimeout(() => this.scheduler(), delay * 1000);
     }

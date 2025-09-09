@@ -265,8 +265,7 @@ export default function Home() {
     }, [setVolumes, setTempo, cookieConsent]);
     
     const handleMixerChange = useCallback((changedMixerVolumes: Partial<Volumes>) => {
-        const newVolumes = { ...volumes, ...changedMixerVolumes };
-        updateVolumes(newVolumes);
+        updateVolumes({ ...volumes, ...changedMixerVolumes });
     }, [volumes, updateVolumes]);
     
     const handleChannelEffectChange = useCallback((
@@ -385,7 +384,7 @@ export default function Home() {
     }
 
     return (
-        <div className="relative flex flex-col h-screen overflow-hidden bg-background">
+        <div className="relative flex flex-col h-screen overflow-hidden">
             <div className="fixed inset-0 z-0">
                  <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={currentTempo} />
             </div>
