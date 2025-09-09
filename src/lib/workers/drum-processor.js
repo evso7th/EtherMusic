@@ -20,7 +20,7 @@ class DrumProcessor extends AudioWorkletProcessor {
   log(...args) {
     // console.log(...args);
     // Use this for more verbose logging from the worklet if needed.
-    // this.port.postMessage({ type: 'log', message: args });
+    this.port.postMessage({ type: 'log', message: args });
   }
 
   handleMessage(event) {
@@ -92,6 +92,7 @@ class DrumProcessor extends AudioWorkletProcessor {
       this.pattern = this.patterns[patternName];
       this.updateBeatLength();
       if (this.isPlaying) {
+          // Reset the beat time to the current time to start the new pattern immediately
           this.nextBeatTime = currentTime; 
       }
     } else {
