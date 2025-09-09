@@ -70,7 +70,7 @@ export interface BassInstrumentPreset {
 export type BeatPattern = {
     name: string;
     type: 'Meditative' | 'Classic' | 'System';
-    length: number;
+    length: number; // in measures
     sequence: { time: number; note: string; vol?: number }[];
 };
 
@@ -97,6 +97,7 @@ export interface Volumes {
   drums: ChannelVolumes;
   reverbReturn: number; // in dB
   compressor: CompressorSettings;
+  swing: number; // 0 to 1
 }
 
 export interface SynthNote {
@@ -116,8 +117,8 @@ export type WorkerMessage =
     | { type: 'setPreset', preset: InstrumentPresetParams | BassInstrumentPresetParams };
 
 export type DrumWorkerMessage =
-    | { type: 'loadSample'; name: string; buffer: ArrayBuffer }
-    | { type: 'playSample'; sampleName: string; volume?: number };
+    | { type: 'loadSample'; name: string; buffer: ArrayBuffer; }
+    | { type: 'playSample'; sampleName: string; volume?: number; };
 
 
 export type EnvelopeCurve = "linear" | "exponential";

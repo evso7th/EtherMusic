@@ -107,6 +107,10 @@ export function useAudioEngine() {
         console.log("[useAudioEngine] Setting tempo to:", tempo);
         audioEngine.current?.setTempo(tempo);
     }, []);
+
+    const setSwing = useCallback((swing: number) => {
+        audioEngine.current?.setSwing(swing);
+    }, []);
     
     const setBeatPattern = useCallback((patternName: string) => {
         if (!audioEngine.current) return;
@@ -188,6 +192,7 @@ export function useAudioEngine() {
         stop,
         setVolumes,
         setTempo,
+        setSwing,
         setMelodyInstrument,
         setBassInstrument,
         setBeatPattern,
