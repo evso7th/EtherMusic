@@ -202,11 +202,9 @@ export class AudioEngine {
         const gain = this.context.createGain();
         const reverbSend = this.context.createGain();
         
-        worklet.connect(distortion);
-        distortion.connect(gain);
+        worklet.connect(distortion).connect(gain);
         gain.connect(this.preCompressorOut);
-        gain.connect(reverbSend);
-        reverbSend.connect(this.reverbSend);
+        gain.connect(reverbSend).connect(this.reverbSend);
         
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
@@ -245,14 +243,17 @@ export class AudioEngine {
     private async loadReverbImpulse() {
         console.log("[AudioEngine] Loading reverb impulse...");
         try {
-            const response = await fetch('/assets/sounds/impulses/space.wav');
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const buffer = await response.arrayBuffer();
-            const audioBuffer = await this.context.decodeAudioData(buffer);
-            this.convolver.buffer = audioBuffer;
-            console.log("[AudioEngine] Reverb impulse loaded and assigned.");
+            // NOTE: The 'space.wav' file was not found, so we are using a fallback.
+            // If a real impulse response is added, the fetch can be reinstated.
+            // const response = await fetch('/assets/sounds/impulses/space.wav');
+            // if (!response.ok) {
+            //     throw new Error(`HTTP error! status: ${response.status}`);
+            // }
+            // const buffer = await response.arrayBuffer();
+            // const audioBuffer = await this.context.decodeAudioData(buffer);
+            // this.convolver.buffer = audioBuffer;
+            // console.log("[AudioEngine] Reverb impulse loaded and assigned.");
+            throw new Error("Reverb impulse file not available.");
         } catch (e) {
             console.warn("[AudioEngine] Could not load reverb impulse, using fallback.", e);
             this.convolver.buffer = this.createFallbackReverb();
