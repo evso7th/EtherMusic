@@ -17,7 +17,7 @@ export const beatPatterns: Readonly<BeatPattern[]> = [
     { name: 'Earth', type: 'Meditative', length: 1, sequence: [{ time: 0, note: 'k' }, { time: 8, note: 's' }] },
     { name: 'Water', type: 'Meditative', length: 1, sequence: [{ time: 0, note: 't' }, { time: 4, note: 'H' }, { time: 8, note: 'T' }, { time: 12, note: 'H' }] },
     { name: 'Tibet', type: 'Meditative', length: 1, sequence: [{ time: 0, note: 'l' }, { time: 8, note: 'y' }] },
-    { name: 'Space', type: 'Meditative', length: 1, sequence: [{ time: 0, note: 'k' }, { time: 5, note: 'h' }, { time: 11, note: 'y' }] }, // Approximation of 1/3
+    { name: 'Space', type: 'Meditative', length: 2, sequence: [{ time: 0, note: 'k' }, { time: 10, note: 'h' }, { time: 22, note: 'y' }] },
     { name: 'Toccata', type: 'Classic', length: 1, sequence: [
         { time: 0, note: 'k' }, { time: 2, note: 'H' }, { time: 4, note: 'k' }, { time: 6, note: 'H' },
         { time: 8, note: 's' }, { time: 10, note: 'H' }, { time: 12, note: 'k' }, { time: 14, note: 'H' },
@@ -82,13 +82,13 @@ export class DrumMachine {
             return;
         }
         
-        this.step = 0;
+        this.step = -1; // Start at -1 so the first tick is 0
         const sixteenthNoteDurationMs = (60 / this._tempo / 4) * 1000; 
         console.log(`[DrumMachine] Starting loop with interval ${sixteenthNoteDurationMs.toFixed(2)}ms for tempo ${this._tempo} BPM.`);
         
-        // This is a safety check for the browser environment
         if (typeof window !== 'undefined') {
-            this.scheduler(); // Trigger first beat immediately
+            // Trigger first beat immediately and then set interval
+            this.scheduler(); 
             this.intervalId = window.setInterval(() => {
                 this.scheduler();
             }, sixteenthNoteDurationMs);
@@ -107,26 +107,23 @@ export class DrumMachine {
             clearInterval(this.intervalId);
             this.intervalId = null;
             this.step = 0;
-             console.log("[DrumMachine] Loop stopped.");
+            console.log("[DrumMachine] Loop stopped.");
         }
     }
 
     private scheduler() {
         if (!this.audioEngine || !this._pattern) return;
+        
         const totalSteps = this._pattern.length * 16;
-        const currentStep = this.step % totalSteps;
-
-        console.log(`[DrumMachine] Scheduler tick. Step: ${currentStep}`);
+        this.step = (this.step + 1) % totalSteps;
+        
+        console.log(`[DrumMachine] Scheduler tick. Step: ${this.step}`);
 
         this._pattern.sequence.forEach(note => {
-            if (note.time === currentStep) {
-                console.log(`[DrumMachine] scheduling note: ${note.note} at step ${currentStep}`);
+            if (note.time === this.step) {
+                console.log(`[DrumMachine] scheduling note: ${note.note} at step ${this.step}`);
                 this.audioEngine.playDrumSample(note.note, note.vol);
             }
         });
-
-        this.step++;
     }
 }
-
-    

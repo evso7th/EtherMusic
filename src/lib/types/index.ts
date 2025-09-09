@@ -111,14 +111,9 @@ export interface SynthNote {
     time?: number;
 }
 
-export type DrumSampleMessage = {
-    type: 'loadSamples';
-    samples: { name: string; data: Float32Array }[];
-} | {
-    type: 'playSample';
-    sampleName: string;
-    volume?: number;
-};
+export type DrumWorkerMessage =
+    | { type: 'loadSamples'; samples: { name: string; data: ArrayBuffer }[] }
+    | { type: 'playSample'; sampleName: string; volume?: number };
 
 
 export type WorkerMessage = 
@@ -126,8 +121,7 @@ export type WorkerMessage =
     | { type: 'noteOff', id: number }
     | { type: 'noteUpdate', note: SynthNote }
     | { type: 'allNotesOff' }
-    | { type: 'setPreset', preset: InstrumentPresetParams | BassInstrumentPresetParams }
-    | DrumSampleMessage;
+    | { type: 'setPreset', preset: InstrumentPresetParams | BassInstrumentPresetParams };
 
 
 export type EnvelopeCurve = "linear" | "exponential";
@@ -140,5 +134,3 @@ export interface Note {
     duration?: number; // for autopilot and scheduled notes
     time?: number; // for autopilot and scheduled notes
 }
-
-    

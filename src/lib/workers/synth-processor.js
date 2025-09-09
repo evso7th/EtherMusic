@@ -1,4 +1,5 @@
 
+
 // A class representing a single oscillator with its own phase.
 class Oscillator {
     constructor(type, sampleRate) {
@@ -133,30 +134,60 @@ class Voice {
     processLayerEnvelope(layer) {
         const env = layer.envelope;
         if (this.isReleasing) {
-          if (env.state !== 'release') { env.state = 'release'; env.releaseLevel = env.currentValue; }
+          if (env.state !== 'release') { 
+              env.state = 'release'; 
+              env.releaseLevel = env.currentValue; 
+          }
         }
         switch (env.state) {
-            case 'attack': env.currentValue += 1.0 / env.attackSamples; if (env.currentValue >= 1.0) { env.currentValue = 1.0; env.state = 'decay'; } break;
-            case 'decay': env.currentValue -= (1.0 - env.sustainLevel) / env.decaySamples; if (env.currentValue <= env.sustainLevel) { env.currentValue = env.sustainLevel; env.state = 'sustain'; } break;
-            case 'sustain': break;
-            case 'release': env.currentValue -= env.releaseLevel / env.releaseSamples; if (env.currentValue <= 0) { env.currentValue = 0; } break;
+            case 'attack':
+                env.currentValue += 1.0 / env.attackSamples;
+                if (env.currentValue >= 1.0) {
+                    env.currentValue = 1.0;
+                    env.state = 'decay';
+                }
+                break;
+            case 'decay':
+                env.currentValue -= (1.0 - (env.sustainLevel ?? env.sustain)) / env.decaySamples;
+                if (env.currentValue <= (env.sustainLevel ?? env.sustain)) {
+                    env.currentValue = (env.sustainLevel ?? env.sustain);
+                    env.state = 'sustain';
+                }
+                break;
+            case 'sustain':
+                break;
+            case 'release':
+                env.currentValue -= env.releaseLevel / env.releaseSamples;
+                if (env.currentValue <= 0) {
+                    env.currentValue = 0;
+                }
+                break;
         }
         return env.currentValue;
     }
 
     render() {
-        if (this.isReleasing && this.layers.every(l => l.envelope.currentValue <= 0)) this.isFinished = true;
+        if (this.isReleasing && this.layers.every(l => l.envelope.currentValue <= 0.0001)) {
+            this.isFinished = true;
+        }
         if (this.isFinished) return 0;
-        if (this.portamentoSpeed > 0) this.baseFrequency += (this.targetFrequency - this.baseFrequency) * this.portamentoSpeed;
+        
+        if (this.portamentoSpeed > 0) {
+            this.baseFrequency += (this.targetFrequency - this.baseFrequency) * this.portamentoSpeed;
+        }
+
         const lfoModulation = this.processLFO();
+        
         let mixedSample = 0;
         this.layers.forEach(layer => {
             const envelopeValue = this.processLayerEnvelope(layer);
-            const modulatedFrequency = (this.baseFrequency * layer.freqMult) + lfoModulation;
+            const modulatedFrequency = (this.baseFrequency * (layer.freqMult || 1)) + lfoModulation;
             const oscSample = layer.osc.process(modulatedFrequency);
             mixedSample += oscSample * layer.level * envelopeValue;
         });
+        
         const filteredSample = this.processFilter(mixedSample);
+        
         return filteredSample * this.volume;
     }
 
@@ -164,79 +195,35 @@ class Voice {
     release() { if (!this.isReleasing) this.isReleasing = true; }
 }
 
-// A class representing a simple sample player voice
-class SampleVoice {
-    constructor(id, buffer, volume, sampleRate) {
-        this.id = id;
-        this.buffer = buffer;
-        this.volume = volume;
-        this.sampleRate = sampleRate;
-        this.position = 0;
-        this.isFinished = false;
-    }
-
-    render() {
-        if (this.isFinished || this.position >= this.buffer.length) {
-            this.isFinished = true;
-            return 0;
-        }
-        const sample = this.buffer[this.position] * this.volume;
-        this.position++;
-        return sample;
-    }
-}
-
-
 class SynthProcessor extends AudioWorkletProcessor {
     constructor(options) {
         super();
-        this.polyphony = options.processorOptions?.polyphony || 8;
         this.voices = new Map();
-        this.activeSamples = new Map();
-        this.samples = new Map();
-        
-        this.nextSampleId = 0;
+        this.polyphony = options.processorOptions?.polyphony || 8;
         this.preset = this.getDefaultPreset();
-        
+        console.log(`[synth-processor] Initialized with polyphony: ${this.polyphony}`);
         this.port.onmessage = this.handleMessage.bind(this);
     }
 
     handleMessage(event) {
         console.log('[synth-processor] Received message:', event.data);
-        const { type, note, id, preset, samples, sampleName, volume } = event.data;
+        const { type, note, id, preset } = event.data;
         switch (type) {
-            case 'noteOn': if (note) this.noteOn(note); break;
-            case 'noteOff': if (id !== undefined) this.noteOff(id); break;
-            case 'noteUpdate': if (note) this.noteUpdate(note); break;
-            case 'allNotesOff': this.allNotesOff(); break;
-            case 'setPreset': if (preset) this.applyPreset(preset); break;
-            case 'loadSamples': if (samples) this.loadSamples(samples); break;
-            case 'playSample': if (sampleName) this.playSample(sampleName, volume); break;
-        }
-    }
-
-    loadSamples(samples) {
-        try {
-            console.log('[synth-processor] Loading samples:', samples.map(s => s.name));
-            samples.forEach(sample => {
-                this.samples.set(sample.name, sample.data);
-            });
-            console.log('[synth-processor] Samples loaded successfully. Available samples:', ...this.samples.keys());
-        } catch(e) {
-          this.port.postMessage({ type: 'error', message: `Sample loading failed in worklet: ${e.message}` });
-        }
-    }
-
-    playSample(name, volume = 1.0) {
-        const buffer = this.samples.get(name);
-        console.log(`[synth-processor] playSample called for '${name}'. Buffer found:`, !!buffer);
-        if (buffer) {
-             const sampleId = `sample_${this.nextSampleId++}`;
-             const sampleVoice = new SampleVoice(sampleId, buffer, volume, sampleRate);
-             this.activeSamples.set(sampleId, sampleVoice);
-             console.log(`[synth-processor] Playing sample '${name}', id: ${sampleId}`);
-        } else {
-            this.port.postMessage({type: 'error', message: `Sample not found in worklet: ${name}`});
+            case 'noteOn':
+                if (note) this.noteOn(note);
+                break;
+            case 'noteOff':
+                if (id !== undefined) this.noteOff(id);
+                break;
+            case 'noteUpdate':
+                if (note) this.noteUpdate(note);
+                break;
+            case 'allNotesOff':
+                this.allNotesOff();
+                break;
+            case 'setPreset':
+                if (preset) this.applyPreset(preset);
+                break;
         }
     }
 
@@ -251,54 +238,73 @@ class SynthProcessor extends AudioWorkletProcessor {
             voice.noteUpdate(note.frequency, note.volume);
             return;
         }
+
         if (this.voices.size >= this.polyphony) {
-            const oldestVoiceId = this.voices.keys().next().value;
-            this.voices.get(oldestVoiceId)?.release();
+            // Find the oldest voice that is releasing, or just the oldest if none are.
+            let oldestId = this.voices.keys().next().value;
+            let oldestVoice = this.voices.get(oldestId);
+            let foundReleasing = oldestVoice?.isReleasing;
+
+            if (!foundReleasing) {
+                for (const [id, voice] of this.voices.entries()) {
+                    if (voice.isReleasing) {
+                        oldestId = id;
+                        foundReleasing = true;
+                        break;
+                    }
+                }
+            }
+             this.voices.delete(oldestId);
         }
+
         const voice = new Voice(note.id, note.frequency, note.volume, this.preset, sampleRate);
         this.voices.set(note.id, voice);
     }
     
     noteUpdate(note) {
         const voice = this.voices.get(note.id);
-        if (voice) voice.noteUpdate(note.frequency, note.volume);
+        if (voice) {
+            voice.noteUpdate(note.frequency, note.volume);
+        }
     }
 
     noteOff(id) {
         const voice = this.voices.get(id);
-        if (voice) voice.release();
+        if (voice) {
+            voice.release();
+        }
     }
 
-    allNotesOff() {
-        this.voices.forEach(voice => voice.release());
-    }
+allNotesOff() {
+    this.voices.forEach(voice => {
+        voice.isReleasing = true;
+        voice.layers.forEach(l => {
+            l.envelope.releaseSamples = Math.min(l.envelope.releaseSamples, sampleRate * 0.05); // 50ms fade
+        });
+    });
+}
+
 
     process(inputs, outputs, parameters) {
-        const outputChannel = outputs[0][0];
-        if (!outputChannel) return true;
+        const output = outputs[0];
+        const channel = output[0];
         
-        outputChannel.fill(0);
-
-        for (let i = 0; i < outputChannel.length; i++) {
-            let frameSample = 0;
-
-            this.voices.forEach((voice, id) => {
-                frameSample += voice.render();
-                if (voice.isFinished) {
-                    this.voices.delete(id);
-                }
-            });
-
-            this.activeSamples.forEach((sample, id) => {
-                frameSample += sample.render();
-                if (sample.isFinished) {
-                    this.activeSamples.delete(id);
-                }
-            });
-
-            outputChannel[i] = Math.max(-1, Math.min(1, frameSample));
+        if (channel) {
+            // Initialize buffer to zeros
+            channel.fill(0);
+            
+            if (this.voices.size > 0) {
+                this.voices.forEach((voice, id) => {
+                    if (voice.isFinished) {
+                        this.voices.delete(id);
+                    } else {
+                        for (let i = 0; i < channel.length; i++) {
+                            channel[i] += voice.render();
+                        }
+                    }
+                });
+            }
         }
-        
         return true;
     }
     
@@ -315,5 +321,3 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
-
-    
