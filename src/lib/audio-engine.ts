@@ -44,6 +44,8 @@ const DRUM_SAMPLES: Record<string, string> = {
     'g': '/assets/sounds/drums/snare_ghost_note.wav',
     'c': '/assets/sounds/drums/crash.wav',
     'y': '/assets/sounds/drums/cymbal.wav',
+    'Y': '/assets/sounds/drums/cymbal_bell.wav',
+    'Z': '/assets/sounds/drums/cymbal_bell2.wav',
     't': '/assets/sounds/drums/high_tom.wav',
     'T': '/assets/sounds/drums/mid_tom.wav',
     'l': '/assets/sounds/drums/low_tom.wav',
@@ -489,7 +491,7 @@ export class AudioEngine {
         console.log("[AudioEngine] All drum samples processed.");
     }
 
-    private applyVolumeForPart(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing'>, volumes: ChannelVolumes) {
+    private applyVolumeForPart(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' | 'autopilot'>, volumes: ChannelVolumes) {
         const rampTime = this.context.currentTime + 0.05;
     
         const nodeInfo = this.nodes.get(partName);
@@ -578,3 +580,5 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
+
+    

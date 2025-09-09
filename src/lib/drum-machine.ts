@@ -8,8 +8,8 @@ export const beatPatterns: Readonly<BeatPattern[]> = [
     { name: 'Air', type: 'Meditative', length: 1, sequence: [{ time: 0, note: 'k' }, { time: 8, note: 'h' }] },
     { name: 'Earth', type: 'Meditative', length: 1, sequence: [{ time: 0, note: 'k' }, { time: 8, note: 's' }] },
     { name: 'Water', type: 'Meditative', length: 1, sequence: [{ time: 0, note: 't' }, { time: 4, note: 'H' }, { time: 8, note: 'T' }, { time: 12, note: 'H' }] },
-    { name: 'Tibet', type: 'Meditative', length: 1, sequence: [{ time: 0, note: 'l' }, { time: 8, note: 'y' }] },
-    { name: 'Space', type: 'Meditative', length: 2, sequence: [{ time: 0, note: 'k' }, { time: 10, note: 'h' }, { time: 22, note: 'y' }] },
+    { name: 'Tibet', type: 'Meditative', length: 2, sequence: [{ time: 0, note: 'Y' }, { time: 16, note: 'Z' }] },
+    { name: 'Space', type: 'Meditative', length: 2, sequence: [{ time: 0, note: 'k' }, { time: 10, note: 'h' }, { time: 22, note: 'c' }] },
 
     // Classic
     { name: 'Toccata', type: 'Classic', length: 1, sequence: [
@@ -154,3 +154,5 @@ export class DrumMachine {
         this.timeoutId = setTimeout(() => this.scheduler(), delay * 1000);
     }
 }
+
+    
