@@ -24,21 +24,22 @@ export const beatPatterns: Readonly<BeatPattern[]> = [
     ]},
     { name: 'Aria', type: 'Classic', length: 1, sequence: [{ time: 0, note: 'c', vol: 0.7 }, { time: 8, note: 'b', vol: 0.9 }] },
     { name: 'Funky', type: 'Classic', length: 1, sequence: [
-        { time: 0, note: 'k' }, { time: 4, note: 'h' }, { time: 6, note: 'g' }, { time: 8, note: 's' }, { time: 10, note: 'h' }, { time: 12, note: 'k' }, { time: 14, note: 'g'},
+        { time: 0, note: 'k' }, { time: 4, note: 'h' }, { time: 8, note: 's' }, { time: 12, note: 'k' }, { time: 14, note: 'h'},
     ]},
      { name: 'Airy', type: 'Classic', length: 1, sequence: [
-        { time: 0, note: 'k' }, { time: 4, note: 'h' }, {time: 6, note: 'o'}, { time: 8, note: 'g' }, { time: 12, note: 'h' },
+        { time: 0, note: 'k' }, { time: 4, note: 'h' }, {time: 6, note: 'o'}, { time: 8, note: 'S' }, { time: 12, note: 'h' },
     ]},
     { name: 'Groove', type: 'Classic', length: 1, sequence: [
         { time: 0, note: 'K' }, { time: 4, note: 'h' }, { time: 8, note: 'S' }, { time: 12, note: 'h' },
     ]},
+    { name: 'Slow Tom', type: 'Meditative', length: 2, sequence: [{ time: 0, note: 't' }, { time: 4, note: 'T' }, { time: 8, note: 'l' } ]},
 
     // Fills
     { name: 'Fill A', type: 'Fill', length: 1, sequence: [
         { time: 8, note: 't', vol: 0.6 }, { time: 10, note: 't', vol: 0.8 }, { time: 12, note: 'T', vol: 0.9 }, { time: 14, note: 'l', vol: 1.0 },
     ]},
      { name: 'Fill B', type: 'Fill', length: 1, sequence: [
-        { time: 8, note: 'g', vol: 0.5 }, { time: 10, note: 't', vol: 0.7 }, { time: 12, note: 'T', vol: 0.8 }, { time: 13, note: 'T', vol: 0.9 }, { time: 14, note: 'l', vol: 1.0 },
+        { time: 8, note: 's', vol: 0.5 }, { time: 10, note: 't', vol: 0.7 }, { time: 12, note: 'T', vol: 0.8 }, { time: 13, note: 'T', vol: 0.9 }, { time: 14, note: 'l', vol: 1.0 },
     ]},
 
     // System
@@ -47,7 +48,7 @@ export const beatPatterns: Readonly<BeatPattern[]> = [
 
 export class DrumMachine {
     private audioEngine: AudioEngine;
-    private _tempo: number = 90;
+    private _tempo: number = 60;
     private _swing: number = 0; // 0 = no swing, 1 = max swing
     private _pattern: BeatPattern;
     private timeoutId: NodeJS.Timeout | null = null;
@@ -154,5 +155,3 @@ export class DrumMachine {
         this.timeoutId = setTimeout(() => this.scheduler(), delay * 1000);
     }
 }
-
-    

@@ -39,9 +39,8 @@ const DRUM_SAMPLES: Record<string, string> = {
     'S': '/assets/sounds/drums/snarepress.wav',
     'h': '/assets/sounds/drums/closed_hi_hat_accented.wav',
     'H': '/assets/sounds/drums/closed_hi_hat_ghost.wav',
-    'o': '/assets/sounds/drums/open_hh_top2.wav',
+    'o': '/assets/sounds/drums/open_hh_top.wav',
     'O': '/assets/sounds/drums/open_hh_bottom.wav',
-    'g': '/assets/sounds/drums/snare_ghost_note.wav',
     'c': '/assets/sounds/drums/crash.wav',
     'y': '/assets/sounds/drums/cymbal.wav',
     'Y': '/assets/sounds/drums/cymbal_bell.wav',
@@ -50,6 +49,8 @@ const DRUM_SAMPLES: Record<string, string> = {
     'T': '/assets/sounds/drums/mid_tom.wav',
     'l': '/assets/sounds/drums/low_tom.wav',
     'b': '/assets/sounds/drums/hh_bark_short.wav'
+    // 'g' for snare_ghost_note.wav is not present in the final list, so it's removed.
+    // 'snare_off.wav' is in the list but not mapped. We can add it if needed, e.g. as 'x'.
 };
 
 export class AudioEngine {
@@ -491,7 +492,7 @@ export class AudioEngine {
         console.log("[AudioEngine] All drum samples processed.");
     }
 
-    private applyVolumeForPart(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' | 'autopilot'>, volumes: ChannelVolumes) {
+    private applyVolumeForPart(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' >, volumes: ChannelVolumes) {
         const rampTime = this.context.currentTime + 0.05;
     
         const nodeInfo = this.nodes.get(partName);
@@ -580,5 +581,3 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
-
-    
