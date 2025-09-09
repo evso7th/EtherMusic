@@ -84,8 +84,8 @@ interface ThereminPadProps {
 }
 
 const padTitles = {
-    melody: "Melody Theremin",
-    bass: "Bass Theremin"
+    melody: "MELODY PAD",
+    bass: "BASS PAD"
 }
 
 export function ThereminPad({ 
@@ -205,12 +205,14 @@ export function ThereminPad({
             </Tooltip>
         );
         
+        const fullTitle = `${type === 'melody' ? 'Melody' : 'Bass'} Pad Settings`;
+
         return (
             <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
                 {sheetTrigger}
                 <SheetContent side={isMobile ? "bottom" : "right"}>
                     <SheetHeader>
-                        <SheetTitle>{padTitles[type]} Settings</SheetTitle>
+                        <SheetTitle>{fullTitle}</SheetTitle>
                         <SheetDescription>Configure the sound and behavior of the instrument.</SheetDescription>
                     </SheetHeader>
                      <ScrollArea className="h-[85vh]">
@@ -297,13 +299,14 @@ export function ThereminPad({
             </Sheet>
         );
      }
-
-
-    const [title, subtitle] = padTitles[type].split(' ');
     
     const instrumentName = useMemo(() => {
         return instruments?.find(i => i.id === activeInstrument)?.name || '...';
     }, [instruments, activeInstrument]);
+
+    const padTitle = padTitles[type];
+    const [title, subtitle] = padTitle.split(' ');
+
 
     return (
         <Card 
@@ -345,11 +348,14 @@ export function ThereminPad({
                         backgroundImage: `linear-gradient(to top, transparent 30%, ${color}20)`,
                     }}
                 >
-                    <div className="absolute inset-0 flex items-center justify-center text-5xl md:text-7xl font-bold text-foreground/10 pointer-events-none uppercase tracking-widest text-center">
-                        <div>
+                    <div className="absolute inset-0 flex items-center justify-center text-5xl md:text-7xl font-bold text-foreground/10 pointer-events-none uppercase tracking-widest text-center leading-tight">
+                        <div className="md:hidden">
                             <span>{title}</span>
                             <br />
                             <span>{subtitle}</span>
+                        </div>
+                        <div className="hidden md:block">
+                           <span>{padTitle}</span>
                         </div>
                     </div>
                 </div>
