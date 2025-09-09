@@ -1,3 +1,4 @@
+
 class DrumProcessor extends AudioWorkletProcessor {
   constructor(options) {
     super();
@@ -10,28 +11,29 @@ class DrumProcessor extends AudioWorkletProcessor {
     this.pattern = this.patterns['Off'];
     this.step = 0;
     this.isPlaying = false;
-    this.nextTickTime = 0;
+    this.nextBeatTime = 0;
+    this.beatLengthSeconds = 0; // Duration of one full pattern loop in seconds
 
     this.port.onmessage = this.handleMessage.bind(this);
   }
 
   handleMessage(event) {
-    const { type, payload } = event.data;
+    const { type, samples, bpm, startTime, pattern } = event.data;
     switch(type) {
         case 'loadSamples':
-            this.loadSamples(event.data.samples);
+            this.loadSamples(samples);
             break;
         case 'start':
-            this.start(event.data.bpm, event.data.startTime);
+            this.start(bpm, startTime);
             break;
         case 'stop':
             this.stop();
             break;
         case 'setBpm':
-            this.setBpm(event.data.bpm);
+            this.setBpm(bpm);
             break;
         case 'setPattern':
-            this.setPattern(event.data.pattern);
+            this.setPattern(pattern);
             break;
         case 'error':
             console.error('[DRUM WORKLET] Received error from main thread:', event.data.message);
@@ -68,63 +70,68 @@ class DrumProcessor extends AudioWorkletProcessor {
             { time: 0, note: 'k' }, { time: 0.25, note: 't' }, { time: 0.5, note: 's' }, { time: 0.625, note: 'H' }, { time: 0.75, note: 'T' },
         ], length: 1 },
         'Aria': { sequence: [{ time: 0, note: 'c', vol: 0.7 }, { time: 0.5, note: 'b', vol: 0.9 }], length: 1 },
-        'Loop 1': { sequence: [{ time: 0, note: 'loop1' }], length: 8, loop: true }, // Assuming 92bpm, 8 beats
-        'Loop 2': { sequence: [{ time: 0, note: 'loop2' }], length: 8, loop: true }, // Assuming 110bpm, 8 beats
-        'Loop 3': { sequence: [{ time: 0, note: 'loop3' }], length: 8, loop: true }, // Assuming 80bpm, 8 beats
+        'Loop 1': { sequence: [{ time: 0, note: 'loop1' }], length: 8, loop: true },
+        'Loop 2': { sequence: [{ time: 0, note: 'loop2' }], length: 8, loop: true },
+        'Loop 3': { sequence: [{ time: 0, note: 'loop3' }], length: 8, loop: true },
     };
+  }
+
+  updateBeatLength() {
+      const beatsPerMeasure = this.pattern.loop ? this.pattern.length : 4; 
+      this.beatLengthSeconds = (60.0 / this.bpm) * beatsPerMeasure;
   }
 
   setPattern(patternName) {
     if (this.patterns[patternName]) {
       this.pattern = this.patterns[patternName];
-      this.step = 0; // Reset step on pattern change
+      this.step = 0;
+      this.updateBeatLength();
     }
   }
 
   setBpm(newBpm) {
     this.bpm = newBpm;
+    this.updateBeatLength();
   }
 
   start(bpm, startTime) {
     this.isPlaying = true;
     this.bpm = bpm;
     this.step = 0;
-    this.nextTickTime = startTime;
+    this.nextBeatTime = startTime;
+    this.updateBeatLength();
   }
 
   stop() {
     this.isPlaying = false;
-    this.activeVoices = []; // Clear active voices
+    this.activeVoices = [];
   }
 
   process(inputs, outputs, parameters) {
-    if (!this.isPlaying || this.pattern.length === 0) {
+    const output = outputs[0][0];
+    if (!this.isPlaying || !this.pattern.sequence.length) {
       this.activeVoices = [];
+      for (let i = 0; i < output.length; i++) output[i] = 0;
       return true;
     }
 
-    const output = outputs[0][0];
-    const secondsPerBeat = 60.0 / this.bpm;
-    
-    // Check if it's time to schedule the next pattern loop
-    if (currentTime >= this.nextTickTime) {
-      const patternLengthInBeats = this.pattern.length;
-      const loopDurationSeconds = patternLengthInBeats * secondsPerBeat;
-      
+    if (currentTime >= this.nextBeatTime) {
+      const secondsPerBeat = 60.0 / this.bpm;
+      const patternDurationSeconds = this.pattern.length * (this.pattern.loop ? secondsPerBeat : (secondsPerBeat * 4));
+
       this.pattern.sequence.forEach(patternNote => {
-        const noteTime = this.nextTickTime + (patternNote.time * secondsPerBeat * (this.pattern.loop ? 1 : patternLengthInBeats));
-        
-        if (this.samples[patternNote.note] && this.activeVoices.length < this.polyphony) {
+        const noteTime = this.nextBeatTime + (patternNote.time * secondsPerBeat);
+        const sample = this.samples[patternNote.note];
+        if (sample && this.activeVoices.length < this.polyphony) {
           this.activeVoices.push({
-            sample: this.samples[patternNote.note],
+            sample: sample,
             position: 0,
             startTime: noteTime,
             volume: patternNote.vol || 1.0,
           });
         }
       });
-      
-      this.nextTickTime += loopDurationSeconds;
+      this.nextBeatTime += patternDurationSeconds;
     }
     
     // Process and mix active voices
@@ -152,5 +159,3 @@ class DrumProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('drum-processor', DrumProcessor);
-
-    
