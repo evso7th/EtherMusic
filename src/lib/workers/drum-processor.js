@@ -17,12 +17,6 @@ class DrumProcessor extends AudioWorkletProcessor {
     this.port.onmessage = this.handleMessage.bind(this);
   }
 
-  log(...args) {
-    // console.log(...args);
-    // Use this for more verbose logging from the worklet if needed.
-    this.port.postMessage({ type: 'log', message: args });
-  }
-
   handleMessage(event) {
     const { type, samples, bpm, startTime, pattern } = event.data;
 
@@ -163,5 +157,3 @@ class DrumProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('drum-processor', DrumProcessor);
-
-    

@@ -240,7 +240,6 @@ export class AudioEngine {
     }
     
     private loadReverbImpulse() {
-        console.log('Using fallback reverb impulse.');
         this.convolver.buffer = this.createFallbackReverb();
     }
 
@@ -417,7 +416,6 @@ export class AudioEngine {
         const samples: Record<string, Float32Array> = {};
         const promises = Object.entries(DRUM_SAMPLES).map(async ([key, path]) => {
             try {
-                const filename = path.split('/').pop() || path;
                 const response = await fetch(path);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status} for ${path}`);
@@ -524,5 +522,3 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
-
-    
