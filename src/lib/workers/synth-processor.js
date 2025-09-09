@@ -1,4 +1,5 @@
 
+
 // A class representing a single oscillator with its own phase.
 class Oscillator {
     constructor(type, sampleRate) {
@@ -171,7 +172,7 @@ class Voice {
         const y1 = this.filter.y1 || 0;
         const y2 = this.filter.y2 || 0;
         
-        let outputSample = (b0/a0) * inputSample + (b1/a0) * x1 + (b2/a0) * x2 - (a1/a0) * y1 - (a2/a0) * y2;
+        let outputSample = (b0/a0) * inputSample + (b1/a0) * x1 + (b2/a0) * x2 - (a1/a0)*y1 - (a2/a0)*y2;
         outputSample = isNaN(outputSample) ? 0 : outputSample;
         
         this.filter.x2 = x1;
@@ -263,9 +264,14 @@ class SynthProcessor extends AudioWorkletProcessor {
         
         this.port.onmessage = this.handleMessage.bind(this);
     }
+    
+    log(...args) {
+        this.port.postMessage({ type: 'log', message: args });
+    }
 
     handleMessage(event) {
         const { type, note, id, preset } = event.data;
+        this.log(`Synth ${this.polyphony} received:`, type, id);
         switch (type) {
             case 'noteOn':
                 if (note) this.noteOn(note);
@@ -286,11 +292,13 @@ class SynthProcessor extends AudioWorkletProcessor {
     }
 
     applyPreset(preset) {
+        this.log('Synth applying preset', preset);
         this.preset = { ...this.getDefaultPreset(), ...preset };
         this.allNotesOff();
     }
 
     noteOn(note) {
+        this.log('Synth noteOn:', note);
         if (this.voices.has(note.id)) {
             const voice = this.voices.get(note.id);
             voice.noteUpdate(note.frequency, note.volume);
@@ -314,6 +322,7 @@ class SynthProcessor extends AudioWorkletProcessor {
     }
 
     noteOff(id) {
+        this.log('Synth noteOff:', id);
         const voice = this.voices.get(id);
         if (voice) {
             voice.release();
@@ -321,6 +330,7 @@ class SynthProcessor extends AudioWorkletProcessor {
     }
 
     allNotesOff() {
+        this.log('Synth allNotesOff');
         this.voices.forEach(voice => voice.release());
     }
 
