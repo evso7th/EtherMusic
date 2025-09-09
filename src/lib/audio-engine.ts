@@ -31,19 +31,16 @@ function createDistortionCurve(amount: number): Float32Array {
 type SynthPartName = 'melody' | 'manualBass' | 'latch';
 
 const DRUM_SAMPLES: Record<string, string> = {
-    'k': 'assets/sounds/drums/kick_drum.wav',
-    's': 'assets/sounds/drums/snare.wav',
-    'h': 'assets/sounds/drums/closed_hi_hat_accented.wav',
-    'H': 'assets/sounds/drums/closed_hi_hat_ghost.wav',
-    'c': 'assets/sounds/drums/crash.wav',
-    'y': 'assets/sounds/drums/cymbal.wav',
-    't': 'assets/sounds/drums/high_tom.wav',
-    'T': 'assets/sounds/drums/mid_tom.wav',
-    'l': 'assets/sounds/drums/low_tom.wav',
-    'b': 'assets/sounds/drums/hh_bark_short.wav',
-    'loop1': 'assets/sounds/drums/loop_1_92bpm.wav',
-    'loop2': 'assets/sounds/drums/loop_2_110bpm.wav',
-    'loop3': 'assets/sounds/drums/loop_3_80bpm.wav'
+    'k': '/assets/sounds/drums/kick_drum.wav',
+    's': '/assets/sounds/drums/snare.wav',
+    'h': '/assets/sounds/drums/closed_hi_hat_accented.wav',
+    'H': '/assets/sounds/drums/closed_hi_hat_ghost.wav',
+    'c': '/assets/sounds/drums/crash.wav',
+    'y': '/assets/sounds/drums/cymbal.wav',
+    't': '/assets/sounds/drums/high_tom.wav',
+    'T': '/assets/sounds/drums/mid_tom.wav',
+    'l': '/assets/sounds/drums/low_tom.wav',
+    'b': '/assets/sounds/drums/hh_bark_short.wav'
 };
 
 export class AudioEngine {
@@ -237,7 +234,7 @@ export class AudioEngine {
     
     private async loadReverbImpulse() {
         try {
-            const response = await fetch('assets/impulse/reverb.wav');
+            const response = await fetch('/assets/sounds/impulse/reverb.wav');
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
@@ -422,8 +419,9 @@ export class AudioEngine {
         const promises = Object.entries(DRUM_SAMPLES).map(async ([key, path]) => {
             try {
                 const response = await fetch(path);
+                const filename = path.split('/').pop() || path;
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status} for ${path}`);
+                    throw new Error(`HTTP error! status: ${response.status} for ${filename}`);
                 }
                 const arrayBuffer = await response.arrayBuffer();
                 const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
@@ -431,8 +429,6 @@ export class AudioEngine {
                 samples[key] = audioBuffer.getChannelData(0);
             } catch (error) {
                 console.error(`Failed to load or decode drum sample: ${path}`, error);
-                // We can either throw here to stop everything, or continue with missing samples.
-                // For a more resilient app, we'll log the error and continue.
             }
         });
 

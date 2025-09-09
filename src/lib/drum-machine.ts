@@ -16,12 +16,7 @@ export const beatPatterns = [
         { time: 0, note: 'k' }, { time: 0.25, note: 't' }, { time: 0.5, note: 's' }, { time: 0.625, note: 'H' }, { time: 0.75, note: 'T' },
     ]},
     { name: 'Aria', type: 'Classic', length: 1, sequence: [{ time: 0, note: 'c', vol: 0.7 }, { time: 0.5, note: 'b', vol: 0.9 }] },
-    { name: 'Loop 1', type: 'Classic', length: 8, sequence: [{ time: 0, note: 'loop1' }], loop: true },
-    { name: 'Loop 2', type: 'Classic', length: 8, sequence: [{ time: 0, note: 'loop2' }], loop: true },
-    { name: 'Loop 3', type: 'Classic', length: 8, sequence: [{ time: 0, note: 'loop3' }], loop: true },
     { name: 'Off', type: 'System', length: 1, sequence: [] },
 ];
 
 export type BeatPattern = typeof beatPatterns[number];
-
-    

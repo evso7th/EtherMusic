@@ -54,7 +54,7 @@ class DrumProcessor extends AudioWorkletProcessor {
   getPatterns() {
     return {
         'Off': { sequence: [], length: 1 },
-        'Air': { sequence: [{ time: 0, note: 'k' }, { time: 0.5, note: 'H' }], length: 1 },
+        'Air': { sequence: [{ time: 0, note: 'k' }, { time: 0.5, note: 'h' }], length: 1 },
         'Earth': { sequence: [{ time: 0, note: 'k' }, { time: 0.5, note: 's' }], length: 1 },
         'Water': { sequence: [{ time: 0, note: 't' }, { time: 0.25, note: 'H' }, { time: 0.5, note: 'T' }, { time: 0.75, note: 'H' }], length: 1 },
         'Tibet': { sequence: [{ time: 0, note: 'l' }, { time: 0.5, note: 'y' }], length: 1 },
@@ -70,9 +70,6 @@ class DrumProcessor extends AudioWorkletProcessor {
             { time: 0, note: 'k' }, { time: 0.25, note: 't' }, { time: 0.5, note: 's' }, { time: 0.625, note: 'H' }, { time: 0.75, note: 'T' },
         ], length: 1 },
         'Aria': { sequence: [{ time: 0, note: 'c', vol: 0.7 }, { time: 0.5, note: 'b', vol: 0.9 }], length: 1 },
-        'Loop 1': { sequence: [{ time: 0, note: 'loop1' }], length: 8, loop: true },
-        'Loop 2': { sequence: [{ time: 0, note: 'loop2' }], length: 8, loop: true },
-        'Loop 3': { sequence: [{ time: 0, note: 'loop3' }], length: 8, loop: true },
     };
   }
 
@@ -86,6 +83,9 @@ class DrumProcessor extends AudioWorkletProcessor {
       this.pattern = this.patterns[patternName];
       this.step = 0;
       this.updateBeatLength();
+      if (this.isPlaying) {
+          this.nextBeatTime = currentTime; 
+      }
     }
   }
 
@@ -115,10 +115,11 @@ class DrumProcessor extends AudioWorkletProcessor {
       return true;
     }
 
-    if (currentTime >= this.nextBeatTime) {
-      const secondsPerBeat = 60.0 / this.bpm;
-      const patternDurationSeconds = this.pattern.length * (this.pattern.loop ? secondsPerBeat : (secondsPerBeat * 4));
+    const secondsPerBeat = 60.0 / this.bpm;
+    const patternDurationSeconds = this.pattern.length * (this.pattern.loop ? secondsPerBeat : 4 * secondsPerBeat);
 
+
+    if (currentTime >= this.nextBeatTime) {
       this.pattern.sequence.forEach(patternNote => {
         const noteTime = this.nextBeatTime + (patternNote.time * secondsPerBeat);
         const sample = this.samples[patternNote.note];

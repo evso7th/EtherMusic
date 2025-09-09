@@ -1,0 +1,13 @@
+public/assets/sounds/ethermusic_sample.mp3
+public/assets/sounds/ethermusic_start.mp3
+public/assets/sounds/transition.webm
+public/assets/sounds/drums/closed_hi_hat_accented.wav
+public/assets/sounds/drums/closed_hi_hat_ghost.wav
+public/assets/sounds/drums/crash.wav
+public/assets/sounds/drums/cymbal.wav
+public/assets/sounds/drums/hh_bark_short.wav
+public/assets/sounds/drums/high_tom.wav
+public/assets/sounds/drums/kick_drum.wav
+public/assets/sounds/drums/low_tom.wav
+public/assets/sounds/drums/mid_tom.wav
+public/assets/sounds/drums/snare.wav
