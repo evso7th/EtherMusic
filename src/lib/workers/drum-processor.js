@@ -18,7 +18,9 @@ class DrumProcessor extends AudioWorkletProcessor {
   }
 
   log(...args) {
-    this.port.postMessage({ type: 'log', message: args });
+    // console.log(...args);
+    // Use this for more verbose logging from the worklet if needed.
+    // this.port.postMessage({ type: 'log', message: args });
   }
 
   handleMessage(event) {
@@ -67,7 +69,7 @@ class DrumProcessor extends AudioWorkletProcessor {
         'Space': { sequence: [{ time: 0, note: 'k' }, { time: 0.33, note: 'h' }, { time: 0.66, note: 'y' }], length: 1 },
         'Toccata': { sequence: [
             { time: 0, note: 'k' }, { time: 0.125, note: 'H' }, { time: 0.25, note: 'k' }, { time: 0.375, note: 'H' },
-            { time: 0.5, note:s' }, { time: 0.625, note: 'H' }, { time: 0.75, note: 'k' }, { time: 0.875, note: 'H' },
+            { time: 0.5, note: 's' }, { time: 0.625, note: 'H' }, { time: 0.75, note: 'k' }, { time: 0.875, note: 'H' },
         ], length: 1},
         'Nocturne': { sequence: [
             { time: 0, note: 'k', vol: 0.8 }, { time: 0.25, note: 'H' }, { time: 0.5, note: 's', vol: 0.6 }, { time: 0.625, note: 'H', vol: 0.5 }, { time: 0.75, note: 'H' },
@@ -80,7 +82,6 @@ class DrumProcessor extends AudioWorkletProcessor {
   }
 
   updateBeatLength() {
-      // A "beat" is a quarter note in 4/4 time. The pattern length is in measures.
       const secondsPerBeat = 60.0 / this.bpm;
       this.beatLengthSeconds = this.pattern.length * 4 * secondsPerBeat;
   }
@@ -91,7 +92,6 @@ class DrumProcessor extends AudioWorkletProcessor {
       this.pattern = this.patterns[patternName];
       this.updateBeatLength();
       if (this.isPlaying) {
-          // Reset the beat time to the next frame to resync the pattern
           this.nextBeatTime = currentTime; 
       }
     } else {
@@ -107,7 +107,8 @@ class DrumProcessor extends AudioWorkletProcessor {
   start(bpm, startTime) {
     this.isPlaying = true;
     this.bpm = bpm;
-    this.nextBeatTime = startTime > currentTime ? startTime : currentTime;
+    // Align start time to the next processing block to ensure sync
+    this.nextBeatTime = Math.max(startTime, currentTime);
     this.updateBeatLength();
     this.log(`Drum machine started. BPM: ${this.bpm}, StartTime: ${startTime}, NextBeatTime: ${this.nextBeatTime}`);
   }
@@ -120,11 +121,10 @@ class DrumProcessor extends AudioWorkletProcessor {
 
   process(inputs, outputs, parameters) {
     const outputChannel = outputs[0][0];
+    outputChannel.fill(0);
     
-    // Always clear the buffer to prevent noise if not playing
     if (!this.isPlaying || !this.pattern.sequence.length) {
         if(this.activeVoices.length > 0) this.activeVoices = []; // Clear voices if stopped
-        outputChannel.fill(0);
         return true;
     }
 
@@ -136,7 +136,6 @@ class DrumProcessor extends AudioWorkletProcessor {
         let sampleValue = 0;
 
         if (frameTime >= this.nextBeatTime) {
-            this.log(`Scheduling beat at ${this.nextBeatTime} (current: ${frameTime})`);
             this.pattern.sequence.forEach(patternNote => {
                 const noteTime = this.nextBeatTime + (patternNote.time * 4 * secondsPerBeat);
                 const sample = this.samples[patternNote.note];
@@ -154,16 +153,12 @@ class DrumProcessor extends AudioWorkletProcessor {
 
         for (let j = this.activeVoices.length - 1; j >= 0; j--) {
             const voice = this.activeVoices[j];
-            
-            // This check is now redundant because we start playing based on position.
-            // if (frameTime >= voice.startTime) {
               if (voice.position < voice.sample.length) {
                   sampleValue += voice.sample[voice.position] * voice.volume;
                   voice.position++;
               } else {
                   this.activeVoices.splice(j, 1);
               }
-            // }
         }
         outputChannel[i] = sampleValue;
     }

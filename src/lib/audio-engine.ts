@@ -31,16 +31,16 @@ function createDistortionCurve(amount: number): Float32Array {
 type SynthPartName = 'melody' | 'manualBass' | 'latch';
 
 const DRUM_SAMPLES: Record<string, string> = {
-    'k': '/assets/sounds/drums/kick_drum.wav',
-    's': '/assets/sounds/drums/snare.wav',
-    'h': '/assets/sounds/drums/closed_hi_hat_accented.wav',
-    'H': '/assets/sounds/drums/closed_hi_hat_ghost.wav',
-    'c': '/assets/sounds/drums/crash.wav',
-    'y': '/assets/sounds/drums/cymbal.wav',
-    't': '/assets/sounds/drums/high_tom.wav',
-    'T': '/assets/sounds/drums/mid_tom.wav',
-    'l': '/assets/sounds/drums/low_tom.wav',
-    'b': '/assets/sounds/drums/hh_bark_short.wav'
+    'k': 'assets/sounds/drums/kick_drum.wav',
+    's': 'assets/sounds/drums/snare.wav',
+    'h': 'assets/sounds/drums/closed_hi_hat_accented.wav',
+    'H': 'assets/sounds/drums/closed_hi_hat_ghost.wav',
+    'c': 'assets/sounds/drums/crash.wav',
+    'y': 'assets/sounds/drums/cymbal.wav',
+    't': 'assets/sounds/drums/high_tom.wav',
+    'T': 'assets/sounds/drums/mid_tom.wav',
+    'l': 'assets/sounds/drums/low_tom.wav',
+    'b': 'assets/sounds/drums/hh_bark_short.wav'
 };
 
 export class AudioEngine {
@@ -166,7 +166,7 @@ export class AudioEngine {
             throw new Error("Could not load core audio components. Please try refreshing the page.");
         }
         
-        await this.loadReverbImpulse();
+        this.loadReverbImpulse();
 
         this.createSynthChannel('melody', 10);
         this.createSynthChannel('manualBass', 4);
@@ -194,6 +194,12 @@ export class AudioEngine {
         
         worklet.connect(distortion).connect(gain).connect(this.preCompressorOut);
         gain.connect(reverbSend).connect(this.reverbSend);
+        
+        worklet.port.onmessage = (e) => {
+            if (e.data.type === 'log') {
+                console.log(`[SYNTH-WORKLET-${part}]`, ...e.data.message);
+            }
+        };
 
         this.nodes.set(part, { worklet, gain, reverbSend, distortion });
     }
@@ -236,17 +242,9 @@ export class AudioEngine {
         };
     }
     
-    private async loadReverbImpulse() {
-        try {
-            const response = await fetch('/assets/sounds/impulse/reverb.wav');
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            const arrayBuffer = await response.arrayBuffer();
-            const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
-            this.convolver.buffer = audioBuffer;
-        } catch (e) {
-            console.warn('Could not load impulse response. Using a fallback reverb.', e);
-            this.convolver.buffer = this.createFallbackReverb();
-        }
+    private loadReverbImpulse() {
+        console.log('Using fallback reverb impulse.');
+        this.convolver.buffer = this.createFallbackReverb();
     }
 
     private createFallbackReverb(): AudioBuffer {
@@ -264,7 +262,7 @@ export class AudioEngine {
     }
     
     public play() {
-        if (!this.isInitialized || !this._isPlaying || !this.context) return;
+        if (!this.isInitialized || this._isPlaying || !this.context) return;
         if (this.context.state === 'suspended') {
             this.context.resume();
         }
@@ -412,13 +410,11 @@ export class AudioEngine {
     
     public setBeatPattern(patternName: string) {
         if (!this.isInitialized) return;
-        console.log(`[AudioEngine] Setting beat pattern to: ${patternName}`);
         this.drumWorklet?.port.postMessage({type: 'setPattern', pattern: patternName});
     }
 
     public setTempo(newTempo: number) {
         this.tempo = newTempo;
-        console.log(`[AudioEngine] Setting tempo to: ${newTempo}`);
         this.drumWorklet?.port.postMessage({type: 'setBpm', bpm: this.tempo });
     }
     
@@ -427,7 +423,6 @@ export class AudioEngine {
         const promises = Object.entries(DRUM_SAMPLES).map(async ([key, path]) => {
             try {
                 const filename = path.split('/').pop() || path;
-                console.log(`[AudioEngine] Loading drum sample: ${filename}`);
                 const response = await fetch(path);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status} for ${path}`);
