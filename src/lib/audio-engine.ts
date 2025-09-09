@@ -205,7 +205,8 @@ export class AudioEngine {
         worklet.connect(distortion);
         distortion.connect(gain);
         gain.connect(this.preCompressorOut);
-        gain.connect(reverbSend).connect(this.reverbSend);
+        gain.connect(reverbSend);
+        reverbSend.connect(this.reverbSend);
         
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
@@ -226,7 +227,8 @@ export class AudioEngine {
 
         this.drumWorklet.connect(gain);
         gain.connect(this.preCompressorOut);
-        gain.connect(reverbSend).connect(this.reverbSend);
+        gain.connect(reverbSend);
+        reverbSend.connect(this.reverbSend);
         
         this.drumWorklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
@@ -443,6 +445,7 @@ export class AudioEngine {
             return;
         }
 
+        console.log("[AudioEngine] Posting loaded samples to drum worklet.");
         for (const [name, url] of Object.entries(DRUM_SAMPLES)) {
             try {
                 const response = await fetch(url);
@@ -450,14 +453,18 @@ export class AudioEngine {
                     throw new Error(`HTTP error! status: ${response.status} for ${url.split('/').pop()}`);
                 }
                 const arrayBuffer = await response.arrayBuffer();
+                // We decode in the main thread
                 const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
-                const channelData = audioBuffer.getChannelData(0); // Float32Array
+                // And send the raw channel data, which is a Float32Array
+                const channelData = audioBuffer.getChannelData(0);
 
                 const message: DrumWorkerMessage = {
                     type: 'loadSample',
                     name,
-                    buffer: channelData.buffer
+                    buffer: channelData, // This is a Float32Array
                 };
+                 // The second argument is an array of Transferable objects.
+                 // We transfer the underlying ArrayBuffer to avoid copying.
                 drumWorklet.port.postMessage(message, [channelData.buffer]);
                 console.log(`[AudioEngine] Loaded and sent sample: ${name}`);
 
@@ -517,6 +524,7 @@ export class AudioEngine {
     public stopAllSounds() {
         if (!this.isInitialized) return;
         this.nodes.forEach((node, name) => {
+             // We don't want to stop the drum worklet, just the synth voices
             if (name !== 'drums') {
                 node.worklet.port.postMessage({ type: 'allNotesOff' });
             }
@@ -555,5 +563,3 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
-
-    
