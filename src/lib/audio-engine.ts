@@ -31,19 +31,19 @@ function createDistortionCurve(amount: number): Float32Array {
 type SynthPartName = 'melody' | 'manualBass' | 'latch';
 
 const DRUM_SAMPLES: Record<string, string> = {
-    'k': 'kick_drum.wav',
-    's': 'snare.wav',
-    'h': 'closed_hi_hat_accented.wav',
-    'H': 'closed_hi_hat_ghost.wav',
-    'c': 'crash.wav',
-    'y': 'cymbal.wav',
-    't': 'high_tom.wav',
-    'T': 'mid_tom.wav',
-    'l': 'low_tom.wav',
-    'b': 'hh_bark_short.wav',
-    'loop1': 'loop_1_92bpm.wav',
-    'loop2': 'loop_2_110bpm.wav',
-    'loop3': 'loop_3_80bpm.wav'
+    'k': '/assets/sounds/drums/kick_drum.wav',
+    's': '/assets/sounds/drums/snare.wav',
+    'h': '/assets/sounds/drums/closed_hi_hat_accented.wav',
+    'H': '/assets/sounds/drums/closed_hi_hat_ghost.wav',
+    'c': '/assets/sounds/drums/crash.wav',
+    'y': '/assets/sounds/drums/cymbal.wav',
+    't': '/assets/sounds/drums/high_tom.wav',
+    'T': '/assets/sounds/drums/mid_tom.wav',
+    'l': '/assets/sounds/drums/low_tom.wav',
+    'b': '/assets/sounds/drums/hh_bark_short.wav',
+    'loop1': '/assets/sounds/drums/loop_1_92bpm.wav',
+    'loop2': '/assets/sounds/drums/loop_2_110bpm.wav',
+    'loop3': '/assets/sounds/drums/loop_3_80bpm.wav'
 };
 
 export class AudioEngine {
@@ -161,8 +161,8 @@ export class AudioEngine {
 
         try {
              await Promise.all([
-                this.context.audioWorklet.addModule('workers/synth-processor.js'),
-                this.context.audioWorklet.addModule('workers/drum-processor.js'),
+                this.context.audioWorklet.addModule('/workers/synth-processor.js'),
+                this.context.audioWorklet.addModule('/workers/drum-processor.js'),
              ]);
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
@@ -219,7 +219,6 @@ export class AudioEngine {
                     name,
                     data: data
                 }));
-                // We need to transfer the ArrayBuffer, not the Float32Array directly
                 const transferList = transferableSamples.map(s => s.data.buffer);
                 this.drumWorklet.port.postMessage({ type: 'loadSamples', samples: transferableSamples }, transferList);
             }
@@ -420,19 +419,18 @@ export class AudioEngine {
     
     private async loadDrumSamples(): Promise<Record<string, Float32Array>> {
         const samples: Record<string, Float32Array> = {};
-        const promises = Object.entries(DRUM_SAMPLES).map(async ([key, filename]) => {
+        const promises = Object.entries(DRUM_SAMPLES).map(async ([key, path]) => {
             try {
-                const path = `/assets/sounds/drums/${filename}`;
                 const response = await fetch(path);
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status} for ${filename}`);
+                    throw new Error(`HTTP error! status: ${response.status} for ${path}`);
                 }
                 const arrayBuffer = await response.arrayBuffer();
                 const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
                 // We use only the left channel for simplicity, as drum samples are often mono.
                 samples[key] = audioBuffer.getChannelData(0);
             } catch (error) {
-                console.error(`Failed to load or decode drum sample: ${filename}`, error);
+                console.error(`Failed to load or decode drum sample: ${path}`, error);
                 // We can either throw here to stop everything, or continue with missing samples.
                 // For a more resilient app, we'll log the error and continue.
             }
