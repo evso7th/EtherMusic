@@ -34,9 +34,13 @@ type SynthPartName = 'melody' | 'manualBass' | 'latch';
 
 const DRUM_SAMPLES: Record<string, string> = {
     'k': '/assets/sounds/drums/kick_drum.wav',
+    'K': '/assets/sounds/drums/kick_drum8.wav', // New Kick
     's': '/assets/sounds/drums/snare.wav',
+    'S': '/assets/sounds/drums/snare_press.wav', // New Snare Press
     'h': '/assets/sounds/drums/closed_hi_hat_accented.wav',
     'H': '/assets/sounds/drums/closed_hi_hat_ghost.wav',
+    'o': '/assets/sounds/drums/open_hh_top2.wav',
+    'g': '/assets/sounds/drums/snare_ghost_note.wav',
     'c': '/assets/sounds/drums/crash.wav',
     'y': '/assets/sounds/drums/cymbal.wav',
     't': '/assets/sounds/drums/high_tom.wav',
