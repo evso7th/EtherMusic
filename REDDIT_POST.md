@@ -5,7 +5,7 @@
 
 Hey /r/webdev,
 
-We just went through a brutal but rewarding journey building a generative ambient music app ([EtherMusic](https://ethermusic.app/)) and wanted to share the story of our fight against our arch-nemesis: **the audio crackle**. If you've ever worked with the Web Audio API, you know what I'm talking about. We hit every single wall, so maybe our story can save you some time.
+We just went through a brutal but rewarding journey building a generative ambient music app and wanted to share the story of our fight against our arch-nemesis: **the audio crackle**. If you've ever worked with the Web Audio API, you know what I'm talking about. We hit every single wall, so maybe our story can save you some time.
 
 ### The Dream: A Smooth, Meditative Audio Experience in the Browser
 
@@ -31,7 +31,7 @@ Okay, `PolySynth` is out. What's the "pro" way? Individual synths! So we tried w
 
 **Mistake #2:** Churning objects in the audio loop. The garbage collector can't keep up, and it causes massive performance hits.
 
-### Architecture 3 (Getting Warmer): The Monosynth Pool
+### Architecture 3 (The Monosynth Pool): The Right Way for Manual Play
 
 This is where we started to get it right. The industry-standard approach is a **pool of pre-allocated synths**.
 1.  On startup, create a fixed number of `Tone.Synth` instances (e.g., 8 voices) and keep them in an array (our "pool").
@@ -43,29 +43,20 @@ This is where we started to get it right. The industry-standard approach is a **
 
 ...but we had forgotten about our Autopilot feature.
 
-### Architecture 4 (The Final Boss): The Tyranny of the Main Thread
+### The Final Boss & The Great Schism: Main Thread vs. Web Worker
 
-Our app has an "Autopilot" that generates complex musical phrases. And all that generation logic was running in the **main UI thread**.
+Our app originally had an "Autopilot" that generated complex musical phrases. All that logic ran in the **main UI thread**. As soon as the Autopilot started thinking, the entire app would freeze.
 
-**The Reality:** As soon as the Autopilot started thinking (calculating the next phrase), the entire app would freeze. Animations stopped. The UI became unresponsive. We had defeated the audio glitches only to introduce **The UI Freeze**.
+The solution was to move ALL music generation logic into a dedicated **Web Worker**. The main thread's only job became UI updates and *executing* audio commands received from the worker. This resulted in perfect performance.
 
-**Mistake #3:** Running heavy, continuous calculations on the main thread. The browser can't draw frames and run your complex `for` loops at the same time.
-
-### The Final, Victorious Architecture: The Web Worker Exodus
-
-This was the final, liberating step.
-1.  **Isolate the Brain:** We moved ALL the music generation logic—every single algorithm for every style—into a dedicated **Web Worker**. The main thread's only job now is UI updates and *executing* audio commands.
-2.  **Become the Conductor:** The main thread no longer thinks about *what* to play. It just receives commands from the Worker like `(playNote, {note: 'C4', time: ...})` and passes them to the `AudioEngine`.
-3.  **Bonus - Batching:** To avoid flooding the main thread with `postMessage` calls, the Worker batches notes together. Instead of sending 16 individual messages for an arpeggio, it sends one message with an array of 16 notes.
-
-**The Result:** Perfect, buttery-smooth performance. The UI is 100% responsive, no matter how complex the music generation gets. The audio is crystal clear. We finally achieved our dream.
+This architectural shift was so significant that we decided to split the project. **EtherMusic** ([https://ethermusic.app/](https://ethermusic.app/)) remains as the highly-optimized manual instrument you see today. The generative "Autopilot" brain has been moved into its own, more complex application, now named **AuraGroove**, which we are developing separately.
 
 ---
 
 **TL;DR:**
 *   **Don't use `Tone.PolySynth`** for serious apps. Use a **pool** of reusable `Tone.Synth` instances.
 *   **NEVER** create/destroy audio nodes in a real-time loop.
-*   Move **ALL** heavy, continuous logic (like music generation) to a **Web Worker**. Don't let the main thread "think". It should only react to UI and execute commands.
+*   Move **ALL** heavy, continuous logic (like music generation) to a **Web Worker**. We ended up moving this to a whole new app, **AuraGroove**.
 *   **Batch** messages from your Worker to the main thread to reduce overhead.
 
 It was a painful journey, but we learned a ton. Hope this helps someone else avoid our mistakes! You can feel the result of our efforts at [https://ethermusic.app/](https://ethermusic.app/).

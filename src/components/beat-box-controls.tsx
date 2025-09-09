@@ -17,7 +17,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/t
 import type { BeatPattern, Volumes, CompressorSettings } from '@/types';
 import { MixerControls } from "./mixer-controls";
 import { beatPatterns } from "@/lib/drum-machine";
-// import { AutopilotControls } from "./autopilot-controls"; // Keep this commented out
+import { AutopilotControls } from "./autopilot-controls";
 
 interface BeatBoxControlsProps {
     activePattern: BeatPattern;
@@ -180,7 +180,17 @@ export function BeatBoxControls({
                             </ScrollArea>
                         </DialogContent>
                     </Dialog>
-                    
+
+                    <AutopilotControls
+                        isMobile={isMobile}
+                        isLandscape={isLandscape}
+                        onSettingsChange={() => {}}
+                        initialSettings={{}}
+                        volumes={volumes}
+                        onMixerChange={onMixerChange}
+                        onAutopilotPresetLoad={() => {}}
+                    />
+
                     <HelpGuide buttonVariant="outline" size="icon" className="w-10 h-10 rounded-full" showText={false}/>
                 </div>
             </TooltipProvider>
@@ -278,6 +288,15 @@ export function BeatBoxControls({
                             </ScrollArea>
                         </DialogContent>
                     </Dialog>
+
+                    <AutopilotControls
+                        isMobile={isMobile}
+                        initialSettings={{ enabled: false, style: 'Ambient', density: 0.5, instruments: {} }}
+                        onSettingsChange={() => {}}
+                        volumes={volumes}
+                        onMixerChange={onMixerChange}
+                        onAutopilotPresetLoad={() => {}}
+                    />
                     
                     <HelpGuide buttonVariant="outline" buttonClassName="flex-1" size={buttonSize}/>
                 </CardContent>

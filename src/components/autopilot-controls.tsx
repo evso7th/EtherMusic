@@ -26,12 +26,12 @@ import { useToast } from "@/hooks/use-toast";
 import type { Volumes } from '@/types';
 import { MixerControls } from './mixer-controls';
 
-// This component is currently not used, but is kept for potential future re-integration of Autopilot features.
-// To re-enable, you would need to:
-// 1. Restore the Autopilot-related types in `src/types/index.ts`.
-// 2. Restore the Autopilot worker and related logic in `src/lib/audio-engine.ts` and `use-audio-engine.ts`.
-// 3. Add the component back into `beat-box-controls.tsx`.
-// 4. Update state management in `page.tsx` to handle autopilot settings.
+// --- DEPRECATION NOTICE ---
+// This component and the entire Autopilot/AuraGroove feature set have been deprecated and moved to a separate application.
+// This file is kept for historical and reference purposes but is no longer used in the active EtherMusic application.
+// Key functionalities like the Autopilot worker (`autopilot-worker.ts`), its state management in `useAudioEngine`, 
+// and its associated types in `src/types/index.ts` have been removed or commented out.
+// ---
 
 const AUTOPILOT_STYLES: any[] = ['Ambient', 'Sequence', 'Water', 'Air', 'Toccata', 'Promenade', 'Space'];
 const melodyInstruments: any[] = [];
@@ -300,6 +300,8 @@ export function AutopilotControls({
                             onCompressorChange={() => {}} // Pass a dummy function, as master compressor is handled outside
                             tempo={0} // Tempo is not controlled here
                             setTempo={() => {}} // Pass a dummy function
+                            setSwing={() => {}}
+                            swing={0}
                             isAutopilotMixer={true}
                         />
                     </div>
@@ -331,6 +333,7 @@ export function AutopilotControls({
                         className={cn(isLandscape ? "w-10 h-10 rounded-full" : "flex-1", settings.enabled && 'animate-pulse')}
                         size={isLandscape ? "icon" : buttonSize}
                         aria-label="Autopilot Settings"
+                        disabled // The entire Autopilot feature is deprecated
                     >
                         <Bot className="w-4 h-4 md:w-5 md:h-5 md:mr-2" />
                         {!isLandscape && <span className="hidden sm:inline">Autopilot</span>}
@@ -338,16 +341,14 @@ export function AutopilotControls({
                 </DialogTrigger>
                 <DialogContent>
                      <DialogHeader>
-                        <DialogTitle>Autopilot Settings</DialogTitle>
+                        <DialogTitle>Autopilot is now AuraGroove</DialogTitle>
                         <DialogDescription>
-                             Configure the automatic music generation. Changes are applied immediately.
+                             The Autopilot feature has been moved to a new, separate application. This UI is no longer functional.
                         </DialogDescription>
                     </DialogHeader>
-                    {renderContent()}
+                    {/* {renderContent()} */}
                 </DialogContent>
             </Dialog>
         </TooltipProvider>
     );
 }
-
-    

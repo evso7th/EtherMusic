@@ -133,4 +133,18 @@ export interface Note {
     time?: number; // for autopilot and scheduled notes
 }
 
+// Autopilot functionality is deprecated and moved to AuraGroove app.
+// Types are kept for reference but are not actively used.
+export interface AutopilotSettings {
+    enabled: boolean;
+    style: string;
+    density: number;
+    key: MusicKey;
+    scale: MusicScale;
+    instruments: {
+        melody: Instrument;
+        accompaniment: Instrument;
+        bass: BassInstrument;
+    }
+}
     

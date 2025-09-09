@@ -17,6 +17,7 @@ export function useAudioEngine() {
 
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
+    const workerRef = useRef<Worker | null>(null);
     
     const initializeAudioEngine = useCallback(async () => {
         try {
@@ -33,6 +34,8 @@ export function useAudioEngine() {
                     await context.resume();
                     console.log("[useAudioEngine] AudioContext resumed.");
                 }
+                // Note: The worker is no longer passed to the AudioEngine constructor
+                // as the Autopilot feature is deprecated.
                 audioEngine.current = new AudioEngine(context, orbManager.current);
                 await audioEngine.current.initialize();
             }
@@ -115,18 +118,19 @@ export function useAudioEngine() {
     const setBeatPattern = useCallback((patternName: string) => {
         if (!audioEngine.current) return;
         console.log(`[useAudioEngine] Setting beat pattern to: ${patternName}`);
+        const wasPlaying = audioEngine.current.isPlaying;
         audioEngine.current.setBeatPattern(patternName);
 
         if (patternName !== 'Off') {
             // If a pattern is selected and we weren't playing, start it.
-            if (!audioEngine.current.isPlaying) {
+            if (!wasPlaying) {
                  console.log("[useAudioEngine] Pattern set to ON, calling play().");
                  play();
             }
              setIsPlaying(true);
         } else {
             // If pattern is set to 'Off', always pause.
-            if (audioEngine.current.isPlaying) {
+            if (wasPlaying) {
                 console.log("[useAudioEngine] Pattern set to OFF, calling pause().");
                 pause();
             }

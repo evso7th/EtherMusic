@@ -8,56 +8,43 @@ The application's logic is cleanly divided into specialized engines and componen
 
 - **`AudioEngine` (`src/lib/audio-engine.ts`):** The "heart" of the application, responsible solely for **sound production**.
     - It manages pools of synthesizers (`Voice` instances) for manual play and latch mode.
-    - It creates and manages dedicated synths for each part of the Autopilot.
-    - It handles real-time audio events from user interaction on the Theremin pads (`startNote`, `updateNote`, `stopNote`).
-    - It plays note events received from the `autopilot-worker.ts`.
     - It contains and controls the `DrumMachine`.
     - It manages the `MediaRecorder` for session recording.
-    - It does **not** decide *what* or *when* to play; it only executes playback commands.
-
-- **`autopilot-worker.ts` (`src/lib/autopilot-worker.ts`):** The "brain" of the automatic music generation.
-    - It runs in a completely separate thread, ensuring the UI never freezes.
-    - It contains all the logic for every autopilot style (`Ambient`, `Toccata`, `Space`, etc.).
-    - It acts as a composer, receiving settings (style, key, scale, tempo) from the main thread and sending back precisely timed note events.
-    - This is a critical performance and architectural feature.
+    - It does **not** decide *what* to play; it only executes playback commands from user interaction or the drum machine.
 
 - **`DrumMachine` (`src/lib/drum-machine.ts`):** Manages the rhythm section.
     - It loads high-quality drum samples.
-    - It uses `Tone.Part` to schedule and loop drum patterns, ensuring perfect synchronization with the master `Tone.Transport`.
+    - It uses a custom `setTimeout`-based scheduler to trigger drum patterns, ensuring perfect synchronization with the master clock.
 
 - **`LatchEngine` (`src/lib/latch-engine.ts`):** Manages the "hold" functionality for the bass pad.
     - It tracks active latched notes, up to a maximum of three.
     - It interfaces with the `AudioEngine` to request and release voices from the 'latch' pool.
 
+### Note on Autopilot (AuraGroove)
+The previous "Autopilot" functionality, which involved a Web Worker for music generation, has been deprecated in this version and moved to a separate application, **AuraGroove**. The current EtherMusic architecture focuses solely on manual and rhythmic performance.
+
 ## 2. Unidirectional Data Flow and UI as the Source of Truth
 
 - **Centralized State:** The main React component, **`src/app/page.tsx`**, holds all the application's state (volumes, tempo, selected instruments, active patterns, switch states) using `useState`. It is the single source of truth.
-- **Top-Down Propagation:** When a user changes a setting in the UI, the state is updated in `page.tsx`. Then, `useEffect` hooks watch for these state changes and propagate them down to the appropriate engines via method calls (e.g., `audioEngine.setTempo(newTempo)` or `worker.postMessage(...)`). This creates a predictable and debuggable data flow.
-- **Cookie-Based Persistence:** User preferences for the mixer and autopilot presets are saved to browser cookies, allowing settings to persist between sessions if the user consents.
+- **Top-Down Propagation:** When a user changes a setting in the UI, the state is updated in `page.tsx`. Then, `useEffect` hooks watch for these state changes and propagate them down to the `AudioEngine` via method calls (e.g., `audioEngine.setTempo(newTempo)`). This creates a predictable and debuggable data flow.
+- **Cookie-Based Persistence:** User preferences for the mixer are saved to browser cookies, allowing settings to persist between sessions if the user consents.
 
 ## 3. Key Command Chains (Data Flow Examples)
 
 - **Application Start:**
     1. User clicks "Start Meditation" in `page.tsx`.
     2. `handleStartApp` is called.
-    3. `initializeAudio()` is called, which creates and initializes the `AudioEngine` and the `autopilot-worker`.
-    4. Inside `audioEngine.initialize()`, `Tone.Transport.start()` is called **once**. This starts the master clock for the entire application.
+    3. `initializeAudio()` is called, which creates and initializes the `AudioEngine`.
+    4. Inside `audioEngine.initialize()`, the audio context is resumed and all necessary audio nodes and worklets are prepared.
 
-- **Autopilot Activation:**
-    1. User toggles the "Autopilot On/Off" switch in the UI (`page.tsx`).
-    2. The `isAutopilotOn` state changes to `true`.
-    3. `autopilotWorker.current.postMessage({ type: 'start' })` is called.
-    4. The worker sets its internal `isRunning` flag to `true`.
+- **Changing a Beat:**
+    1. User selects a new beat pattern in the UI (`beat-box-controls.tsx`).
+    2. The `onPatternChange` callback is triggered, which calls `handlePatternChange` in `page.tsx`.
+    3. The `activePattern` state is updated, and `setBeatPattern(newPattern.name)` is called.
+    4. This calls `audioEngine.current.setBeatPattern(patternName)`, which tells the `DrumMachine` to stop the current loop and start a new one with the selected pattern.
 
-- **Note Generation and Playback:**
-    1. The active Web Worker generates a musical event (a note or a series of notes) based on the current style.
-    2. The worker sends the note data back to the main thread via `self.postMessage({ type: 'playNote', ... })`.
-    3. The `onmessage` handler in `page.tsx` receives the event.
-    4. It immediately calls `audioEngine.current.playWorkerNote(note)`, passing the note to the `AudioEngine`.
-    5. The `AudioEngine` uses the dedicated synth for that autopilot part to schedule the note to play at the precise time.
-
-- **Saving an Autopilot Preset:**
-    1. User clicks "Save Preset" in the Autopilot dialog in `beat-box-controls.tsx`.
-    2. The `onSavePreset` callback is triggered, which calls `handleSaveAutopilotPreset` in `page.tsx`.
-    3. `handleSaveAutopilotPreset` gathers the current autopilot-related state (instruments, volumes, effects) into a preset object.
-    4. The preset object is saved to a cookie, keyed by the active autopilot style name.
+- **Playing a Theremin Note:**
+    1. User interacts with a `ThereminPad` component.
+    2. The `onInteraction` callback is triggered, sending the note data (`frequency`, `volume`, `state`) to `page.tsx`.
+    3. `handleThereminInteraction` in `page.tsx` calls `audioEngine.current.handleThereminInteraction(...)`.
+    4. The `AudioEngine` posts a message to the appropriate synth worklet (`melody` or `bass`) to start, update, or stop the note.
