@@ -35,20 +35,19 @@ export const beatPatterns: Readonly<BeatPattern[]> = [
     { name: 'Off', type: 'System', length: 1, sequence: [] },
     // Fills
     { name: 'Tom Fill 1', type: 'Fill', length: 1, sequence: [
-        { time: 0, note: 't', vol: 0.6 }, { time: 2, note: 't', vol: 0.7 }, { time: 4, note: 'T', vol: 0.8 }, { time: 6, note: 'T', vol: 0.9 },
-        { time: 8, note: 'l', vol: 1.0 }, { time: 10, note: 'l', vol: 0.9 }, { time: 12, note: 'l', vol: 0.8 }, { time: 14, note: 'l', vol: 0.7 },
+        { time: 8, note: 't', vol: 0.6 }, { time: 10, note: 't', vol: 0.7 }, { time: 12, note: 'T', vol: 0.8 }, { time: 14, note: 'T', vol: 0.9 },
     ]},
     { name: 'Tom Fill 2', type: 'Fill', length: 1, sequence: [
-        { time: 0, note: 't', vol: 0.7 }, { time: 4, note: 'T', vol: 0.8 }, { time: 8, note: 'l', vol: 0.9 }, { time: 12, note: 'l', vol: 1.0 },
+        { time: 12, note: 't', vol: 0.7 }, { time: 13, note: 'T', vol: 0.8 }, { time: 14, note: 'l', vol: 0.9 }, { time: 15, note: 'l', vol: 1.0 },
     ]},
-    { name: 'Tom Fill 3', type: 'Fill', length: 1, sequence: [
+     { name: 'Slow Toms', type: 'Fill', length: 1, sequence: [
         { time: 8, note: 't', vol: 0.6 }, { time: 10, note: 'T', vol: 0.7 }, { time: 12, note: 'l', vol: 0.8 }, { time: 14, note: 'l', vol: 0.9 },
     ]},
 ];
 
 export class DrumMachine {
     private audioEngine: AudioEngine;
-    private _tempo: number = 90;
+    private _tempo: number = 60;
     private _swing: number = 0;
     private _pattern: BeatPattern;
     private timeoutId: NodeJS.Timeout | null = null;
@@ -126,18 +125,18 @@ export class DrumMachine {
     private scheduler() {
         const sixteenthNoteDuration = 60 / this._tempo / 4;
         
-        let currentPattern = this._pattern;
-        // Every 4th measure, play a fill, but only if we are not already playing one
-        if (this.measureCount > 0 && this.measureCount % 4 === 0 && !this.isPlayingFill) {
+        // Decide whether to play a fill
+        // Every 4th measure (but not the first), if we are not already in a fill, 50% chance to play one.
+        if (this.measureCount > 0 && this.measureCount % 4 === 3 && !this.isPlayingFill && Math.random() < 0.5) {
             this.isPlayingFill = true;
-            if (this.fillPatterns.length > 0) {
-                const fillIndex = Math.floor(Math.random() * this.fillPatterns.length);
-                currentPattern = this.fillPatterns[fillIndex];
-            }
         }
         
-        const totalSteps = currentPattern.length * 16;
-        const currentStepInPattern = this.step % totalSteps;
+        let currentPattern = this.isPlayingFill ? 
+            this.fillPatterns[Math.floor(Math.random() * this.fillPatterns.length)] : 
+            this._pattern;
+
+        const totalStepsInPattern = currentPattern.length * 16;
+        const currentStepInPattern = this.step % totalStepsInPattern;
         
         currentPattern.sequence.forEach(note => {
             if (note.time === currentStepInPattern) {
@@ -156,17 +155,17 @@ export class DrumMachine {
         this.step = (this.step + 1);
 
         if (this.step % 16 === 0) { // A measure has passed
-            this.measureCount++;
-             if (this.isPlayingFill) {
-                this.isPlayingFill = false; // Fill is over, go back to main pattern next measure
+            if (this.isPlayingFill) {
+                this.isPlayingFill = false; // Fill is over, go back to main pattern
             }
+            this.measureCount++;
         }
         
-        // Reset step to keep it from growing indefinitely
-        if (this.step >= totalSteps) {
-            if (!this.isPlayingFill) {
-                this.step = 0;
-            }
+        // Reset step to avoid it growing indefinitely, respecting pattern length
+        const totalStepsInMainPattern = this._pattern.length * 16;
+        if (this.step >= totalStepsInMainPattern && !this.isPlayingFill) {
+            this.step = 0;
+            // The measure count continues to increment, determining when to play the next fill
         }
 
 

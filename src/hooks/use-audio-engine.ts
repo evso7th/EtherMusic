@@ -107,6 +107,10 @@ export function useAudioEngine() {
         console.log("[useAudioEngine] Setting tempo to:", tempo);
         audioEngine.current?.setTempo(tempo);
     }, []);
+
+    const setSwing = useCallback((swing: number) => {
+        audioEngine.current?.setSwing(swing);
+    }, []);
     
     const setBeatPattern = useCallback((patternName: string) => {
         if (!audioEngine.current) return;
@@ -114,12 +118,14 @@ export function useAudioEngine() {
         audioEngine.current.setBeatPattern(patternName);
 
         if (patternName !== 'Off') {
+            // If a pattern is selected and we weren't playing, start it.
             if (!audioEngine.current.isPlaying) {
                  console.log("[useAudioEngine] Pattern set to ON, calling play().");
                  play();
             }
              setIsPlaying(true);
         } else {
+            // If pattern is set to 'Off', always pause.
             if (audioEngine.current.isPlaying) {
                 console.log("[useAudioEngine] Pattern set to OFF, calling pause().");
                 pause();
@@ -185,6 +191,7 @@ export function useAudioEngine() {
         stop,
         setVolumes,
         setTempo,
+        setSwing,
         setMelodyInstrument,
         setBassInstrument,
         setBeatPattern,
@@ -196,5 +203,3 @@ export function useAudioEngine() {
         handleCompressorChange,
     };
 }
-
-    

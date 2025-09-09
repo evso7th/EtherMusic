@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Waves, Drum, Anchor, Blend, AudioLines, Music, Clock } from 'lucide-react';
+import { Waves, Drum, Anchor, Blend, AudioLines, Music, Clock, Shuffle } from 'lucide-react';
 import { useState, useCallback, useEffect } from 'react';
 import type { Volumes, CompressorSettings, ChannelVolumes } from '@/types';
 import { cn } from "@/lib/utils";
@@ -50,7 +50,7 @@ const VolumeControl = ({
     </div>
 );
 
-type VolumeChannel = keyof Omit<Volumes, 'compressor' | 'reverbReturn' >;
+type VolumeChannel = keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' >;
 
 export function MixerControls({ 
     volumes: initialVolumes, 
@@ -58,6 +58,8 @@ export function MixerControls({
     onCompressorChange,
     tempo,
     setTempo,
+    swing,
+    setSwing,
     isAutopilotMixer = false,
 }: { 
     volumes: Volumes, 
@@ -65,31 +67,38 @@ export function MixerControls({
     onCompressorChange: (compressorSettings: CompressorSettings) => void,
     tempo: number,
     setTempo: (tempo: number) => void,
+    swing: number,
+    setSwing: (swing: number) => void,
     isAutopilotMixer?: boolean
 }) {
     
     const [localVolumes, setLocalVolumes] = useState(initialVolumes);
     const [localTempo, setLocalTempo] = useState(tempo);
+    const [localSwing, setLocalSwing] = useState(swing);
     const [compressor, setCompressor] = useState(initialVolumes.compressor);
 
     useEffect(() => {
         setLocalVolumes(initialVolumes);
         setCompressor(initialVolumes.compressor);
         setLocalTempo(tempo);
-    }, [initialVolumes, tempo]);
+        setLocalSwing(swing);
+    }, [initialVolumes, tempo, swing]);
 
     const handleChannelVolumeChange = (part: VolumeChannel, value: number) => {
-        setLocalVolumes(prev => ({
-            ...prev,
-            [part]: { ...prev[part], gain: value }
-        }));
+        setLocalVolumes(prev => {
+            const channel = prev[part] as ChannelVolumes;
+            return {
+                ...prev,
+                [part]: { ...channel, gain: value }
+            }
+        });
     }
 
     const handleChannelVolumeCommit = (part: VolumeChannel, value: number) => {
         const currentPartVolume = localVolumes[part] as ChannelVolumes;
         onMixerChange({ [part]: { ...currentPartVolume, gain: value } });
     };
-
+    
     const handleReverbReturnCommit = (value: number) => {
         onMixerChange({ reverbReturn: value });
     };
@@ -111,6 +120,10 @@ export function MixerControls({
     const handleTempoCommit = (value: number) => {
         setTempo(value);
     };
+    
+    const handleSwingCommit = (value: number) => {
+        setSwing(value);
+    };
 
     return (
         <div className="space-y-6">
@@ -127,6 +140,17 @@ export function MixerControls({
                             max={200}
                             step={1}
                             unit="BPM"
+                        />
+                        <VolumeControl 
+                            label="Swing"
+                            icon={Shuffle}
+                            volume={localSwing * 100}
+                            onVolumeChange={(v) => setLocalSwing(v / 100)}
+                            onVolumeCommit={(v) => handleSwingCommit(v / 100)}
+                            min={0}
+                            max={75}
+                            step={1}
+                            unit="%"
                         />
                     </div>
                     <Separator />
@@ -227,5 +251,3 @@ export function MixerControls({
         </div>
     );
 }
-
-    

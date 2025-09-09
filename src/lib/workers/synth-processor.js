@@ -31,6 +31,7 @@ class Oscillator {
     }
 }
 
+
 // A class representing a single synth voice
 class Voice {
     constructor(id, frequency, volume, preset, sampleRate) {
@@ -316,5 +317,3 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
-
-    

@@ -82,7 +82,8 @@ export class AudioEngine {
             ratio: 12,
             attack: 0.003,
             release: 0.25
-        }
+        },
+        swing: 0,
     };
     private isBassLatchOn: boolean = false;
     private latchEngine = new LatchEngine();
@@ -236,7 +237,6 @@ export class AudioEngine {
         };
         
         this.nodes.set('drums', { worklet: this.drumWorklet, gain: gain, reverbSend: reverbSend });
-        console.log('[AudioEngine] Drum channel audio graph configured.');
     }
     
     private async loadReverbImpulse() {
@@ -418,15 +418,22 @@ export class AudioEngine {
     
     public setBeatPattern(patternName: string) {
         console.log(`[AudioEngine] setBeatPattern called with: ${patternName}`);
-        const wasPlaying = this.isPlaying;
-        if(wasPlaying) this.drumMachine.stop();
         this.drumMachine.setPattern(patternName);
-        if(wasPlaying || patternName !== 'Off') this.drumMachine.play();
+        const wasPlaying = this.isPlaying;
+        if (patternName === 'Off') {
+            if (wasPlaying) this.pause();
+        } else {
+            if (!wasPlaying) this.play();
+        }
     }
 
     public setTempo(newTempo: number) {
         console.log(`[AudioEngine] setTempo called with: ${newTempo}`);
         this.drumMachine.setTempo(newTempo);
+    }
+
+    public setSwing(swing: number) {
+        this.drumMachine.setSwing(swing);
     }
     
     public playDrumSample(sampleName: string, volume: number = 1.0) {
@@ -436,7 +443,6 @@ export class AudioEngine {
             return;
         }
         const message: DrumWorkerMessage = { type: 'playSample', sampleName, volume };
-        // console.log(`[AudioEngine] playDrumSample: posting message to 'drum-processor' worklet`, message);
         drumNode.worklet.port.postMessage(message);
     }
     
@@ -457,17 +463,15 @@ export class AudioEngine {
                 }
                 const arrayBuffer = await response.arrayBuffer();
                 // We decode in the main thread
-                const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
-                // And send the raw channel data, which is a Float32Array
+                const audioBuffer = await this.context.decodeAudioData(arrayBuffer.slice(0)); // slice to create a copy
+                
+                // And send the raw channel data, which is a Float32Array, and transfer its ownership
                 const channelData = audioBuffer.getChannelData(0);
-
                 const message: DrumWorkerMessage = {
                     type: 'loadSample',
                     name,
-                    buffer: channelData.buffer, // Transfer the underlying ArrayBuffer
+                    buffer: channelData.buffer,
                 };
-                 // The second argument is an array of Transferable objects.
-                 // We transfer the underlying ArrayBuffer to avoid copying.
                 drumWorklet.port.postMessage(message, [channelData.buffer]);
                 console.log(`[AudioEngine] Loaded and sent sample: ${name}`);
 
@@ -478,7 +482,7 @@ export class AudioEngine {
         console.log("[AudioEngine] All drum samples processed.");
     }
 
-    private applyVolumeForPart(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn' >, volumes: ChannelVolumes) {
+    private applyVolumeForPart(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' >, volumes: ChannelVolumes) {
         const rampTime = this.context.currentTime + 0.05;
     
         const nodeInfo = this.nodes.get(partName);
@@ -503,6 +507,7 @@ export class AudioEngine {
         
         this.reverbReturnGain.gain.linearRampToValueAtTime(dbToGain(this.volumes.reverbReturn), rampTime);
         this.setCompressorSettings(this.volumes.compressor);
+        this.setSwing(this.volumes.swing);
     }
     
     public setCompressorSettings(compressorSettings: CompressorSettings) {

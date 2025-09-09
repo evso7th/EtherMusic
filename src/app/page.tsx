@@ -54,7 +54,8 @@ const defaultVolumes: Volumes = {
         ratio: 12,
         attack: 0.003,
         release: 0.25
-    }
+    },
+    swing: 0,
 };
 
 function loadSettings(): { volumes: Volumes } {
@@ -90,6 +91,7 @@ function loadVolumes(): Volumes {
             latch: ensureChannelSettings(volumes.latch, defaultVolumes.latch),
             drums: ensureChannelSettings(volumes.drums, defaultVolumes.drums),
             compressor: { ...defaultVolumes.compressor, ...(volumes.compressor || {}) },
+            swing: typeof volumes.swing === 'number' ? volumes.swing : defaultVolumes.swing,
         };
         
         return mergedVolumes;
@@ -153,6 +155,7 @@ export default function Home() {
         orbManager,
         setVolumes,
         setTempo,
+        setSwing,
         handleCompressorChange,
     } = useAudioEngine();
     
@@ -247,6 +250,7 @@ export default function Home() {
             const { volumes: loadedVolumes } = loadSettings();
             // Set volumes for all channels
             updateVolumes(loadedVolumes);
+            setCurrentTempo(loadedVolumes.swing ?? 90);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isReady, cookieConsent]);
@@ -254,10 +258,11 @@ export default function Home() {
     const updateVolumes = useCallback((newVolumes: Volumes) => {
         setVolumesState(newVolumes);
         setVolumes(newVolumes);
+        setTempo(newVolumes.swing ?? 0);
         if (cookieConsent) {
             saveVolumes(newVolumes);
         }
-    }, [setVolumes, cookieConsent]);
+    }, [setVolumes, setTempo, cookieConsent]);
     
     const handleMixerChange = useCallback((changedMixerVolumes: Partial<Volumes>) => {
         updateVolumes({ ...volumes, ...changedMixerVolumes });
@@ -283,6 +288,12 @@ export default function Home() {
         updateVolumes(newVolumes);
         handleCompressorChange(compressorSettings);
     }, [volumes, updateVolumes, handleCompressorChange]);
+    
+    const handleSwingChange = useCallback((swing: number) => {
+        const newVolumes: Volumes = { ...volumes, swing: swing };
+        updateVolumes(newVolumes);
+        setSwing(swing);
+    }, [volumes, updateVolumes, setSwing]);
 
     const handleStartApp = useCallback(() => {
         startApp();
@@ -475,6 +486,8 @@ export default function Home() {
                             isMobile={isMobile}
                             tempo={currentTempo}
                             setTempo={handleTempoChange}
+                            swing={volumes.swing || 0}
+                            setSwing={handleSwingChange}
                         />
                     </div>
                 </main>
@@ -490,6 +503,8 @@ export default function Home() {
                         isLandscape={true}
                         tempo={currentTempo}
                         setTempo={handleTempoChange}
+                        swing={volumes.swing || 0}
+                        setSwing={handleSwingChange}
                     />
                 </div>
             </div>
@@ -497,4 +512,3 @@ export default function Home() {
     );
 }
 
-    
