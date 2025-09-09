@@ -239,6 +239,7 @@ export class AudioEngine {
         };
         
         this.nodes.set('drums', { worklet: this.drumWorklet, gain: gain, reverbSend: reverbSend });
+        console.log('[AudioEngine] Drum channel audio graph configured.');
     }
     
     private async loadReverbImpulse() {
@@ -461,7 +462,7 @@ export class AudioEngine {
                 const message: DrumWorkerMessage = {
                     type: 'loadSample',
                     name,
-                    buffer: channelData, // This is a Float32Array
+                    buffer: channelData.buffer, // Transfer the underlying ArrayBuffer
                 };
                  // The second argument is an array of Transferable objects.
                  // We transfer the underlying ArrayBuffer to avoid copying.
@@ -563,3 +564,5 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
+
+    
