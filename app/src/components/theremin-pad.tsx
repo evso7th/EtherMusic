@@ -84,8 +84,8 @@ interface ThereminPadProps {
 }
 
 const padTitles = {
-    melody: "Melody Theremin",
-    bass: "Bass Theremin"
+    melody: "MELODY PAD",
+    bass: "BASS PAD"
 }
 
 export function ThereminPad({ 
@@ -210,7 +210,7 @@ export function ThereminPad({
                 {sheetTrigger}
                 <SheetContent side={isMobile ? "bottom" : "right"}>
                     <SheetHeader>
-                        <SheetTitle>{padTitles[type]} Settings</SheetTitle>
+                        <SheetTitle>{padTitles[type]}</SheetTitle>
                         <SheetDescription>Configure the sound and behavior of the instrument.</SheetDescription>
                     </SheetHeader>
                      <ScrollArea className="h-[85vh]">
@@ -298,8 +298,6 @@ export function ThereminPad({
         );
      }
 
-
-    const [title, subtitle] = padTitles[type].split(' ');
     
     const instrumentName = useMemo(() => {
         return instruments?.find(i => i.id === activeInstrument)?.name || '...';
@@ -347,9 +345,10 @@ export function ThereminPad({
                 >
                     <div className="absolute inset-0 flex items-center justify-center text-5xl md:text-7xl font-bold text-foreground/10 pointer-events-none uppercase tracking-widest text-center">
                         <div>
-                            <span>{title}</span>
-                            <br />
-                            <span>{subtitle}</span>
+                           {padTitles[type].split(' ')[0]}
+                           <br className="md:hidden" />
+                           {' '}
+                           {padTitles[type].split(' ')[1]}
                         </div>
                     </div>
                 </div>
