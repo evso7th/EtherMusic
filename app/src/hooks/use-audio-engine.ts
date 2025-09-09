@@ -39,7 +39,7 @@ export function useAudioEngine() {
             
             setIsReady(true);
             setIsPlaying(audioEngine.current.isPlaying);
-             console.log("[useAudioEngine] AudioEngine initialized.");
+            console.log("[useAudioEngine] AudioEngine initialized.");
             
         } catch(e) {
             console.error("Failed to initialize audio engine:", e);
@@ -111,18 +111,23 @@ export function useAudioEngine() {
     const setBeatPattern = useCallback((patternName: string) => {
         if (!audioEngine.current) return;
         console.log(`[useAudioEngine] Setting beat pattern to: ${patternName}`);
+        const wasPlaying = audioEngine.current.isPlaying;
         audioEngine.current.setBeatPattern(patternName);
 
         if (patternName !== 'Off') {
-            if (!audioEngine.current.isPlaying) {
+            // If a pattern is selected and we weren't playing, start it.
+            if (!wasPlaying) {
                  console.log("[useAudioEngine] Pattern set to ON, calling play().");
                  play();
             }
+             setIsPlaying(true);
         } else {
-            if (audioEngine.current.isPlaying) {
+            // If pattern is set to 'Off', always pause.
+            if (wasPlaying) {
                 console.log("[useAudioEngine] Pattern set to OFF, calling pause().");
                 pause();
             }
+             setIsPlaying(false);
         }
     }, [play, pause]);
     
@@ -180,7 +185,7 @@ export function useAudioEngine() {
         startApp,
         play,
         pause,
-stop,
+        stop,
         setVolumes,
         setTempo,
         setMelodyInstrument,

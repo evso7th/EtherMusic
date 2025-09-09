@@ -178,8 +178,10 @@ export class AudioEngine {
         this.createSynthChannel('melody', 10);
         this.createSynthChannel('manualBass', 4);
         this.createSynthChannel('latch', 4);
+        console.log("[AudioEngine] Synth channels created.");
+        
         this.createDrumChannel();
-        console.log("[AudioEngine] Synth and Drum channels created.");
+        console.log("[AudioEngine] Drum channel created.");
         
         this.setVolumes(this.volumes);
         
@@ -217,9 +219,8 @@ export class AudioEngine {
         if (!this.context) return;
         console.log('[AudioEngine] Creating drum channel.');
 
-        this.drumWorklet = new AudioWorkletNode(this.context, 'drum-processor', {
-            processorOptions: { sampleRate: this.context.sampleRate }
-        });
+        // Pass empty processorOptions as drum-processor doesn't need any
+        this.drumWorklet = new AudioWorkletNode(this.context, 'drum-processor', { processorOptions: {} });
         this.drumGain = this.context.createGain();
         this.drumReverbSend = this.context.createGain();
 
@@ -250,8 +251,25 @@ export class AudioEngine {
     
     private loadReverbImpulse() {
         console.log("[AudioEngine] Loading reverb impulse...");
-        this.convolver.buffer = this.createFallbackReverb();
-        console.log("[AudioEngine] Fallback reverb created and assigned.");
+        // This file doesn't exist, so we will always use the fallback.
+        // In the future, a real impulse response file can be placed at this path.
+        fetch('/assets/sounds/impulses/space.wav')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.arrayBuffer();
+            })
+            .then(buffer => this.context.decodeAudioData(buffer))
+            .then(audioBuffer => {
+                this.convolver.buffer = audioBuffer;
+                console.log("[AudioEngine] Reverb impulse loaded and assigned.");
+            })
+            .catch(e => {
+                console.warn("[AudioEngine] Could not load reverb impulse, using fallback.", e);
+                this.convolver.buffer = this.createFallbackReverb();
+                console.log("[AudioEngine] Fallback reverb created and assigned.");
+            });
     }
 
     private createFallbackReverb(): AudioBuffer {
@@ -284,6 +302,7 @@ export class AudioEngine {
     }
 
     public stop() {
+        if (!this.isInitialized) return;
         this.drumMachine.stop();
         this.stopAllSounds();
     }
@@ -427,7 +446,7 @@ export class AudioEngine {
             return;
         }
         const message: DrumWorkerMessage = { type: 'playSample', sampleName, volume };
-        console.log(`[AudioEngine] playDrumSample: posting message to 'drum-processor' worklet`, message);
+        console.log(`[AudioEngine] playDrumSample: posting message to drum worklet`, message);
         this.drumWorklet.port.postMessage(message);
     }
     
@@ -456,7 +475,7 @@ export class AudioEngine {
         return samples;
     }
 
-    private applyVolume(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn'>, volumes: ChannelVolumes) {
+    private applyVolume(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn' >, volumes: ChannelVolumes) {
         const rampTime = this.context.currentTime + 0.05;
 
         if (partName === 'drums') {

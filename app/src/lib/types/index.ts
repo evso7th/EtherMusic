@@ -38,6 +38,7 @@ export interface BaseInstrumentParams {
         freqMult: number; // Frequency multiplier relative to base
         level: number; // Volume level (0-1)
         detune?: number; // Detune in cents
+        envelope?: Partial<Omit<BaseInstrumentParams['envelope'], 'attackCurve' | 'decayCurve' | 'releaseCurve'>>;
     }[];
     stagger?: number; // Delay between layer note ons in seconds
     reverbSend?: number;
@@ -116,13 +117,11 @@ export type WorkerMessage =
     | { type: 'noteOff', id: number }
     | { type: 'noteUpdate', note: SynthNote }
     | { type: 'allNotesOff' }
-    | { type: 'setPreset', preset: InstrumentPresetParams | BassInstrumentPresetParams }
-    | { type: 'playSample', sampleName: string; volume?: number };
-
+    | { type: 'setPreset', preset: InstrumentPresetParams | BassInstrumentPresetParams };
 
 export type DrumWorkerMessage =
     | { type: 'loadSamples'; samples: { name: string; buffer: ArrayBuffer }[] }
-    | { type: 'playSample'; sampleName: string; volume?: number };
+    | { type: 'playSample'; sampleName: string; volume: number };
 
 
 export type EnvelopeCurve = "linear" | "exponential";

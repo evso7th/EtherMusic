@@ -67,7 +67,7 @@ export class DrumMachine {
                 this.stop();
             }
             this._pattern = newPattern;
-             if (newPattern.name !== 'Off') {
+             if (newPattern.name !== 'Off' && wasPlaying) {
                 this.play();
             }
         } else {
@@ -82,7 +82,7 @@ export class DrumMachine {
             return;
         }
         
-        this.step = -1; // Start at -1 so the first tick is 0
+        this.step = 0; 
         const sixteenthNoteDurationMs = (60 / this._tempo / 4) * 1000; 
         console.log(`[DrumMachine] Starting loop with interval ${sixteenthNoteDurationMs.toFixed(2)}ms for tempo ${this._tempo} BPM.`);
         
@@ -114,9 +114,8 @@ export class DrumMachine {
         if (!this.audioEngine || !this._pattern) return;
         
         const totalSteps = this._pattern.length * 16;
-        this.step = (this.step + 1) % totalSteps;
         
-        // console.log(`[DrumMachine] Scheduler tick. Step: ${this.step}`);
+        console.log(`[DrumMachine] Scheduler tick. Step: ${this.step}`);
 
         this._pattern.sequence.forEach(note => {
             if (note.time === this.step) {
@@ -124,5 +123,7 @@ export class DrumMachine {
                 this.audioEngine.playDrumSample(note.note, note.vol);
             }
         });
+
+        this.step = (this.step + 1) % totalSteps;
     }
 }
