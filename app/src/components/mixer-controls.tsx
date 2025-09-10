@@ -53,7 +53,7 @@ type VolumeChannel = keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing'
 
 interface MixerControlsProps {
     volumes: Volumes;
-    onMixerChange: (newVolumes: Partial<Volumes> | ((v: Volumes) => Volumes)) => void;
+    onMixerChange: (newVolumes: Partial<Volumes>) => void;
     onCompressorChange: (compressorSettings: CompressorSettings) => void;
     tempo: number;
     setTempo: (tempo: number) => void;
@@ -67,10 +67,10 @@ export function MixerControls({
     volumes: initialVolumes, 
     onMixerChange,
     onCompressorChange,
-    tempo,
-    setTempo,
-    swing,
-    setSwing,
+    tempo: initialTempo,
+    setTempo: applyTempo,
+    swing: initialSwing,
+    setSwing: applySwing,
     closeDialog,
     isAutopilotMixer = false,
 }: MixerControlsProps) {
@@ -82,16 +82,19 @@ export function MixerControls({
     }, [initialVolumes]);
 
     const handleLocalVolumeChange = (update: Partial<Volumes> | ((v: Volumes) => Volumes)) => {
-        const newVolumes = typeof update === 'function' ? update(localVolumes) : { ...localVolumes, ...update };
-        setLocalVolumes(newVolumes);
+        setLocalVolumes(current => {
+            const updated = typeof update === 'function' ? update(current) : { ...current, ...update };
+            return updated;
+        });
     }
     
     const handleChannelVolumeChange = (part: VolumeChannel, value: number) => {
         handleLocalVolumeChange(prev => {
-            const newVolumes = { ...prev };
-            const newChannelVolumes = { ...(prev[part] as ChannelVolumes), gain: value };
+            const newVolumes = JSON.parse(JSON.stringify(prev)); // Deep copy to be safe
+            const newChannelVolumes = { ...(newVolumes[part] as ChannelVolumes), gain: value };
             newVolumes[part] = newChannelVolumes;
 
+            // Sync manualBass and latch gain sliders
             if (part === 'manualBass') {
                 newVolumes.latch = { ...newVolumes.latch, gain: value };
             } else if (part === 'latch') {
@@ -114,7 +117,11 @@ export function MixerControls({
     }, []);
 
     const handleApplyChanges = () => {
+        // Apply all changes at once
         onMixerChange(localVolumes);
+        onCompressorChange(localVolumes.compressor);
+        applyTempo(localVolumes.tempo);
+        applySwing(localVolumes.swing);
         closeDialog();
     };
 
@@ -232,8 +239,7 @@ export function MixerControls({
                     </div>
                 </>
             )}
-
-            <Separator />
+             <Separator />
             <Button 
                 onClick={handleApplyChanges}
                 className="w-full mt-4"

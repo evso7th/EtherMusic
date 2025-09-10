@@ -48,7 +48,7 @@ const ControlButtonWithTooltip = memo(function ControlButtonWithTooltip({ toolti
 ControlButtonWithTooltip.displayName = 'ControlButtonWithTooltip';
 
 
-export function BeatBoxControls({
+function BeatBoxControlsComponent({
     activePattern,
     onPatternChange,
     volumes,
@@ -61,7 +61,6 @@ export function BeatBoxControls({
     isMobile,
     isLandscape = false,
 }: BeatBoxControlsProps) {
-    console.log('--- Rendering: BeatBoxControls ---');
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isMixerOpen, setIsMixerOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<'Meditative' | 'Classic'>('Meditative');
@@ -90,6 +89,13 @@ export function BeatBoxControls({
              <ControlButtonWithTooltip tooltipText={tooltipText} {...buttonProps} />
         );
     }, [isMobile]);
+
+    const handleMixerChange = useCallback((newVolumes: Partial<Volumes>) => {
+        onMixerChange(currentVolumes => ({
+            ...currentVolumes,
+            ...newVolumes
+        }));
+    }, [onMixerChange]);
 
     if (isLandscape) {
         return (
@@ -169,7 +175,7 @@ export function BeatBoxControls({
                                 <div className="pr-4 py-4">
                                     <MixerControls 
                                         volumes={volumes} 
-                                        onMixerChange={onMixerChange}
+                                        onMixerChange={handleMixerChange}
                                         onCompressorChange={onCompressorChange}
                                         tempo={tempo}
                                         setTempo={setTempo}
@@ -268,7 +274,7 @@ export function BeatBoxControls({
                                 <div className="pr-4 py-4">
                                     <MixerControls 
                                         volumes={volumes}
-                                        onMixerChange={onMixerChange}
+                                        onMixerChange={handleMixerChange}
                                         onCompressorChange={onCompressorChange}
                                         tempo={tempo}
                                         setTempo={setTempo}
@@ -287,3 +293,5 @@ export function BeatBoxControls({
         </TooltipProvider>
     );
 }
+
+export const BeatBoxControls = memo(BeatBoxControlsComponent);
