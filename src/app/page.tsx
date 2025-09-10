@@ -127,7 +127,6 @@ const Preloader = () => (
 );
 
 export default function Home() {
-    console.log('--- Rendering: Home Page ---');
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [isClient, setIsClient] = useState(false);

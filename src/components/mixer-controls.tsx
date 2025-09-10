@@ -73,7 +73,6 @@ export function MixerControls({
     closeDialog,
     isAutopilotMixer = false,
 }: MixerControlsProps) {
-    console.log('--- Rendering: MixerControls ---', { initialVolumes, tempo, swing });
     
     const [localVolumes, setLocalVolumes] = useState(initialVolumes);
     const [localTempo, setLocalTempo] = useState(tempo);
@@ -110,9 +109,11 @@ export function MixerControls({
     }, []);
 
     const handleApplyChanges = () => {
+        // Only call update functions if the values have actually changed
         if (JSON.stringify(localVolumes) !== JSON.stringify(initialVolumes)) {
             onMixerChange(localVolumes);
         }
+
         if (JSON.stringify(localCompressor) !== JSON.stringify(initialVolumes.compressor)) {
             onCompressorChange(localCompressor);
         }
