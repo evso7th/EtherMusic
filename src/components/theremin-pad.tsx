@@ -25,7 +25,6 @@ const EffectControl = ({
     icon: Icon,
     level,
     onLevelChange,
-    onLevelCommit,
     min,
     max,
     step,
@@ -34,8 +33,7 @@ const EffectControl = ({
     label: string,
     icon: React.ElementType,
     level: number,
-    onLevelChange: (v: number) => void,
-    onLevelCommit: (v: number) => void,
+    onLevelChange: (v: number[]) => void,
     min: number,
     max: number,
     step: number,
@@ -53,8 +51,7 @@ const EffectControl = ({
                 max={max}
                 step={step}
                 value={[level ?? 0]}
-                onValueChange={(v) => onLevelChange(v[0])}
-                onValueCommit={(v) => onLevelCommit(v[0])}
+                onValueChange={onLevelChange}
             />
         </div>
     </div>
@@ -80,7 +77,7 @@ interface ThereminPadProps {
     onLatchToggle?: (checked: boolean) => void;
     orbManager?: OrbManager | null;
     effects: Omit<ChannelVolumes, 'gain'>;
-    onEffectChange: (effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => void;
+    onEffectChange: (type: 'melody' | 'bass', effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => void;
 }
 
 const padTitles = {
@@ -113,12 +110,6 @@ export function ThereminPad({
     const padRef = useRef<HTMLDivElement>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const isMobile = useIsMobile();
-    
-    const [localEffects, setLocalEffects] = useState(effects);
-
-    useEffect(() => {
-        setLocalEffects(effects);
-    }, [effects]);
 
     // Manage orbs for latch mode
     useEffect(() => {
@@ -271,28 +262,18 @@ export function ThereminPad({
                                 <EffectControl
                                     label="Reverb Send"
                                     icon={Blend}
-                                    level={localEffects.reverbSend}
-                                    onLevelChange={(v) => setLocalEffects(p => ({...p, reverbSend: v}))}
-                                    onLevelCommit={(v) => onEffectChange('reverbSend', v)}
+                                    level={effects.reverbSend}
+                                    onLevelChange={(v) => onEffectChange(type, 'reverbSend', v[0])}
                                     min={-48} max={0} step={1} unit="dB"
                                 />
                                 <EffectControl
                                     label="Distortion"
                                     icon={Waves}
-                                    level={localEffects.distortion}
-                                    onLevelChange={(v) => setLocalEffects(p => ({...p, distortion: v}))}
-                                    onLevelCommit={(v) => onEffectChange('distortion', v)}
+                                    level={effects.distortion}
+                                    onLevelChange={(v) => onEffectChange(type, 'distortion', v[0])}
                                     min={0} max={100} step={1} unit="%"
                                 />
                             </div>
-
-                            <Button 
-                                onClick={() => setIsSettingsOpen(false)} 
-                                className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                                variant="outline"
-                            >
-                                Done
-                            </Button>
                         </div>
                     </ScrollArea>
                 </SheetContent>

@@ -7,6 +7,7 @@ import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
 import { bassInstruments } from './bass-presets';
 import { DrumMachine } from './drum-machine';
+import mitt, { Emitter } from 'mitt';
 
 
 function dbToGain(db: number): number {
@@ -67,6 +68,9 @@ const DRUM_SAMPLES: Record<string, string> = {
     'p15': '/assets/sounds/drums/perc-015.wav',
 };
 
+type AudioEngineEvents = {
+    volumesChanged: Volumes;
+};
 
 export class AudioEngine {
     public isInitialized = false;
@@ -74,6 +78,7 @@ export class AudioEngine {
     public orbManager: OrbManager;
     private mediaRecorder: MediaRecorder | null = null;
     private recordedChunks: Blob[] = [];
+    private eventEmitter: Emitter<AudioEngineEvents>;
 
     private masterOut: GainNode;
     private preCompressorOut: GainNode;
@@ -117,6 +122,7 @@ export class AudioEngine {
     constructor(context: AudioContext, orbManager: OrbManager) {
         this.context = context;
         this.orbManager = orbManager;
+        this.eventEmitter = mitt<AudioEngineEvents>();
         
         this.masterOut = this.context.createGain();
         this.masterOut.connect(this.context.destination);
@@ -147,6 +153,14 @@ export class AudioEngine {
 
     public get isPlaying(): boolean {
         return this.drumMachine.isPlaying;
+    }
+
+    public on(event: keyof AudioEngineEvents, handler: (payload: any) => void) {
+        this.eventEmitter.on(event, handler);
+    }
+    
+    public off(event: keyof AudioEngineEvents, handler: (payload: any) => void) {
+        this.eventEmitter.off(event, handler);
     }
     
     public getVolumes(): Volumes {
@@ -250,8 +264,6 @@ export class AudioEngine {
         this.drumWorklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error('[DRUM WORKLET ERROR]', e.data.message);
-            } else if (e.data.type === 'log') {
-                // console.log('[DRUM WORKLET]', e.data.message);
             }
         };
         
@@ -412,17 +424,22 @@ export class AudioEngine {
             this.nodes.get('manualBass')?.worklet.port.postMessage(message);
             this.nodes.get('latch')?.worklet.port.postMessage(message);
             
-            const newVolumes = { ...this.volumes };
-            if (bassPresetParams.reverbSend !== undefined) {
-                newVolumes.manualBass.reverbSend = bassPresetParams.reverbSend;
-                newVolumes.latch.reverbSend = bassPresetParams.reverbSend;
-            }
-            if (bassPresetParams.distortion !== undefined) {
-                newVolumes.manualBass.distortion = bassPresetParams.distortion;
-                newVolumes.latch.distortion = bassPresetParams.distortion;
-            }
-
+            // Create a new volume object based on the current state
+            const newVolumes = {
+                ...this.volumes,
+                manualBass: {
+                    ...this.volumes.manualBass,
+                    reverbSend: bassPresetParams.reverbSend ?? this.volumes.manualBass.reverbSend,
+                    distortion: bassPresetParams.distortion ?? this.volumes.manualBass.distortion,
+                },
+                latch: {
+                    ...this.volumes.latch,
+                    reverbSend: bassPresetParams.reverbSend ?? this.volumes.latch.reverbSend,
+                    distortion: bassPresetParams.distortion ?? this.volumes.latch.distortion,
+                }
+            };
             this.setVolumes(newVolumes);
+            this.eventEmitter.emit('volumesChanged', newVolumes);
         }
     }
     

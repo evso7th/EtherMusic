@@ -29,15 +29,19 @@ export function useAudioEngine() {
                 if (context.state === 'suspended') {
                     await context.resume();
                 }
-                audioEngine.current = new AudioEngine(context, orbManager.current);
-                await audioEngine.current.initialize();
+                const engine = new AudioEngine(context, orbManager.current);
+                await engine.initialize();
                 
-                // Set up a listener for the isPlaying state from the drum machine
-                const updatePlayingState = (playing: boolean) => {
+                engine.getDrumMachine().on('playStateChanged', (playing: boolean) => {
                     setIsPlaying(playing);
-                };
-                audioEngine.current.getDrumMachine().on('playStateChanged', updatePlayingState);
+                });
+                
+                engine.on('volumesChanged', (newVolumes: Volumes) => {
+                    // This is to update the UI when bass instrument changes effects
+                    // This is not available in the hook's state to avoid loops
+                });
 
+                audioEngine.current = engine;
             }
             
             setIsReady(true);

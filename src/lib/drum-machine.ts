@@ -123,7 +123,7 @@ export class DrumMachine {
         this.eventEmitter.emit('playStateChanged', true);
         this.scheduler();
     }
-
+    
     public stop() {
         if (this.timeoutId !== null) {
             clearTimeout(this.timeoutId);
