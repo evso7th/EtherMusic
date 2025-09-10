@@ -7,18 +7,42 @@ import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
 import type { Volumes, Instrument, BassInstrument, CompressorSettings } from '@/types';
 
-export function useAudioEngine() {
-    console.log('--- Rendering: useAudioEngine Hook ---');
+function setCookie(name: string, value: string, days: number) {
+    if (typeof document === 'undefined') return;
+    let expires = "";
+    if (days) {
+        const date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        expires = "; expires=" + date.toUTCString();
+    }
+    document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=Lax";
+}
+
+function saveVolumes(volumes: Volumes) {
+    if (typeof window === 'undefined' || document.cookie.indexOf("ethermusic_consent=true") === -1) {
+        return;
+    }
+    try {
+        setCookie("ethermusic_volumes", JSON.stringify(volumes), 365);
+    } catch (e) {
+        console.error("Failed to save volume settings to cookies", e);
+    }
+}
+
+export function useAudioEngine(initialVolumes: Volumes) {
     const { toast } = useToast();
     
     const [isAppStarted, setIsAppStarted] = useState(false);
     const [isReady, setIsReady] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
-
+    
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
     
-    const initializeAudioEngine = useCallback(async () => {
+    const [volumes, setVolumesState] = useState<Volumes>(initialVolumes);
+    const currentTempo = volumes.tempo;
+    
+    const initializeAudioEngine = useCallback(async (initialVols: Volumes) => {
         try {
             if (!orbManager.current) {
                 const padContainer = document.querySelector('main');
@@ -30,15 +54,13 @@ export function useAudioEngine() {
                 if (context.state === 'suspended') {
                     await context.resume();
                 }
-                audioEngine.current = new AudioEngine(context, orbManager.current);
-                await audioEngine.current.initialize();
+                const engine = new AudioEngine(context, orbManager.current);
+                await engine.initialize();
                 
-                // Set up a listener for the isPlaying state from the drum machine
-                const updatePlayingState = (playing: boolean) => {
-                    setIsPlaying(playing);
-                };
-                audioEngine.current.getDrumMachine().on('playStateChanged', updatePlayingState);
-
+                engine.getDrumMachine().on('playStateChanged', setIsPlaying);
+                
+                engine.setVolumes(initialVols);
+                audioEngine.current = engine;
             }
             
             setIsReady(true);
@@ -54,15 +76,14 @@ export function useAudioEngine() {
         }
     }, [toast]);
 
-    const startApp = useCallback(async () => {
+    const startApp = useCallback(async (initialVols: Volumes) => {
         if (isAppStarted) return;
         
         setIsAppStarted(true);
-        // Play a subtle transition sound
         const audio = new Audio('/assets/sounds/transition.webm');
         audio.play().catch(e => console.error("Error playing transition sound:", e));
         
-        await initializeAudioEngine();
+        await initializeAudioEngine(initialVols);
     }, [isAppStarted, initializeAudioEngine]);
 
     useEffect(() => {
@@ -76,31 +97,34 @@ export function useAudioEngine() {
       return () => {
         document.removeEventListener('click', resumeAudio);
         document.removeEventListener('touchstart', resumeAudio);
+        audioEngine.current?.getDrumMachine().off('playStateChanged', setIsPlaying);
       };
     }, []);
 
     const stopAllSounds = useCallback(() => {
-        if (!audioEngine.current) return;
-        audioEngine.current.stopAllSounds();
+        audioEngine.current?.stopAllSounds();
     }, []);
 
-    const setVolumes = useCallback((volumes: Volumes) => {
-        audioEngine.current?.setVolumes(volumes);
+    const setVolumes = useCallback((newVolumes: Partial<Volumes> | ((prev: Volumes) => Volumes)) => {
+        setVolumesState(prev => {
+            const updated = typeof newVolumes === 'function' ? newVolumes(prev) : { ...prev, ...newVolumes };
+            audioEngine.current?.setVolumes(updated);
+            saveVolumes(updated);
+            return updated;
+        });
     }, []);
 
     const setTempo = useCallback((tempo: number) => {
         audioEngine.current?.setTempo(tempo);
-    }, []);
-
-    const setSwing = useCallback((swing: number) => {
-        audioEngine.current?.setSwing(swing);
+        setVolumesState(v => ({ ...v, tempo }));
     }, []);
     
+    const setSwing = useCallback((swing: number) => {
+        setVolumes(v => ({...v, swing }));
+    }, [setVolumes]);
+    
     const setBeatPattern = useCallback((patternName: string) => {
-        if (!audioEngine.current) return;
-        
-        audioEngine.current.setBeatPattern(patternName);
-
+        audioEngine.current?.setBeatPattern(patternName);
     }, []);
     
     const setBassLatch = useCallback((isOn: boolean) => {
@@ -125,13 +149,15 @@ export function useAudioEngine() {
     }, []);
     
     const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
-        audioEngine.current?.setBassInstrument(instrumentName);
-    }, []);
+        const newVolumes = audioEngine.current?.setBassInstrument(instrumentName);
+        if (newVolumes) {
+            setVolumes(newVolumes);
+        }
+    }, [setVolumes]);
     
     const handleCompressorChange = useCallback((compressorSettings: CompressorSettings) => {
-        audioEngine.current?.setCompressorSettings(compressorSettings);
-    }, []);
-    
+        setVolumes(v => ({...v, compressor: compressorSettings }));
+    }, [setVolumes]);
 
     return {
         isAppStarted,
@@ -141,6 +167,7 @@ export function useAudioEngine() {
         orbManager: orbManager.current,
         startApp,
         stopAllSounds,
+        volumes,
         setVolumes,
         setTempo,
         setSwing,
@@ -152,5 +179,6 @@ export function useAudioEngine() {
         stopRecording,
         handleThereminInteraction,
         handleCompressorChange,
+        currentTempo
     };
 }

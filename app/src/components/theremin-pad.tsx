@@ -80,7 +80,7 @@ interface ThereminPadProps {
     onLatchToggle?: (checked: boolean) => void;
     orbManager?: OrbManager | null;
     effects: Omit<ChannelVolumes, 'gain'>;
-    onEffectChange: (effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => void;
+    onEffectChange: (channel: 'melody' | 'bass', effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => void;
 }
 
 const padTitles = {
@@ -182,6 +182,10 @@ export function ThereminPad({
         }
     }, [calculateInteraction, isDisabled, onInteraction, type, isLatchOn]);
     
+     const handleEffectCommit = useCallback((effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => {
+        onEffectChange(type, effect, value);
+    }, [type, onEffectChange]);
+
     const renderSettingsControls = () => {
         const triggerButton = (
              <Button variant="outline" size="sm" className={cn("h-8 capitalize",
@@ -273,7 +277,7 @@ export function ThereminPad({
                                     icon={Blend}
                                     level={localEffects.reverbSend}
                                     onLevelChange={(v) => setLocalEffects(p => ({...p, reverbSend: v}))}
-                                    onLevelCommit={(v) => onEffectChange('reverbSend', v)}
+                                    onLevelCommit={(v) => handleEffectCommit('reverbSend', v)}
                                     min={-48} max={0} step={1} unit="dB"
                                 />
                                 <EffectControl
@@ -281,14 +285,14 @@ export function ThereminPad({
                                     icon={Waves}
                                     level={localEffects.distortion}
                                     onLevelChange={(v) => setLocalEffects(p => ({...p, distortion: v}))}
-                                    onLevelCommit={(v) => onEffectChange('distortion', v)}
+                                    onLevelCommit={(v) => handleEffectCommit('distortion', v)}
                                     min={0} max={100} step={1} unit="%"
                                 />
                             </div>
 
                             <Button 
                                 onClick={() => setIsSettingsOpen(false)} 
-                                className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                                className="w-full mt-6 border-primary text-primary hover:bg-primary hover:text-primary-foreground"
                                 variant="outline"
                             >
                                 Done
