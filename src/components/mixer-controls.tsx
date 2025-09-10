@@ -48,7 +48,7 @@ const VolumeControl = ({
     </div>
 );
 
-type VolumeChannel = keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' | 'autoplay' >;
+type VolumeChannel = keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' >;
 
 interface MixerControlsProps {
     volumes: Volumes;
@@ -59,6 +59,7 @@ interface MixerControlsProps {
     swing: number;
     setSwing: (swing: number) => void;
     closeDialog: () => void;
+    isAutopilotMixer?: boolean;
 }
 
 export function MixerControls({ 
@@ -70,7 +71,9 @@ export function MixerControls({
     swing,
     setSwing,
     closeDialog,
+    isAutopilotMixer = false,
 }: MixerControlsProps) {
+    console.log('--- Rendering: MixerControls ---', { initialVolumes, tempo, swing });
     
     const [localVolumes, setLocalVolumes] = useState(initialVolumes);
     const [localTempo, setLocalTempo] = useState(tempo);
@@ -85,19 +88,13 @@ export function MixerControls({
         setLocalSwing(swing);
     }, [initialVolumes, tempo, swing]);
 
-    const handleLocalVolumeChange = (part: VolumeChannel, value: number) => {
+    const handleChannelVolumeChange = (part: VolumeChannel, value: number) => {
         setLocalVolumes(prev => {
-            const newVolumes = JSON.parse(JSON.stringify(prev));
-            (newVolumes[part] as ChannelVolumes).gain = value;
-            
-            // Sync bass and latch volumes
-            if (part === 'manualBass') {
-                newVolumes.latch.gain = value;
-            } else if (part === 'latch') {
-                newVolumes.manualBass.gain = value;
-            }
-            
-            return newVolumes;
+            const newChannelVolumes = { ...prev[part] as ChannelVolumes, gain: value };
+            return {
+                ...prev,
+                [part]: newChannelVolumes
+            };
         });
     };
     
@@ -123,52 +120,62 @@ export function MixerControls({
 
     return (
         <div className="space-y-6">
-            <div className="space-y-4">
-                <VolumeControl 
-                    label="Tempo"
-                    icon={Clock}
-                    volume={localTempo}
-                    onVolumeChange={setLocalTempo}
-                    min={30}
-                    max={200}
-                    step={1}
-                    unit="BPM"
-                />
-                <VolumeControl 
-                    label="Swing"
-                    icon={Shuffle}
-                    volume={localSwing * 100}
-                    onVolumeChange={(v) => setLocalSwing(v / 100)}
-                    min={0}
-                    max={75}
-                    step={1}
-                    unit="%"
-                />
-            </div>
-            <Separator />
+            {!isAutopilotMixer && (
+                <>
+                    <div className="space-y-4">
+                        <VolumeControl 
+                            label="Tempo"
+                            icon={Clock}
+                            volume={localTempo}
+                            onVolumeChange={setLocalTempo}
+                            min={30}
+                            max={200}
+                            step={1}
+                            unit="BPM"
+                        />
+                        <VolumeControl 
+                            label="Swing"
+                            icon={Shuffle}
+                            volume={localSwing * 100}
+                            onVolumeChange={(v) => setLocalSwing(v / 100)}
+                            min={0}
+                            max={75}
+                            step={1}
+                            unit="%"
+                        />
+                    </div>
+                    <Separator />
+                </>
+            )}
 
             <div className="space-y-4">
                 <h3 className="text-lg font-semibold tracking-tight text-foreground">
-                    Manual Player Levels
+                    {isAutopilotMixer ? "Autopilot Levels" : "Manual Player Levels"}
                 </h3>
                 
                 <VolumeControl 
                     label="Melody"
                     icon={Music}
                     volume={localVolumes.melody.gain}
-                    onVolumeChange={(v) => handleLocalVolumeChange('melody', v)}
+                    onVolumeChange={(v) => handleChannelVolumeChange('melody', v)}
                 />
                  <VolumeControl 
-                    label="Bass / Latch"
+                    label="Bass"
                     icon={Waves}
                     volume={localVolumes.manualBass.gain}
-                    onVolumeChange={(v) => handleLocalVolumeChange('manualBass', v)}
+                    onVolumeChange={(v) => handleChannelVolumeChange('manualBass', v)}
+                />
+                <VolumeControl 
+                    label="Latch"
+                    icon={Anchor}
+                    volume={localVolumes.latch.gain}
+                    onVolumeChange={(v) => handleChannelVolumeChange('latch', v)}
                 />
                 <VolumeControl 
                     label="Drums"
                     icon={Drum}
                     volume={localVolumes.drums.gain}
-                    onVolumeChange={(v) => handleLocalVolumeChange('drums', v)}
+                    onVolumeChange={(v) => handleChannelVolumeChange('drums', v)}
                 />
             </div>
             
@@ -185,42 +192,46 @@ export function MixerControls({
                 />
             </div>
 
-            <Separator />
-            <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                     <div className="flex items-center gap-2">
-                        <AudioLines className="w-5 h-5 text-primary" />
-                        <Label htmlFor="compressor-switch" className="text-sm font-medium">Master Compressor</Label>
+            {!isAutopilotMixer && (
+                <>
+                    <Separator />
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                             <div className="flex items-center gap-2">
+                                <AudioLines className="w-5 h-5 text-primary" />
+                                <Label htmlFor="compressor-switch" className="text-sm font-medium">Master Compressor</Label>
+                            </div>
+                            <Switch
+                                id="compressor-switch"
+                                checked={localCompressor.enabled}
+                                onCheckedChange={handleToggleCompressor}
+                            />
+                        </div>
+                        <div className={cn("space-y-4 transition-opacity", !localCompressor.enabled && "opacity-50 pointer-events-none")}>
+                             <VolumeControl 
+                                label="Threshold"
+                                icon={Waves}
+                                volume={localCompressor.threshold}
+                                onVolumeChange={(v) => handleCompressorSettingChange('threshold', v)}
+                                min={-100}
+                                max={0}
+                                step={1}
+                                unit="dB"
+                            />
+                             <VolumeControl 
+                                label="Ratio"
+                                icon={Waves}
+                                volume={localCompressor.ratio}
+                                onVolumeChange={(v) => handleCompressorSettingChange('ratio', v)}
+                                min={1}
+                                max={20}
+                                step={1}
+                                unit=":1"
+                            />
+                        </div>
                     </div>
-                    <Switch
-                        id="compressor-switch"
-                        checked={localCompressor.enabled}
-                        onCheckedChange={handleToggleCompressor}
-                    />
-                </div>
-                <div className={cn("space-y-4 transition-opacity", !localCompressor.enabled && "opacity-50 pointer-events-none")}>
-                     <VolumeControl 
-                        label="Threshold"
-                        icon={Waves}
-                        volume={localCompressor.threshold}
-                        onVolumeChange={(v) => handleCompressorSettingChange('threshold', v)}
-                        min={-100}
-                        max={0}
-                        step={1}
-                        unit="dB"
-                    />
-                     <VolumeControl 
-                        label="Ratio"
-                        icon={Waves}
-                        volume={localCompressor.ratio}
-                        onVolumeChange={(v) => handleCompressorSettingChange('ratio', v)}
-                        min={1}
-                        max={20}
-                        step={1}
-                        unit=":1"
-                    />
-                </div>
-            </div>
+                </>
+            )}
 
             <Separator />
             <Button 
@@ -232,3 +243,5 @@ export function MixerControls({
         </div>
     );
 }
+
+    

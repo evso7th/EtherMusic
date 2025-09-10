@@ -61,6 +61,7 @@ export function BeatBoxControls({
     isMobile,
     isLandscape = false,
 }: BeatBoxControlsProps) {
+    console.log('--- Rendering: BeatBoxControls ---');
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isMixerOpen, setIsMixerOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<'Meditative' | 'Classic'>('Meditative');
