@@ -17,7 +17,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/t
 import type { BeatPattern, Volumes, CompressorSettings } from '@/types';
 import { MixerControls } from "./mixer-controls";
 import { beatPatterns } from "@/lib/drum-machine";
-import { AutopilotControls } from "./autopilot-controls";
 
 interface BeatBoxControlsProps {
     activePattern: BeatPattern;
@@ -175,6 +174,7 @@ export function BeatBoxControls({
                                         setTempo={setTempo}
                                         swing={swing}
                                         setSwing={setSwing}
+                                        closeDialog={() => setIsMixerOpen(false)}
                                     />
                                 </div>
                             </ScrollArea>
@@ -273,6 +273,7 @@ export function BeatBoxControls({
                                         setTempo={setTempo}
                                         swing={swing}
                                         setSwing={setSwing}
+                                        closeDialog={() => setIsMixerOpen(false)}
                                     />
                                 </div>
                             </ScrollArea>

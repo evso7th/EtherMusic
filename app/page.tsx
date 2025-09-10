@@ -257,7 +257,7 @@ export default function Home() {
     // Load settings from cookies into the audio engine once it's ready.
     useEffect(() => {
         if(isReady && cookieConsent) {
-            const { volumes: loadedVolumes } = loadSettings();
+            const loadedVolumes = loadVolumes();
             updateVolumes(loadedVolumes);
             handleTempoChange(60); 
         } else if (isReady) {
@@ -276,15 +276,22 @@ export default function Home() {
         effect: 'reverbSend' | 'distortion', 
         value: number
     ) => {
-        const newVolumes = JSON.parse(JSON.stringify(volumes));
-        (newVolumes[channel] as ChannelVolumes)[effect] = value;
-        // Since latch and manual bass share effects, update both
-        if (channel === 'manualBass' || channel === 'latch') {
-            newVolumes.manualBass[effect] = value;
-            newVolumes.latch[effect] = value;
-        }
-        updateVolumes(newVolumes);
-    }, [volumes, updateVolumes]);
+        setVolumesState(prevVolumes => {
+            const newVolumes = JSON.parse(JSON.stringify(prevVolumes));
+            (newVolumes[channel] as ChannelVolumes)[effect] = value;
+            // Since latch and manual bass share effects, update both
+            if (channel === 'manualBass' || channel === 'latch') {
+                newVolumes.manualBass[effect] = value;
+                newVolumes.latch[effect] = value;
+            }
+            // Now, call the functions to update the audio engine and save to cookie
+            if (cookieConsent) {
+                saveVolumes(newVolumes);
+            }
+            setVolumes(newVolumes);
+            return newVolumes;
+        });
+    }, [volumes, setVolumes, cookieConsent]);
     
     const handleCompressorChangeCallback = useCallback((compressorSettings: CompressorSettings) => {
         updateVolumes({ ...volumes, compressor: compressorSettings });
