@@ -48,7 +48,6 @@ const DRUM_SAMPLES: Record<string, string> = {
     't': '/assets/sounds/drums/high_tom.wav',
     'T': '/assets/sounds/drums/mid_tom.wav',
     'l': '/assets/sounds/drums/low_tom.wav',
-    'g': '/assets/sounds/drums/snare_ghost_note.wav',
     'b': '/assets/sounds/drums/hh_bark_short.wav'
 };
 
@@ -557,6 +556,21 @@ export class AudioEngine {
         if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
             this.mediaRecorder.stop();
         }
+    }
+
+    public fadeOutAndStop(durationSeconds: number) {
+        if (!this.masterOut || !this.context) return;
+        const now = this.context.currentTime;
+        this.masterOut.gain.cancelScheduledValues(now);
+        this.masterOut.gain.setValueAtTime(this.masterOut.gain.value, now);
+        this.masterOut.gain.linearRampToValueAtTime(0, now + durationSeconds);
+        setTimeout(() => {
+            this.stopAllSounds();
+            if (this.masterOut && this.context) {
+                 this.masterOut.gain.cancelScheduledValues(this.context.currentTime);
+                 this.masterOut.gain.setValueAtTime(1, this.context.currentTime);
+            }
+        }, (durationSeconds + 0.5) * 1000);
     }
 }
 

@@ -32,7 +32,6 @@ export const beatPatterns: Readonly<BeatPattern[]> = [
     { name: 'Groove', type: 'Classic', length: 1, sequence: [
         { time: 0, note: 'K' }, { time: 4, note: 'h' }, { time: 8, note: 'S' }, { time: 12, note: 'h' },
     ]},
-    { name: 'Slow Tom', type: 'Meditative', length: 2, sequence: [{ time: 0, note: 't' }, { time: 4, note: 'T' }, { time: 8, note: 'l' } ]},
 
     // Fills
     { name: 'Fill A', type: 'Fill', length: 1, sequence: [
@@ -155,3 +154,5 @@ export class DrumMachine {
         this.timeoutId = setTimeout(() => this.scheduler(), delay * 1000);
     }
 }
+
+    
