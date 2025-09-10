@@ -242,11 +242,22 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isReady]);
     
+    const updateVolumes = useCallback((newVolumes: Partial<Volumes>) => {
+        const mergedVolumes = { ...volumes, ...newVolumes };
+        setVolumesState(mergedVolumes);
+        setVolumes(mergedVolumes);
+        if (typeof newVolumes.swing === 'number') {
+            setSwing(newVolumes.swing);
+        }
+        if (cookieConsent) {
+            saveVolumes(mergedVolumes);
+        }
+    }, [volumes, setVolumes, setSwing, cookieConsent]);
+
     // Load settings from cookies into the audio engine once it's ready.
     useEffect(() => {
         if(isReady && cookieConsent) {
             const { volumes: loadedVolumes } = loadSettings();
-            // Set volumes for all channels
             updateVolumes(loadedVolumes);
             handleTempoChange(60); 
         } else if (isReady) {
@@ -255,19 +266,10 @@ export default function Home() {
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isReady, cookieConsent]);
-
-    const updateVolumes = useCallback((newVolumes: Volumes) => {
-        setVolumesState(newVolumes);
-        setVolumes(newVolumes);
-        setSwing(newVolumes.swing);
-        if (cookieConsent) {
-            saveVolumes(newVolumes);
-        }
-    }, [setVolumes, setSwing, cookieConsent]);
     
     const handleMixerChange = useCallback((changedMixerVolumes: Partial<Volumes>) => {
-        updateVolumes({ ...volumes, ...changedMixerVolumes });
-    }, [volumes, updateVolumes]);
+        updateVolumes(changedMixerVolumes);
+    }, [updateVolumes]);
     
     const handleChannelEffectChange = useCallback((
         channel: 'melody' | 'manualBass' | 'latch', 
@@ -285,16 +287,13 @@ export default function Home() {
     }, [volumes, updateVolumes]);
     
     const handleCompressorChangeCallback = useCallback((compressorSettings: CompressorSettings) => {
-        const newVolumes: Volumes = { ...volumes, compressor: compressorSettings };
-        updateVolumes(newVolumes);
+        updateVolumes({ ...volumes, compressor: compressorSettings });
         handleCompressorChange(compressorSettings);
     }, [volumes, updateVolumes, handleCompressorChange]);
     
     const handleSwingChange = useCallback((swing: number) => {
-        const newVolumes: Volumes = { ...volumes, swing: swing };
-        updateVolumes(newVolumes);
-        setSwing(swing);
-    }, [volumes, updateVolumes, setSwing]);
+        updateVolumes({ ...volumes, swing: swing });
+    }, [volumes, updateVolumes]);
 
     const handleStartApp = useCallback(() => {
         startApp();
