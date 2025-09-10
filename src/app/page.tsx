@@ -15,7 +15,6 @@ import { beatPatterns } from '@/lib/drum-machine';
 import { CookieConsent } from '@/components/cookie-consent';
 import { useAudioEngine } from '@/hooks/use-audio-engine';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
-import { SleepTimer } from '@/components/sleep-timer';
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
 import { melodyInstruments, defaultMelodyInstrument } from '@/lib/melody-presets';
 import { bassInstruments, defaultBassInstrument } from '@/lib/bass-presets';
@@ -44,18 +43,18 @@ function setCookie(name: string, value: string, days: number) {
 
 const defaultVolumes: Volumes = { 
     melody: { gain: 0, reverbSend: -18, distortion: 0 },
-    manualBass: { gain: -3, reverbSend: -48, distortion: 0 },
-    latch: { gain: -9, reverbSend: -48, distortion: 0 },
-    drums: { gain: -9, reverbSend: -48, distortion: 0 },
-    reverbReturn: -12,
+    manualBass: { gain: -25, reverbSend: -48, distortion: 0 },
+    latch: { gain: -25, reverbSend: -48, distortion: 0 },
+    drums: { gain: -20, reverbSend: -48, distortion: 0 },
+    reverbReturn: -25,
     compressor: {
         enabled: true,
-        threshold: -24,
-        ratio: 12,
+        threshold: -70,
+        ratio: 7,
         attack: 0.003,
         release: 0.25
     },
-    swing: 0,
+    swing: 0.33,
 };
 
 function loadSettings(): { volumes: Volumes } {
@@ -147,7 +146,6 @@ export default function Home() {
         startRecording,
         stopRecording,
         handleThereminInteraction,
-        setSleepTimer,
         setMelodyInstrument,
         setBassInstrument,
         orbManager,
@@ -167,15 +165,17 @@ export default function Home() {
     const [activeBassInstrument, setActiveBassInstrument] = useState<BassInstrument>(defaultBassInstrument);
     
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
-    const [currentTempo, setCurrentTempo] = useState(90);
+    const [currentTempo, setCurrentTempo] = useState(60);
     
     const onConsentChange = useCallback((consent: boolean) => {
         setCookieConsent(consent);
         if (consent) {
             const { volumes } = loadSettings();
             setVolumesState(volumes);
+            setCurrentTempo(60);
         } else {
             setVolumesState(defaultVolumes);
+            setCurrentTempo(60);
             if (typeof document !== 'undefined') {
                 document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
             }
@@ -248,7 +248,10 @@ export default function Home() {
             const { volumes: loadedVolumes } = loadSettings();
             // Set volumes for all channels
             updateVolumes(loadedVolumes);
-            setCurrentTempo(loadedVolumes.swing ?? 90);
+            handleTempoChange(60); 
+        } else if (isReady) {
+            updateVolumes(defaultVolumes);
+            handleTempoChange(60);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isReady, cookieConsent]);
@@ -256,11 +259,11 @@ export default function Home() {
     const updateVolumes = useCallback((newVolumes: Volumes) => {
         setVolumesState(newVolumes);
         setVolumes(newVolumes);
-        setTempo(newVolumes.swing ?? 0);
+        setSwing(newVolumes.swing);
         if (cookieConsent) {
             saveVolumes(newVolumes);
         }
-    }, [setVolumes, setTempo, cookieConsent]);
+    }, [setVolumes, setSwing, cookieConsent]);
     
     const handleMixerChange = useCallback((changedMixerVolumes: Partial<Volumes>) => {
         updateVolumes({ ...volumes, ...changedMixerVolumes });
@@ -416,7 +419,6 @@ export default function Home() {
                             onExit={stopAllSounds}
                             isReady={isReady}
                         />
-                         <SleepTimer onTimerSet={setSleepTimer} />
                     </div>
                 </header>
 
@@ -499,4 +501,3 @@ export default function Home() {
         </div>
     );
 }
-

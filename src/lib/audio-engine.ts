@@ -48,6 +48,7 @@ const DRUM_SAMPLES: Record<string, string> = {
     't': '/assets/sounds/drums/high_tom.wav',
     'T': '/assets/sounds/drums/mid_tom.wav',
     'l': '/assets/sounds/drums/low_tom.wav',
+    'g': '/assets/sounds/drums/snare_ghost_note.wav',
     'b': '/assets/sounds/drums/hh_bark_short.wav'
 };
 
@@ -78,18 +79,18 @@ export class AudioEngine {
         
     private volumes: Volumes = { 
         melody: { gain: 0, reverbSend: -18, distortion: 0 },
-        manualBass: { gain: -3, reverbSend: -48, distortion: 0 },
-        latch: { gain: -9, reverbSend: -48, distortion: 0 },
-        drums: { gain: -9, reverbSend: -48, distortion: 0 },
-        reverbReturn: -12,
+        manualBass: { gain: -25, reverbSend: -48, distortion: 0 },
+        latch: { gain: -25, reverbSend: -48, distortion: 0 },
+        drums: { gain: -20, reverbSend: -48, distortion: 0 },
+        reverbReturn: -25,
         compressor: {
             enabled: true,
-            threshold: -24,
-            ratio: 12,
+            threshold: -70,
+            ratio: 7,
             attack: 0.003,
             release: 0.25
         },
-        swing: 0,
+        swing: 0.33,
     };
     private isBassLatchOn: boolean = false;
     private latchEngine = new LatchEngine();
@@ -411,7 +412,7 @@ export class AudioEngine {
     public setBassInstrument(instrumentName: BassInstrument) {
         const preset = bassInstruments.find(i => i.id === instrumentName);
         if (preset) {
-            const bassPresetParams = preset.params;
+            const bassPresetParams = preset.params as BassInstrumentPresetParams;
             const message: WorkerMessage = { type: 'setPreset', preset: bassPresetParams };
             
             this.nodes.get('manualBass')?.worklet.port.postMessage(message);
@@ -557,19 +558,6 @@ export class AudioEngine {
             this.mediaRecorder.stop();
         }
     }
-
-    public fadeOutAndStop(durationSeconds: number) {
-        if (!this.masterOut || !this.context) return;
-        const now = this.context.currentTime;
-        this.masterOut.gain.cancelScheduledValues(now);
-        this.masterOut.gain.setValueAtTime(this.masterOut.gain.value, now);
-        this.masterOut.gain.linearRampToValueAtTime(0, now + durationSeconds);
-        setTimeout(() => {
-            this.stopAllSounds();
-            if (this.masterOut && this.context) {
-                 this.masterOut.gain.cancelScheduledValues(this.context.currentTime);
-                 this.masterOut.gain.setValueAtTime(1, this.context.currentTime);
-            }
-        }, (durationSeconds + 0.5) * 1000);
-    }
 }
+
+    
