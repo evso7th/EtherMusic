@@ -76,29 +76,13 @@ export function useAudioEngine() {
         document.removeEventListener('touchstart', resumeAudio);
       };
     }, []);
-
-    const play = useCallback(() => {
-        console.log("[useAudioEngine] Play requested.");
-        if (!isReady || !audioEngine.current) {
-            return;
-        }
-        audioEngine.current.play();
-        setIsPlaying(true);
-    }, [isReady]);
-
-    const pause = useCallback(() => {
-        console.log("[useAudioEngine] Pause requested.");
-        if (!isReady || !audioEngine.current) return;
-        audioEngine.current.pause();
-        setIsPlaying(false);
-    }, [isReady]);
-
-    const stop = useCallback(() => {
+    
+    const stopAllSounds = useCallback(() => {
         if (!audioEngine.current) return;
         audioEngine.current.stopAllSounds();
         setIsPlaying(false);
     }, []);
-    
+
     const setVolumes = useCallback((volumes: Volumes) => {
         audioEngine.current?.setVolumes(volumes);
     }, []);
@@ -115,25 +99,16 @@ export function useAudioEngine() {
     const setBeatPattern = useCallback((patternName: string) => {
         if (!audioEngine.current) return;
         console.log(`[useAudioEngine] Setting beat pattern to: ${patternName}`);
-        const wasPlaying = audioEngine.current.isPlaying;
         audioEngine.current.setBeatPattern(patternName);
 
         if (patternName !== 'Off') {
-            // If a pattern is selected and we weren't playing, start it.
-            if (!wasPlaying) {
-                 console.log("[useAudioEngine] Pattern set to ON, calling play().");
-                 play();
-            }
+             audioEngine.current.play();
              setIsPlaying(true);
         } else {
-            // If pattern is set to 'Off', always pause.
-            if (wasPlaying) {
-                console.log("[useAudioEngine] Pattern set to OFF, calling pause().");
-                pause();
-            }
+             audioEngine.current.pause();
              setIsPlaying(false);
         }
-    }, [play, pause]);
+    }, []);
     
     const setBassLatch = useCallback((isOn: boolean) => {
         audioEngine.current?.setBassLatch(isOn);
@@ -187,9 +162,7 @@ export function useAudioEngine() {
         audioEngine: audioEngine.current,
         orbManager: orbManager.current,
         startApp,
-        play,
-        pause,
-        stop,
+        stopAllSounds,
         setVolumes,
         setTempo,
         setSwing,

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { SlidersHorizontal, Drum, Bot } from 'lucide-react';
+import { SlidersHorizontal, Drum } from 'lucide-react';
 import { useState, useMemo, useCallback, memo } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
@@ -180,17 +180,7 @@ export function BeatBoxControls({
                             </ScrollArea>
                         </DialogContent>
                     </Dialog>
-
-                    <AutopilotControls
-                        isMobile={isMobile}
-                        isLandscape={isLandscape}
-                        onSettingsChange={() => {}}
-                        initialSettings={{}}
-                        volumes={volumes}
-                        onMixerChange={onMixerChange}
-                        onAutopilotPresetLoad={() => {}}
-                    />
-
+                    
                     <HelpGuide buttonVariant="outline" size="icon" className="w-10 h-10 rounded-full" showText={false}/>
                 </div>
             </TooltipProvider>
@@ -288,15 +278,6 @@ export function BeatBoxControls({
                             </ScrollArea>
                         </DialogContent>
                     </Dialog>
-
-                    <AutopilotControls
-                        isMobile={isMobile}
-                        initialSettings={{ enabled: false, style: 'Ambient', density: 0.5, instruments: {} }}
-                        onSettingsChange={() => {}}
-                        volumes={volumes}
-                        onMixerChange={onMixerChange}
-                        onAutopilotPresetLoad={() => {}}
-                    />
                     
                     <HelpGuide buttonVariant="outline" buttonClassName="flex-1" size={buttonSize}/>
                 </CardContent>

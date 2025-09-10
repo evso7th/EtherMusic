@@ -141,9 +141,7 @@ export default function Home() {
         isPlaying,
         audioEngine,
         startApp,
-        play,
-        pause,
-        stop,
+        stopAllSounds,
         setBeatPattern,
         setBassLatch,
         startRecording,
@@ -413,12 +411,9 @@ export default function Home() {
                     </div>
                     <div className="flex items-center gap-1 md:gap-2 landscape:flex-col">
                          <PlaybackControls
-                            isPlaying={isPlaying}
                             isRecording={isRecording}
-                            onPlay={play}
-                            onPause={pause}
                             onRecord={handleRecord}
-                            onStop={stop}
+                            onExit={stopAllSounds}
                             isReady={isReady}
                         />
                          <SleepTimer onTimerSet={setSleepTimer} />
@@ -504,3 +499,4 @@ export default function Home() {
         </div>
     );
 }
+

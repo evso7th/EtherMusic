@@ -3,7 +3,7 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { Circle, Power, Play, Pause } from 'lucide-react';
+import { Circle, Power } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -20,12 +20,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface PlaybackControlsProps {
-    isPlaying: boolean;
     isRecording: boolean;
-    onPlay: () => void;
-    onPause: () => void;
     onRecord: () => void;
-    onStop: () => void;
+    onExit: () => void;
     isReady: boolean;
 }
 
@@ -47,18 +44,15 @@ const ControlButton = ({ tooltipText, children, isMobile, ...props }: { tooltipT
 
 
 export function PlaybackControls({ 
-    isPlaying,
     isRecording, 
-    onPlay,
-    onPause,
     onRecord, 
-    onStop,
+    onExit,
     isReady 
 }: PlaybackControlsProps) {
     const isMobile = useIsMobile();
     
     const handleExit = () => {
-        onStop();
+        onExit();
         if (typeof window !== "undefined") {
             try {
                 // This will close the window if it was opened by a script.
@@ -73,18 +67,6 @@ export function PlaybackControls({
 
     return (
         <TooltipProvider>
-             <ControlButton
-                tooltipText={isPlaying ? "Pause" : "Play"}
-                onClick={isPlaying ? onPause : onPlay} 
-                size="icon" 
-                variant="outline" 
-                className="w-10 h-10 rounded-full" 
-                aria-label={isPlaying ? "Pause" : "Play"} 
-                disabled={!isReady}
-                isMobile={isMobile}
-             >
-                {isPlaying ? <Pause className="w-5 h-5 md:w-6 md:h-6" /> : <Play className="w-5 h-5 md:w-6 md:h-6" />}
-            </ControlButton>
             <ControlButton
                 tooltipText="Record"
                 onClick={onRecord} 
