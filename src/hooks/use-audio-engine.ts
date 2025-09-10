@@ -7,16 +7,17 @@ import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
 import type { Volumes, Instrument, BassInstrument, CompressorSettings } from '@/types';
 
-export function useAudioEngine() {
-    console.log('--- Rendering: useAudioEngine Hook ---');
+export function useAudioEngine(initialVolumes: Volumes) {
     const { toast } = useToast();
     
     const [isAppStarted, setIsAppStarted] = useState(false);
     const [isReady, setIsReady] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [currentTempo, setCurrentTempo] = useState(60);
 
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
+    const [volumes, setVolumes] = useState<Volumes>(initialVolumes);
     
     const initializeAudioEngine = useCallback(async () => {
         try {
@@ -78,21 +79,26 @@ export function useAudioEngine() {
       };
     }, []);
 
+    // Effect to apply volumes when they change
+    useEffect(() => {
+        if (audioEngine.current) {
+            audioEngine.current.setVolumes(volumes);
+        }
+    }, [volumes]);
+
     const stopAllSounds = useCallback(() => {
         audioEngine.current?.stopAllSounds();
     }, []);
 
-    const setVolumes = useCallback((volumes: Volumes) => {
-        audioEngine.current?.setVolumes(volumes);
-    }, []);
-
     const setTempo = useCallback((tempo: number) => {
         audioEngine.current?.setTempo(tempo);
+        setCurrentTempo(tempo);
     }, []);
 
     const setSwing = useCallback((swing: number) => {
         audioEngine.current?.setSwing(swing);
-    }, []);
+        setVolumes(v => ({...v, swing}));
+    }, [setVolumes]);
     
     const setBeatPattern = useCallback((patternName: string) => {
         audioEngine.current?.setBeatPattern(patternName);
@@ -119,14 +125,18 @@ export function useAudioEngine() {
         audioEngine.current?.setMelodyInstrument(instrumentName);
     }, []);
     
-    const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
-        audioEngine.current?.setBassInstrument(instrumentName);
+    const setBassInstrument = useCallback((instrumentName: BassInstrument): Volumes | undefined => {
+        const newVolumes = audioEngine.current?.setBassInstrument(instrumentName);
+        if (newVolumes) {
+            setVolumes(newVolumes);
+        }
+        return newVolumes;
     }, []);
     
     const handleCompressorChange = useCallback((compressorSettings: CompressorSettings) => {
         audioEngine.current?.setCompressorSettings(compressorSettings);
-    }, []);
-    
+        setVolumes(v => ({...v, compressor: compressorSettings }));
+    }, [setVolumes]);
 
     return {
         isAppStarted,
@@ -136,6 +146,7 @@ export function useAudioEngine() {
         orbManager: orbManager.current,
         startApp,
         stopAllSounds,
+        volumes,
         setVolumes,
         setTempo,
         setSwing,
@@ -147,7 +158,7 @@ export function useAudioEngine() {
         stopRecording,
         handleThereminInteraction,
         handleCompressorChange,
+        currentTempo,
+        setCurrentTempo
     };
 }
-
-    

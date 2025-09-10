@@ -72,7 +72,6 @@ export class AudioEngine {
     public isInitialized = false;
     private context!: AudioContext;
     public orbManager: OrbManager;
-    private onVolumesChanged: (volumes: Volumes) => void;
     private mediaRecorder: MediaRecorder | null = null;
     private recordedChunks: Blob[] = [];
 
@@ -114,10 +113,9 @@ export class AudioEngine {
     private activePointers = new Map<number, { type: 'melody' | 'bass', noteId: number }>();
     private nextNoteId = 0;
     
-    constructor(context: AudioContext, orbManager: OrbManager, onVolumesChanged: (volumes: Volumes) => void) {
+    constructor(context: AudioContext, orbManager: OrbManager) {
         this.context = context;
         this.orbManager = orbManager;
-        this.onVolumesChanged = onVolumesChanged;
         
         this.masterOut = this.context.createGain();
         this.masterOut.connect(this.context.destination);
@@ -253,7 +251,7 @@ export class AudioEngine {
             }
         };
         
-        this.nodes.set('drums', { worklet, gain, reverbSend });
+        this.nodes.set('drums', { worklet: worklet, gain: gain, reverbSend: reverbSend });
     }
     
     private async loadReverbImpulse() {
@@ -261,11 +259,10 @@ export class AudioEngine {
             const response = await fetch('/assets/sounds/impulses/space.wav');
             if (!response.ok) {
                  if (response.status === 404) {
-                    console.log("[AudioEngine] Reverb impulse '/assets/sounds/impulses/space.wav' not found. Using a generated fallback reverb. This is expected if the file doesn't exist.");
-                } else {
-                    // Don't throw for other errors, just log and fallback.
+                    console.warn("[AudioEngine] Reverb impulse '/assets/sounds/impulses/space.wav' not found. Using a generated fallback reverb. This is expected if the file doesn't exist.");
+                 } else {
                     console.error(`[AudioEngine] HTTP error! status: ${response.status}`);
-                }
+                 }
                 this.convolver.buffer = this.createFallbackReverb();
                 return;
             }
@@ -407,7 +404,8 @@ export class AudioEngine {
         }
     }
     
-    public setBassInstrument(instrumentName: BassInstrument) {
+    public setBassInstrument(instrumentName: BassInstrument): Volumes {
+        const newVolumes = this.getVolumes(); // Start with current volumes
         const preset = bassInstruments.find(i => i.id === instrumentName);
         if (preset) {
             const bassPresetParams = preset.params as BassInstrumentPresetParams;
@@ -416,9 +414,6 @@ export class AudioEngine {
             this.nodes.get('manualBass')?.worklet.port.postMessage(message);
             this.nodes.get('latch')?.worklet.port.postMessage(message);
             
-            // Create a deep copy to modify
-            const newVolumes = JSON.parse(JSON.stringify(this.volumes));
-            
             // Update reverb and distortion for both bass channels from the preset
             newVolumes.manualBass.reverbSend = bassPresetParams.reverbSend ?? newVolumes.manualBass.reverbSend;
             newVolumes.manualBass.distortion = bassPresetParams.distortion ?? newVolumes.manualBass.distortion;
@@ -426,9 +421,8 @@ export class AudioEngine {
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
             this.setVolumes(newVolumes);
-            // Notify the UI about the volume change from the preset
-            this.onVolumesChanged(newVolumes);
         }
+        return newVolumes;
     }
     
     public setBeatPattern(patternName: string) {
