@@ -69,7 +69,7 @@ export interface BassInstrumentPreset {
 
 export type BeatPattern = {
     name: string;
-    type: 'Meditative' | 'Classic' | 'System';
+    type: 'Meditative' | 'Classic' | 'System' | 'Fill';
     length: number; // in measures
     sequence: { time: number; note: string; vol?: number }[];
 };
@@ -97,7 +97,7 @@ export interface Volumes {
   drums: ChannelVolumes;
   reverbReturn: number; // in dB
   compressor: CompressorSettings;
-  swing: number; // 0 to 1
+  swing: number;
 }
 
 export interface SynthNote {
@@ -132,4 +132,19 @@ export interface Note {
     time?: number; // for autopilot and scheduled notes
 }
 
+// Autopilot functionality is deprecated and moved to AuraGroove app.
+// Types are kept for reference but are not actively used.
+export interface AutopilotSettings {
+    enabled: boolean;
+    style: string;
+    density: number;
+    key: MusicKey;
+    scale: MusicScale;
+    instruments: {
+        melody: Instrument;
+        accompaniment: Instrument;
+        bass: BassInstrument;
+    }
+}
     
+

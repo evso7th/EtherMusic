@@ -143,7 +143,6 @@ export default function Home() {
         startApp,
         play,
         pause,
-        stop,
         setBeatPattern,
         setBassLatch,
         startRecording,
@@ -157,6 +156,7 @@ export default function Home() {
         setTempo,
         setSwing,
         handleCompressorChange,
+        stopAllSounds,
     } = useAudioEngine();
     
     const [isRecording, setIsRecording] = useState(false);
@@ -299,13 +299,6 @@ export default function Home() {
         startApp();
     }, [startApp]);
 
-    const handleStop = useCallback(() => {
-        stop();
-        const offPattern = beatPatterns.find(p => p.name === 'Off')!;
-        setActivePattern(offPattern);
-        setBeatPattern(offPattern.name);
-    }, [stop, setBeatPattern]);
-
     const handleRecord = useCallback(() => {
         if (isRecording) {
             stopRecording();
@@ -420,12 +413,9 @@ export default function Home() {
                     </div>
                     <div className="flex items-center gap-1 md:gap-2 landscape:flex-col">
                          <PlaybackControls
-                            isPlaying={isPlaying}
                             isRecording={isRecording}
-                            onPlay={play}
-                            onPause={pause}
                             onRecord={handleRecord}
-                            onStop={handleStop}
+                            onExit={stopAllSounds}
                             isReady={isReady}
                         />
                          <SleepTimer onTimerSet={setSleepTimer} />
@@ -486,7 +476,7 @@ export default function Home() {
                             isMobile={isMobile}
                             tempo={currentTempo}
                             setTempo={handleTempoChange}
-                            swing={volumes.swing}
+                            swing={volumes.swing || 0}
                             setSwing={handleSwingChange}
                         />
                     </div>
@@ -503,7 +493,7 @@ export default function Home() {
                         isLandscape={true}
                         tempo={currentTempo}
                         setTempo={handleTempoChange}
-                        swing={volumes.swing}
+                        swing={volumes.swing || 0}
                         setSwing={handleSwingChange}
                     />
                 </div>
@@ -511,3 +501,4 @@ export default function Home() {
         </div>
     );
 }
+

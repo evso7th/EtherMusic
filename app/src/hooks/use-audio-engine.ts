@@ -92,13 +92,13 @@ export function useAudioEngine() {
         audioEngine.current.pause();
         setIsPlaying(false);
     }, [isReady]);
-
-    const stop = useCallback(() => {
+    
+    const stopAllSounds = useCallback(() => {
         if (!audioEngine.current) return;
-        audioEngine.current.stop();
+        audioEngine.current.stopAllSounds();
         setIsPlaying(false);
     }, []);
-    
+
     const setVolumes = useCallback((volumes: Volumes) => {
         audioEngine.current?.setVolumes(volumes);
     }, []);
@@ -119,14 +119,12 @@ export function useAudioEngine() {
         audioEngine.current.setBeatPattern(patternName);
 
         if (patternName !== 'Off') {
-            // If a pattern is selected and we weren't playing, start it.
             if (!wasPlaying) {
                  console.log("[useAudioEngine] Pattern set to ON, calling play().");
                  play();
             }
              setIsPlaying(true);
         } else {
-            // If pattern is set to 'Off', always pause.
             if (wasPlaying) {
                 console.log("[useAudioEngine] Pattern set to OFF, calling pause().");
                 pause();
@@ -189,7 +187,7 @@ export function useAudioEngine() {
         startApp,
         play,
         pause,
-        stop,
+        stopAllSounds,
         setVolumes,
         setTempo,
         setSwing,

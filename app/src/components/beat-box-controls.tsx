@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { SlidersHorizontal, Drum, Bot } from 'lucide-react';
+import { SlidersHorizontal, Drum } from 'lucide-react';
 import { useState, useMemo, useCallback, memo } from "react";
 import { cn } from "@/lib/utils";
 import { HelpGuide } from "./help-guide";
@@ -17,7 +17,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/t
 import type { BeatPattern, Volumes, CompressorSettings } from '@/types';
 import { MixerControls } from "./mixer-controls";
 import { beatPatterns } from "@/lib/drum-machine";
-// import { AutopilotControls } from "./autopilot-controls"; // Keep this commented out
 
 interface BeatBoxControlsProps {
     activePattern: BeatPattern;

@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Volumes, Instrument, BassInstrument, CompressorSettings, InstrumentPreset, BassInstrumentPreset, ChannelVolumes, SynthNote, WorkerMessage, DrumWorkerMessage } from '@/types';
+import type { Volumes, Instrument, BassInstrument, CompressorSettings, InstrumentPreset, BassInstrumentPresetParams, ChannelVolumes, SynthNote, WorkerMessage, DrumWorkerMessage } from '@/types';
 import { OrbManager } from './orb-manager';
 import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
@@ -34,18 +34,21 @@ type SynthPartName = 'melody' | 'manualBass' | 'latch';
 
 const DRUM_SAMPLES: Record<string, string> = {
     'k': '/assets/sounds/drums/kick_drum.wav',
-    'K': '/assets/sounds/drums/kick_drum8.wav', // New Kick
+    'K': '/assets/sounds/drums/kick_drum8.wav',
     's': '/assets/sounds/drums/snare.wav',
-    'S': '/assets/sounds/drums/snare_press.wav', // New Snare Press
+    'S': '/assets/sounds/drums/snarepress.wav',
     'h': '/assets/sounds/drums/closed_hi_hat_accented.wav',
     'H': '/assets/sounds/drums/closed_hi_hat_ghost.wav',
-    'o': '/assets/sounds/drums/open_hh_top2.wav',
-    'g': '/assets/sounds/drums/snare_ghost_note.wav',
+    'o': '/assets/sounds/drums/open_hh_top.wav',
+    'O': '/assets/sounds/drums/open_hh_bottom.wav',
     'c': '/assets/sounds/drums/crash.wav',
     'y': '/assets/sounds/drums/cymbal.wav',
+    'Y': '/assets/sounds/drums/cymbal_bell.wav',
+    'Z': '/assets/sounds/drums/cymbal_bell2.wav',
     't': '/assets/sounds/drums/high_tom.wav',
     'T': '/assets/sounds/drums/mid_tom.wav',
     'l': '/assets/sounds/drums/low_tom.wav',
+    'g': '/assets/sounds/drums/snare_ghost_note.wav',
     'b': '/assets/sounds/drums/hh_bark_short.wav'
 };
 
@@ -246,15 +249,14 @@ export class AudioEngine {
     private async loadReverbImpulse() {
         console.log("[AudioEngine] Loading reverb impulse...");
         try {
-            // const response = await fetch('/assets/sounds/impulses/space.wav');
-            // if (!response.ok) {
-            //     throw new Error(`HTTP error! status: ${response.status}`);
-            // }
-            // const buffer = await response.arrayBuffer();
-            // const audioBuffer = await this.context.decodeAudioData(buffer);
-            // this.convolver.buffer = audioBuffer;
-            // console.log("[AudioEngine] Reverb impulse loaded and assigned.");
-            throw new Error("Reverb impulse file not available, using fallback.");
+            const response = await fetch('/assets/sounds/impulses/space.wav');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const buffer = await response.arrayBuffer();
+            const audioBuffer = await this.context.decodeAudioData(buffer);
+            this.convolver.buffer = audioBuffer;
+            console.log("[AudioEngine] Reverb impulse loaded and assigned.");
         } catch (e) {
             console.warn("[AudioEngine] Could not load reverb impulse, using fallback.", e);
             this.convolver.buffer = this.createFallbackReverb();
@@ -291,10 +293,20 @@ export class AudioEngine {
         this.drumMachine.pause();
     }
 
-    public stop() {
+    public stopAllSounds() {
         if (!this.isInitialized) return;
         this.drumMachine.stop();
-        this.stopAllSounds();
+        this.nodes.forEach((node, name) => {
+             // We don't want to stop the drum worklet, just the synth voices
+            if (name !== 'drums') {
+                node.worklet.port.postMessage({ type: 'allNotesOff' });
+            }
+        });
+        
+        const notesToTurnOff = this.latchEngine.clear();
+        notesToTurnOff.forEach(note => this.orbManager.removeOrb(note.id));
+        this.orbManager?.removeAllOrbs();
+        this.activePointers.clear();
     }
     
     public handleThereminInteraction(type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') {
@@ -400,7 +412,7 @@ export class AudioEngine {
     public setBassInstrument(instrumentName: BassInstrument) {
         const preset = bassInstruments.find(i => i.id === instrumentName);
         if (preset) {
-            const bassPresetParams = preset.params;
+            const bassPresetParams = preset.params as BassInstrumentPresetParams;
             const message: WorkerMessage = { type: 'setPreset', preset: bassPresetParams };
             
             this.nodes.get('manualBass')?.worklet.port.postMessage(message);
@@ -458,8 +470,10 @@ export class AudioEngine {
             return;
         }
 
-        console.log("[AudioEngine] Posting loaded samples to drum worklet.");
-        for (const [name, url] of Object.entries(DRUM_SAMPLES)) {
+        const sampleEntries = Object.entries(DRUM_SAMPLES);
+        console.log(`[AudioEngine] Found ${sampleEntries.length} samples to load.`);
+
+        for (const [name, url] of sampleEntries) {
             try {
                 const response = await fetch(url);
                 if (!response.ok) {
@@ -486,7 +500,7 @@ export class AudioEngine {
         console.log("[AudioEngine] All drum samples processed.");
     }
 
-    private applyVolumeForPart(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing'>, volumes: ChannelVolumes) {
+    private applyVolumeForPart(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' >, volumes: ChannelVolumes) {
         const rampTime = this.context.currentTime + 0.05;
     
         const nodeInfo = this.nodes.get(partName);
@@ -511,7 +525,7 @@ export class AudioEngine {
         
         this.reverbReturnGain.gain.linearRampToValueAtTime(dbToGain(this.volumes.reverbReturn), rampTime);
         this.setCompressorSettings(this.volumes.compressor);
-        this.setSwing(this.volumes.swing);
+        this.setSwing(this.volumes.swing ?? 0);
     }
     
     public setCompressorSettings(compressorSettings: CompressorSettings) {
@@ -533,21 +547,6 @@ export class AudioEngine {
         }
     }
     
-    public stopAllSounds() {
-        if (!this.isInitialized) return;
-        this.nodes.forEach((node, name) => {
-             // We don't want to stop the drum worklet, just the synth voices
-            if (name !== 'drums') {
-                node.worklet.port.postMessage({ type: 'allNotesOff' });
-            }
-        });
-        
-        const notesToTurnOff = this.latchEngine.clear();
-        notesToTurnOff.forEach(note => this.orbManager.removeOrb(note.id));
-        this.orbManager?.removeAllOrbs();
-        this.activePointers.clear();
-    }
-    
     public startRecording() {
         if (!this.mediaRecorder || this.mediaRecorder.state === 'recording') return;
         this.recordedChunks = [];
@@ -567,7 +566,7 @@ export class AudioEngine {
         this.masterOut.gain.setValueAtTime(this.masterOut.gain.value, now);
         this.masterOut.gain.linearRampToValueAtTime(0, now + durationSeconds);
         setTimeout(() => {
-            this.stop();
+            this.stopAllSounds();
             if (this.masterOut && this.context) {
                  this.masterOut.gain.cancelScheduledValues(this.context.currentTime);
                  this.masterOut.gain.setValueAtTime(1, this.context.currentTime);
