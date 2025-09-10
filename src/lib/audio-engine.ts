@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Volumes, Instrument, BassInstrument, CompressorSettings, InstrumentPreset, BassInstrumentPreset, ChannelVolumes, SynthNote, WorkerMessage, DrumWorkerMessage } from '@/types';
+import type { Volumes, Instrument, BassInstrument, CompressorSettings, InstrumentPreset, BassInstrumentPresetParams, ChannelVolumes, SynthNote, WorkerMessage, DrumWorkerMessage } from '@/types';
 import { OrbManager } from './orb-manager';
 import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
@@ -48,9 +48,8 @@ const DRUM_SAMPLES: Record<string, string> = {
     't': '/assets/sounds/drums/high_tom.wav',
     'T': '/assets/sounds/drums/mid_tom.wav',
     'l': '/assets/sounds/drums/low_tom.wav',
+    'g': '/assets/sounds/drums/snare_ghost_note.wav',
     'b': '/assets/sounds/drums/hh_bark_short.wav'
-    // 'g' for snare_ghost_note.wav is not present in the final list, so it's removed.
-    // 'snare_off.wav' is in the list but not mapped. We can add it if needed, e.g. as 'x'.
 };
 
 export class AudioEngine {
@@ -250,15 +249,14 @@ export class AudioEngine {
     private async loadReverbImpulse() {
         console.log("[AudioEngine] Loading reverb impulse...");
         try {
-            // const response = await fetch('/assets/sounds/impulses/space.wav');
-            // if (!response.ok) {
-            //     throw new Error(`HTTP error! status: ${response.status}`);
-            // }
-            // const buffer = await response.arrayBuffer();
-            // const audioBuffer = await this.context.decodeAudioData(buffer);
-            // this.convolver.buffer = audioBuffer;
-            // console.log("[AudioEngine] Reverb impulse loaded and assigned.");
-            throw new Error("Reverb impulse file not available, using fallback.");
+            const response = await fetch('/assets/sounds/impulses/space.wav');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const buffer = await response.arrayBuffer();
+            const audioBuffer = await this.context.decodeAudioData(buffer);
+            this.convolver.buffer = audioBuffer;
+            console.log("[AudioEngine] Reverb impulse loaded and assigned.");
         } catch (e) {
             console.warn("[AudioEngine] Could not load reverb impulse, using fallback.", e);
             this.convolver.buffer = this.createFallbackReverb();
@@ -492,7 +490,7 @@ export class AudioEngine {
         console.log("[AudioEngine] All drum samples processed.");
     }
 
-    private applyVolumeForPart(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' >, volumes: ChannelVolumes) {
+    private applyVolumeForPart(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing'>, volumes: ChannelVolumes) {
         const rampTime = this.context.currentTime + 0.05;
     
         const nodeInfo = this.nodes.get(partName);
@@ -552,6 +550,7 @@ export class AudioEngine {
         notesToTurnOff.forEach(note => this.orbManager.removeOrb(note.id));
         this.orbManager?.removeAllOrbs();
         this.activePointers.clear();
+        this.pause(); // Stop the drum machine as well
     }
     
     public startRecording() {
