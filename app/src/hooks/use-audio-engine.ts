@@ -8,6 +8,7 @@ import { OrbManager } from '@/lib/orb-manager';
 import type { Volumes, Instrument, BassInstrument, CompressorSettings } from '@/types';
 
 export function useAudioEngine() {
+    console.log('--- Rendering: useAudioEngine Hook ---');
     const { toast } = useToast();
     
     const [isAppStarted, setIsAppStarted] = useState(false);
@@ -19,26 +20,29 @@ export function useAudioEngine() {
     
     const initializeAudioEngine = useCallback(async () => {
         try {
-            console.log("[useAudioEngine] Initializing...");
             if (!orbManager.current) {
                 const padContainer = document.querySelector('main');
                 orbManager.current = new OrbManager(padContainer);
-                console.log("[useAudioEngine] OrbManager created.");
             }
 
             if (!audioEngine.current) {
                 const context = new (window.AudioContext || (window as any).webkitAudioContext)();
                 if (context.state === 'suspended') {
                     await context.resume();
-                    console.log("[useAudioEngine] AudioContext resumed.");
                 }
                 audioEngine.current = new AudioEngine(context, orbManager.current);
                 await audioEngine.current.initialize();
+                
+                // Set up a listener for the isPlaying state from the drum machine
+                const updatePlayingState = (playing: boolean) => {
+                    setIsPlaying(playing);
+                };
+                audioEngine.current.getDrumMachine().on('playStateChanged', updatePlayingState);
+
             }
             
             setIsReady(true);
             setIsPlaying(audioEngine.current.isPlaying);
-            console.log("[useAudioEngine] AudioEngine initialized.");
             
         } catch(e) {
             console.error("Failed to initialize audio engine:", e);
@@ -53,7 +57,6 @@ export function useAudioEngine() {
     const startApp = useCallback(async () => {
         if (isAppStarted) return;
         
-        console.log("[useAudioEngine] Starting app...");
         setIsAppStarted(true);
         // Play a subtle transition sound
         const audio = new Audio('/assets/sounds/transition.webm');
@@ -76,22 +79,9 @@ export function useAudioEngine() {
       };
     }, []);
 
-    const play = useCallback(() => {
-        if (!isReady || !audioEngine.current) return;
-        audioEngine.current.play();
-        setIsPlaying(true);
-    }, [isReady]);
-
-    const pause = useCallback(() => {
-        if (!isReady || !audioEngine.current) return;
-        audioEngine.current.pause();
-        setIsPlaying(false);
-    }, [isReady]);
-    
     const stopAllSounds = useCallback(() => {
         if (!audioEngine.current) return;
         audioEngine.current.stopAllSounds();
-        setIsPlaying(false);
     }, []);
 
     const setVolumes = useCallback((volumes: Volumes) => {
@@ -99,7 +89,6 @@ export function useAudioEngine() {
     }, []);
 
     const setTempo = useCallback((tempo: number) => {
-        console.log("[useAudioEngine] Setting tempo to:", tempo);
         audioEngine.current?.setTempo(tempo);
     }, []);
 
@@ -109,12 +98,8 @@ export function useAudioEngine() {
     
     const setBeatPattern = useCallback((patternName: string) => {
         if (!audioEngine.current) return;
-        console.log(`[useAudioEngine] Setting beat pattern to: ${patternName}`);
         
         audioEngine.current.setBeatPattern(patternName);
-        
-        const isPlaying = patternName !== 'Off';
-        setIsPlaying(isPlaying);
 
     }, []);
     
@@ -155,8 +140,6 @@ export function useAudioEngine() {
         audioEngine: audioEngine.current,
         orbManager: orbManager.current,
         startApp,
-        play,
-        pause,
         stopAllSounds,
         setVolumes,
         setTempo,

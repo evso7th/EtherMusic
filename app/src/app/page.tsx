@@ -127,6 +127,7 @@ const Preloader = () => (
 );
 
 export default function Home() {
+    console.log('--- Rendering: Home Page ---');
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [isClient, setIsClient] = useState(false);
@@ -170,38 +171,36 @@ export default function Home() {
     const onConsentChange = useCallback((consent: boolean) => {
         setCookieConsent(consent);
         if (consent) {
-            const { volumes } = loadSettings();
-            setVolumesState(volumes);
+            const { volumes: loadedVolumes } = loadSettings();
+            setVolumesState(loadedVolumes);
+            setVolumes(loadedVolumes);
             setCurrentTempo(60);
+            setTempo(60);
         } else {
             setVolumesState(defaultVolumes);
+            setVolumes(defaultVolumes);
             setCurrentTempo(60);
+            setTempo(60);
             if (typeof document !== 'undefined') {
                 document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
             }
         }
-    }, []);
+    }, [setVolumes, setTempo]);
 
     useEffect(() => {
         setIsClient(true);
         const consent = getCookie("ethermusic_consent");
         if (consent !== null) {
-             setCookieConsent(consent === 'true');
+            const initialConsent = consent === 'true';
+            setCookieConsent(initialConsent);
+            if (initialConsent) {
+                const { volumes } = loadSettings();
+                setVolumesState(volumes);
+            }
         } else {
             setCookieConsent(undefined);
         }
     }, []);
-    
-    useEffect(() => {
-      if (cookieConsent === true) {
-        const { volumes } = loadSettings();
-        setVolumesState(volumes);
-        setCurrentTempo(60);
-      } else if (cookieConsent === false) {
-        setVolumesState(defaultVolumes);
-        setCurrentTempo(60);
-      }
-    }, [cookieConsent]);
 
     useEffect(() => {
         if (isReady && activeMelodyInstrument) {
@@ -249,29 +248,23 @@ export default function Home() {
     }, [isReady]);
     
     const updateVolumes = useCallback((newVolumes: Partial<Volumes>) => {
-        setVolumesState(prev => {
-            const merged = { ...prev, ...newVolumes };
-            setVolumes(merged); 
-            if (cookieConsent) {
-                saveVolumes(merged);
-            }
-            return merged;
-        });
-    }, [setVolumes, cookieConsent]);
+        const mergedVolumes = { ...volumes, ...newVolumes };
+        setVolumesState(mergedVolumes);
+        setVolumes(mergedVolumes);
+        if (cookieConsent) {
+            saveVolumes(mergedVolumes);
+        }
+    }, [volumes, setVolumes, cookieConsent]);
 
     // Load settings from cookies into the audio engine once it's ready.
     useEffect(() => {
         if(isReady && cookieConsent) {
-            const { volumes: loadedVolumes } = loadSettings();
-            setVolumesState(loadedVolumes);
-            setVolumes(loadedVolumes);
-            setCurrentTempo(60); 
-            setTempo(60);
+            const loadedVolumes = loadVolumes();
+            updateVolumes(loadedVolumes);
+            handleTempoChange(60); 
         } else if (isReady) {
-            setVolumesState(defaultVolumes);
-            setVolumes(defaultVolumes);
-            setCurrentTempo(60);
-            setTempo(60);
+            updateVolumes(defaultVolumes);
+            handleTempoChange(60);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isReady, cookieConsent]);
@@ -285,25 +278,27 @@ export default function Home() {
         effect: 'reverbSend' | 'distortion', 
         value: number
     ) => {
-        const newVolumes = JSON.parse(JSON.stringify(volumes));
-        (newVolumes[channel] as ChannelVolumes)[effect] = value;
-        // Since latch and manual bass share effects, update both
-        if (channel === 'manualBass' || channel === 'latch') {
-            newVolumes.manualBass[effect] = value;
-            newVolumes.latch[effect] = value;
-        }
-        updateVolumes(newVolumes);
-    }, [volumes, updateVolumes]);
+        setVolumesState(prevVolumes => {
+            const newVolumes = JSON.parse(JSON.stringify(prevVolumes));
+            (newVolumes[channel] as ChannelVolumes)[effect] = value;
+            if (channel === 'manualBass' || channel === 'latch') {
+                newVolumes.manualBass[effect] = value;
+                newVolumes.latch[effect] = value;
+            }
+            updateVolumes(newVolumes);
+            return newVolumes;
+        });
+    }, [updateVolumes]);
     
     const handleCompressorChangeCallback = useCallback((compressorSettings: CompressorSettings) => {
-        updateVolumes({ compressor: compressorSettings });
         handleCompressorChange(compressorSettings);
-    }, [updateVolumes, handleCompressorChange]);
+        updateVolumes({ compressor: compressorSettings });
+    }, [handleCompressorChange, updateVolumes]);
     
-    const handleSwingChange = useCallback((swing: number) => {
-        updateVolumes({ swing: swing });
-        setSwing(swing);
-    }, [updateVolumes, setSwing]);
+    const handleSwingChange = useCallback((swingValue: number) => {
+        setSwing(swingValue);
+        updateVolumes({ swing: swingValue });
+    }, [setSwing, updateVolumes]);
 
     const handleStartApp = useCallback(() => {
         startApp();
@@ -510,7 +505,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
-
-    

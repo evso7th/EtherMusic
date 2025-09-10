@@ -50,6 +50,18 @@ const VolumeControl = ({
 
 type VolumeChannel = keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' >;
 
+interface MixerControlsProps {
+    volumes: Volumes;
+    onMixerChange: (newVolumes: Partial<Volumes>) => void;
+    onCompressorChange: (compressorSettings: CompressorSettings) => void;
+    tempo: number;
+    setTempo: (tempo: number) => void;
+    swing: number;
+    setSwing: (swing: number) => void;
+    closeDialog: () => void;
+    isAutopilotMixer?: boolean;
+}
+
 export function MixerControls({ 
     volumes: initialVolumes, 
     onMixerChange,
@@ -60,23 +72,15 @@ export function MixerControls({
     setSwing,
     closeDialog,
     isAutopilotMixer = false,
-}: { 
-    volumes: Volumes, 
-    onMixerChange: (newVolumes: Partial<Volumes>) => void,
-    onCompressorChange: (compressorSettings: CompressorSettings) => void,
-    tempo: number,
-    setTempo: (tempo: number) => void,
-    swing: number,
-    setSwing: (swing: number) => void,
-    closeDialog: () => void;
-    isAutopilotMixer?: boolean
-}) {
+}: MixerControlsProps) {
+    console.log('--- Rendering: MixerControls ---', { initialVolumes, tempo, swing });
     
     const [localVolumes, setLocalVolumes] = useState(initialVolumes);
     const [localTempo, setLocalTempo] = useState(tempo);
     const [localSwing, setLocalSwing] = useState(swing);
     const [localCompressor, setLocalCompressor] = useState(initialVolumes.compressor);
 
+    // This effect ensures that if the mixer is re-opened, it reflects the current global state.
     useEffect(() => {
         setLocalVolumes(initialVolumes);
         setLocalCompressor(initialVolumes.compressor);
@@ -86,13 +90,13 @@ export function MixerControls({
 
     const handleChannelVolumeChange = (part: VolumeChannel, value: number) => {
         setLocalVolumes(prev => {
-            const channel = prev[part] as ChannelVolumes;
+            const newChannelVolumes = { ...prev[part] as ChannelVolumes, gain: value };
             return {
                 ...prev,
-                [part]: { ...channel, gain: value }
-            }
+                [part]: newChannelVolumes
+            };
         });
-    }
+    };
     
     const handleReverbReturnChange = (value: number) => {
         setLocalVolumes(prev => ({...prev, reverbReturn: value }));
@@ -107,26 +111,12 @@ export function MixerControls({
     }, []);
 
     const handleApplyChanges = () => {
-        const changedVolumes: Partial<Volumes> = {};
-        let volumesChanged = false;
-        
-        // This deep comparison is not perfect for functions, but for serializable state it's ok
-        if (JSON.stringify(localVolumes) !== JSON.stringify(initialVolumes)) {
-            onMixerChange(localVolumes)
-        }
-
-        if (JSON.stringify(localCompressor) !== JSON.stringify(initialVolumes.compressor)) {
-            onCompressorChange(localCompressor);
-        }
-        if (localTempo !== tempo) {
-            setTempo(localTempo);
-        }
-        if (localSwing !== swing) {
-            setSwing(localSwing);
-        }
+        onMixerChange(localVolumes);
+        onCompressorChange(localCompressor);
+        setTempo(localTempo);
+        setSwing(localSwing);
         closeDialog();
     };
-
 
     return (
         <div className="space-y-6">
