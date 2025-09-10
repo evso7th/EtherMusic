@@ -44,18 +44,18 @@ function setCookie(name: string, value: string, days: number) {
 
 const defaultVolumes: Volumes = { 
     melody: { gain: 0, reverbSend: -18, distortion: 0 },
-    manualBass: { gain: -3, reverbSend: -48, distortion: 0 },
-    latch: { gain: -9, reverbSend: -48, distortion: 0 },
-    drums: { gain: -9, reverbSend: -48, distortion: 0 },
-    reverbReturn: -12,
+    manualBass: { gain: -25, reverbSend: -48, distortion: 0 },
+    latch: { gain: -25, reverbSend: -48, distortion: 0 },
+    drums: { gain: -20, reverbSend: -48, distortion: 0 },
+    reverbReturn: -25,
     compressor: {
         enabled: true,
-        threshold: -24,
-        ratio: 12,
+        threshold: -70,
+        ratio: 7,
         attack: 0.003,
         release: 0.25
     },
-    swing: 0,
+    swing: 0.33,
 };
 
 function loadSettings(): { volumes: Volumes } {
@@ -141,9 +141,7 @@ export default function Home() {
         isPlaying,
         audioEngine,
         startApp,
-        play,
-        pause,
-        stop,
+        stopAllSounds,
         setBeatPattern,
         setBassLatch,
         startRecording,
@@ -169,15 +167,17 @@ export default function Home() {
     const [activeBassInstrument, setActiveBassInstrument] = useState<BassInstrument>(defaultBassInstrument);
     
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
-    const [currentTempo, setCurrentTempo] = useState(90);
+    const [currentTempo, setCurrentTempo] = useState(60);
     
     const onConsentChange = useCallback((consent: boolean) => {
         setCookieConsent(consent);
         if (consent) {
             const { volumes } = loadSettings();
             setVolumesState(volumes);
+            setCurrentTempo(60);
         } else {
             setVolumesState(defaultVolumes);
+            setCurrentTempo(60);
             if (typeof document !== 'undefined') {
                 document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
             }
@@ -250,7 +250,10 @@ export default function Home() {
             const { volumes: loadedVolumes } = loadSettings();
             // Set volumes for all channels
             updateVolumes(loadedVolumes);
-            setCurrentTempo(loadedVolumes.swing ?? 90);
+            handleTempoChange(60); 
+        } else if (isReady) {
+            updateVolumes(defaultVolumes);
+            handleTempoChange(60);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isReady, cookieConsent]);
@@ -258,11 +261,11 @@ export default function Home() {
     const updateVolumes = useCallback((newVolumes: Volumes) => {
         setVolumesState(newVolumes);
         setVolumes(newVolumes);
-        setTempo(newVolumes.swing ?? 0);
+        setSwing(newVolumes.swing);
         if (cookieConsent) {
             saveVolumes(newVolumes);
         }
-    }, [setVolumes, setTempo, cookieConsent]);
+    }, [setVolumes, setSwing, cookieConsent]);
     
     const handleMixerChange = useCallback((changedMixerVolumes: Partial<Volumes>) => {
         updateVolumes({ ...volumes, ...changedMixerVolumes });
@@ -298,13 +301,6 @@ export default function Home() {
     const handleStartApp = useCallback(() => {
         startApp();
     }, [startApp]);
-
-    const handleStop = useCallback(() => {
-        stop();
-        const offPattern = beatPatterns.find(p => p.name === 'Off')!;
-        setActivePattern(offPattern);
-        setBeatPattern(offPattern.name);
-    }, [stop, setBeatPattern]);
 
     const handleRecord = useCallback(() => {
         if (isRecording) {
@@ -420,12 +416,9 @@ export default function Home() {
                     </div>
                     <div className="flex items-center gap-1 md:gap-2 landscape:flex-col">
                          <PlaybackControls
-                            isPlaying={isPlaying}
                             isRecording={isRecording}
-                            onPlay={play}
-                            onPause={pause}
                             onRecord={handleRecord}
-                            onStop={handleStop}
+                            onExit={stopAllSounds}
                             isReady={isReady}
                         />
                          <SleepTimer onTimerSet={setSleepTimer} />
@@ -511,4 +504,3 @@ export default function Home() {
         </div>
     );
 }
-
