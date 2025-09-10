@@ -35,7 +35,7 @@ function setCookie(name: string, value: string, days: number) {
     let expires = "";
     if (days) {
         const date = new Date();
-        date.setTime(date.getTime() + (days*24*60*60*1000));
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
         expires = "; expires=" + date.toUTCString();
     }
     document.cookie = name + "=" + (value || "")  + expires + "; path=/; SameSite=Lax";
@@ -55,6 +55,7 @@ const defaultVolumes: Volumes = {
         release: 0.25
     },
     swing: 0.33,
+    tempo: 90,
 };
 
 function loadVolumes(): Volumes {
@@ -84,6 +85,7 @@ function loadVolumes(): Volumes {
             drums: ensureChannelSettings(volumes.drums, defaultVolumes.drums),
             compressor: { ...defaultVolumes.compressor, ...(volumes.compressor || {}) },
             swing: typeof volumes.swing === 'number' ? volumes.swing : defaultVolumes.swing,
+            tempo: typeof volumes.tempo === 'number' ? volumes.tempo : defaultVolumes.tempo,
         };
         
         return mergedVolumes;
@@ -124,7 +126,7 @@ export default function Home() {
     const isMobile = useIsMobile();
     const [isClient, setIsClient] = useState(false);
     
-    // initialVolumes is now a stable reference thanks to useState initializer
+    // Initialize volumes once, and only on the client
     const [initialVolumes] = useState<Volumes>(loadVolumes);
 
     const {
@@ -144,14 +146,10 @@ export default function Home() {
         orbManager,
         volumes,
         setVolumes,
-        setTempo,
-        setSwing,
-        handleCompressorChange,
         currentTempo,
     } = useAudioEngine(initialVolumes);
-
-    const [cookieConsent, setCookieConsent] = useState<boolean | undefined>(undefined);
     
+    const [cookieConsent, setCookieConsent] = useState<boolean | undefined>(undefined);
     const [isRecording, setIsRecording] = useState(false);
     const [activePattern, setActivePattern] = useState<BeatPattern>(beatPatterns.find(p => p.name === 'Off')!);
     const [musicKey, setMusicKey] = useState<MusicKey>('G');
@@ -166,7 +164,7 @@ export default function Home() {
     const onConsentChange = useCallback((consent: boolean) => {
         setCookieConsent(consent);
         const newVolumes = consent ? loadVolumes() : defaultVolumes;
-        setVolumes(newVolumes); // This now comes from useAudioEngine
+        setVolumes(newVolumes); // This comes from useAudioEngine now and updates the engine
         
         if (!consent) {
              if (typeof document !== 'undefined') {
@@ -185,11 +183,10 @@ export default function Home() {
         }
     }, []);
 
-    // Effect to apply initial loaded volumes when consent is known and engine is ready
     useEffect(() => {
         if (isReady && cookieConsent !== undefined) {
-            const newVolumes = cookieConsent ? loadVolumes() : defaultVolumes;
-            setVolumes(newVolumes);
+             const newVolumes = cookieConsent ? loadVolumes() : defaultVolumes;
+             setVolumes(newVolumes);
         }
     }, [isReady, cookieConsent, setVolumes]);
 
@@ -210,10 +207,6 @@ export default function Home() {
         }
     }, [isReady, activeBassInstrument, handleSetBassInstrument]);
     
-    const handleTempoChange = useCallback((newTempo: number) => {
-        setTempo(newTempo);
-    }, [setTempo]);
-
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         let newKey = musicKey;
         let newScale = musicScale;
@@ -245,24 +238,48 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isReady]);
     
+    const updateVolumesAndSave = useCallback((newVolumes: Partial<Volumes> | ((v: Volumes) => Volumes)) => {
+        setVolumes(newVolumes); // This now directly calls the setter from the hook
+    }, [setVolumes]);
+
+    const handleMixerChange = useCallback((mixerState: Partial<Volumes>) => {
+        updateVolumesAndSave(currentVolumes => ({
+            ...currentVolumes,
+            ...mixerState
+        }));
+    }, [updateVolumesAndSave]);
+    
     const handleChannelEffectChange = useCallback((
         channel: 'melody' | 'bass', 
         effect: 'reverbSend' | 'distortion', 
         value: number
     ) => {
         setVolumes(prevVolumes => {
+            // Deep copy to avoid mutation
             const newVolumes = JSON.parse(JSON.stringify(prevVolumes));
             const targetChannelKey = channel === 'bass' ? 'manualBass' : 'melody';
-            (newVolumes[targetChannelKey] as ChannelVolumes)[effect] = value;
-             if (channel === 'bass') {
-                 (newVolumes.latch as ChannelVolumes)[effect] = value;
+            
+            newVolumes[targetChannelKey][effect] = value;
+            if (channel === 'bass') {
+                newVolumes.latch[effect] = value;
             }
             return newVolumes;
         });
     }, [setVolumes]);
     
+    const handleCompressorChange = useCallback((compressorSettings: CompressorSettings) => {
+        updateVolumesAndSave(prev => ({...prev, compressor: compressorSettings }));
+    }, [updateVolumesAndSave]);
+    
+    const handleTempoChange = useCallback((newTempo: number) => {
+        updateVolumesAndSave({ tempo: newTempo });
+    }, [updateVolumesAndSave]);
+    
+    const handleSwingChange = useCallback((swingValue: number) => {
+        updateVolumesAndSave({ swing: swingValue });
+    }, [updateVolumesAndSave]);
+
     const handleStartApp = useCallback(() => {
-        // Pass the initial volumes to the startApp function
         startApp(initialVolumes);
     }, [startApp, initialVolumes]);
 
@@ -297,26 +314,6 @@ export default function Home() {
         handleThereminInteraction(type, data, state);
     }, [isReady, audioEngine, handleThereminInteraction]);
 
-    const updateVolumesAndSave = useCallback((newVolumes: Partial<Volumes> | ((v: Volumes) => Volumes)) => {
-        const updatedVolumes = typeof newVolumes === 'function' ? newVolumes(volumes) : { ...volumes, ...newVolumes };
-        setVolumes(updatedVolumes);
-        if (cookieConsent) {
-            saveVolumes(updatedVolumes);
-        }
-    }, [volumes, setVolumes, cookieConsent]);
-
-    const handleMixerChange = useCallback((changedMixerVolumes: Partial<Volumes>) => {
-        updateVolumesAndSave(prev => ({ ...prev, ...changedMixerVolumes }));
-    }, [updateVolumesAndSave]);
-    
-    const handleCompressorChangeCallback = useCallback((compressorSettings: CompressorSettings) => {
-        updateVolumesAndSave(prev => ({ ...prev, compressor: compressorSettings }));
-    }, [updateVolumesAndSave]);
-    
-    const handleSwingChange = useCallback((swingValue: number) => {
-        updateVolumesAndSave({ swing: swingValue });
-    }, [updateVolumesAndSave]);
-    
     if (!isClient) {
         return <Preloader />;
     }
@@ -347,9 +344,9 @@ export default function Home() {
                     <p>&copy; 2024, EVS</p>
                     <p className="mt-2">v.2.1 "Maestro"</p>
                 </footer>
-                {cookieConsent === undefined && (
+                {cookieConsent === undefined || cookieConsent === false ? (
                     <CookieConsent onConsentChange={onConsentChange} />
-                )}
+                ) : null}
             </div>
         )
     }
@@ -453,7 +450,7 @@ export default function Home() {
                             onPatternChange={handlePatternChange}
                             volumes={volumes}
                             onMixerChange={handleMixerChange}
-                            onCompressorChange={handleCompressorChangeCallback}
+                            onCompressorChange={handleCompressorChange}
                             isMobile={isMobile}
                             tempo={currentTempo}
                             setTempo={handleTempoChange}
@@ -469,7 +466,7 @@ export default function Home() {
                         onPatternChange={handlePatternChange}
                         volumes={volumes}
                         onMixerChange={handleMixerChange}
-                        onCompressorChange={handleCompressorChangeCallback}
+                        onCompressorChange={handleCompressorChange}
                         isMobile={isMobile}
                         isLandscape={true}
                         tempo={currentTempo}

@@ -7,6 +7,14 @@ import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
 import type { Volumes, Instrument, BassInstrument, CompressorSettings } from '@/types';
 
+function getCookie(name: string): string | null {
+    if (typeof document === 'undefined') return null;
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+    return null;
+}
+
 function setCookie(name: string, value: string, days: number) {
     if (typeof document === 'undefined') return;
     let expires = "";
@@ -19,7 +27,7 @@ function setCookie(name: string, value: string, days: number) {
 }
 
 function saveVolumes(volumes: Volumes) {
-    if (typeof window === 'undefined' || document.cookie.indexOf("ethermusic_consent=true") === -1) {
+    if (typeof window === 'undefined' || getCookie("ethermusic_consent") !== 'true') {
         return;
     }
     try {
@@ -40,7 +48,7 @@ export function useAudioEngine(initialVolumes: Volumes) {
     const orbManager = useRef<OrbManager | null>(null);
     
     const [volumes, setVolumesState] = useState<Volumes>(initialVolumes);
-    const currentTempo = volumes.tempo;
+    const [currentTempo, setCurrentTempo] = useState(initialVolumes.tempo);
     
     const initializeAudioEngine = useCallback(async (initialVols: Volumes) => {
         try {
@@ -76,14 +84,14 @@ export function useAudioEngine(initialVolumes: Volumes) {
         }
     }, [toast]);
 
-    const startApp = useCallback(async (initialVols: Volumes) => {
+    const startApp = useCallback(async (vols: Volumes) => {
         if (isAppStarted) return;
         
         setIsAppStarted(true);
         const audio = new Audio('/assets/sounds/transition.webm');
         audio.play().catch(e => console.error("Error playing transition sound:", e));
         
-        await initializeAudioEngine(initialVols);
+        await initializeAudioEngine(vols);
     }, [isAppStarted, initializeAudioEngine]);
 
     useEffect(() => {
@@ -94,35 +102,46 @@ export function useAudioEngine(initialVolumes: Volumes) {
       };
       document.addEventListener('click', resumeAudio, { once: true });
       document.addEventListener('touchstart', resumeAudio, { once: true });
+      
+      const engine = audioEngine.current;
+      const playStateCallback = (playing: boolean) => setIsPlaying(playing);
+      engine?.getDrumMachine().on('playStateChanged', playStateCallback);
+
       return () => {
         document.removeEventListener('click', resumeAudio);
         document.removeEventListener('touchstart', resumeAudio);
-        audioEngine.current?.getDrumMachine().off('playStateChanged', setIsPlaying);
+        engine?.getDrumMachine().off('playStateChanged', playStateCallback);
       };
     }, []);
+    
+    const setVolumes = useCallback((newVolumes: Partial<Volumes> | ((prev: Volumes) => Volumes)) => {
+        setVolumesState(prev => {
+            const updated = typeof newVolumes === 'function' ? newVolumes(prev) : { ...prev, ...newVolumes };
+            audioEngine.current?.setVolumes(updated);
+            if (getCookie("ethermusic_consent") === 'true') {
+                saveVolumes(updated);
+            }
+            if(updated.tempo !== currentTempo) {
+                setCurrentTempo(updated.tempo);
+            }
+            return updated;
+        });
+    }, [currentTempo]);
+
+    const setTempo = useCallback((tempo: number) => {
+        audioEngine.current?.setTempo(tempo);
+        setVolumes(v => ({ ...v, tempo }));
+    }, [setVolumes]);
+    
+    const setSwing = useCallback((swing: number) => {
+        audioEngine.current?.setSwing(swing);
+        setVolumes(v => ({...v, swing }));
+    }, [setVolumes]);
 
     const stopAllSounds = useCallback(() => {
         audioEngine.current?.stopAllSounds();
     }, []);
 
-    const setVolumes = useCallback((newVolumes: Partial<Volumes> | ((prev: Volumes) => Volumes)) => {
-        setVolumesState(prev => {
-            const updated = typeof newVolumes === 'function' ? newVolumes(prev) : { ...prev, ...newVolumes };
-            audioEngine.current?.setVolumes(updated);
-            saveVolumes(updated);
-            return updated;
-        });
-    }, []);
-
-    const setTempo = useCallback((tempo: number) => {
-        audioEngine.current?.setTempo(tempo);
-        setVolumesState(v => ({ ...v, tempo }));
-    }, []);
-    
-    const setSwing = useCallback((swing: number) => {
-        setVolumes(v => ({...v, swing }));
-    }, [setVolumes]);
-    
     const setBeatPattern = useCallback((patternName: string) => {
         audioEngine.current?.setBeatPattern(patternName);
     }, []);
@@ -158,6 +177,7 @@ export function useAudioEngine(initialVolumes: Volumes) {
     const handleCompressorChange = useCallback((compressorSettings: CompressorSettings) => {
         setVolumes(v => ({...v, compressor: compressorSettings }));
     }, [setVolumes]);
+
 
     return {
         isAppStarted,
