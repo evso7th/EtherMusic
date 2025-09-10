@@ -43,18 +43,18 @@ function setCookie(name: string, value: string, days: number) {
 
 const defaultVolumes: Volumes = { 
     melody: { gain: 0, reverbSend: -18, distortion: 0 },
-    manualBass: { gain: -3, reverbSend: -48, distortion: 0 },
-    latch: { gain: -9, reverbSend: -48, distortion: 0 },
-    drums: { gain: -9, reverbSend: -48, distortion: 0 },
-    reverbReturn: -12,
+    manualBass: { gain: -25, reverbSend: -48, distortion: 0 },
+    latch: { gain: -25, reverbSend: -48, distortion: 0 },
+    drums: { gain: -20, reverbSend: -48, distortion: 0 },
+    reverbReturn: -25,
     compressor: {
         enabled: true,
-        threshold: -24,
-        ratio: 12,
+        threshold: -70,
+        ratio: 7,
         attack: 0.003,
         release: 0.25
     },
-    swing: 0,
+    swing: 0.33,
 };
 
 function loadSettings(): { volumes: Volumes } {
@@ -140,8 +140,7 @@ export default function Home() {
         isPlaying,
         audioEngine,
         startApp,
-        play,
-        pause,
+        stopAllSounds,
         setBeatPattern,
         setBassLatch,
         startRecording,
@@ -154,7 +153,6 @@ export default function Home() {
         setTempo,
         setSwing,
         handleCompressorChange,
-        stopAllSounds,
     } = useAudioEngine();
     
     const [isRecording, setIsRecording] = useState(false);
@@ -167,15 +165,17 @@ export default function Home() {
     const [activeBassInstrument, setActiveBassInstrument] = useState<BassInstrument>(defaultBassInstrument);
     
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
-    const [currentTempo, setCurrentTempo] = useState(90);
+    const [currentTempo, setCurrentTempo] = useState(60);
     
     const onConsentChange = useCallback((consent: boolean) => {
         setCookieConsent(consent);
         if (consent) {
             const { volumes } = loadSettings();
             setVolumesState(volumes);
+            setCurrentTempo(60);
         } else {
             setVolumesState(defaultVolumes);
+            setCurrentTempo(60);
             if (typeof document !== 'undefined') {
                 document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
             }
@@ -185,17 +185,23 @@ export default function Home() {
     useEffect(() => {
         setIsClient(true);
         const consent = getCookie("ethermusic_consent");
-        const initialConsent = consent === 'true';
         if (consent !== null) {
-             setCookieConsent(initialConsent);
+             setCookieConsent(consent === 'true');
         } else {
             setCookieConsent(undefined);
         }
-       if (initialConsent) {
-            const { volumes } = loadSettings();
-            setVolumesState(volumes);
-        }
     }, []);
+    
+    useEffect(() => {
+      if (cookieConsent === true) {
+        const { volumes } = loadSettings();
+        setVolumesState(volumes);
+        setCurrentTempo(60);
+      } else if (cookieConsent === false) {
+        setVolumesState(defaultVolumes);
+        setCurrentTempo(60);
+      }
+    }, [cookieConsent]);
 
     useEffect(() => {
         if (isReady && activeMelodyInstrument) {
@@ -242,29 +248,37 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isReady]);
     
+    const updateVolumes = useCallback((newVolumes: Partial<Volumes>) => {
+        setVolumesState(prev => {
+            const merged = { ...prev, ...newVolumes };
+            setVolumes(merged); 
+            if (cookieConsent) {
+                saveVolumes(merged);
+            }
+            return merged;
+        });
+    }, [setVolumes, cookieConsent]);
+
     // Load settings from cookies into the audio engine once it's ready.
     useEffect(() => {
         if(isReady && cookieConsent) {
             const { volumes: loadedVolumes } = loadSettings();
-            // Set volumes for all channels
-            updateVolumes(loadedVolumes);
-            setCurrentTempo(loadedVolumes.swing ?? 90);
+            setVolumesState(loadedVolumes);
+            setVolumes(loadedVolumes);
+            setCurrentTempo(60); 
+            setTempo(60);
+        } else if (isReady) {
+            setVolumesState(defaultVolumes);
+            setVolumes(defaultVolumes);
+            setCurrentTempo(60);
+            setTempo(60);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isReady, cookieConsent]);
-
-    const updateVolumes = useCallback((newVolumes: Volumes) => {
-        setVolumesState(newVolumes);
-        setVolumes(newVolumes);
-        setTempo(newVolumes.swing ?? 0);
-        if (cookieConsent) {
-            saveVolumes(newVolumes);
-        }
-    }, [setVolumes, setTempo, cookieConsent]);
     
     const handleMixerChange = useCallback((changedMixerVolumes: Partial<Volumes>) => {
-        updateVolumes({ ...volumes, ...changedMixerVolumes });
-    }, [volumes, updateVolumes]);
+        updateVolumes(changedMixerVolumes);
+    }, [updateVolumes]);
     
     const handleChannelEffectChange = useCallback((
         channel: 'melody' | 'manualBass' | 'latch', 
@@ -282,16 +296,14 @@ export default function Home() {
     }, [volumes, updateVolumes]);
     
     const handleCompressorChangeCallback = useCallback((compressorSettings: CompressorSettings) => {
-        const newVolumes: Volumes = { ...volumes, compressor: compressorSettings };
-        updateVolumes(newVolumes);
+        updateVolumes({ compressor: compressorSettings });
         handleCompressorChange(compressorSettings);
-    }, [volumes, updateVolumes, handleCompressorChange]);
+    }, [updateVolumes, handleCompressorChange]);
     
     const handleSwingChange = useCallback((swing: number) => {
-        const newVolumes: Volumes = { ...volumes, swing: swing };
-        updateVolumes(newVolumes);
+        updateVolumes({ swing: swing });
         setSwing(swing);
-    }, [volumes, updateVolumes, setSwing]);
+    }, [updateVolumes, setSwing]);
 
     const handleStartApp = useCallback(() => {
         startApp();
@@ -498,3 +510,7 @@ export default function Home() {
         </div>
     );
 }
+
+    
+
+    

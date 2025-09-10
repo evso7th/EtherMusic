@@ -110,17 +110,9 @@ export function MixerControls({
         const changedVolumes: Partial<Volumes> = {};
         let volumesChanged = false;
         
-        Object.keys(localVolumes).forEach(key => {
-            const k = key as keyof Volumes;
-            if (JSON.stringify(localVolumes[k]) !== JSON.stringify(initialVolumes[k])) {
-                // @ts-ignore
-                changedVolumes[k] = localVolumes[k];
-                volumesChanged = true;
-            }
-        });
-
-        if (volumesChanged) {
-            onMixerChange(changedVolumes);
+        // This deep comparison is not perfect for functions, but for serializable state it's ok
+        if (JSON.stringify(localVolumes) !== JSON.stringify(initialVolumes)) {
+            onMixerChange(localVolumes)
         }
 
         if (JSON.stringify(localCompressor) !== JSON.stringify(initialVolumes.compressor)) {
