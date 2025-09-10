@@ -118,7 +118,8 @@ export function ThereminPad({
     }, [effects]);
 
     const handleEffectChange = (effect: keyof typeof localEffects, value: number) => {
-        setLocalEffects(prev => ({ ...prev, [effect]: value }));
+        const newLocalEffects = { ...localEffects, [effect]: value };
+        setLocalEffects(newLocalEffects);
         onEffectChange(effect, value);
     };
 

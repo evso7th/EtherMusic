@@ -153,7 +153,7 @@ export default function Home() {
         setTempo,
         setSwing,
         handleCompressorChange,
-    } = useAudioEngine();
+    } = useAudioEngine({ onVolumesChanged: (newVolumes) => setVolumesState(newVolumes) });
     
     const [isRecording, setIsRecording] = useState(false);
     const [activePattern, setActivePattern] = useState<BeatPattern>(beatPatterns.find(p => p.name === 'Off')!);
@@ -167,24 +167,41 @@ export default function Home() {
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
     const [currentTempo, setCurrentTempo] = useState(60);
     
+    const updateVolumes = useCallback((newVolumes: Partial<Volumes>) => {
+        setVolumesState(prev => {
+            const merged = { ...prev, ...newVolumes };
+            if (cookieConsent) {
+                saveVolumes(merged);
+            }
+            // The setVolumes on the audio engine will be called inside the handleMixerChange
+            return merged;
+        });
+    }, [cookieConsent]);
+
+    const handleMixerChange = useCallback((changedMixerVolumes: Partial<Volumes>) => {
+        setVolumesState(prev => {
+            const merged = { ...prev, ...changedMixerVolumes };
+            setVolumes(merged); 
+            if (cookieConsent) {
+                saveVolumes(merged);
+            }
+            return merged;
+        });
+    }, [setVolumes, cookieConsent]);
+
     const onConsentChange = useCallback((consent: boolean) => {
         setCookieConsent(consent);
-        if (consent) {
-            const { volumes: loadedVolumes } = loadSettings();
-            setVolumesState(loadedVolumes);
-            setVolumes(loadedVolumes);
-            setCurrentTempo(60);
-            setTempo(60);
-        } else {
-            setVolumesState(defaultVolumes);
-            setVolumes(defaultVolumes);
-            setCurrentTempo(60);
-            setTempo(60);
-            if (typeof document !== 'undefined') {
-                document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-            }
+        const newVolumes = consent ? loadVolumes() : defaultVolumes;
+        setVolumesState(newVolumes);
+        setVolumes(newVolumes);
+        setCurrentTempo(60);
+        setTempo(60);
+        setSwing(newVolumes.swing);
+        if (!consent && typeof document !== 'undefined') {
+            document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
         }
-    }, [setVolumes, setTempo]);
+    }, [setVolumes, setTempo, setSwing]);
+
 
     useEffect(() => {
         setIsClient(true);
@@ -193,8 +210,8 @@ export default function Home() {
             const initialConsent = consent === 'true';
             setCookieConsent(initialConsent);
             if (initialConsent) {
-                const { volumes } = loadSettings();
-                setVolumesState(volumes);
+                const loadedVolumes = loadVolumes();
+                setVolumesState(loadedVolumes);
             }
         } else {
             setCookieConsent(undefined);
@@ -246,33 +263,24 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isReady]);
     
-    const updateVolumes = useCallback((newVolumes: Partial<Volumes>) => {
-        setVolumesState(prev => {
-            const merged = { ...prev, ...newVolumes };
-            setVolumes(merged); 
-            if (cookieConsent) {
-                saveVolumes(merged);
-            }
-            return merged;
-        });
-    }, [setVolumes, cookieConsent]);
-
     // Load settings from cookies into the audio engine once it's ready.
     useEffect(() => {
         if(isReady && cookieConsent) {
             const loadedVolumes = loadVolumes();
-            updateVolumes(loadedVolumes);
-            handleTempoChange(60); 
+            setVolumesState(loadedVolumes);
+            setVolumes(loadedVolumes);
+            setCurrentTempo(60); 
+            setTempo(60);
+            setSwing(loadedVolumes.swing);
         } else if (isReady) {
-            updateVolumes(defaultVolumes);
-            handleTempoChange(60);
+            setVolumesState(defaultVolumes);
+            setVolumes(defaultVolumes);
+            setCurrentTempo(60);
+            setTempo(60);
+            setSwing(defaultVolumes.swing);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isReady, cookieConsent]);
-    
-    const handleMixerChange = useCallback((changedMixerVolumes: Partial<Volumes>) => {
-        updateVolumes(changedMixerVolumes);
-    }, [updateVolumes]);
+    }, [isReady, cookieConsent, setVolumes, setTempo, setSwing]);
     
     const handleChannelEffectChange = useCallback((
         channel: 'melody' | 'manualBass' | 'latch', 
@@ -280,31 +288,32 @@ export default function Home() {
         value: number
     ) => {
         setVolumesState(prevVolumes => {
-            // Create a deep copy to avoid mutation issues
-            const newVolumes = JSON.parse(JSON.stringify(prevVolumes));
-            
-            (newVolumes[channel] as ChannelVolumes)[effect] = value;
-            
-            // Since latch and manual bass share effects, update both
+            const newVolumes = { ...prevVolumes };
+            const updatedChannel = { ...newVolumes[channel], [effect]: value };
+            newVolumes[channel] = updatedChannel;
+
             if (channel === 'manualBass' || channel === 'latch') {
-                newVolumes.manualBass[effect] = value;
-                newVolumes.latch[effect] = value;
+                newVolumes.manualBass = { ...newVolumes.manualBass, [effect]: value };
+                newVolumes.latch = { ...newVolumes.latch, [effect]: value };
             }
-            
-            updateVolumes(newVolumes);
+
+            setVolumes(newVolumes);
+            if (cookieConsent) {
+                saveVolumes(newVolumes);
+            }
             return newVolumes;
         });
-    }, [updateVolumes]);
+    }, [cookieConsent, setVolumes]);
     
     const handleCompressorChangeCallback = useCallback((compressorSettings: CompressorSettings) => {
-        handleCompressorChange(compressorSettings);
         updateVolumes({ compressor: compressorSettings });
+        handleCompressorChange(compressorSettings);
     }, [handleCompressorChange, updateVolumes]);
     
     const handleSwingChange = useCallback((swingValue: number) => {
-        setSwing(swingValue);
         updateVolumes({ swing: swingValue });
-    }, [setSwing, updateVolumes]);
+        setSwing(swingValue);
+    }, [updateVolumes, setSwing]);
 
     const handleStartApp = useCallback(() => {
         startApp();
@@ -450,7 +459,7 @@ export default function Home() {
                                 reverbSend: volumes.manualBass.reverbSend,
                                 distortion: volumes.manualBass.distortion,
                             }}
-                            onEffectChange={handleChannelEffectChange}
+                            onEffectChange={(effect, value) => handleChannelEffectChange('manualBass', effect, value)}
                         />
                         <MemoizedThereminPad
                             type="melody"
@@ -473,7 +482,7 @@ export default function Home() {
                                 reverbSend: volumes.melody.reverbSend,
                                 distortion: volumes.melody.distortion,
                             }}
-                            onEffectChange={handleChannelEffectChange}
+                            onEffectChange={(effect, value) => handleChannelEffectChange('melody', effect, value)}
                         />
                     </div>
                     <div className="flex-shrink-0 portrait:block landscape:hidden">
@@ -511,7 +520,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
-
-    

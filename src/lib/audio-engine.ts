@@ -214,7 +214,7 @@ export class AudioEngine {
         
         this.createDrumChannel();
         
-        await this.loadReverbImpulse();
+        this.loadReverbImpulse();
         
         await this.loadDrumSamples();
         
@@ -274,13 +274,20 @@ export class AudioEngine {
         try {
             const response = await fetch('/assets/sounds/impulses/space.wav');
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                // If the file is not found, we create a fallback reverb and avoid logging a scary error.
+                if (response.status === 404) {
+                    console.warn("[AudioEngine] Reverb impulse '/assets/sounds/impulses/space.wav' not found. Using a generated fallback reverb. This is expected if the file doesn't exist.");
+                    this.convolver.buffer = this.createFallbackReverb();
+                } else {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+            } else {
+                const buffer = await response.arrayBuffer();
+                const audioBuffer = await this.context.decodeAudioData(buffer);
+                this.convolver.buffer = audioBuffer;
             }
-            const buffer = await response.arrayBuffer();
-            const audioBuffer = await this.context.decodeAudioData(buffer);
-            this.convolver.buffer = audioBuffer;
         } catch (e) {
-            console.warn("[AudioEngine] Could not load reverb impulse, using fallback.", e);
+            console.warn("[AudioEngine] Could not load or decode reverb impulse, using fallback.", e);
             this.convolver.buffer = this.createFallbackReverb();
         }
     }

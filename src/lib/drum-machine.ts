@@ -113,7 +113,7 @@ export class DrumMachine {
         }
     }
 
-    public play() {
+    private play() {
         if (this.isPlaying || !this._pattern || this._pattern.sequence.length === 0) {
             return;
         }
