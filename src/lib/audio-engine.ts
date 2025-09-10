@@ -7,6 +7,7 @@ import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
 import { bassInstruments } from './bass-presets';
 import { DrumMachine } from './drum-machine';
+import mitt, { Emitter } from 'mitt';
 
 
 function dbToGain(db: number): number {
@@ -31,6 +32,11 @@ function createDistortionCurve(amount: number): Float32Array {
 }
 
 type SynthPartName = 'melody' | 'manualBass' | 'latch';
+
+type AudioEngineEvents = {
+    volumesChanged: Volumes;
+};
+
 
 const DRUM_SAMPLES: Record<string, string> = {
     'k': '/assets/sounds/drums/kick_drum.wav',
@@ -84,6 +90,8 @@ export class AudioEngine {
     private convolver: ConvolverNode;
     
     private drumMachine: DrumMachine;
+    private eventEmitter: Emitter<AudioEngineEvents>;
+
 
     private nodes = new Map<SynthPartName | 'drums', { 
         worklet: AudioWorkletNode, 
@@ -102,6 +110,7 @@ export class AudioEngine {
     constructor(context: AudioContext, orbManager: OrbManager) {
         this.context = context;
         this.orbManager = orbManager;
+        this.eventEmitter = mitt<AudioEngineEvents>();
         
         this.masterOut = this.context.createGain();
         this.masterOut.connect(this.context.destination);
@@ -120,6 +129,14 @@ export class AudioEngine {
         this.reverbReturnGain.connect(this.preCompressorOut);
 
         this.drumMachine = new DrumMachine(this);
+    }
+
+    public on(event: keyof AudioEngineEvents, handler: (payload: any) => void) {
+        this.eventEmitter.on(event, handler);
+    }
+    
+    public off(event: keyof AudioEngineEvents, handler: (payload: any) => void) {
+        this.eventEmitter.off(event, handler);
     }
     
     getContext() {
@@ -185,7 +202,7 @@ export class AudioEngine {
         
         this.createDrumChannel();
         
-        this.loadReverbImpulse();
+        await this.loadReverbImpulse();
         
         await this.loadDrumSamples();
                 
@@ -235,7 +252,7 @@ export class AudioEngine {
             }
         };
         
-        this.nodes.set('drums', { worklet: worklet, gain: gain, reverbSend: reverbSend });
+        this.nodes.set('drums', { worklet, gain, reverbSend });
     }
     
     private async loadReverbImpulse() {
@@ -251,8 +268,7 @@ export class AudioEngine {
                 return;
             }
             const buffer = await response.arrayBuffer();
-            const audioBuffer = await this.context.decodeAudioData(buffer);
-            this.convolver.buffer = audioBuffer;
+            this.convolver.buffer = await this.context.decodeAudioData(buffer);
         } catch (e) {
             console.warn("[AudioEngine] Could not load or decode reverb impulse, using fallback.", e);
             this.convolver.buffer = this.createFallbackReverb();
@@ -388,26 +404,25 @@ export class AudioEngine {
         }
     }
     
-    public setBassInstrument(instrumentName: BassInstrument): Volumes | undefined {
+    public setBassInstrument(instrumentName: BassInstrument): Volumes {
+        const newVolumes = this.getVolumes();
         const preset = bassInstruments.find(i => i.id === instrumentName);
+        
         if (preset) {
-            const newVolumes = this.getVolumes(); // Start with current volumes
             const bassPresetParams = preset.params as BassInstrumentPresetParams;
             const message: WorkerMessage = { type: 'setPreset', preset: bassPresetParams };
             
             this.nodes.get('manualBass')?.worklet.port.postMessage(message);
             this.nodes.get('latch')?.worklet.port.postMessage(message);
             
-            // Update reverb and distortion for both bass channels from the preset
             newVolumes.manualBass.reverbSend = bassPresetParams.reverbSend ?? newVolumes.manualBass.reverbSend;
             newVolumes.manualBass.distortion = bassPresetParams.distortion ?? newVolumes.manualBass.distortion;
             newVolumes.latch.reverbSend = bassPresetParams.reverbSend ?? newVolumes.latch.reverbSend;
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
             this.setVolumes(newVolumes);
-            return newVolumes;
         }
-        return undefined;
+        return newVolumes;
     }
     
     public setBeatPattern(patternName: string) {
@@ -463,7 +478,7 @@ export class AudioEngine {
         }
     }
 
-    private applyVolumeForPart(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' >, volumes: ChannelVolumes) {
+    private applyVolumeForPart(partName: SynthPartName | 'drums', volumes: ChannelVolumes) {
         const nodeInfo = this.nodes.get(partName);
         if (nodeInfo) {
             // Ramping is now handled inside the worklet for synths, but gain nodes are fine here.
@@ -488,6 +503,7 @@ export class AudioEngine {
         this.reverbReturnGain.gain.linearRampToValueAtTime(dbToGain(this.volumes.reverbReturn), rampTime);
         this.setCompressorSettings(this.volumes.compressor);
         this.setSwing(this.volumes.swing ?? 0);
+        this.setTempo(this.volumes.tempo);
     }
     
     public setCompressorSettings(compressorSettings: CompressorSettings) {

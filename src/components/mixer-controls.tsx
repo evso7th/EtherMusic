@@ -48,11 +48,11 @@ const VolumeControl = ({
     </div>
 );
 
-type VolumeChannel = keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' >;
+type VolumeChannel = keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' | 'tempo'>;
 
 interface MixerControlsProps {
     volumes: Volumes;
-    onMixerChange: (newVolumes: Partial<Volumes> | ((v: Volumes) => Partial<Volumes>)) => void;
+    onMixerChange: (newVolumes: Partial<Volumes> | ((v: Volumes) => Volumes)) => void;
     onCompressorChange: (compressorSettings: CompressorSettings) => void;
     tempo: number;
     setTempo: (tempo: number) => void;
@@ -76,7 +76,6 @@ export function MixerControls({
     const [localTempo, setLocalTempo] = useState(tempo);
     const [localSwing, setLocalSwing] = useState(swing);
 
-    // This effect ensures that if the mixer is re-opened, it reflects the current global state.
     useEffect(() => {
         setLocalTempo(tempo);
         setLocalSwing(swing);
@@ -84,25 +83,17 @@ export function MixerControls({
 
     const handleChannelVolumeChange = (part: VolumeChannel, value: number) => {
         onMixerChange(prev => {
-            const newChannelVolumes = { ...(prev[part] as ChannelVolumes), gain: value };
+            const newVolumes = {...prev};
+            const newChannelVolumes = { ...(newVolumes[part] as ChannelVolumes), gain: value };
+            newVolumes[part] = newChannelVolumes;
+
             if (part === 'manualBass') {
-                return { 
-                    ...prev,
-                    manualBass: newChannelVolumes,
-                    latch: { ...prev.latch, gain: value } // Sync latch volume
-                };
+                newVolumes.latch = { ...newVolumes.latch, gain: value };
+            } else if (part === 'latch') {
+                newVolumes.manualBass = { ...newVolumes.manualBass, gain: value };
             }
-            if (part === 'latch') {
-                 return { 
-                    ...prev,
-                    latch: newChannelVolumes,
-                    manualBass: { ...prev.manualBass, gain: value } // Sync manualBass volume
-                };
-            }
-            return {
-                ...prev,
-                [part]: newChannelVolumes
-            };
+            
+            return newVolumes;
         });
     };
     

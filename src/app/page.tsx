@@ -30,6 +30,17 @@ function getCookie(name: string): string | null {
     return null;
 }
 
+function setCookie(name: string, value: string, days: number) {
+    if (typeof document === 'undefined') return;
+    let expires = "";
+    if (days) {
+        const date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        expires = "; expires=" + date.toUTCString();
+    }
+    document.cookie = name + "=" + (value || "")  + expires + "; path=/; SameSite=Lax";
+}
+
 const defaultVolumes: Volumes = { 
     melody: { gain: 0, reverbSend: -18, distortion: 0 },
     manualBass: { gain: -25, reverbSend: -48, distortion: 0 },
@@ -44,6 +55,7 @@ const defaultVolumes: Volumes = {
         release: 0.25
     },
     swing: 0.33,
+    tempo: 90,
 };
 
 function loadVolumes(): Volumes {
@@ -73,6 +85,7 @@ function loadVolumes(): Volumes {
             drums: ensureChannelSettings(volumes.drums, defaultVolumes.drums),
             compressor: { ...defaultVolumes.compressor, ...(volumes.compressor || {}) },
             swing: typeof volumes.swing === 'number' ? volumes.swing : defaultVolumes.swing,
+            tempo: typeof volumes.tempo === 'number' ? volumes.tempo : defaultVolumes.tempo,
         };
         
         return mergedVolumes;
@@ -80,6 +93,17 @@ function loadVolumes(): Volumes {
     } catch (e) {
         console.error("Failed to load volume settings from cookies", e);
         return defaultVolumes;
+    }
+}
+
+function saveVolumes(volumes: Volumes) {
+    if (typeof window === 'undefined' || getCookie("ethermusic_consent") !== 'true') {
+        return;
+    }
+    try {
+        setCookie("ethermusic_volumes", JSON.stringify(volumes), 365);
+    } catch (e) {
+        console.error("Failed to save volume settings to cookies", e);
     }
 }
 
@@ -102,7 +126,6 @@ export default function Home() {
     const isMobile = useIsMobile();
     const [isClient, setIsClient] = useState(false);
     
-    // initialVolumes is now a stable reference thanks to useState initializer
     const [initialVolumes] = useState<Volumes>(loadVolumes);
 
     const {
@@ -144,7 +167,7 @@ export default function Home() {
     const onConsentChange = useCallback((consent: boolean) => {
         setCookieConsent(consent);
         const newVolumes = consent ? loadVolumes() : defaultVolumes;
-        setVolumes(newVolumes); // This now comes from useAudioEngine
+        setVolumes(newVolumes);
         
         if (!consent) {
              if (typeof document !== 'undefined') {
@@ -163,7 +186,6 @@ export default function Home() {
         }
     }, []);
 
-    // Effect to apply initial loaded volumes when consent is known and engine is ready
     useEffect(() => {
         if (isReady && cookieConsent !== undefined) {
             const newVolumes = cookieConsent ? loadVolumes() : defaultVolumes;
@@ -230,8 +252,8 @@ export default function Home() {
     ) => {
         setVolumes(prevVolumes => {
             const newVolumes = JSON.parse(JSON.stringify(prevVolumes));
-            const targetChannel = channel === 'bass' ? 'manualBass' : 'melody';
-            (newVolumes[targetChannel] as ChannelVolumes)[effect] = value;
+            const targetChannelKey = channel === 'bass' ? 'manualBass' : 'melody';
+            (newVolumes[targetChannelKey] as ChannelVolumes)[effect] = value;
              if (channel === 'bass') {
                  (newVolumes.latch as ChannelVolumes)[effect] = value;
             }
@@ -240,9 +262,8 @@ export default function Home() {
     }, [setVolumes]);
     
     const handleStartApp = useCallback(() => {
-        // Pass the initial volumes to the startApp function
-        startApp(initialVolumes);
-    }, [startApp, initialVolumes]);
+        startApp();
+    }, [startApp]);
 
     const handleRecord = useCallback(() => {
         if (isRecording) {
@@ -305,9 +326,9 @@ export default function Home() {
                     <p>&copy; 2024, EVS</p>
                     <p className="mt-2">v.2.1 "Maestro"</p>
                 </footer>
-                {cookieConsent === undefined && (
+                {cookieConsent === undefined || cookieConsent === false ? (
                     <CookieConsent onConsentChange={onConsentChange} />
-                )}
+                ) : null}
             </div>
         )
     }
