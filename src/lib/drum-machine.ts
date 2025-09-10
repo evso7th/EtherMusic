@@ -38,7 +38,7 @@ export const beatPatterns: Readonly<BeatPattern[]> = [
         { time: 8, note: 't', vol: 0.6 }, { time: 10, note: 't', vol: 0.8 }, { time: 12, note: 'T', vol: 0.9 }, { time: 14, note: 'l', vol: 1.0 },
     ]},
      { name: 'Fill B', type: 'Fill', length: 1, sequence: [
-        { time: 8, note: 'g', vol: 0.5 }, { time: 10, note: 't', vol: 0.7 }, { time: 12, note: 'T', vol: 0.8 }, { time: 13, note: 'p15', vol: 0.9 }, { time: 14, note: 'l', vol: 1.0 },
+        { time: 8, note: 'H', vol: 0.5 }, { time: 10, note: 't', vol: 0.7 }, { time: 12, note: 'T', vol: 0.8 }, { time: 13, note: 'p15', vol: 0.9 }, { time: 14, note: 'l', vol: 1.0 },
     ]},
 
     // System

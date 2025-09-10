@@ -37,7 +37,6 @@ const DRUM_SAMPLES: Record<string, string> = {
     'K': '/assets/sounds/drums/kick_drum8.wav',
     's': '/assets/sounds/drums/snare.wav',
     'S': '/assets/sounds/drums/snare_off.wav',
-    'g': '/assets/sounds/drums/snare_ghost_note.wav', 
     'h': '/assets/sounds/drums/closed_hi_hat_accented.wav',
     'H': '/assets/sounds/drums/closed_hi_hat_ghost.wav',
     'o': '/assets/sounds/drums/open_hh_top.wav',
