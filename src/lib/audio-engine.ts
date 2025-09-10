@@ -33,11 +33,6 @@ function createDistortionCurve(amount: number): Float32Array {
 
 type SynthPartName = 'melody' | 'manualBass' | 'latch';
 
-type AudioEngineEvents = {
-    volumesChanged: Volumes;
-};
-
-
 const DRUM_SAMPLES: Record<string, string> = {
     'k': '/assets/sounds/drums/kick_drum.wav',
     'K': '/assets/sounds/drums/kick_drum8.wav',
@@ -90,8 +85,6 @@ export class AudioEngine {
     private convolver: ConvolverNode;
     
     private drumMachine: DrumMachine;
-    private eventEmitter: Emitter<AudioEngineEvents>;
-
 
     private nodes = new Map<SynthPartName | 'drums', { 
         worklet: AudioWorkletNode, 
@@ -110,7 +103,6 @@ export class AudioEngine {
     constructor(context: AudioContext, orbManager: OrbManager) {
         this.context = context;
         this.orbManager = orbManager;
-        this.eventEmitter = mitt<AudioEngineEvents>();
         
         this.masterOut = this.context.createGain();
         this.masterOut.connect(this.context.destination);
@@ -129,14 +121,6 @@ export class AudioEngine {
         this.reverbReturnGain.connect(this.preCompressorOut);
 
         this.drumMachine = new DrumMachine(this);
-    }
-
-    public on(event: keyof AudioEngineEvents, handler: (payload: any) => void) {
-        this.eventEmitter.on(event, handler);
-    }
-    
-    public off(event: keyof AudioEngineEvents, handler: (payload: any) => void) {
-        this.eventEmitter.off(event, handler);
     }
     
     getContext() {
@@ -256,23 +240,8 @@ export class AudioEngine {
     }
     
     private async loadReverbImpulse() {
-        try {
-            const response = await fetch('/assets/sounds/impulses/space.wav');
-            if (!response.ok) {
-                 if (response.status === 404) {
-                    console.log("[AudioEngine] Reverb impulse '/assets/sounds/impulses/space.wav' not found. Using a generated fallback reverb. This is expected if the file doesn't exist.");
-                 } else {
-                    console.error(`[AudioEngine] HTTP error! status: ${response.status}`);
-                 }
-                this.convolver.buffer = this.createFallbackReverb();
-                return;
-            }
-            const buffer = await response.arrayBuffer();
-            this.convolver.buffer = await this.context.decodeAudioData(buffer);
-        } catch (e) {
-            console.warn("[AudioEngine] Could not load or decode reverb impulse, using fallback.", e);
-            this.convolver.buffer = this.createFallbackReverb();
-        }
+        // We no longer load from a file. We programmatically create the reverb.
+        this.convolver.buffer = this.createFallbackReverb();
     }
 
     private createFallbackReverb(): AudioBuffer {
@@ -404,11 +373,12 @@ export class AudioEngine {
         }
     }
     
-    public setBassInstrument(instrumentName: BassInstrument): Volumes {
-        const newVolumes = this.getVolumes();
+    public setBassInstrument(instrumentName: BassInstrument): Volumes | undefined {
+        if (!this.volumes) return undefined;
         const preset = bassInstruments.find(i => i.id === instrumentName);
         
         if (preset) {
+            const newVolumes = JSON.parse(JSON.stringify(this.volumes)); // Deep copy
             const bassPresetParams = preset.params as BassInstrumentPresetParams;
             const message: WorkerMessage = { type: 'setPreset', preset: bassPresetParams };
             
@@ -421,8 +391,9 @@ export class AudioEngine {
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
             this.setVolumes(newVolumes);
+            return newVolumes; // Return the modified volumes
         }
-        return newVolumes;
+        return undefined;
     }
     
     public setBeatPattern(patternName: string) {
@@ -462,6 +433,8 @@ export class AudioEngine {
                     throw new Error(`HTTP error! status: ${response.status} for ${url.split('/').pop()}`);
                 }
                 const arrayBuffer = await response.arrayBuffer();
+                // This is a synchronous decode, which is fine inside an async function on the main thread
+                // but would block if this were a more complex operation.
                 const audioBuffer = await this.context.decodeAudioData(arrayBuffer.slice(0)); 
                 
                 const channelData = audioBuffer.getChannelData(0);
@@ -480,7 +453,7 @@ export class AudioEngine {
 
     private applyVolumeForPart(partName: SynthPartName | 'drums', volumes: ChannelVolumes) {
         const nodeInfo = this.nodes.get(partName);
-        if (nodeInfo) {
+        if (nodeInfo && volumes) {
             // Ramping is now handled inside the worklet for synths, but gain nodes are fine here.
             nodeInfo.gain.gain.setValueAtTime(dbToGain(volumes.gain), this.context.currentTime);
             nodeInfo.reverbSend.gain.setValueAtTime(dbToGain(volumes.reverbSend), this.context.currentTime);
@@ -502,7 +475,7 @@ export class AudioEngine {
         
         this.reverbReturnGain.gain.linearRampToValueAtTime(dbToGain(this.volumes.reverbReturn), rampTime);
         this.setCompressorSettings(this.volumes.compressor);
-        this.setSwing(this.volumes.swing ?? 0);
+        this.setSwing(this.volumes.swing);
         this.setTempo(this.volumes.tempo);
     }
     

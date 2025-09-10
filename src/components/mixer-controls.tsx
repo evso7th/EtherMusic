@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Waves, Drum, Anchor, Blend, AudioLines, Music, Clock, Shuffle } from 'lucide-react';
-import { useState, useCallback, useEffect, memo } from 'react';
+import { memo } from 'react';
 import type { Volumes, CompressorSettings, ChannelVolumes } from '@/types';
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
@@ -64,32 +64,20 @@ interface MixerControlsProps {
 }
 
 export function MixerControls({ 
-    volumes: initialVolumes, 
+    volumes,
     onMixerChange,
     onCompressorChange,
-    tempo: initialTempo,
+    tempo,
     setTempo,
-    swing: initialSwing,
+    swing,
     setSwing,
     closeDialog,
     isAutopilotMixer = false,
 }: MixerControlsProps) {
+    console.log("--- Rendering: MixerControls ---", { volumes, tempo, swing });
     
-    const [localVolumes, setLocalVolumes] = useState(initialVolumes);
-
-    useEffect(() => {
-        setLocalVolumes(initialVolumes);
-    }, [initialVolumes]);
-
-    const handleLocalVolumeChange = useCallback((update: Partial<Volumes> | ((v: Volumes) => Volumes)) => {
-        setLocalVolumes(currentVolumes => {
-            const newVolumes = typeof update === 'function' ? update(currentVolumes) : { ...currentVolumes, ...update };
-            return newVolumes;
-        });
-    }, []);
-    
-    const handleChannelVolumeChange = useCallback((part: VolumeChannel, value: number) => {
-        handleLocalVolumeChange(prev => {
+    const handleChannelVolumeChange = (part: VolumeChannel, value: number) => {
+        onMixerChange(prev => {
             const newVolumes = JSON.parse(JSON.stringify(prev));
             const newChannelVolumes = { ...(newVolumes[part] as ChannelVolumes), gain: value };
             newVolumes[part] = newChannelVolumes;
@@ -102,33 +90,10 @@ export function MixerControls({
             
             return newVolumes;
         });
-    }, [handleLocalVolumeChange]);
+    };
     
-    const handleReverbReturnChange = useCallback((value: number) => {
-        handleLocalVolumeChange({ reverbReturn: value });
-    }, [handleLocalVolumeChange]);
-    
-    const handleCompressorSettingChange = useCallback((setting: keyof CompressorSettings, value: any) => {
-        handleLocalVolumeChange(prev => ({
-            ...prev,
-            compressor: { ...prev.compressor, [setting]: value }
-        }));
-    }, [handleLocalVolumeChange]);
-
-    const handleTempoChange = useCallback((value: number) => {
-        handleLocalVolumeChange({ tempo: value });
-    }, [handleLocalVolumeChange]);
-
-    const handleSwingChange = useCallback((value: number) => {
-        handleLocalVolumeChange({ swing: value });
-    }, [handleLocalVolumeChange]);
-
-    const handleApplyChanges = () => {
-        onMixerChange(localVolumes);
-        onCompressorChange(localVolumes.compressor);
-        setTempo(localVolumes.tempo);
-        setSwing(localVolumes.swing);
-        closeDialog();
+    const handleReverbReturnChange = (value: number) => {
+        onMixerChange({ reverbReturn: value });
     };
 
     return (
@@ -139,8 +104,8 @@ export function MixerControls({
                         <VolumeControl 
                             label="Tempo"
                             icon={Clock}
-                            volume={localVolumes.tempo}
-                            onVolumeChange={handleTempoChange}
+                            volume={tempo}
+                            onVolumeChange={setTempo}
                             min={30}
                             max={200}
                             step={1}
@@ -149,8 +114,8 @@ export function MixerControls({
                         <VolumeControl 
                             label="Swing"
                             icon={Shuffle}
-                            volume={(localVolumes.swing || 0) * 100}
-                            onVolumeChange={(v) => handleSwingChange(v / 100)}
+                            volume={swing * 100}
+                            onVolumeChange={(v) => setSwing(v / 100)}
                             min={0}
                             max={75}
                             step={1}
@@ -169,25 +134,25 @@ export function MixerControls({
                 <VolumeControl 
                     label="Melody"
                     icon={Music}
-                    volume={localVolumes.melody.gain}
+                    volume={volumes.melody.gain}
                     onVolumeChange={(v) => handleChannelVolumeChange('melody', v)}
                 />
                  <VolumeControl 
                     label="Bass"
                     icon={Waves}
-                    volume={localVolumes.manualBass.gain}
+                    volume={volumes.manualBass.gain}
                     onVolumeChange={(v) => handleChannelVolumeChange('manualBass', v)}
                 />
                 <VolumeControl 
                     label="Latch"
                     icon={Anchor}
-                    volume={localVolumes.latch.gain}
+                    volume={volumes.latch.gain}
                     onVolumeChange={(v) => handleChannelVolumeChange('latch', v)}
                 />
                 <VolumeControl 
                     label="Drums"
                     icon={Drum}
-                    volume={localVolumes.drums.gain}
+                    volume={volumes.drums.gain}
                     onVolumeChange={(v) => handleChannelVolumeChange('drums', v)}
                 />
             </div>
@@ -199,7 +164,7 @@ export function MixerControls({
                 <VolumeControl
                     label="Reverb Level"
                     icon={Blend}
-                    volume={localVolumes.reverbReturn}
+                    volume={volumes.reverbReturn}
                     onVolumeChange={handleReverbReturnChange}
                     min={-48} max={6} step={1} unit="dB"
                 />
@@ -216,16 +181,16 @@ export function MixerControls({
                             </div>
                             <Switch
                                 id="compressor-switch"
-                                checked={localVolumes.compressor.enabled}
-                                onCheckedChange={(enabled) => handleCompressorSettingChange('enabled', enabled)}
+                                checked={volumes.compressor.enabled}
+                                onCheckedChange={(enabled) => onCompressorChange({ ...volumes.compressor, enabled })}
                             />
                         </div>
-                        <div className={cn("space-y-4 transition-opacity", !localVolumes.compressor.enabled && "opacity-50 pointer-events-none")}>
+                        <div className={cn("space-y-4 transition-opacity", !volumes.compressor.enabled && "opacity-50 pointer-events-none")}>
                              <VolumeControl 
                                 label="Threshold"
                                 icon={Waves}
-                                volume={localVolumes.compressor.threshold}
-                                onVolumeChange={(v) => handleCompressorSettingChange('threshold', v)}
+                                volume={volumes.compressor.threshold}
+                                onVolumeChange={(v) => onCompressorChange({ ...volumes.compressor, threshold: v})}
                                 min={-100}
                                 max={0}
                                 step={1}
@@ -234,8 +199,8 @@ export function MixerControls({
                              <VolumeControl 
                                 label="Ratio"
                                 icon={Waves}
-                                volume={localVolumes.compressor.ratio}
-                                onVolumeChange={(v) => handleCompressorSettingChange('ratio', v)}
+                                volume={volumes.compressor.ratio}
+                                onVolumeChange={(v) => onCompressorChange({ ...volumes.compressor, ratio: v})}
                                 min={1}
                                 max={20}
                                 step={1}
@@ -248,7 +213,7 @@ export function MixerControls({
 
             <Separator />
             <Button 
-                onClick={handleApplyChanges}
+                onClick={closeDialog}
                 className="w-full mt-4"
             >
                 Done
@@ -256,5 +221,3 @@ export function MixerControls({
         </div>
     );
 }
-
-    

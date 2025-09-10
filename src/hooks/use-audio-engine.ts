@@ -5,19 +5,75 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
-import type { Volumes, Instrument, BassInstrument } from '@/types';
+import type { Volumes, Instrument, BassInstrument, CompressorSettings } from '@/types';
 
-export function useAudioEngine(initialVolumes: Volumes) {
+function getCookie(name: string): string | null {
+    if (typeof document === 'undefined') return null;
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+    return null;
+}
+
+function setCookie(name: string, value: string, days: number) {
+    if (typeof document === 'undefined') return;
+    let expires = "";
+    if (days) {
+        const date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        expires = "; expires=" + date.toUTCString();
+    }
+    document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=Lax";
+}
+
+const defaultVolumes: Volumes = { 
+    melody: { gain: 0, reverbSend: -18, distortion: 0 },
+    manualBass: { gain: -25, reverbSend: -48, distortion: 0 },
+    latch: { gain: -25, reverbSend: -48, distortion: 0 },
+    drums: { gain: -20, reverbSend: -48, distortion: 0 },
+    reverbReturn: -25,
+    compressor: {
+        enabled: true,
+        threshold: -70,
+        ratio: 7,
+        attack: 0.003,
+        release: 0.25
+    },
+    swing: 0.33,
+    tempo: 90,
+};
+
+function loadVolumes(): Volumes {
+     if (typeof window === 'undefined') return defaultVolumes;
+     const consent = getCookie("ethermusic_consent") === 'true';
+     if (!consent) return defaultVolumes;
+     try {
+        const savedVolumes = getCookie("ethermusic_volumes");
+        const volumes = savedVolumes ? JSON.parse(savedVolumes) : defaultVolumes;
+        
+        // Basic validation
+        if (!volumes.melody || typeof volumes.melody.gain !== 'number' || !volumes.compressor) {
+            return defaultVolumes; 
+        }
+        return { ...defaultVolumes, ...volumes };
+    } catch (e) {
+        console.error("Failed to load volume settings from cookies", e);
+        return defaultVolumes;
+    }
+}
+
+export function useAudioEngine() {
     const { toast } = useToast();
     
     const [isAppStarted, setIsAppStarted] = useState(false);
     const [isReady, setIsReady] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [volumes, setVolumesState] = useState<Volumes>(defaultVolumes);
     
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
     
-    const initializeAudioEngine = useCallback(async (vols: Volumes) => {
+    const initializeAudioEngine = useCallback(async (initialVols: Volumes) => {
         try {
             if (!orbManager.current) {
                 const padContainer = document.querySelector('main');
@@ -34,12 +90,13 @@ export function useAudioEngine(initialVolumes: Volumes) {
                 
                 engine.getDrumMachine().on('playStateChanged', setIsPlaying);
                 
-                engine.setVolumes(vols);
                 audioEngine.current = engine;
-            } else {
-                audioEngine.current.setVolumes(vols);
             }
             
+            // Set volumes after engine is created and initialized
+            audioEngine.current.setVolumes(initialVols);
+            setVolumesState(initialVols);
+
             setIsReady(true);
             setIsPlaying(audioEngine.current.isPlaying);
             
@@ -53,14 +110,15 @@ export function useAudioEngine(initialVolumes: Volumes) {
         }
     }, [toast]);
 
-    const startApp = useCallback(async (vols: Volumes) => {
+    const startApp = useCallback(async () => {
         if (isAppStarted) return;
         
         setIsAppStarted(true);
         const audio = new Audio('/assets/sounds/transition.webm');
         audio.play().catch(e => console.error("Error playing transition sound:", e));
         
-        await initializeAudioEngine(vols);
+        const initialVols = loadVolumes();
+        await initializeAudioEngine(initialVols);
     }, [isAppStarted, initializeAudioEngine]);
 
     useEffect(() => {
@@ -82,12 +140,18 @@ export function useAudioEngine(initialVolumes: Volumes) {
         engine?.getDrumMachine().off('playStateChanged', playStateCallback);
       };
     }, []);
-
-    useEffect(() => {
-        if (audioEngine.current) {
-            audioEngine.current.setVolumes(initialVolumes);
-        }
-    }, [initialVolumes]);
+    
+    // This is the single, stable function to update volumes.
+    const setVolumes = useCallback((newVolumes: Partial<Volumes> | ((v: Volumes) => Volumes)) => {
+        setVolumesState(prev => {
+            const updated = typeof newVolumes === 'function' ? newVolumes(prev) : { ...prev, ...newVolumes };
+            audioEngine.current?.setVolumes(updated);
+            if (getCookie("ethermusic_consent") === 'true') {
+                saveVolumes(updated);
+            }
+            return updated;
+        });
+    }, []);
 
     const stopAllSounds = useCallback(() => {
         audioEngine.current?.stopAllSounds();
@@ -119,8 +183,11 @@ export function useAudioEngine(initialVolumes: Volumes) {
     }, []);
     
     const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
-        return audioEngine.current?.setBassInstrument(instrumentName);
-    }, []);
+        const newVolumes = audioEngine.current?.setBassInstrument(instrumentName);
+        if (newVolumes) {
+            setVolumes(newVolumes);
+        }
+    }, [setVolumes]);
 
     return {
         isAppStarted,
@@ -128,6 +195,8 @@ export function useAudioEngine(initialVolumes: Volumes) {
         isPlaying,
         audioEngine: audioEngine.current,
         orbManager: orbManager.current,
+        volumes,
+        setVolumes,
         startApp,
         stopAllSounds,
         setBeatPattern,
@@ -139,5 +208,3 @@ export function useAudioEngine(initialVolumes: Volumes) {
         setBassInstrument,
     };
 }
-
-    

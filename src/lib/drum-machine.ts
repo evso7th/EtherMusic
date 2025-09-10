@@ -82,19 +82,17 @@ export class DrumMachine {
     }
 
     public setTempo(bpm: number) {
+        const wasPlaying = this.isPlaying;
+        if (wasPlaying) this.stop();
         this._tempo = bpm;
-        if (this.isPlaying) {
-            this.stop();
-            this.play();
-        }
+        if (wasPlaying) this.play();
     }
     
     public setSwing(swing: number) {
+        const wasPlaying = this.isPlaying;
+        if (wasPlaying) this.stop();
         this._swing = Math.max(0, Math.min(0.75, swing)); // Clamp swing between 0 and 0.75
-         if (this.isPlaying) {
-            this.stop();
-            this.play();
-        }
+        if (wasPlaying) this.play();
     }
 
     public setPattern(patternName: string) {

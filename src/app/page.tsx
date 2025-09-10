@@ -21,7 +21,6 @@ import { bassInstruments, defaultBassInstrument } from '@/lib/bass-presets';
 import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, ChannelVolumes, CompressorSettings, BeatPattern } from '@/types';
 import { cn } from '@/lib/utils';
 
-
 function getCookie(name: string): string | null {
     if (typeof document === 'undefined') return null;
     const value = `; ${document.cookie}`;
@@ -29,84 +28,6 @@ function getCookie(name: string): string | null {
     if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
     return null;
 }
-
-function setCookie(name: string, value: string, days: number) {
-    if (typeof document === 'undefined') return;
-    let expires = "";
-    if (days) {
-        const date = new Date();
-        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-        expires = "; expires=" + date.toUTCString();
-    }
-    document.cookie = name + "=" + (value || "")  + expires + "; path=/; SameSite=Lax";
-}
-
-const defaultVolumes: Volumes = { 
-    melody: { gain: 0, reverbSend: -18, distortion: 0 },
-    manualBass: { gain: -25, reverbSend: -48, distortion: 0 },
-    latch: { gain: -25, reverbSend: -48, distortion: 0 },
-    drums: { gain: -20, reverbSend: -48, distortion: 0 },
-    reverbReturn: -25,
-    compressor: {
-        enabled: true,
-        threshold: -70,
-        ratio: 7,
-        attack: 0.003,
-        release: 0.25
-    },
-    swing: 0.33,
-    tempo: 90,
-};
-
-function loadVolumes(): Volumes {
-     if (typeof window === 'undefined') return defaultVolumes;
-     const consent = getCookie("ethermusic_consent") === 'true';
-     if (!consent) return defaultVolumes;
-     try {
-        const savedVolumes = getCookie("ethermusic_volumes");
-        const volumes = savedVolumes ? JSON.parse(savedVolumes) : defaultVolumes;
-        
-        if (!volumes.melody || typeof volumes.melody.gain !== 'number' || !volumes.compressor) {
-            return defaultVolumes; 
-        }
-
-        const ensureChannelSettings = (channel: Partial<ChannelVolumes> | undefined, defaults: ChannelVolumes): ChannelVolumes => ({
-            gain: typeof channel?.gain === 'number' ? channel.gain : defaults.gain,
-            reverbSend: typeof channel?.reverbSend === 'number' ? channel.reverbSend : defaults.reverbSend,
-            distortion: typeof channel?.distortion === 'number' ? channel.distortion : defaults.distortion,
-        });
-
-        const mergedVolumes: Volumes = {
-            ...defaultVolumes,
-            ...volumes,
-            melody: ensureChannelSettings(volumes.melody, defaultVolumes.melody),
-            manualBass: ensureChannelSettings(volumes.manualBass, defaultVolumes.manualBass),
-            latch: ensureChannelSettings(volumes.latch, defaultVolumes.latch),
-            drums: ensureChannelSettings(volumes.drums, defaultVolumes.drums),
-            compressor: { ...defaultVolumes.compressor, ...(volumes.compressor || {}) },
-            swing: typeof volumes.swing === 'number' ? volumes.swing : defaultVolumes.swing,
-            tempo: typeof volumes.tempo === 'number' ? volumes.tempo : defaultVolumes.tempo,
-        };
-        
-        return mergedVolumes;
-
-    } catch (e) {
-        console.error("Failed to load volume settings from cookies", e);
-        return defaultVolumes;
-    }
-}
-
-function saveVolumes(volumes: Volumes) {
-    if (typeof window === 'undefined' || getCookie("ethermusic_consent") !== 'true') {
-        return;
-    }
-    try {
-        setCookie("ethermusic_volumes", JSON.stringify(volumes), 365);
-    } catch (e) {
-        console.error("Failed to save volume settings to cookies", e);
-    }
-}
-
 
 const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
 const MemoizedThereminPad = memo(ThereminPad);
@@ -122,12 +43,11 @@ const Preloader = () => (
 );
 
 export default function Home() {
+    console.log("--- Rendering: Home ---");
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [isClient, setIsClient] = useState(false);
     
-    const [initialVolumes] = useState<Volumes>(loadVolumes);
-
     const {
         isAppStarted,
         isReady,
@@ -145,12 +65,8 @@ export default function Home() {
         orbManager,
         volumes,
         setVolumes,
-        setTempo,
-        setSwing,
-        handleCompressorChange,
-        currentTempo,
-    } = useAudioEngine(initialVolumes);
-
+    } = useAudioEngine();
+    
     const [cookieConsent, setCookieConsent] = useState<boolean | undefined>(undefined);
     
     const [isRecording, setIsRecording] = useState(false);
@@ -166,15 +82,9 @@ export default function Home() {
 
     const onConsentChange = useCallback((consent: boolean) => {
         setCookieConsent(consent);
-        const newVolumes = consent ? loadVolumes() : defaultVolumes;
-        setVolumes(newVolumes);
-        
-        if (!consent) {
-             if (typeof document !== 'undefined') {
-                document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-            }
-        }
-    }, [setVolumes]);
+        // Let the useAudioEngine hook handle loading/clearing settings
+        // It will be triggered by the `isReady` and `cookieConsent` useEffect
+    }, []);
 
     useEffect(() => {
         setIsClient(true);
@@ -186,12 +96,6 @@ export default function Home() {
         }
     }, []);
 
-    useEffect(() => {
-        if (isReady && cookieConsent !== undefined) {
-            const newVolumes = cookieConsent ? loadVolumes() : defaultVolumes;
-            setVolumes(newVolumes);
-        }
-    }, [isReady, cookieConsent, setVolumes]);
 
     useEffect(() => {
         if (isReady && activeMelodyInstrument) {
@@ -210,10 +114,6 @@ export default function Home() {
         }
     }, [isReady, activeBassInstrument, handleSetBassInstrument]);
     
-    const handleTempoChange = useCallback((newTempo: number) => {
-        setTempo(newTempo);
-    }, [setTempo]);
-
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         let newKey = musicKey;
         let newScale = musicScale;
@@ -245,21 +145,23 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isReady]);
     
-    const handleChannelEffectChange = useCallback((
+    const handleChannelEffectChange = (
         channel: 'melody' | 'bass', 
         effect: 'reverbSend' | 'distortion', 
         value: number
     ) => {
         setVolumes(prevVolumes => {
+            // Deep copy to avoid mutation
             const newVolumes = JSON.parse(JSON.stringify(prevVolumes));
             const targetChannelKey = channel === 'bass' ? 'manualBass' : 'melody';
+            
             (newVolumes[targetChannelKey] as ChannelVolumes)[effect] = value;
-             if (channel === 'bass') {
-                 (newVolumes.latch as ChannelVolumes)[effect] = value;
+            if (channel === 'bass') {
+                (newVolumes.latch as ChannelVolumes)[effect] = value;
             }
             return newVolumes;
         });
-    }, [setVolumes]);
+    };
     
     const handleStartApp = useCallback(() => {
         startApp();
@@ -295,6 +197,18 @@ export default function Home() {
         if (!isReady || !audioEngine) return;
         handleThereminInteraction(type, data, state);
     }, [isReady, audioEngine, handleThereminInteraction]);
+
+    const handleCompressorChange = useCallback((compressorSettings: CompressorSettings) => {
+        setVolumes(v => ({...v, compressor: compressorSettings }));
+    }, [setVolumes]);
+
+    const handleTempoChange = useCallback((newTempo: number) => {
+        setVolumes(v => ({ ...v, tempo: newTempo }));
+    }, [setVolumes]);
+
+    const handleSwingChange = useCallback((swingValue: number) => {
+        setVolumes(v => ({ ...v, swing: swingValue }));
+    }, [setVolumes]);
 
     if (!isClient) {
         return <Preloader />;
@@ -340,7 +254,7 @@ export default function Home() {
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
             <div className="fixed inset-0 z-0">
-                 <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={currentTempo} />
+                 <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={volumes.tempo} />
             </div>
             
              <div className="relative z-10 flex h-full portrait:flex-col portrait:p-2 md:p-6 lg:p-8 landscape:flex-row landscape:p-1 landscape:gap-1">
@@ -434,10 +348,10 @@ export default function Home() {
                             onMixerChange={setVolumes}
                             onCompressorChange={handleCompressorChange}
                             isMobile={isMobile}
-                            tempo={currentTempo}
+                            tempo={volumes.tempo}
                             setTempo={handleTempoChange}
-                            swing={volumes.swing || 0}
-                            setSwing={setSwing}
+                            swing={volumes.swing}
+                            setSwing={handleSwingChange}
                         />
                     </div>
                 </main>
@@ -451,10 +365,10 @@ export default function Home() {
                         onCompressorChange={handleCompressorChange}
                         isMobile={isMobile}
                         isLandscape={true}
-                        tempo={currentTempo}
+                        tempo={volumes.tempo}
                         setTempo={handleTempoChange}
-                        swing={volumes.swing || 0}
-                        setSwing={setSwing}
+                        swing={volumes.swing}
+                        setSwing={handleSwingChange}
                     />
                 </div>
             </div>
