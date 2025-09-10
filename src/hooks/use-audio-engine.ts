@@ -7,10 +7,6 @@ import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
 import type { Volumes, Instrument, BassInstrument, CompressorSettings } from '@/types';
 
-interface UseAudioEngineProps {
-    onVolumesChanged?: (volumes: Volumes) => void;
-}
-
 const defaultVolumes: Volumes = { 
     melody: { gain: 0, reverbSend: -18, distortion: 0 },
     manualBass: { gain: -25, reverbSend: -48, distortion: 0 },
@@ -27,14 +23,17 @@ const defaultVolumes: Volumes = {
     swing: 0.33,
 };
 
+interface UseAudioEngineProps {
+    initialVolumes?: Volumes;
+}
 
-export function useAudioEngine({ onVolumesChanged }: UseAudioEngineProps = {}) {
+export function useAudioEngine({ initialVolumes = defaultVolumes }: UseAudioEngineProps = {}) {
     const { toast } = useToast();
     
     const [isAppStarted, setIsAppStarted] = useState(false);
     const [isReady, setIsReady] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
-    const [volumes, setVolumesState] = useState<Volumes>(defaultVolumes);
+    const [volumes, setVolumesState] = useState<Volumes>(initialVolumes);
 
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
@@ -59,9 +58,8 @@ export function useAudioEngine({ onVolumesChanged }: UseAudioEngineProps = {}) {
                 });
                 
                 audioEngine.current = engine;
-                const initialVolumes = engine.getVolumes();
-                setVolumesState(initialVolumes);
-                onVolumesChanged?.(initialVolumes); 
+                const currentVolumes = engine.getVolumes();
+                setVolumesState(currentVolumes);
             }
             
             setIsReady(true);
@@ -75,7 +73,7 @@ export function useAudioEngine({ onVolumesChanged }: UseAudioEngineProps = {}) {
                 variant: "destructive"
             });
         }
-    }, [toast, onVolumesChanged]);
+    }, [toast]);
 
     const startApp = useCallback(async () => {
         if (isAppStarted) return;
@@ -110,6 +108,12 @@ export function useAudioEngine({ onVolumesChanged }: UseAudioEngineProps = {}) {
         audioEngine.current?.setVolumes(newVolumes);
         setVolumesState(newVolumes);
     }, []);
+
+    useEffect(() => {
+        if (initialVolumes) {
+            setVolumes(initialVolumes);
+        }
+    }, [initialVolumes, setVolumes]);
 
     const setTempo = useCallback((tempo: number) => {
         audioEngine.current?.setTempo(tempo);
@@ -148,9 +152,8 @@ export function useAudioEngine({ onVolumesChanged }: UseAudioEngineProps = {}) {
         const newVolumes = audioEngine.current?.setBassInstrument(instrumentName);
         if (newVolumes) {
             setVolumesState(newVolumes);
-            onVolumesChanged?.(newVolumes);
         }
-    }, [onVolumesChanged]);
+    }, []);
     
     const handleCompressorChange = useCallback((compressorSettings: CompressorSettings) => {
         audioEngine.current?.setCompressorSettings(compressorSettings);
@@ -179,3 +182,5 @@ export function useAudioEngine({ onVolumesChanged }: UseAudioEngineProps = {}) {
         handleCompressorChange,
     };
 }
+
+    

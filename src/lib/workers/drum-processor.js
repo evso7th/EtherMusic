@@ -6,6 +6,8 @@ class Voice {
         this.position = 0;
         this.gain = gain;
         this.isFinished = false;
+        // Add a simple fade-out to prevent clicks
+        this.releaseSamples = Math.floor(sampleRate * 0.01); // 10ms release
     }
 
     // This method processes a block of samples.
@@ -18,8 +20,12 @@ class Voice {
         const samplesToProcess = Math.min(outputChannel.length, remainingSamples);
 
         for (let i = 0; i < samplesToProcess; i++) {
-            // Apply gain and add to the output buffer
-            outputChannel[i] += this.buffer[this.position + i] * this.gain;
+            let envelope = 1.0;
+            // Apply fade-out in the last few samples
+            if (this.position + i >= this.buffer.length - this.releaseSamples) {
+                envelope = (this.buffer.length - (this.position + i)) / this.releaseSamples;
+            }
+            outputChannel[i] += this.buffer[this.position + i] * this.gain * envelope;
         }
 
         this.position += samplesToProcess;
@@ -35,7 +41,8 @@ class DrumProcessor extends AudioWorkletProcessor {
         super();
         this.buffers = new Map();
         this.voices = [];
-        this.maxVoices = 32;
+        // Increased maxVoices to handle more complex drum patterns and fills
+        this.maxVoices = 64; 
 
         this.port.onmessage = this.handleMessage.bind(this);
     }
@@ -50,13 +57,13 @@ class DrumProcessor extends AudioWorkletProcessor {
             } else if (type === 'playSample' && sampleName) {
                 const bufferToPlay = this.buffers.get(sampleName);
                 if (bufferToPlay) {
-                    // Simple voice stealing: if we're at max voices, remove the oldest one.
                     if (this.voices.length >= this.maxVoices) {
                         this.voices.shift();
                     }
                     this.voices.push(new Voice(bufferToPlay, volume ?? 1.0));
                 } else {
-                    this.port.postMessage({ type: 'error', message: `Sample '${sampleName}' not found.` });
+                    // This can be noisy, so we'll only log it if needed for debugging
+                    // this.port.postMessage({ type: 'error', message: `Sample '${sampleName}' not found.` });
                 }
             }
         } catch (e) {
@@ -72,30 +79,33 @@ class DrumProcessor extends AudioWorkletProcessor {
             return true; // Stop processing if there's no output channel.
         }
 
-        // Reset the output buffer for this processing block.
         outputChannel.fill(0);
 
         if (this.voices.length === 0) {
             return true; // No active voices, nothing to do.
         }
         
-        // Use a new array to store active voices for the next block.
-        const activeVoices = [];
-        
-        for (const voice of this.voices) {
+        // This is a more efficient way to manage active voices.
+        // It avoids creating a new array on every tick.
+        let activeVoiceCount = 0;
+        for (let i = 0; i < this.voices.length; i++) {
+            const voice = this.voices[i];
             if (!voice.isFinished) {
-                // Each voice adds its output to the main buffer.
                 voice.process(outputChannel);
-                activeVoices.push(voice);
+                // If the voice is still active after processing, keep it.
+                if (!voice.isFinished) {
+                    // Move the active voice to the front of the array.
+                    this.voices[activeVoiceCount++] = voice;
+                }
             }
         }
-
-        // Replace the old voices array with the list of currently active ones.
-        this.voices = activeVoices;
+        // Truncate the array to only include active voices.
+        this.voices.length = activeVoiceCount;
         
-        // Basic hard-clipping to prevent audio artifacts from exceeding [-1, 1] range.
+        // A simple limiter to prevent clipping and audio artifacts.
         for (let i = 0; i < outputChannel.length; i++) {
-            outputChannel[i] = Math.max(-1, Math.min(1, outputChannel[i]));
+            const sample = outputChannel[i];
+            outputChannel[i] = Math.max(-1, Math.min(1, sample));
         }
 
         return true; // Keep the processor alive.
@@ -103,3 +113,5 @@ class DrumProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('drum-processor', DrumProcessor);
+
+    

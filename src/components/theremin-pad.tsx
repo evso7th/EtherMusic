@@ -111,6 +111,14 @@ export function ThereminPad({
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const isMobile = useIsMobile();
     
+    // Local state for effect controls to provide real-time feedback
+    const [localEffects, setLocalEffects] = useState(effects);
+
+    // Sync local state when props change
+    useEffect(() => {
+        setLocalEffects(effects);
+    }, [effects]);
+
     // Manage orbs for latch mode
     useEffect(() => {
         if (type === 'bass' && orbManager) {
@@ -174,8 +182,9 @@ export function ThereminPad({
     }, [calculateInteraction, isDisabled, onInteraction, type, isLatchOn]);
 
     const handleEffectChange = (effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => {
-        const channel = type === 'bass' ? 'manualBass' : 'melody';
-        onEffectChange(channel, effect, value);
+        const channelType = type === 'bass' ? 'manualBass' : type;
+        setLocalEffects(prev => ({...prev, [effect]: value}));
+        onEffectChange(channelType, effect, value);
     }
     
     const renderSettingsControls = () => {
@@ -267,14 +276,14 @@ export function ThereminPad({
                                 <EffectControl
                                     label="Reverb Send"
                                     icon={Blend}
-                                    level={effects.reverbSend}
+                                    level={localEffects.reverbSend}
                                     onLevelChange={(v) => handleEffectChange('reverbSend', v)}
                                     min={-48} max={0} step={1} unit="dB"
                                 />
                                 <EffectControl
                                     label="Distortion"
                                     icon={Waves}
-                                    level={effects.distortion}
+                                    level={localEffects.distortion}
                                     onLevelChange={(v) => handleEffectChange('distortion', v)}
                                     min={0} max={100} step={1} unit="%"
                                 />

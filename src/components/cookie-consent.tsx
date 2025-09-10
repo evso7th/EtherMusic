@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 
@@ -74,3 +74,5 @@ export function CookieConsent({ onConsentChange }: CookieConsentProps) {
         </div>
     );
 }
+
+    

@@ -7,6 +7,7 @@ import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
 import { bassInstruments } from './bass-presets';
 import { DrumMachine } from './drum-machine';
+import mitt, { Emitter } from 'mitt';
 
 
 function dbToGain(db: number): number {
@@ -254,9 +255,23 @@ export class AudioEngine {
         this.nodes.set('drums', { worklet, gain, reverbSend });
     }
     
-    private loadReverbImpulse() {
-        // This now directly creates the fallback reverb without trying to fetch a file.
-        this.convolver.buffer = this.createFallbackReverb();
+    private async loadReverbImpulse() {
+        try {
+            const response = await fetch('/assets/sounds/impulses/space.wav');
+            if (!response.ok) {
+                // This is now an expected outcome if the file doesn't exist.
+                // We just log it and proceed to the fallback.
+                console.log("[AudioEngine] Reverb impulse '/assets/sounds/impulses/space.wav' not found. Using a generated fallback reverb. This is expected if the file doesn't exist.");
+                this.convolver.buffer = this.createFallbackReverb();
+                return;
+            }
+            const buffer = await response.arrayBuffer();
+            const audioBuffer = await this.context.decodeAudioData(buffer);
+            this.convolver.buffer = audioBuffer;
+        } catch (e) {
+            console.warn("[AudioEngine] Could not load or decode reverb impulse, using fallback.", e);
+            this.convolver.buffer = this.createFallbackReverb();
+        }
     }
 
     private createFallbackReverb(): AudioBuffer {
@@ -521,3 +536,5 @@ export class AudioEngine {
         }
     }
 }
+
+    

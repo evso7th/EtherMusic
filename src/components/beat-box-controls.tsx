@@ -167,13 +167,13 @@ export function BeatBoxControls({
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="pr-4 py-4">
                                     <MixerControls 
-                                        initialVolumes={volumes} 
+                                        volumes={volumes} 
                                         onMixerChange={onMixerChange}
                                         onCompressorChange={onCompressorChange}
-                                        initialTempo={tempo}
-                                        onTempoChange={setTempo}
-                                        initialSwing={swing}
-                                        onSwingChange={setSwing}
+                                        tempo={tempo}
+                                        setTempo={setTempo}
+                                        swing={swing}
+                                        setSwing={setSwing}
                                         closeDialog={() => setIsMixerOpen(false)}
                                     />
                                 </div>
@@ -266,13 +266,13 @@ export function BeatBoxControls({
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="pr-4 py-4">
                                     <MixerControls 
-                                        initialVolumes={volumes}
+                                        volumes={volumes}
                                         onMixerChange={onMixerChange}
                                         onCompressorChange={onCompressorChange}
-                                        initialTempo={tempo}
-                                        onTempoChange={setTempo}
-                                        initialSwing={swing}
-                                        onSwingChange={setSwing}
+                                        tempo={tempo}
+                                        setTempo={setTempo}
+                                        swing={swing}
+                                        setSwing={setSwing}
                                         closeDialog={() => setIsMixerOpen(false)}
                                     />
                                 </div>
@@ -286,3 +286,5 @@ export function BeatBoxControls({
         </TooltipProvider>
     );
 }
+
+    
