@@ -36,7 +36,7 @@ const DRUM_SAMPLES: Record<string, string> = {
     'k': '/assets/sounds/drums/kick_drum.wav',
     'K': '/assets/sounds/drums/kick_drum8.wav',
     's': '/assets/sounds/drums/snare.wav',
-    'S': '/assets/sounds/drums/snarepress.wav',
+    'S': '/assets/sounds/drums/snare_off.wav',
     'h': '/assets/sounds/drums/closed_hi_hat_accented.wav',
     'H': '/assets/sounds/drums/closed_hi_hat_ghost.wav',
     'o': '/assets/sounds/drums/open_hh_top.wav',
@@ -48,9 +48,25 @@ const DRUM_SAMPLES: Record<string, string> = {
     't': '/assets/sounds/drums/high_tom.wav',
     'T': '/assets/sounds/drums/mid_tom.wav',
     'l': '/assets/sounds/drums/low_tom.wav',
-    'g': '/assets/sounds/drums/snare_ghost_note.wav',
-    'b': '/assets/sounds/drums/hh_bark_short.wav'
+    'b': '/assets/sounds/drums/hh_bark_short.wav',
+    // Percussion Samples
+    'p1': '/assets/sounds/drums/perc-001.wav',
+    'p2': '/assets/sounds/drums/perc-002.wav',
+    'p3': '/assets/sounds/drums/perc-003.wav',
+    'p4': '/assets/sounds/drums/perc-004.wav',
+    'p5': '/assets/sounds/drums/perc-005.wav',
+    'p6': '/assets/sounds/drums/perc-006.wav',
+    'p7': '/assets/sounds/drums/perc-007.wav',
+    'p8': '/assets/sounds/drums/perc-008.wav',
+    'p9': '/assets/sounds/drums/perc-009.wav',
+    'p10': '/assets/sounds/drums/perc-010.wav',
+    'p11': '/assets/sounds/drums/perc-011.wav',
+    'p12': '/assets/sounds/drums/perc-012.wav',
+    'p13': '/assets/sounds/drums/perc-013.wav',
+    'p14': '/assets/sounds/drums/perc-014.wav',
+    'p15': '/assets/sounds/drums/perc-015.wav',
 };
+
 
 export class AudioEngine {
     public isInitialized = false;
@@ -79,18 +95,18 @@ export class AudioEngine {
         
     private volumes: Volumes = { 
         melody: { gain: 0, reverbSend: -18, distortion: 0 },
-        manualBass: { gain: -3, reverbSend: -48, distortion: 0 },
-        latch: { gain: -9, reverbSend: -48, distortion: 0 },
-        drums: { gain: -9, reverbSend: -48, distortion: 0 },
-        reverbReturn: -12,
+        manualBass: { gain: -25, reverbSend: -48, distortion: 0 },
+        latch: { gain: -25, reverbSend: -48, distortion: 0 },
+        drums: { gain: -20, reverbSend: -48, distortion: 0 },
+        reverbReturn: -25,
         compressor: {
             enabled: true,
-            threshold: -24,
-            ratio: 12,
+            threshold: -70,
+            ratio: 7,
             attack: 0.003,
             release: 0.25
         },
-        swing: 0,
+        swing: 0.33,
     };
     private isBassLatchOn: boolean = false;
     private latchEngine = new LatchEngine();
@@ -159,7 +175,7 @@ export class AudioEngine {
             a.style.display = 'none';
             a.href = url;
             const date = new Date();
-            const dateString = `${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
+            const dateString = `${date.getFullYear()}${ (date.getMonth()+1).toString().padStart(2, '0') }${ date.getDate().toString().padStart(2, '0') }`;
             a.download = `EtherMusic-Session-${dateString}.webm`;
             a.click();
             window.URL.revokeObjectURL(url);
@@ -279,7 +295,6 @@ export class AudioEngine {
     }
     
     public play() {
-        console.log("[AudioEngine] Play requested.");
         if (!this.isInitialized || this.isPlaying || !this.context) return;
         if (this.context.state === 'suspended') {
             this.context.resume();
@@ -288,7 +303,6 @@ export class AudioEngine {
     }
 
     public pause() {
-        console.log("[AudioEngine] Pause requested.");
         if (!this.isInitialized || !this.isPlaying) return;
         this.drumMachine.pause();
     }
@@ -433,18 +447,15 @@ export class AudioEngine {
     }
     
     public setBeatPattern(patternName: string) {
-        console.log(`[AudioEngine] setBeatPattern called with: ${patternName}`);
         this.drumMachine.setPattern(patternName);
-        const wasPlaying = this.isPlaying;
-        if (patternName === 'Off') {
-            if (wasPlaying) this.pause();
+        if (patternName !== 'Off') {
+            this.play();
         } else {
-            if (!wasPlaying) this.play();
+            this.pause();
         }
     }
 
     public setTempo(newTempo: number) {
-        console.log(`[AudioEngine] setTempo called with: ${newTempo}`);
         this.drumMachine.setTempo(newTempo);
     }
 
@@ -491,7 +502,7 @@ export class AudioEngine {
                     buffer: channelData.buffer,
                 };
                 drumWorklet.port.postMessage(message, [channelData.buffer]);
-                console.log(`[AudioEngine] Loaded and sent sample: ${name}`);
+                // console.log(`[AudioEngine] Loaded and sent sample: ${name}`);
 
             } catch (error) {
                 console.error(`[AudioEngine] Failed to load or process drum sample: ${name}`, error);
@@ -557,20 +568,5 @@ export class AudioEngine {
         if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
             this.mediaRecorder.stop();
         }
-    }
-
-    public fadeOutAndStop(durationSeconds: number) {
-        if (!this.masterOut || !this.context) return;
-        const now = this.context.currentTime;
-        this.masterOut.gain.cancelScheduledValues(now);
-        this.masterOut.gain.setValueAtTime(this.masterOut.gain.value, now);
-        this.masterOut.gain.linearRampToValueAtTime(0, now + durationSeconds);
-        setTimeout(() => {
-            this.stopAllSounds();
-            if (this.masterOut && this.context) {
-                 this.masterOut.gain.cancelScheduledValues(this.context.currentTime);
-                 this.masterOut.gain.setValueAtTime(1, this.context.currentTime);
-            }
-        }, (durationSeconds + 0.5) * 1000);
     }
 }

@@ -13,7 +13,6 @@ export function useAudioEngine() {
     const [isAppStarted, setIsAppStarted] = useState(false);
     const [isReady, setIsReady] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
-    const [sleepTimerId, setSleepTimerId] = useState<NodeJS.Timeout | null>(null);
 
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
@@ -78,16 +77,12 @@ export function useAudioEngine() {
     }, []);
 
     const play = useCallback(() => {
-        console.log("[useAudioEngine] Play requested.");
-        if (!isReady || !audioEngine.current) {
-            return;
-        }
+        if (!isReady || !audioEngine.current) return;
         audioEngine.current.play();
         setIsPlaying(true);
     }, [isReady]);
 
     const pause = useCallback(() => {
-        console.log("[useAudioEngine] Pause requested.");
         if (!isReady || !audioEngine.current) return;
         audioEngine.current.pause();
         setIsPlaying(false);
@@ -115,23 +110,13 @@ export function useAudioEngine() {
     const setBeatPattern = useCallback((patternName: string) => {
         if (!audioEngine.current) return;
         console.log(`[useAudioEngine] Setting beat pattern to: ${patternName}`);
-        const wasPlaying = audioEngine.current.isPlaying;
+        
         audioEngine.current.setBeatPattern(patternName);
+        
+        const isPlaying = patternName !== 'Off';
+        setIsPlaying(isPlaying);
 
-        if (patternName !== 'Off') {
-            if (!wasPlaying) {
-                 console.log("[useAudioEngine] Pattern set to ON, calling play().");
-                 play();
-            }
-             setIsPlaying(true);
-        } else {
-            if (wasPlaying) {
-                console.log("[useAudioEngine] Pattern set to OFF, calling pause().");
-                pause();
-            }
-             setIsPlaying(false);
-        }
-    }, [play, pause]);
+    }, []);
     
     const setBassLatch = useCallback((isOn: boolean) => {
         audioEngine.current?.setBassLatch(isOn);
@@ -144,21 +129,6 @@ export function useAudioEngine() {
     const stopRecording = useCallback(() => {
         audioEngine.current?.stopRecording();
     }, []);
-
-    const setSleepTimer = useCallback((durationMinutes: number | null) => {
-        if (sleepTimerId) {
-            clearTimeout(sleepTimerId);
-            setSleepTimerId(null);
-        }
-        if (durationMinutes !== null) {
-            const id = setTimeout(() => {
-                if (audioEngine.current) {
-                    audioEngine.current.fadeOutAndStop(5); // 5-second fade out
-                }
-            }, durationMinutes * 60 * 1000);
-            setSleepTimerId(id);
-        }
-    }, [sleepTimerId]);
     
     const handleThereminInteraction = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isReady || !audioEngine.current) return;
@@ -198,7 +168,6 @@ export function useAudioEngine() {
         startRecording,
         stopRecording,
         handleThereminInteraction,
-        setSleepTimer,
         handleCompressorChange,
     };
 }

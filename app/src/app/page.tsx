@@ -15,7 +15,6 @@ import { beatPatterns } from '@/lib/drum-machine';
 import { CookieConsent } from '@/components/cookie-consent';
 import { useAudioEngine } from '@/hooks/use-audio-engine';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
-import { SleepTimer } from '@/components/sleep-timer';
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
 import { melodyInstruments, defaultMelodyInstrument } from '@/lib/melody-presets';
 import { bassInstruments, defaultBassInstrument } from '@/lib/bass-presets';
@@ -148,7 +147,6 @@ export default function Home() {
         startRecording,
         stopRecording,
         handleThereminInteraction,
-        setSleepTimer,
         setMelodyInstrument,
         setBassInstrument,
         orbManager,
@@ -418,7 +416,6 @@ export default function Home() {
                             onExit={stopAllSounds}
                             isReady={isReady}
                         />
-                         <SleepTimer onTimerSet={setSleepTimer} />
                     </div>
                 </header>
 
@@ -501,4 +498,3 @@ export default function Home() {
         </div>
     );
 }
-
