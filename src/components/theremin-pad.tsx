@@ -25,6 +25,7 @@ const EffectControl = ({
     icon: Icon,
     level,
     onLevelChange,
+    onLevelCommit,
     min,
     max,
     step,
@@ -34,6 +35,7 @@ const EffectControl = ({
     icon: React.ElementType,
     level: number,
     onLevelChange: (v: number) => void,
+    onLevelCommit: (v: number) => void,
     min: number,
     max: number,
     step: number,
@@ -52,6 +54,7 @@ const EffectControl = ({
                 step={step}
                 value={[level ?? 0]}
                 onValueChange={(v) => onLevelChange(v[0])}
+                onValueCommit={(v) => onLevelCommit(v[0])}
             />
         </div>
     </div>
@@ -111,6 +114,12 @@ export function ThereminPad({
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const isMobile = useIsMobile();
     
+    const [localEffects, setLocalEffects] = useState(effects);
+
+    useEffect(() => {
+        setLocalEffects(effects);
+    }, [effects]);
+
     // Manage orbs for latch mode
     useEffect(() => {
         if (type === 'bass' && orbManager) {
@@ -173,7 +182,7 @@ export function ThereminPad({
         }
     }, [calculateInteraction, isDisabled, onInteraction, type, isLatchOn]);
     
-     const handleEffectChange = useCallback((effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => {
+     const handleEffectCommit = useCallback((effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => {
         onEffectChange(type, effect, value);
     }, [type, onEffectChange]);
 
@@ -266,15 +275,17 @@ export function ThereminPad({
                                 <EffectControl
                                     label="Reverb Send"
                                     icon={Blend}
-                                    level={effects.reverbSend}
-                                    onLevelChange={(v) => handleEffectChange('reverbSend', v)}
+                                    level={localEffects.reverbSend}
+                                    onLevelChange={(v) => setLocalEffects(p => ({...p, reverbSend: v}))}
+                                    onLevelCommit={(v) => handleEffectCommit('reverbSend', v)}
                                     min={-48} max={0} step={1} unit="dB"
                                 />
                                 <EffectControl
                                     label="Distortion"
                                     icon={Waves}
-                                    level={effects.distortion}
-                                    onLevelChange={(v) => handleEffectChange('distortion', v)}
+                                    level={localEffects.distortion}
+                                    onLevelChange={(v) => setLocalEffects(p => ({...p, distortion: v}))}
+                                    onLevelCommit={(v) => handleEffectCommit('distortion', v)}
                                     min={0} max={100} step={1} unit="%"
                                 />
                             </div>

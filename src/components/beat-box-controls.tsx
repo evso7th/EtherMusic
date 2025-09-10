@@ -48,7 +48,7 @@ const ControlButtonWithTooltip = memo(function ControlButtonWithTooltip({ toolti
 ControlButtonWithTooltip.displayName = 'ControlButtonWithTooltip';
 
 
-export function BeatBoxControls({
+function BeatBoxControlsComponent({
     activePattern,
     onPatternChange,
     volumes,
@@ -61,7 +61,6 @@ export function BeatBoxControls({
     isMobile,
     isLandscape = false,
 }: BeatBoxControlsProps) {
-    console.log('--- Rendering: BeatBoxControls ---');
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isMixerOpen, setIsMixerOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<'Meditative' | 'Classic'>('Meditative');
@@ -287,3 +286,6 @@ export function BeatBoxControls({
         </TooltipProvider>
     );
 }
+
+export const BeatBoxControls = memo(BeatBoxControlsComponent);
+

@@ -9,7 +9,6 @@ import { Waves, Drum, Anchor, Blend, AudioLines, Music, Clock, Shuffle } from 'l
 import { memo } from 'react';
 import type { Volumes, CompressorSettings, ChannelVolumes } from '@/types';
 import { cn } from "@/lib/utils";
-import { Button } from "./ui/button";
 
 const VolumeControl = memo(({
     label,
@@ -53,13 +52,12 @@ type VolumeChannel = keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing'
 
 interface MixerControlsProps {
     volumes: Volumes;
-    onMixerChange: (newVolumes: Partial<Volumes> | ((v: Volumes) => Volumes)) => void;
+    onMixerChange: (volumes: Partial<Volumes> | ((v: Volumes) => Volumes)) => void;
     onCompressorChange: (compressorSettings: CompressorSettings) => void;
     tempo: number;
     setTempo: (tempo: number) => void;
     swing: number;
     setSwing: (swing: number) => void;
-    closeDialog: () => void;
     isAutopilotMixer?: boolean;
 }
 
@@ -71,10 +69,8 @@ export function MixerControls({
     setTempo,
     swing,
     setSwing,
-    closeDialog,
     isAutopilotMixer = false,
 }: MixerControlsProps) {
-    console.log("--- Rendering: MixerControls ---", { volumes, tempo, swing });
     
     const handleChannelVolumeChange = (part: VolumeChannel, value: number) => {
         onMixerChange(prev => {
@@ -210,14 +206,6 @@ export function MixerControls({
                     </div>
                 </>
             )}
-
-            <Separator />
-            <Button 
-                onClick={closeDialog}
-                className="w-full mt-4"
-            >
-                Done
-            </Button>
         </div>
     );
 }
