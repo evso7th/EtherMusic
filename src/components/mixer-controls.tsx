@@ -73,6 +73,7 @@ export function MixerControls({
     closeDialog,
     isAutopilotMixer = false,
 }: MixerControlsProps) {
+    console.log('--- Rendering: MixerControls ---', { initialVolumes, tempo, swing });
     
     const [localVolumes, setLocalVolumes] = useState(initialVolumes);
     const [localTempo, setLocalTempo] = useState(tempo);
@@ -239,6 +240,7 @@ export function MixerControls({
                     </div>
                 </>
             )}
+
             <Separator />
             <Button 
                 onClick={handleApplyChanges}

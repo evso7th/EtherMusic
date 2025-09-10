@@ -143,6 +143,10 @@ export class AudioEngine {
         return this.context;
     }
 
+    getDrumMachine() {
+        return this.drumMachine;
+    }
+
     public get isPlaying(): boolean {
         return this.drumMachine.isPlaying;
     }
@@ -298,7 +302,8 @@ export class AudioEngine {
         if (!this.isInitialized) return;
         this.drumMachine.stop();
         this.nodes.forEach((node, name) => {
-             if (name !== 'drums') {
+             // We don't want to stop the drum worklet, just the synth voices
+            if (name !== 'drums') {
                 node.worklet.port.postMessage({ type: 'allNotesOff' });
             }
         });
@@ -434,10 +439,10 @@ export class AudioEngine {
     
     public setBeatPattern(patternName: string) {
         this.drumMachine.setPattern(patternName);
-        if (patternName === 'Off') {
-            this.drumMachine.stop();
-        } else {
+        if (patternName !== 'Off') {
             this.drumMachine.play();
+        } else {
+            this.drumMachine.stop();
         }
     }
 
@@ -553,5 +558,3 @@ export class AudioEngine {
         }
     }
 }
-
-    

@@ -1,6 +1,7 @@
 
 import type { AudioEngine } from './audio-engine';
 import type { BeatPattern } from '@/types';
+import mitt, { Emitter } from 'mitt';
 
 
 export const beatPatterns: Readonly<BeatPattern[]> = [
@@ -27,7 +28,7 @@ export const beatPatterns: Readonly<BeatPattern[]> = [
         { time: 0, note: 'k' }, { time: 4, note: 'h' }, { time: 6, note: 'H' }, { time: 8, note: 's' }, { time: 10, note: 'p12', vol: 0.5 }, { time: 12, note: 'k' }, { time: 14, note: 'H'},
     ]},
      { name: 'Airy', type: 'Classic', length: 1, sequence: [
-        { time: 0, note: 'k' }, { time: 4, note: 'h' }, {time: 6, note: 'o'}, { time: 8, note: 'p13', vol: 0.6 }, { time: 12, note: 'h' },
+        { time: 0, note: 'k' }, { time: 4, note: 'h' }, {time: 6, note: 'o'}, { time: 8, note: 's', vol: 0.6 }, { time: 12, note: 'h' }, { time: 14, note: 'p13', vol: 0.5}
     ]},
     { name: 'Groove', type: 'Classic', length: 1, sequence: [
         { time: 0, note: 'K' }, { time: 4, note: 'h' }, { time: 8, note: 'S' }, { time: 12, note: 'h' }, {time: 14, note: 'p14', vol: 0.7}
@@ -45,6 +46,10 @@ export const beatPatterns: Readonly<BeatPattern[]> = [
     { name: 'Off', type: 'System', length: 1, sequence: [] },
 ];
 
+type DrumMachineEvents = {
+    playStateChanged: boolean;
+};
+
 export class DrumMachine {
     private audioEngine: AudioEngine;
     private _tempo: number = 90;
@@ -54,11 +59,22 @@ export class DrumMachine {
     private step: number = 0;
     private measureCount: number = 0;
     private fills: Readonly<BeatPattern[]>;
+    private eventEmitter: Emitter<DrumMachineEvents>;
+
     
     constructor(audioEngine: AudioEngine) {
         this.audioEngine = audioEngine;
         this._pattern = beatPatterns.find(p => p.name === 'Off')!;
         this.fills = beatPatterns.filter(p => p.type === 'Fill');
+        this.eventEmitter = mitt<DrumMachineEvents>();
+    }
+
+    public on(event: keyof DrumMachineEvents, handler: (payload: any) => void) {
+        this.eventEmitter.on(event, handler);
+    }
+    
+    public off(event: keyof DrumMachineEvents, handler: (payload: any) => void) {
+        this.eventEmitter.off(event, handler);
     }
 
     public get isPlaying(): boolean {
@@ -89,7 +105,7 @@ export class DrumMachine {
                 this.stop();
             }
             this._pattern = newPattern;
-             if (newPattern.name !== 'Off' && wasPlaying) {
+             if (newPattern.name !== 'Off') {
                 this.play();
             }
         } else {
@@ -104,11 +120,8 @@ export class DrumMachine {
         
         this.step = 0; 
         this.measureCount = 0;
+        this.eventEmitter.emit('playStateChanged', true);
         this.scheduler();
-    }
-    
-    public pause() {
-        this.stop();
     }
 
     public stop() {
@@ -117,6 +130,7 @@ export class DrumMachine {
             this.timeoutId = null;
             this.step = 0;
             this.measureCount = 0;
+            this.eventEmitter.emit('playStateChanged', false);
         }
     }
 

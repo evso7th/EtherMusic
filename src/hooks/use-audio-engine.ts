@@ -8,6 +8,7 @@ import { OrbManager } from '@/lib/orb-manager';
 import type { Volumes, Instrument, BassInstrument, CompressorSettings } from '@/types';
 
 export function useAudioEngine() {
+    console.log('--- Rendering: useAudioEngine Hook ---');
     const { toast } = useToast();
     
     const [isAppStarted, setIsAppStarted] = useState(false);
@@ -34,6 +35,13 @@ export function useAudioEngine() {
                 }
                 audioEngine.current = new AudioEngine(context, orbManager.current);
                 await audioEngine.current.initialize();
+                
+                // Set up a listener for the isPlaying state from the drum machine
+                const updatePlayingState = (playing: boolean) => {
+                    setIsPlaying(playing);
+                };
+                audioEngine.current.getDrumMachine().on('playStateChanged', updatePlayingState);
+
             }
             
             setIsReady(true);
@@ -75,7 +83,7 @@ export function useAudioEngine() {
         document.removeEventListener('touchstart', resumeAudio);
       };
     }, []);
-    
+
     const stopAllSounds = useCallback(() => {
         if (!audioEngine.current) return;
         audioEngine.current.stopAllSounds();
@@ -98,9 +106,6 @@ export function useAudioEngine() {
         if (!audioEngine.current) return;
         
         audioEngine.current.setBeatPattern(patternName);
-        
-        const isPlaying = patternName !== 'Off';
-        setIsPlaying(isPlaying);
 
     }, []);
     
@@ -155,5 +160,3 @@ export function useAudioEngine() {
         handleCompressorChange,
     };
 }
-
-    
