@@ -36,8 +36,8 @@ const DRUM_SAMPLES: Record<string, string> = {
     'k': '/assets/sounds/drums/kick_drum.wav',
     'K': '/assets/sounds/drums/kick_drum8.wav',
     's': '/assets/sounds/drums/snare.wav',
-    'S': '/assets/sounds/drums/snare_off.wav', // Changed from snarepress.wav
-    'g': '/assets/sounds/drums/snare_ghost_note.wav', // Added ghost note
+    'S': '/assets/sounds/drums/snare_off.wav',
+    'g': '/assets/sounds/drums/snare_ghost_note.wav', 
     'h': '/assets/sounds/drums/closed_hi_hat_accented.wav',
     'H': '/assets/sounds/drums/closed_hi_hat_ghost.wav',
     'o': '/assets/sounds/drums/open_hh_top.wav',
@@ -49,8 +49,25 @@ const DRUM_SAMPLES: Record<string, string> = {
     't': '/assets/sounds/drums/high_tom.wav',
     'T': '/assets/sounds/drums/mid_tom.wav',
     'l': '/assets/sounds/drums/low_tom.wav',
-    'b': '/assets/sounds/drums/hh_bark_short.wav'
+    'b': '/assets/sounds/drums/hh_bark_short.wav',
+    // Percussion Samples
+    'p1': '/assets/sounds/drums/perc-001.wav',
+    'p2': '/assets/sounds/drums/perc-002.wav',
+    'p3': '/assets/sounds/drums/perc-003.wav',
+    'p4': '/assets/sounds/drums/perc-004.wav',
+    'p5': '/assets/sounds/drums/perc-005.wav',
+    'p6': '/assets/sounds/drums/perc-006.wav',
+    'p7': '/assets/sounds/drums/perc-007.wav',
+    'p8': '/assets/sounds/drums/perc-008.wav',
+    'p9': '/assets/sounds/drums/perc-009.wav',
+    'p10': '/assets/sounds/drums/perc-010.wav',
+    'p11': '/assets/sounds/drums/perc-011.wav',
+    'p12': '/assets/sounds/drums/perc-012.wav',
+    'p13': '/assets/sounds/drums/perc-013.wav',
+    'p14': '/assets/sounds/drums/perc-014.wav',
+    'p15': '/assets/sounds/drums/perc-015.wav',
 };
+
 
 export class AudioEngine {
     public isInitialized = false;

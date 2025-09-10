@@ -5,32 +5,32 @@ import type { BeatPattern } from '@/types';
 
 export const beatPatterns: Readonly<BeatPattern[]> = [
     // Meditative
-    { name: 'Air', type: 'Meditative', length: 1, sequence: [{ time: 0, note: 'k' }, { time: 8, note: 'h' }] },
-    { name: 'Earth', type: 'Meditative', length: 1, sequence: [{ time: 0, note: 'k' }, { time: 8, note: 's' }] },
-    { name: 'Water', type: 'Meditative', length: 1, sequence: [{ time: 0, note: 't' }, { time: 4, note: 'H' }, { time: 8, note: 'T' }, { time: 12, note: 'H' }] },
-    { name: 'Tibet', type: 'Meditative', length: 2, sequence: [{ time: 0, note: 'Y' }, { time: 16, note: 'Z' }] },
-    { name: 'Space', type: 'Meditative', length: 2, sequence: [{ time: 0, note: 'k' }, { time: 10, note: 'h' }, { time: 22, note: 'c' }] },
+    { name: 'Air', type: 'Meditative', length: 1, sequence: [{ time: 0, note: 'k' }, { time: 8, note: 'h' }, { time: 12, note: 'p1', vol: 0.4 }] },
+    { name: 'Earth', type: 'Meditative', length: 1, sequence: [{ time: 0, note: 'k' }, { time: 8, note: 's' }, { time: 4, note: 'p2', vol: 0.5 }] },
+    { name: 'Water', type: 'Meditative', length: 1, sequence: [{ time: 0, note: 't' }, { time: 4, note: 'H' }, { time: 8, note: 'T' }, { time: 12, note: 'p3', vol: 0.6 }] },
+    { name: 'Tibet', type: 'Meditative', length: 2, sequence: [{ time: 0, note: 'Y' }, {time: 8, note: 'p4', vol: 0.5}, { time: 16, note: 'Z' }, {time: 24, note: 'p5', vol: 0.5}] },
+    { name: 'Space', type: 'Meditative', length: 2, sequence: [{ time: 0, note: 'k' }, { time: 10, note: 'h' }, { time: 22, note: 'c' }, {time: 16, note: 'p6', vol: 0.4}] },
 
     // Classic
     { name: 'Toccata', type: 'Classic', length: 1, sequence: [
-        { time: 0, note: 'k' }, { time: 2, note: 'H' }, { time: 4, note: 'k' }, { time: 6, note: 'H' },
-        { time: 8, note: 's' }, { time: 10, note: 'H' }, { time: 12, note: 'k' }, { time: 14, note: 'H' },
+        { time: 0, note: 'k' }, { time: 2, note: 'H' }, { time: 3, note: 'p7', vol: 0.4 }, { time: 4, note: 'k' }, { time: 6, note: 'H' },
+        { time: 8, note: 's' }, { time: 10, note: 'H' }, { time: 11, note: 'p8', vol: 0.4 }, { time: 12, note: 'k' }, { time: 14, note: 'H' },
     ]},
     { name: 'Nocturne', type: 'Classic', length: 1, sequence: [
-        { time: 0, note: 'k', vol: 0.8 }, { time: 4, note: 'H' }, { time: 8, note: 's', vol: 0.6 }, { time: 10, note: 'H', vol: 0.5 }, { time: 12, note: 'H' },
+        { time: 0, note: 'k', vol: 0.8 }, { time: 4, note: 'H' }, { time: 7, note: 'p9', vol: 0.5 }, { time: 8, note: 's', vol: 0.6 }, { time: 10, note: 'H', vol: 0.5 }, { time: 12, note: 'H' },
     ]},
     { name: 'Scherzo', type: 'Classic', length: 1, sequence: [
-        { time: 0, note: 'k' }, { time: 4, note: 't' }, { time: 8, note: 's' }, { time: 10, note: 'H' }, { time: 12, note: 'T' },
+        { time: 0, note: 'k' }, { time: 4, note: 't' }, { time: 8, note: 's' }, { time: 10, note: 'H' }, { time: 12, note: 'T' }, { time: 14, note: 'p10', vol: 0.7 },
     ]},
-    { name: 'Aria', type: 'Classic', length: 1, sequence: [{ time: 0, note: 'c', vol: 0.7 }, { time: 8, note: 'b', vol: 0.9 }] },
+    { name: 'Aria', type: 'Classic', length: 1, sequence: [{ time: 0, note: 'c', vol: 0.7 }, { time: 8, note: 'b', vol: 0.9 }, {time: 14, note: 'p11', vol: 0.6}] },
     { name: 'Funky', type: 'Classic', length: 1, sequence: [
-        { time: 0, note: 'k' }, { time: 4, note: 'h' }, { time: 6, note: 'H' }, { time: 8, note: 's' }, { time: 10, note: 'h' }, { time: 12, note: 'k' }, { time: 14, note: 'H'},
+        { time: 0, note: 'k' }, { time: 4, note: 'h' }, { time: 6, note: 'H' }, { time: 8, note: 's' }, { time: 10, note: 'p12', vol: 0.5 }, { time: 12, note: 'k' }, { time: 14, note: 'H'},
     ]},
      { name: 'Airy', type: 'Classic', length: 1, sequence: [
-        { time: 0, note: 'k' }, { time: 4, note: 'h' }, {time: 6, note: 'o'}, { time: 8, note: 'g' }, { time: 12, note: 'h' },
+        { time: 0, note: 'k' }, { time: 4, note: 'h' }, {time: 6, note: 'o'}, { time: 8, note: 'p13', vol: 0.6 }, { time: 12, note: 'h' },
     ]},
     { name: 'Groove', type: 'Classic', length: 1, sequence: [
-        { time: 0, note: 'K' }, { time: 4, note: 'h' }, { time: 8, note: 'S' }, { time: 12, note: 'h' },
+        { time: 0, note: 'K' }, { time: 4, note: 'h' }, { time: 8, note: 'S' }, { time: 12, note: 'h' }, {time: 14, note: 'p14', vol: 0.7}
     ]},
 
     // Fills
@@ -38,7 +38,7 @@ export const beatPatterns: Readonly<BeatPattern[]> = [
         { time: 8, note: 't', vol: 0.6 }, { time: 10, note: 't', vol: 0.8 }, { time: 12, note: 'T', vol: 0.9 }, { time: 14, note: 'l', vol: 1.0 },
     ]},
      { name: 'Fill B', type: 'Fill', length: 1, sequence: [
-        { time: 8, note: 'g', vol: 0.5 }, { time: 10, note: 't', vol: 0.7 }, { time: 12, note: 'T', vol: 0.8 }, { time: 13, note: 'T', vol: 0.9 }, { time: 14, note: 'l', vol: 1.0 },
+        { time: 8, note: 'g', vol: 0.5 }, { time: 10, note: 't', vol: 0.7 }, { time: 12, note: 'T', vol: 0.8 }, { time: 13, note: 'p15', vol: 0.9 }, { time: 14, note: 'l', vol: 1.0 },
     ]},
 
     // System
