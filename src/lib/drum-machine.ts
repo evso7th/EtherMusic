@@ -48,7 +48,7 @@ export const beatPatterns: Readonly<BeatPattern[]> = [
 
 export class DrumMachine {
     private audioEngine: AudioEngine;
-    private _tempo: number = 60;
+    private _tempo: number = 90;
     private _swing: number = 0; // 0 = no swing, 1 = max swing
     private _pattern: BeatPattern;
     private timeoutId: NodeJS.Timeout | null = null;
