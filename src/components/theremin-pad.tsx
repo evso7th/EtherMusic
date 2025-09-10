@@ -25,6 +25,7 @@ const EffectControl = ({
     icon: Icon,
     level,
     onLevelChange,
+    onLevelCommit,
     min,
     max,
     step,
@@ -33,7 +34,8 @@ const EffectControl = ({
     label: string,
     icon: React.ElementType,
     level: number,
-    onLevelChange: (v: number[]) => void,
+    onLevelChange: (v: number) => void,
+    onLevelCommit: (v: number) => void,
     min: number,
     max: number,
     step: number,
@@ -51,7 +53,8 @@ const EffectControl = ({
                 max={max}
                 step={step}
                 value={[level ?? 0]}
-                onValueChange={onLevelChange}
+                onValueChange={(v) => onLevelChange(v[0])}
+                onValueCommit={(v) => onLevelCommit(v[0])}
             />
         </div>
     </div>
@@ -77,7 +80,7 @@ interface ThereminPadProps {
     onLatchToggle?: (checked: boolean) => void;
     orbManager?: OrbManager | null;
     effects: Omit<ChannelVolumes, 'gain'>;
-    onEffectChange: (type: 'melody' | 'bass', effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => void;
+    onEffectChange: (effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => void;
 }
 
 const padTitles = {
@@ -110,6 +113,21 @@ export function ThereminPad({
     const padRef = useRef<HTMLDivElement>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const isMobile = useIsMobile();
+    
+    const [localEffects, setLocalEffects] = useState(effects);
+
+    useEffect(() => {
+        setLocalEffects(effects);
+    }, [effects]);
+
+    const handleEffectChange = (effect: keyof typeof localEffects, value: number) => {
+        setLocalEffects(prev => ({ ...prev, [effect]: value }));
+    };
+
+    const handleEffectCommit = (effect: keyof typeof localEffects, value: number) => {
+        onEffectChange(effect, value);
+    };
+
 
     // Manage orbs for latch mode
     useEffect(() => {
@@ -262,18 +280,28 @@ export function ThereminPad({
                                 <EffectControl
                                     label="Reverb Send"
                                     icon={Blend}
-                                    level={effects.reverbSend}
-                                    onLevelChange={(v) => onEffectChange(type, 'reverbSend', v[0])}
+                                    level={localEffects.reverbSend}
+                                    onLevelChange={(v) => handleEffectChange('reverbSend', v)}
+                                    onLevelCommit={(v) => handleEffectCommit('reverbSend', v)}
                                     min={-48} max={0} step={1} unit="dB"
                                 />
                                 <EffectControl
                                     label="Distortion"
                                     icon={Waves}
-                                    level={effects.distortion}
-                                    onLevelChange={(v) => onEffectChange(type, 'distortion', v[0])}
+                                    level={localEffects.distortion}
+                                    onLevelChange={(v) => handleEffectChange('distortion', v)}
+                                    onLevelCommit={(v) => handleEffectCommit('distortion', v)}
                                     min={0} max={100} step={1} unit="%"
                                 />
                             </div>
+
+                            <Button 
+                                onClick={() => setIsSettingsOpen(false)} 
+                                className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                                variant="outline"
+                            >
+                                Done
+                            </Button>
                         </div>
                     </ScrollArea>
                 </SheetContent>
@@ -286,7 +314,6 @@ export function ThereminPad({
     }, [instruments, activeInstrument]);
 
     const padTitle = padTitles[type];
-    const [title, subtitle] = padTitle.split(' ');
 
 
     return (
@@ -330,11 +357,9 @@ export function ThereminPad({
                     }}
                 >
                     <div className="absolute inset-0 flex items-center justify-center text-5xl md:text-7xl font-bold text-foreground/10 pointer-events-none uppercase tracking-widest text-center leading-tight">
-                        <div className="md:hidden">
-                            {title}<br />{subtitle}
-                        </div>
+                        <div className="md:hidden" dangerouslySetInnerHTML={{ __html: padTitle.replace(' ', '<br/>') }} />
                         <div className="hidden md:block">
-                           <span>{title} {subtitle}</span>
+                           <span>{padTitle}</span>
                         </div>
                     </div>
                 </div>

@@ -7,7 +7,11 @@ import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
 import type { Volumes, Instrument, BassInstrument, CompressorSettings } from '@/types';
 
-export function useAudioEngine() {
+type UseAudioEngineProps = {
+    onVolumesChanged?: (volumes: Volumes) => void;
+}
+
+export function useAudioEngine({ onVolumesChanged }: UseAudioEngineProps = {}) {
     const { toast } = useToast();
     
     const [isAppStarted, setIsAppStarted] = useState(false);
@@ -36,10 +40,9 @@ export function useAudioEngine() {
                     setIsPlaying(playing);
                 });
                 
-                engine.on('volumesChanged', (newVolumes: Volumes) => {
-                    // This is to update the UI when bass instrument changes effects
-                    // This is not available in the hook's state to avoid loops
-                });
+                if (onVolumesChanged) {
+                    engine.on('volumesChanged', onVolumesChanged);
+                }
 
                 audioEngine.current = engine;
             }
@@ -55,7 +58,7 @@ export function useAudioEngine() {
                 variant: "destructive"
             });
         }
-    }, [toast]);
+    }, [toast, onVolumesChanged]);
 
     const startApp = useCallback(async () => {
         if (isAppStarted) return;

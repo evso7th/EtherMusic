@@ -127,6 +127,7 @@ const Preloader = () => (
 );
 
 export default function Home() {
+    console.log('--- Rendering: Home Page ---');
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [isClient, setIsClient] = useState(false);
@@ -153,7 +154,7 @@ export default function Home() {
         setTempo,
         setSwing,
         handleCompressorChange,
-    } = useAudioEngine();
+    } = useAudioEngine({ onVolumesChanged: (newVolumes) => setVolumesState(newVolumes) });
     
     const [isRecording, setIsRecording] = useState(false);
     const [activePattern, setActivePattern] = useState<BeatPattern>(beatPatterns.find(p => p.name === 'Off')!);
@@ -170,30 +171,34 @@ export default function Home() {
     const onConsentChange = useCallback((consent: boolean) => {
         setCookieConsent(consent);
         if (consent) {
-            const { volumes } = loadSettings();
-            setVolumesState(volumes);
+            const { volumes: loadedVolumes } = loadSettings();
+            setVolumesState(loadedVolumes);
+            setVolumes(loadedVolumes);
             setCurrentTempo(60);
+            setTempo(60);
         } else {
             setVolumesState(defaultVolumes);
+            setVolumes(defaultVolumes);
             setCurrentTempo(60);
+            setTempo(60);
             if (typeof document !== 'undefined') {
                 document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
             }
         }
-    }, []);
+    }, [setVolumes, setTempo]);
 
     useEffect(() => {
         setIsClient(true);
         const consent = getCookie("ethermusic_consent");
-        const initialConsent = consent === 'true';
         if (consent !== null) {
-             setCookieConsent(initialConsent);
+            const initialConsent = consent === 'true';
+            setCookieConsent(initialConsent);
+            if (initialConsent) {
+                const { volumes } = loadSettings();
+                setVolumesState(volumes);
+            }
         } else {
             setCookieConsent(undefined);
-        }
-       if (initialConsent) {
-            const { volumes } = loadSettings();
-            setVolumesState(volumes);
         }
     }, []);
 
@@ -243,20 +248,18 @@ export default function Home() {
     }, [isReady]);
     
     const updateVolumes = useCallback((newVolumes: Partial<Volumes>) => {
-        setVolumesState(prev => {
-            const merged = { ...prev, ...newVolumes };
-            setVolumes(merged); 
-            if (cookieConsent) {
-                saveVolumes(merged);
-            }
-            return merged;
-        });
-    }, [setVolumes, cookieConsent]);
+        const mergedVolumes = { ...volumes, ...newVolumes };
+        setVolumesState(mergedVolumes);
+        setVolumes(mergedVolumes);
+        if (cookieConsent) {
+            saveVolumes(mergedVolumes);
+        }
+    }, [volumes, setVolumes, cookieConsent]);
 
     // Load settings from cookies into the audio engine once it's ready.
     useEffect(() => {
         if(isReady && cookieConsent) {
-            const { volumes: loadedVolumes } = loadSettings();
+            const loadedVolumes = loadVolumes();
             setVolumesState(loadedVolumes);
             setVolumes(loadedVolumes);
             setCurrentTempo(60); 
@@ -279,24 +282,26 @@ export default function Home() {
         effect: 'reverbSend' | 'distortion', 
         value: number
     ) => {
-        const newVolumes = JSON.parse(JSON.stringify(volumes));
-        (newVolumes[channel] as ChannelVolumes)[effect] = value;
-        // Since latch and manual bass share effects, update both
-        if (channel === 'manualBass' || channel === 'latch') {
-            newVolumes.manualBass[effect] = value;
-            newVolumes.latch[effect] = value;
-        }
-        updateVolumes(newVolumes);
-    }, [volumes, updateVolumes]);
+        setVolumesState(prevVolumes => {
+            const newVolumes = JSON.parse(JSON.stringify(prevVolumes));
+            (newVolumes[channel] as ChannelVolumes)[effect] = value;
+            if (channel === 'manualBass' || channel === 'latch') {
+                newVolumes.manualBass[effect] = value;
+                newVolumes.latch[effect] = value;
+            }
+            updateVolumes(newVolumes);
+            return newVolumes;
+        });
+    }, [updateVolumes]);
     
     const handleCompressorChangeCallback = useCallback((compressorSettings: CompressorSettings) => {
         updateVolumes({ compressor: compressorSettings });
         handleCompressorChange(compressorSettings);
     }, [updateVolumes, handleCompressorChange]);
     
-    const handleSwingChange = useCallback((swing: number) => {
-        updateVolumes({ swing: swing });
-        setSwing(swing);
+    const handleSwingChange = useCallback((swingValue: number) => {
+        updateVolumes({ swing: swingValue });
+        setSwing(swingValue);
     }, [updateVolumes, setSwing]);
 
     const handleStartApp = useCallback(() => {
@@ -443,7 +448,7 @@ export default function Home() {
                                 reverbSend: volumes.manualBass.reverbSend,
                                 distortion: volumes.manualBass.distortion,
                             }}
-                            onEffectChange={(effect, value) => handleChannelEffectChange('manualBass', effect, value)}
+                            onEffectChange={handleChannelEffectChange}
                         />
                         <MemoizedThereminPad
                             type="melody"
@@ -466,7 +471,7 @@ export default function Home() {
                                 reverbSend: volumes.melody.reverbSend,
                                 distortion: volumes.melody.distortion,
                             }}
-                            onEffectChange={(effect, value) => handleChannelEffectChange('melody', effect, value)}
+                            onEffectChange={handleChannelEffectChange}
                         />
                     </div>
                     <div className="flex-shrink-0 portrait:block landscape:hidden">
@@ -504,3 +509,4 @@ export default function Home() {
         </div>
     );
 }
+
