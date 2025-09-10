@@ -9,13 +9,13 @@ import { Waves, Drum, Anchor, Blend, AudioLines, Music, Clock, Shuffle } from 'l
 import { useState, useCallback, useEffect } from 'react';
 import type { Volumes, CompressorSettings, ChannelVolumes } from '@/types';
 import { cn } from "@/lib/utils";
+import { Button } from "./ui/button";
 
 const VolumeControl = ({
     label,
     icon: Icon,
     volume,
     onVolumeChange,
-    onVolumeCommit,
     min = -48,
     max = 6,
     step = 1,
@@ -25,7 +25,6 @@ const VolumeControl = ({
     icon: React.ElementType,
     volume: number,
     onVolumeChange: (v: number) => void,
-    onVolumeCommit: (v: number) => void,
     min?: number,
     max?: number,
     step?: number,
@@ -44,7 +43,6 @@ const VolumeControl = ({
                 step={step}
                 value={[volume]}
                 onValueChange={(v) => onVolumeChange(v[0])}
-                onValueCommit={(v) => onVolumeCommit(v[0])}
             />
         </div>
     </div>
@@ -60,6 +58,7 @@ export function MixerControls({
     setTempo,
     swing,
     setSwing,
+    closeDialog,
     isAutopilotMixer = false,
 }: { 
     volumes: Volumes, 
@@ -69,6 +68,7 @@ export function MixerControls({
     setTempo: (tempo: number) => void,
     swing: number,
     setSwing: (swing: number) => void,
+    closeDialog: () => void;
     isAutopilotMixer?: boolean
 }) {
     
@@ -93,37 +93,27 @@ export function MixerControls({
             }
         });
     }
-
-    const handleChannelVolumeCommit = (part: VolumeChannel, value: number) => {
-        const currentPartVolume = localVolumes[part] as ChannelVolumes;
-        onMixerChange({ [part]: { ...currentPartVolume, gain: value } });
-    };
     
-    const handleReverbReturnCommit = (value: number) => {
-        onMixerChange({ reverbReturn: value });
+    const handleReverbReturnChange = (value: number) => {
+        setLocalVolumes(prev => ({...prev, reverbReturn: value }));
     };
     
     const handleCompressorSettingChange = useCallback((setting: keyof Omit<CompressorSettings, 'enabled'>, value: number) => {
         setLocalCompressor(prev => ({ ...prev, [setting]: value }));
     }, []);
     
-    const handleCompressorCommit = useCallback(() => {
-        onCompressorChange(localCompressor);
-    }, [localCompressor, onCompressorChange]);
-    
     const handleToggleCompressor = useCallback((enabled: boolean) => {
-        const newSettings = { ...localCompressor, enabled };
-        setLocalCompressor(newSettings);
-        onCompressorChange(newSettings);
-    }, [localCompressor, onCompressorChange]);
+        setLocalCompressor(prev => ({ ...prev, enabled }));
+    }, []);
 
-    const handleTempoCommit = (value: number) => {
-        setTempo(value);
+    const handleApplyChanges = () => {
+        onMixerChange(localVolumes);
+        onCompressorChange(localCompressor);
+        setTempo(localTempo);
+        setSwing(localSwing);
+        closeDialog();
     };
-    
-    const handleSwingCommit = (value: number) => {
-        setSwing(value);
-    };
+
 
     return (
         <div className="space-y-6">
@@ -135,7 +125,6 @@ export function MixerControls({
                             icon={Clock}
                             volume={localTempo}
                             onVolumeChange={setLocalTempo}
-                            onVolumeCommit={handleTempoCommit}
                             min={30}
                             max={200}
                             step={1}
@@ -146,7 +135,6 @@ export function MixerControls({
                             icon={Shuffle}
                             volume={localSwing * 100}
                             onVolumeChange={(v) => setLocalSwing(v / 100)}
-                            onVolumeCommit={(v) => handleSwingCommit(v / 100)}
                             min={0}
                             max={75}
                             step={1}
@@ -167,28 +155,24 @@ export function MixerControls({
                     icon={Music}
                     volume={localVolumes.melody.gain}
                     onVolumeChange={(v) => handleChannelVolumeChange('melody', v)}
-                    onVolumeCommit={(v) => handleChannelVolumeCommit('melody', v)}
                 />
                  <VolumeControl 
                     label="Bass"
                     icon={Waves}
                     volume={localVolumes.manualBass.gain}
                     onVolumeChange={(v) => handleChannelVolumeChange('manualBass', v)}
-                    onVolumeCommit={(v) => handleChannelVolumeCommit('manualBass', v)}
                 />
                 <VolumeControl 
                     label="Latch"
                     icon={Anchor}
                     volume={localVolumes.latch.gain}
                     onVolumeChange={(v) => handleChannelVolumeChange('latch', v)}
-                    onVolumeCommit={(v) => handleChannelVolumeCommit('latch', v)}
                 />
                 <VolumeControl 
                     label="Drums"
                     icon={Drum}
                     volume={localVolumes.drums.gain}
                     onVolumeChange={(v) => handleChannelVolumeChange('drums', v)}
-                    onVolumeCommit={(v) => handleChannelVolumeCommit('drums', v)}
                 />
             </div>
             
@@ -200,8 +184,7 @@ export function MixerControls({
                     label="Reverb Level"
                     icon={Blend}
                     volume={localVolumes.reverbReturn}
-                    onVolumeChange={(v) => setLocalVolumes(p => ({...p, reverbReturn: v}))}
-                    onVolumeCommit={handleReverbReturnCommit}
+                    onVolumeChange={handleReverbReturnChange}
                     min={-48} max={6} step={1} unit="dB"
                 />
             </div>
@@ -227,7 +210,6 @@ export function MixerControls({
                                 icon={Waves}
                                 volume={localCompressor.threshold}
                                 onVolumeChange={(v) => handleCompressorSettingChange('threshold', v)}
-                                onVolumeCommit={handleCompressorCommit}
                                 min={-100}
                                 max={0}
                                 step={1}
@@ -238,7 +220,6 @@ export function MixerControls({
                                 icon={Waves}
                                 volume={localCompressor.ratio}
                                 onVolumeChange={(v) => handleCompressorSettingChange('ratio', v)}
-                                onVolumeCommit={handleCompressorCommit}
                                 min={1}
                                 max={20}
                                 step={1}
@@ -248,6 +229,14 @@ export function MixerControls({
                     </div>
                 </>
             )}
+
+            <Separator />
+            <Button 
+                onClick={handleApplyChanges}
+                className="w-full mt-4"
+            >
+                Done
+            </Button>
         </div>
     );
 }
