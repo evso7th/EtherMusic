@@ -29,48 +29,41 @@ const VolumeControl = memo(({
     max?: number,
     step?: number,
     unit?: string,
-}) => (
-    <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-            <Icon className="w-5 h-5 text-primary flex-shrink-0" />
-            <Label className="text-sm font-medium flex-1 truncate">{label}</Label>
-            <span className="text-xs text-muted-foreground w-14 text-right">{(volume ?? 0).toFixed(1)} {unit}</span>
+}) => {
+    // No console.log here to keep the console clean in production
+    return (
+        <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+                <Icon className="w-5 h-5 text-primary flex-shrink-0" />
+                <Label className="text-sm font-medium flex-1 truncate">{label}</Label>
+                <span className="text-xs text-muted-foreground w-14 text-right">{(volume ?? 0).toFixed(1)} {unit}</span>
+            </div>
+            <div className="flex items-center gap-4 pl-7">
+                <Slider
+                    min={min}
+                    max={max}
+                    step={step}
+                    value={[volume ?? 0]}
+                    onValueChange={(v) => onVolumeChange(v[0])}
+                />
+            </div>
         </div>
-        <div className="flex items-center gap-4 pl-7">
-            <Slider
-                min={min}
-                max={max}
-                step={step}
-                value={[volume ?? 0]}
-                onValueChange={(v) => onVolumeChange(v[0])}
-            />
-        </div>
-    </div>
-));
+    );
+});
 VolumeControl.displayName = 'VolumeControl';
 
 type VolumeChannel = keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' | 'tempo' >;
 
 interface MixerControlsProps {
-    volumes: Volumes;
-    onMixerChange: (newVolumes: Partial<Volumes>) => void;
-    onCompressorChange: (compressorSettings: CompressorSettings) => void;
-    tempo: number;
-    setTempo: (tempo: number) => void;
-    swing: number;
-    setSwing: (swing: number) => void;
+    initialVolumes: Volumes;
+    onApply: (newVolumes: Volumes) => void;
     closeDialog: () => void;
     isAutopilotMixer?: boolean;
 }
 
 export function MixerControls({ 
-    volumes: initialVolumes, 
-    onMixerChange,
-    onCompressorChange,
-    tempo: initialTempo,
-    setTempo: applyTempo,
-    swing: initialSwing,
-    setSwing: applySwing,
+    initialVolumes, 
+    onApply,
     closeDialog,
     isAutopilotMixer = false,
 }: MixerControlsProps) {
@@ -118,10 +111,7 @@ export function MixerControls({
 
     const handleApplyChanges = () => {
         // Apply all changes at once
-        onMixerChange(localVolumes);
-        onCompressorChange(localVolumes.compressor);
-        applyTempo(localVolumes.tempo);
-        applySwing(localVolumes.swing);
+        onApply(localVolumes);
         closeDialog();
     };
 
@@ -134,7 +124,7 @@ export function MixerControls({
                             label="Tempo"
                             icon={Clock}
                             volume={localVolumes.tempo}
-                            onVolumeChange={(v) => handleLocalVolumeChange({tempo: v})}
+                            onVolumeChange={(v) => handleLocalVolumeChange(prev => ({...prev, tempo: v}))}
                             min={30}
                             max={200}
                             step={1}
@@ -144,7 +134,7 @@ export function MixerControls({
                             label="Swing"
                             icon={Shuffle}
                             volume={(localVolumes.swing || 0) * 100}
-                            onVolumeChange={(v) => handleLocalVolumeChange({ swing: v / 100})}
+                            onVolumeChange={(v) => handleLocalVolumeChange(prev => ({...prev, swing: v / 100}))}
                             min={0}
                             max={75}
                             step={1}
@@ -195,7 +185,7 @@ export function MixerControls({
                     icon={Blend}
                     volume={localVolumes.reverbReturn}
                     onVolumeChange={handleReverbReturnChange}
-                    min={-48} max={6} step={1} unit="dB"
+                    min={-48} max={6} unit="dB"
                 />
             </div>
 
@@ -249,3 +239,5 @@ export function MixerControls({
         </div>
     );
 }
+
+    

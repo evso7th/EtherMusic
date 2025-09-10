@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
 import { melodyInstruments, defaultMelodyInstrument } from '@/lib/melody-presets';
 import { bassInstruments, defaultBassInstrument } from '@/lib/bass-presets';
-import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, ChannelVolumes, CompressorSettings, BeatPattern } from '@/types';
+import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, ChannelVolumes, BeatPattern } from '@/types';
 import { cn } from '@/lib/utils';
 
 function getCookie(name: string): string | null {
@@ -43,13 +43,16 @@ const Preloader = () => (
 );
 
 export default function Home() {
+    console.log("--- Rendering: Home ---");
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [isClient, setIsClient] = useState(false);
     
-    // Initialize volumes once, and only on the client
+    // Initialize volumes once, and only on the client, with a lazy initializer for useState.
     const [initialVolumes] = useState<Volumes>(() => {
-        if (typeof window === 'undefined') return defaultVolumes;
+        if (typeof window === 'undefined') {
+            return defaultVolumes;
+        }
         return loadVolumes();
     });
 
@@ -101,18 +104,17 @@ export default function Home() {
         setIsClient(true);
         const consent = getCookie("ethermusic_consent");
         if (consent !== null) {
-            setCookieConsent(consent === 'true');
+            const hasConsent = consent === 'true';
+            setCookieConsent(hasConsent);
+            // Directly use the consent value to load volumes, don't wait for state update
+            if (isReady) {
+                const newVolumes = hasConsent ? loadVolumes() : defaultVolumes;
+                setVolumes(newVolumes);
+            }
         } else {
             setCookieConsent(undefined);
         }
-    }, []);
-
-    useEffect(() => {
-        if (isReady && cookieConsent !== undefined) {
-             const newVolumes = loadVolumes();
-             setVolumes(newVolumes);
-        }
-    }, [isReady, cookieConsent, setVolumes]);
+    }, [isReady, setVolumes]);
 
     useEffect(() => {
         if (isReady && activeMelodyInstrument) {
@@ -165,24 +167,17 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isReady]);
     
-    const updateVolumesAndSave = useCallback((newVolumes: Partial<Volumes> | ((v: Volumes) => Volumes)) => {
-        setVolumes(newVolumes); // This now directly calls the setter from the hook
+    // This is the single function that will apply all mixer changes at once.
+    const handleMixerApply = useCallback((newVolumes: Volumes) => {
+        setVolumes(newVolumes);
     }, [setVolumes]);
-
-    const handleMixerChange = useCallback((mixerState: Partial<Volumes>) => {
-        updateVolumesAndSave(currentVolumes => ({
-            ...currentVolumes,
-            ...mixerState
-        }));
-    }, [updateVolumesAndSave]);
     
     const handleChannelEffectChange = useCallback((
         channel: 'melody' | 'bass', 
         effect: 'reverbSend' | 'distortion', 
         value: number
     ) => {
-        updateVolumesAndSave(prevVolumes => {
-            // Deep copy to avoid mutation
+        setVolumes(prevVolumes => {
             const newVolumes = JSON.parse(JSON.stringify(prevVolumes));
             const targetChannelKey = channel === 'bass' ? 'manualBass' : 'melody';
             
@@ -192,20 +187,8 @@ export default function Home() {
             }
             return newVolumes;
         });
-    }, [updateVolumesAndSave]);
+    }, [setVolumes]);
     
-    const handleCompressorChange = useCallback((compressorSettings: CompressorSettings) => {
-        updateVolumesAndSave(prev => ({...prev, compressor: compressorSettings }));
-    }, [updateVolumesAndSave]);
-    
-    const handleTempoChange = useCallback((newTempo: number) => {
-        updateVolumesAndSave({ tempo: newTempo });
-    }, [updateVolumesAndSave]);
-    
-    const handleSwingChange = useCallback((swingValue: number) => {
-        updateVolumesAndSave({ swing: swingValue });
-    }, [updateVolumesAndSave]);
-
     const handleStartApp = useCallback(() => {
         startApp(initialVolumes);
     }, [startApp, initialVolumes]);
@@ -375,14 +358,9 @@ export default function Home() {
                         <BeatBoxControls
                             activePattern={activePattern}
                             onPatternChange={handlePatternChange}
-                            volumes={volumes}
-                            onMixerChange={handleMixerChange}
-                            onCompressorChange={handleCompressorChange}
+                            initialVolumes={volumes}
+                            onApply={handleMixerApply}
                             isMobile={isMobile}
-                            tempo={currentTempo}
-                            setTempo={handleTempoChange}
-                            swing={volumes.swing || 0}
-                            setSwing={handleSwingChange}
                         />
                     </div>
                 </main>
@@ -391,18 +369,15 @@ export default function Home() {
                      <BeatBoxControls
                         activePattern={activePattern}
                         onPatternChange={handlePatternChange}
-                        volumes={volumes}
-                        onMixerChange={handleMixerChange}
-                        onCompressorChange={handleCompressorChange}
+                        initialVolumes={volumes}
+                        onApply={handleMixerApply}
                         isMobile={isMobile}
                         isLandscape={true}
-                        tempo={currentTempo}
-                        setTempo={handleTempoChange}
-                        swing={volumes.swing || 0}
-                        setSwing={handleSwingChange}
                     />
                 </div>
             </div>
         </div>
     );
 }
+
+    

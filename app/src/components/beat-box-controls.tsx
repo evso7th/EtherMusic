@@ -14,20 +14,15 @@ import { Separator } from "./ui/separator";
 import { Switch } from "./ui/switch";
 import { ScrollArea } from "./ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
-import type { BeatPattern, Volumes, CompressorSettings } from '@/types';
+import type { BeatPattern, Volumes } from '@/types';
 import { MixerControls } from "./mixer-controls";
 import { beatPatterns } from "@/lib/drum-machine";
 
 interface BeatBoxControlsProps {
     activePattern: BeatPattern;
     onPatternChange: (pattern: BeatPattern) => void;
-    volumes: Volumes;
-    onMixerChange: (volumes: Partial<Volumes>) => void;
-    onCompressorChange: (compressorSettings: CompressorSettings) => void;
-    tempo: number;
-    setTempo: (tempo: number) => void;
-    swing: number;
-    setSwing: (swing: number) => void;
+    initialVolumes: Volumes;
+    onApply: (newVolumes: Volumes) => void;
     isMobile: boolean;
     isLandscape?: boolean;
 }
@@ -48,19 +43,15 @@ const ControlButtonWithTooltip = memo(function ControlButtonWithTooltip({ toolti
 ControlButtonWithTooltip.displayName = 'ControlButtonWithTooltip';
 
 
-function BeatBoxControlsComponent({
+const BeatBoxControlsComponent = ({
     activePattern,
     onPatternChange,
-    volumes,
-    onMixerChange,
-    onCompressorChange,
-    tempo,
-    setTempo,
-    swing,
-    setSwing,
+    initialVolumes,
+    onApply,
     isMobile,
     isLandscape = false,
-}: BeatBoxControlsProps) {
+}: BeatBoxControlsProps) => {
+    console.log("--- Rendering: BeatBoxControls ---");
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isMixerOpen, setIsMixerOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<'Meditative' | 'Classic'>('Meditative');
@@ -89,13 +80,6 @@ function BeatBoxControlsComponent({
              <ControlButtonWithTooltip tooltipText={tooltipText} {...buttonProps} />
         );
     }, [isMobile]);
-
-    const handleMixerChange = useCallback((newVolumes: Partial<Volumes>) => {
-        onMixerChange(currentVolumes => ({
-            ...currentVolumes,
-            ...newVolumes
-        }));
-    }, [onMixerChange]);
 
     if (isLandscape) {
         return (
@@ -174,13 +158,8 @@ function BeatBoxControlsComponent({
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="pr-4 py-4">
                                     <MixerControls 
-                                        volumes={volumes} 
-                                        onMixerChange={handleMixerChange}
-                                        onCompressorChange={onCompressorChange}
-                                        tempo={tempo}
-                                        setTempo={setTempo}
-                                        swing={swing}
-                                        setSwing={setSwing}
+                                        initialVolumes={initialVolumes} 
+                                        onApply={onApply}
                                         closeDialog={() => setIsMixerOpen(false)}
                                     />
                                 </div>
@@ -273,13 +252,8 @@ function BeatBoxControlsComponent({
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="pr-4 py-4">
                                     <MixerControls 
-                                        volumes={volumes}
-                                        onMixerChange={handleMixerChange}
-                                        onCompressorChange={onCompressorChange}
-                                        tempo={tempo}
-                                        setTempo={setTempo}
-                                        swing={swing}
-                                        setSwing={setSwing}
+                                        initialVolumes={initialVolumes}
+                                        onApply={onApply}
                                         closeDialog={() => setIsMixerOpen(false)}
                                     />
                                 </div>
@@ -292,6 +266,8 @@ function BeatBoxControlsComponent({
             </Card>
         </TooltipProvider>
     );
-}
+};
 
 export const BeatBoxControls = memo(BeatBoxControlsComponent);
+
+    

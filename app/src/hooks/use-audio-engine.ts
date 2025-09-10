@@ -5,7 +5,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
-import type { Volumes, Instrument, BassInstrument, CompressorSettings } from '@/types';
+import type { Volumes, Instrument, BassInstrument } from '@/types';
 
 function getCookie(name: string): string | null {
     if (typeof document === 'undefined') return null;
@@ -63,21 +63,18 @@ export function loadVolumes(): Volumes {
         if (!savedVolumes) return defaultVolumes;
         
         const parsed = JSON.parse(savedVolumes);
-        // A simple check to see if it's a valid-looking object
-        if (parsed && typeof parsed.melody === 'object' && typeof parsed.compressor === 'object') {
-            // Deep merge with defaults to ensure all properties are present
-            const mergeDeep = (target: any, source: any) => {
-                for (const key in source) {
-                    if (source[key] instanceof Object && key in target) {
-                        Object.assign(source[key], mergeDeep(target[key], source[key]))
-                    }
-                }
-                return Object.assign(target || {}, source)
-            }
-            return mergeDeep(defaultVolumes, parsed);
-        }
-        
-        return defaultVolumes;
+
+        // Deep merge with defaults to ensure all properties are present and valid
+        const merged = {
+            ...defaultVolumes,
+            ...parsed,
+            melody: { ...defaultVolumes.melody, ...(parsed.melody || {}) },
+            manualBass: { ...defaultVolumes.manualBass, ...(parsed.manualBass || {}) },
+            latch: { ...defaultVolumes.latch, ...(parsed.latch || {}) },
+            drums: { ...defaultVolumes.drums, ...(parsed.drums || {}) },
+            compressor: { ...defaultVolumes.compressor, ...(parsed.compressor || {}) },
+        };
+        return merged;
 
     } catch (e) {
         console.error("Failed to load volume settings from cookies", e);
@@ -85,7 +82,9 @@ export function loadVolumes(): Volumes {
     }
 }
 
+
 export function useAudioEngine(initialVolumes: Volumes) {
+    console.log("--- Rendering: useAudioEngine ---");
     const { toast } = useToast();
     
     const [isAppStarted, setIsAppStarted] = useState(false);
@@ -116,8 +115,9 @@ export function useAudioEngine(initialVolumes: Volumes) {
                 engine.getDrumMachine().on('playStateChanged', setIsPlaying);
                 
                 engine.setVolumes(vols);
-                setVolumesState(vols);
                 audioEngine.current = engine;
+            } else {
+                audioEngine.current.setVolumes(vols);
             }
             
             setIsReady(true);
@@ -144,49 +144,36 @@ export function useAudioEngine(initialVolumes: Volumes) {
     }, [isAppStarted, initializeAudioEngine]);
 
     useEffect(() => {
-      const resumeAudio = async () => {
-        if (audioEngine.current?.isInitialized && audioEngine.current.getContext().state === 'suspended') {
-          await audioEngine.current.getContext().resume();
-        }
-      };
-      document.addEventListener('click', resumeAudio, { once: true });
-      document.addEventListener('touchstart', resumeAudio, { once: true });
-      
       const engine = audioEngine.current;
       const playStateCallback = (playing: boolean) => setIsPlaying(playing);
       engine?.getDrumMachine().on('playStateChanged', playStateCallback);
 
+      const handleResume = async () => {
+        if (audioEngine.current?.isInitialized && audioEngine.current.getContext().state === 'suspended') {
+          await audioEngine.current.getContext().resume();
+        }
+      };
+      
+      document.addEventListener('click', handleResume, { once: true });
+      document.addEventListener('touchstart', handleResume, { once: true });
+
       return () => {
-        document.removeEventListener('click', resumeAudio);
-        document.removeEventListener('touchstart', resumeAudio);
+        document.removeEventListener('click', handleResume);
+        document.removeEventListener('touchstart', handleResume);
         engine?.getDrumMachine().off('playStateChanged', playStateCallback);
       };
     }, []);
     
-    const setVolumes = useCallback((newVolumes: Partial<Volumes> | ((prev: Volumes) => Volumes)) => {
+    const setVolumes = useCallback((newVolumes: Volumes | ((prev: Volumes) => Volumes)) => {
         setVolumesState(prev => {
-            const updated = typeof newVolumes === 'function' ? newVolumes(prev) : { ...prev, ...newVolumes };
+            const updated = typeof newVolumes === 'function' ? newVolumes(prev) : newVolumes;
             if (audioEngine.current) {
                 audioEngine.current.setVolumes(updated);
             }
-            if (getCookie("ethermusic_consent") === 'true') {
-                saveVolumes(updated);
-            }
+            saveVolumes(updated);
             return updated;
         });
     }, []);
-
-    const setTempo = useCallback((tempo: number) => {
-        setVolumes(v => ({ ...v, tempo }));
-    }, [setVolumes]);
-    
-    const setSwing = useCallback((swing: number) => {
-        setVolumes(v => ({...v, swing }));
-    }, [setVolumes]);
-
-    const setCompressorSettings = useCallback((compressorSettings: CompressorSettings) => {
-        setVolumes(v => ({...v, compressor: compressorSettings }));
-    }, [setVolumes]);
 
     const stopAllSounds = useCallback(() => {
         audioEngine.current?.stopAllSounds();
@@ -238,9 +225,6 @@ export function useAudioEngine(initialVolumes: Volumes) {
         stopAllSounds,
         volumes,
         setVolumes,
-        setTempo,
-        setSwing,
-        setCompressorSettings,
         setMelodyInstrument,
         setBassInstrument,
         setBeatPattern,
@@ -251,3 +235,5 @@ export function useAudioEngine(initialVolumes: Volumes) {
         currentTempo
     };
 }
+
+    
