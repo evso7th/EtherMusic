@@ -75,11 +75,11 @@ export function MixerControls({
     const [localVolumes, setLocalVolumes] = useState(initialVolumes);
     const [localTempo, setLocalTempo] = useState(tempo);
     const [localSwing, setLocalSwing] = useState(swing);
-    const [compressor, setCompressor] = useState(initialVolumes.compressor);
+    const [localCompressor, setLocalCompressor] = useState(initialVolumes.compressor);
 
     useEffect(() => {
         setLocalVolumes(initialVolumes);
-        setCompressor(initialVolumes.compressor);
+        setLocalCompressor(initialVolumes.compressor);
         setLocalTempo(tempo);
         setLocalSwing(swing);
     }, [initialVolumes, tempo, swing]);
@@ -104,18 +104,18 @@ export function MixerControls({
     };
     
     const handleCompressorSettingChange = useCallback((setting: keyof Omit<CompressorSettings, 'enabled'>, value: number) => {
-        setCompressor(prev => ({ ...prev, [setting]: value }));
+        setLocalCompressor(prev => ({ ...prev, [setting]: value }));
     }, []);
     
     const handleCompressorCommit = useCallback(() => {
-        onCompressorChange(compressor);
-    }, [compressor, onCompressorChange]);
+        onCompressorChange(localCompressor);
+    }, [localCompressor, onCompressorChange]);
     
     const handleToggleCompressor = useCallback((enabled: boolean) => {
-        const newSettings = { ...compressor, enabled };
-        setCompressor(newSettings);
+        const newSettings = { ...localCompressor, enabled };
+        setLocalCompressor(newSettings);
         onCompressorChange(newSettings);
-    }, [compressor, onCompressorChange]);
+    }, [localCompressor, onCompressorChange]);
 
     const handleTempoCommit = (value: number) => {
         setTempo(value);
@@ -217,15 +217,15 @@ export function MixerControls({
                             </div>
                             <Switch
                                 id="compressor-switch"
-                                checked={compressor.enabled}
+                                checked={localCompressor.enabled}
                                 onCheckedChange={handleToggleCompressor}
                             />
                         </div>
-                        <div className={cn("space-y-4 transition-opacity", !compressor.enabled && "opacity-50 pointer-events-none")}>
+                        <div className={cn("space-y-4 transition-opacity", !localCompressor.enabled && "opacity-50 pointer-events-none")}>
                              <VolumeControl 
                                 label="Threshold"
                                 icon={Waves}
-                                volume={compressor.threshold}
+                                volume={localCompressor.threshold}
                                 onVolumeChange={(v) => handleCompressorSettingChange('threshold', v)}
                                 onVolumeCommit={handleCompressorCommit}
                                 min={-100}
@@ -236,7 +236,7 @@ export function MixerControls({
                              <VolumeControl 
                                 label="Ratio"
                                 icon={Waves}
-                                volume={compressor.ratio}
+                                volume={localCompressor.ratio}
                                 onVolumeChange={(v) => handleCompressorSettingChange('ratio', v)}
                                 onVolumeCommit={handleCompressorCommit}
                                 min={1}
