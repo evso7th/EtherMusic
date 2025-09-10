@@ -7,12 +7,8 @@ import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
 import type { Volumes, Instrument, BassInstrument, CompressorSettings } from '@/types';
 
-interface UseAudioEngineProps {
-    onVolumesChanged: (volumes: Volumes) => void;
-    initialVolumes: Volumes;
-}
 
-export function useAudioEngine({ onVolumesChanged, initialVolumes }: UseAudioEngineProps) {
+export function useAudioEngine() {
     const { toast } = useToast();
     
     const [isAppStarted, setIsAppStarted] = useState(false);
@@ -22,7 +18,7 @@ export function useAudioEngine({ onVolumesChanged, initialVolumes }: UseAudioEng
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
     
-    const initializeAudioEngine = useCallback(async () => {
+    const initializeAudioEngine = useCallback(async (onVolumesChanged: (volumes: Volumes) => void) => {
         try {
             if (!orbManager.current) {
                 const padContainer = document.querySelector('main');
@@ -55,9 +51,9 @@ export function useAudioEngine({ onVolumesChanged, initialVolumes }: UseAudioEng
                 variant: "destructive"
             });
         }
-    }, [toast, onVolumesChanged]);
+    }, [toast]);
 
-    const startApp = useCallback(async () => {
+    const startApp = useCallback(async (onVolumesChanged: (volumes: Volumes) => void) => {
         if (isAppStarted) return;
         
         setIsAppStarted(true);
@@ -65,7 +61,7 @@ export function useAudioEngine({ onVolumesChanged, initialVolumes }: UseAudioEng
         const audio = new Audio('/assets/sounds/transition.webm');
         audio.play().catch(e => console.error("Error playing transition sound:", e));
         
-        await initializeAudioEngine();
+        await initializeAudioEngine(onVolumesChanged);
     }, [isAppStarted, initializeAudioEngine]);
 
     useEffect(() => {
@@ -81,13 +77,6 @@ export function useAudioEngine({ onVolumesChanged, initialVolumes }: UseAudioEng
         document.removeEventListener('touchstart', resumeAudio);
       };
     }, []);
-
-    useEffect(() => {
-        if (isReady && audioEngine.current && initialVolumes) {
-            audioEngine.current.setVolumes(initialVolumes);
-        }
-    }, [isReady, initialVolumes]);
-
 
     const stopAllSounds = useCallback(() => {
         audioEngine.current?.stopAllSounds();
@@ -118,33 +107,6 @@ export function useAudioEngine({ onVolumesChanged, initialVolumes }: UseAudioEng
         audioEngine.current?.setMelodyInstrument(instrumentName);
     }, []);
     
-    const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
-        audioEngine.current?.setBassInstrument(instrumentName);
-    }, []);
-    
-    const setVolumes = useCallback((volumes: Volumes) => {
-        audioEngine.current?.setVolumes(volumes);
-        onVolumesChanged(volumes);
-    }, [onVolumesChanged]);
-    
-    const setTempo = useCallback((tempo: number) => {
-        audioEngine.current?.setTempo(tempo);
-    }, []);
-
-    const setSwing = useCallback((swing: number) => {
-        audioEngine.current?.setSwing(swing);
-    }, []);
-    
-    const handleCompressorChange = useCallback((compressorSettings: CompressorSettings) => {
-        if(audioEngine.current) {
-            const currentVolumes = audioEngine.current.getVolumes();
-            const newVolumes = {...currentVolumes, compressor: compressorSettings};
-            audioEngine.current.setCompressorSettings(compressorSettings);
-            onVolumesChanged(newVolumes);
-        }
-    }, [onVolumesChanged]);
-    
-
     return {
         isAppStarted,
         isReady,
@@ -153,16 +115,11 @@ export function useAudioEngine({ onVolumesChanged, initialVolumes }: UseAudioEng
         orbManager: orbManager.current,
         startApp,
         stopAllSounds,
-        setVolumes,
-        setTempo,
-        setSwing,
         setMelodyInstrument,
-        setBassInstrument,
         setBeatPattern,
         setBassLatch,
         startRecording,
         stopRecording,
         handleThereminInteraction,
-        handleCompressorChange,
     };
 }

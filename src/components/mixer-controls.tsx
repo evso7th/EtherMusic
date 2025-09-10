@@ -87,15 +87,14 @@ export function MixerControls({
 
     const handleLocalVolumeChange = (part: VolumeChannel, value: number) => {
         setLocalVolumes(prev => {
-            const newVolumes = { ...prev };
-            const newChannelVolumes: ChannelVolumes = { ...(newVolumes[part] as ChannelVolumes), gain: value };
-            newVolumes[part] = newChannelVolumes;
-
+            const newVolumes = JSON.parse(JSON.stringify(prev));
+            (newVolumes[part] as ChannelVolumes).gain = value;
+            
             // Sync bass and latch volumes
             if (part === 'manualBass') {
-                newVolumes.latch = { ...newVolumes.latch, gain: value };
+                newVolumes.latch.gain = value;
             } else if (part === 'latch') {
-                newVolumes.manualBass = { ...newVolumes.manualBass, gain: value };
+                newVolumes.manualBass.gain = value;
             }
             
             return newVolumes;

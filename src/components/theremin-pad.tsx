@@ -182,8 +182,7 @@ export function ThereminPad({
         }
     }, [calculateInteraction, isDisabled, onInteraction, type, isLatchOn]);
     
-    const handleEffectChange = useCallback((effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => {
-        setLocalEffects(prev => ({...prev, [effect]: value}));
+     const handleEffectCommit = useCallback((effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => {
         const channelType = type === 'bass' ? 'manualBass' : type;
         onEffectChange(channelType, effect, value);
     }, [type, onEffectChange]);
@@ -278,16 +277,16 @@ export function ThereminPad({
                                     label="Reverb Send"
                                     icon={Blend}
                                     level={localEffects.reverbSend}
-                                    onLevelChange={(v) => handleEffectChange('reverbSend', v)}
-                                    onLevelCommit={(v) => { /* Already handled by onLevelChange */ }}
+                                    onLevelChange={(v) => setLocalEffects(p => ({...p, reverbSend: v}))}
+                                    onLevelCommit={(v) => handleEffectCommit('reverbSend', v)}
                                     min={-48} max={0} step={1} unit="dB"
                                 />
                                 <EffectControl
                                     label="Distortion"
                                     icon={Waves}
                                     level={localEffects.distortion}
-                                    onLevelChange={(v) => handleEffectChange('distortion', v)}
-                                    onLevelCommit={(v) => { /* Already handled by onLevelChange */ }}
+                                    onLevelChange={(v) => setLocalEffects(p => ({...p, distortion: v}))}
+                                    onLevelCommit={(v) => handleEffectCommit('distortion', v)}
                                     min={0} max={100} step={1} unit="%"
                                 />
                             </div>
