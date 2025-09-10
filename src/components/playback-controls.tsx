@@ -52,12 +52,13 @@ export function PlaybackControls({
     onPlay,
     onPause,
     onRecord, 
-    onStop, // This prop is no longer used but kept for type compatibility
+    onStop,
     isReady 
 }: PlaybackControlsProps) {
     const isMobile = useIsMobile();
     
     const handleExit = () => {
+        onStop();
         if (typeof window !== "undefined") {
             try {
                 // This will close the window if it was opened by a script.

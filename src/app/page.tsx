@@ -299,13 +299,6 @@ export default function Home() {
         startApp();
     }, [startApp]);
 
-    const handleStop = useCallback(() => {
-        stop();
-        const offPattern = beatPatterns.find(p => p.name === 'Off')!;
-        setActivePattern(offPattern);
-        setBeatPattern(offPattern.name);
-    }, [stop, setBeatPattern]);
-
     const handleRecord = useCallback(() => {
         if (isRecording) {
             stopRecording();
@@ -425,7 +418,7 @@ export default function Home() {
                             onPlay={play}
                             onPause={pause}
                             onRecord={handleRecord}
-                            onStop={handleStop}
+                            onStop={stop}
                             isReady={isReady}
                         />
                          <SleepTimer onTimerSet={setSleepTimer} />

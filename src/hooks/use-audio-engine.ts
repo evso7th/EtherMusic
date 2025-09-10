@@ -17,7 +17,6 @@ export function useAudioEngine() {
 
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
-    const workerRef = useRef<Worker | null>(null);
     
     const initializeAudioEngine = useCallback(async () => {
         try {
@@ -34,8 +33,6 @@ export function useAudioEngine() {
                     await context.resume();
                     console.log("[useAudioEngine] AudioContext resumed.");
                 }
-                // Note: The worker is no longer passed to the AudioEngine constructor
-                // as the Autopilot feature is deprecated.
                 audioEngine.current = new AudioEngine(context, orbManager.current);
                 await audioEngine.current.initialize();
             }
@@ -98,7 +95,7 @@ export function useAudioEngine() {
 
     const stop = useCallback(() => {
         if (!audioEngine.current) return;
-        audioEngine.current.stop();
+        audioEngine.current.stopAllSounds();
         setIsPlaying(false);
     }, []);
     

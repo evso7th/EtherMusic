@@ -293,10 +293,20 @@ export class AudioEngine {
         this.drumMachine.pause();
     }
 
-    public stop() {
+    public stopAllSounds() {
         if (!this.isInitialized) return;
         this.drumMachine.stop();
-        this.stopAllSounds();
+        this.nodes.forEach((node, name) => {
+             // We don't want to stop the drum worklet, just the synth voices
+            if (name !== 'drums') {
+                node.worklet.port.postMessage({ type: 'allNotesOff' });
+            }
+        });
+        
+        const notesToTurnOff = this.latchEngine.clear();
+        notesToTurnOff.forEach(note => this.orbManager.removeOrb(note.id));
+        this.orbManager?.removeAllOrbs();
+        this.activePointers.clear();
     }
     
     public handleThereminInteraction(type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') {
@@ -537,22 +547,6 @@ export class AudioEngine {
         }
     }
     
-    public stopAllSounds() {
-        if (!this.isInitialized) return;
-        this.nodes.forEach((node, name) => {
-             // We don't want to stop the drum worklet, just the synth voices
-            if (name !== 'drums') {
-                node.worklet.port.postMessage({ type: 'allNotesOff' });
-            }
-        });
-        
-        const notesToTurnOff = this.latchEngine.clear();
-        notesToTurnOff.forEach(note => this.orbManager.removeOrb(note.id));
-        this.orbManager?.removeAllOrbs();
-        this.activePointers.clear();
-        this.pause(); // Stop the drum machine as well
-    }
-    
     public startRecording() {
         if (!this.mediaRecorder || this.mediaRecorder.state === 'recording') return;
         this.recordedChunks = [];
@@ -572,7 +566,7 @@ export class AudioEngine {
         this.masterOut.gain.setValueAtTime(this.masterOut.gain.value, now);
         this.masterOut.gain.linearRampToValueAtTime(0, now + durationSeconds);
         setTimeout(() => {
-            this.stop();
+            this.stopAllSounds();
             if (this.masterOut && this.context) {
                  this.masterOut.gain.cancelScheduledValues(this.context.currentTime);
                  this.masterOut.gain.setValueAtTime(1, this.context.currentTime);
