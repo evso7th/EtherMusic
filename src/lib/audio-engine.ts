@@ -36,7 +36,8 @@ const DRUM_SAMPLES: Record<string, string> = {
     'k': '/assets/sounds/drums/kick_drum.wav',
     'K': '/assets/sounds/drums/kick_drum8.wav',
     's': '/assets/sounds/drums/snare.wav',
-    'S': '/assets/sounds/drums/snarepress.wav',
+    'S': '/assets/sounds/drums/snare_off.wav', // Changed from snarepress.wav
+    'g': '/assets/sounds/drums/snare_ghost_note.wav', // Added ghost note
     'h': '/assets/sounds/drums/closed_hi_hat_accented.wav',
     'H': '/assets/sounds/drums/closed_hi_hat_ghost.wav',
     'o': '/assets/sounds/drums/open_hh_top.wav',
@@ -279,7 +280,7 @@ export class AudioEngine {
     
     public play() {
         console.log("[AudioEngine] Play requested.");
-        if (!this.isInitialized || this.isPlaying || !this.context) return;
+        if (!this.isInitialized || !this.context) return;
         if (this.context.state === 'suspended') {
             this.context.resume();
         }
@@ -288,7 +289,7 @@ export class AudioEngine {
 
     public pause() {
         console.log("[AudioEngine] Pause requested.");
-        if (!this.isInitialized || !this.isPlaying) return;
+        if (!this.isInitialized) return;
         this.drumMachine.pause();
     }
 
@@ -434,11 +435,10 @@ export class AudioEngine {
     public setBeatPattern(patternName: string) {
         console.log(`[AudioEngine] setBeatPattern called with: ${patternName}`);
         this.drumMachine.setPattern(patternName);
-        const wasPlaying = this.isPlaying;
         if (patternName === 'Off') {
-            if (wasPlaying) this.pause();
+            this.pause();
         } else {
-            if (!wasPlaying) this.play();
+            this.play();
         }
     }
 
@@ -573,5 +573,3 @@ export class AudioEngine {
         }, (durationSeconds + 0.5) * 1000);
     }
 }
-
-    
