@@ -107,10 +107,31 @@ export function MixerControls({
     }, []);
 
     const handleApplyChanges = () => {
-        onMixerChange(localVolumes);
-        onCompressorChange(localCompressor);
-        setTempo(localTempo);
-        setSwing(localSwing);
+        const changedVolumes: Partial<Volumes> = {};
+        let volumesChanged = false;
+        
+        Object.keys(localVolumes).forEach(key => {
+            const k = key as keyof Volumes;
+            if (JSON.stringify(localVolumes[k]) !== JSON.stringify(initialVolumes[k])) {
+                // @ts-ignore
+                changedVolumes[k] = localVolumes[k];
+                volumesChanged = true;
+            }
+        });
+
+        if (volumesChanged) {
+            onMixerChange(changedVolumes);
+        }
+
+        if (JSON.stringify(localCompressor) !== JSON.stringify(initialVolumes.compressor)) {
+            onCompressorChange(localCompressor);
+        }
+        if (localTempo !== tempo) {
+            setTempo(localTempo);
+        }
+        if (localSwing !== swing) {
+            setSwing(localSwing);
+        }
         closeDialog();
     };
 
