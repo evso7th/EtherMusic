@@ -73,6 +73,7 @@ export function MixerControls({
     closeDialog,
     isAutopilotMixer = false,
 }: MixerControlsProps) {
+    
     const [localVolumes, setLocalVolumes] = useState(initialVolumes);
     const [localTempo, setLocalTempo] = useState(tempo);
     const [localSwing, setLocalSwing] = useState(swing);
@@ -88,11 +89,17 @@ export function MixerControls({
 
     const handleChannelVolumeChange = (part: VolumeChannel, value: number) => {
         setLocalVolumes(prev => {
-            const newChannelVolumes = { ...prev[part] as ChannelVolumes, gain: value };
-            return {
-                ...prev,
-                [part]: newChannelVolumes
-            };
+            const newChannelVolumes = { ...(prev[part] as ChannelVolumes), gain: value };
+            const newVolumes = { ...prev, [part]: newChannelVolumes };
+
+            // Sync bass and latch volumes
+            if (part === 'manualBass') {
+                newVolumes.latch.gain = value;
+            } else if (part === 'latch') {
+                newVolumes.manualBass.gain = value;
+            }
+
+            return newVolumes;
         });
     };
     

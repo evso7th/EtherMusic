@@ -25,7 +25,6 @@ const EffectControl = ({
     icon: Icon,
     level,
     onLevelChange,
-    onLevelCommit,
     min,
     max,
     step,
@@ -35,7 +34,6 @@ const EffectControl = ({
     icon: React.ElementType,
     level: number,
     onLevelChange: (v: number) => void,
-    onLevelCommit: (v: number) => void,
     min: number,
     max: number,
     step: number,
@@ -54,7 +52,6 @@ const EffectControl = ({
                 step={step}
                 value={[level ?? 0]}
                 onValueChange={(v) => onLevelChange(v[0])}
-                onValueCommit={(v) => onLevelCommit(v[0])}
             />
         </div>
     </div>
@@ -122,12 +119,8 @@ export function ThereminPad({
 
     const handleEffectChange = (effect: keyof typeof localEffects, value: number) => {
         setLocalEffects(prev => ({ ...prev, [effect]: value }));
-    };
-
-    const handleEffectCommit = (effect: keyof typeof localEffects, value: number) => {
         onEffectChange(effect, value);
     };
-
 
     // Manage orbs for latch mode
     useEffect(() => {
@@ -282,7 +275,6 @@ export function ThereminPad({
                                     icon={Blend}
                                     level={localEffects.reverbSend}
                                     onLevelChange={(v) => handleEffectChange('reverbSend', v)}
-                                    onLevelCommit={(v) => handleEffectCommit('reverbSend', v)}
                                     min={-48} max={0} step={1} unit="dB"
                                 />
                                 <EffectControl
@@ -290,7 +282,6 @@ export function ThereminPad({
                                     icon={Waves}
                                     level={localEffects.distortion}
                                     onLevelChange={(v) => handleEffectChange('distortion', v)}
-                                    onLevelCommit={(v) => handleEffectCommit('distortion', v)}
                                     min={0} max={100} step={1} unit="%"
                                 />
                             </div>

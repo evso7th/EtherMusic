@@ -214,7 +214,7 @@ export class AudioEngine {
         
         this.createDrumChannel();
         
-        this.loadReverbImpulse();
+        await this.loadReverbImpulse();
         
         await this.loadDrumSamples();
         
@@ -425,19 +425,13 @@ export class AudioEngine {
             this.nodes.get('latch')?.worklet.port.postMessage(message);
             
             // Create a new volume object based on the current state
-            const newVolumes = {
-                ...this.volumes,
-                manualBass: {
-                    ...this.volumes.manualBass,
-                    reverbSend: bassPresetParams.reverbSend ?? this.volumes.manualBass.reverbSend,
-                    distortion: bassPresetParams.distortion ?? this.volumes.manualBass.distortion,
-                },
-                latch: {
-                    ...this.volumes.latch,
-                    reverbSend: bassPresetParams.reverbSend ?? this.volumes.latch.reverbSend,
-                    distortion: bassPresetParams.distortion ?? this.volumes.latch.distortion,
-                }
-            };
+            const newVolumes: Volumes = JSON.parse(JSON.stringify(this.volumes));
+
+            newVolumes.manualBass.reverbSend = bassPresetParams.reverbSend ?? newVolumes.manualBass.reverbSend;
+            newVolumes.manualBass.distortion = bassPresetParams.distortion ?? newVolumes.manualBass.distortion;
+            newVolumes.latch.reverbSend = bassPresetParams.reverbSend ?? newVolumes.latch.reverbSend;
+            newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
+
             this.setVolumes(newVolumes);
             this.eventEmitter.emit('volumesChanged', newVolumes);
         }
