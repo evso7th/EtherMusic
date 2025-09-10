@@ -22,7 +22,7 @@ interface BeatBoxControlsProps {
     activePattern: BeatPattern;
     onPatternChange: (pattern: BeatPattern) => void;
     volumes: Volumes;
-    onMixerChange: (volumes: Partial<Volumes>) => void;
+    onMixerChange: (volumes: Partial<Volumes> | ((v: Volumes) => Volumes)) => void;
     onCompressorChange: (compressorSettings: CompressorSettings) => void;
     tempo: number;
     setTempo: (tempo: number) => void;
@@ -61,7 +61,6 @@ export function BeatBoxControls({
     isMobile,
     isLandscape = false,
 }: BeatBoxControlsProps) {
-    console.log('--- Rendering: BeatBoxControls ---');
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isMixerOpen, setIsMixerOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<'Meditative' | 'Classic'>('Meditative');

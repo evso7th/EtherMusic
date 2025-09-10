@@ -35,7 +35,7 @@ function setCookie(name: string, value: string, days: number) {
     let expires = "";
     if (days) {
         const date = new Date();
-        date.setTime(date.getTime() + (days*24*60*60*1000));
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
         expires = "; expires=" + date.toUTCString();
     }
     document.cookie = name + "=" + (value || "")  + expires + "; path=/; SameSite=Lax";
@@ -55,6 +55,7 @@ const defaultVolumes: Volumes = {
         release: 0.25
     },
     swing: 0.33,
+    tempo: 90,
 };
 
 function loadVolumes(): Volumes {
@@ -84,6 +85,7 @@ function loadVolumes(): Volumes {
             drums: ensureChannelSettings(volumes.drums, defaultVolumes.drums),
             compressor: { ...defaultVolumes.compressor, ...(volumes.compressor || {}) },
             swing: typeof volumes.swing === 'number' ? volumes.swing : defaultVolumes.swing,
+            tempo: typeof volumes.tempo === 'number' ? volumes.tempo : defaultVolumes.tempo,
         };
         
         return mergedVolumes;
@@ -124,12 +126,8 @@ export default function Home() {
     const isMobile = useIsMobile();
     const [isClient, setIsClient] = useState(false);
     
-    const [initialVolumes] = useState<Volumes>(() => {
-        if (typeof window !== 'undefined' && getCookie("ethermusic_consent") === 'true') {
-            return loadVolumes();
-        }
-        return defaultVolumes;
-    });
+    // Initialize volumes once, and only on the client
+    const [volumes, setVolumesState] = useState<Volumes>(loadVolumes);
 
     const {
         isAppStarted,
@@ -146,17 +144,9 @@ export default function Home() {
         setMelodyInstrument,
         setBassInstrument,
         orbManager,
-        volumes,
-        setVolumes,
-        setTempo,
-        setSwing,
-        handleCompressorChange,
-        setCurrentTempo,
-        currentTempo,
-    } = useAudioEngine(initialVolumes);
-
-    const [cookieConsent, setCookieConsent] = useState<boolean | undefined>(undefined);
+    } = useAudioEngine(volumes);
     
+    const [cookieConsent, setCookieConsent] = useState<boolean | undefined>(undefined);
     const [isRecording, setIsRecording] = useState(false);
     const [activePattern, setActivePattern] = useState<BeatPattern>(beatPatterns.find(p => p.name === 'Off')!);
     const [musicKey, setMusicKey] = useState<MusicKey>('G');
@@ -171,14 +161,14 @@ export default function Home() {
     const onConsentChange = useCallback((consent: boolean) => {
         setCookieConsent(consent);
         const newVolumes = consent ? loadVolumes() : defaultVolumes;
-        setVolumes(newVolumes);
+        setVolumes(newVolumes); 
         
         if (!consent) {
              if (typeof document !== 'undefined') {
                 document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
             }
         }
-    }, [setVolumes]);
+    }, []);
 
     useEffect(() => {
         setIsClient(true);
@@ -190,12 +180,38 @@ export default function Home() {
         }
     }, []);
 
+    const setVolumes = useCallback((newVolumes: Partial<Volumes> | ((v: Volumes) => Volumes)) => {
+        setVolumesState(prev => {
+            const updated = typeof newVolumes === 'function' ? newVolumes(prev) : { ...prev, ...newVolumes };
+            if (audioEngine) {
+                audioEngine.setVolumes(updated);
+            }
+            if (cookieConsent) {
+                saveVolumes(updated);
+            }
+            return updated;
+        });
+    }, [audioEngine, cookieConsent]);
+
+    const setTempo = useCallback((newTempo: number) => {
+        setVolumes(v => ({ ...v, tempo: newTempo }));
+    }, [setVolumes]);
+
+    const setSwing = useCallback((swingValue: number) => {
+        setVolumes(v => ({ ...v, swing: swingValue }));
+    }, [setVolumes]);
+
+    const handleCompressorChange = useCallback((compressorSettings: CompressorSettings) => {
+        setVolumes(v => ({...v, compressor: compressorSettings }));
+    }, [setVolumes]);
+
+
     useEffect(() => {
-        if (cookieConsent !== undefined) {
+        if (isReady && cookieConsent !== undefined) {
              const newVolumes = cookieConsent ? loadVolumes() : defaultVolumes;
              setVolumes(newVolumes);
         }
-    }, [cookieConsent, setVolumes]);
+    }, [isReady, cookieConsent, setVolumes]);
 
     useEffect(() => {
         if (isReady && activeMelodyInstrument) {
@@ -206,10 +222,10 @@ export default function Home() {
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
         const newVolumes = setBassInstrument(instrumentId);
-        if (newVolumes && cookieConsent) {
-            saveVolumes(newVolumes);
+        if (newVolumes) {
+            setVolumes(newVolumes);
         }
-    }, [setBassInstrument, cookieConsent]);
+    }, [setBassInstrument, setVolumes]);
 
     useEffect(() => {
         if (isReady && activeBassInstrument) {
@@ -217,11 +233,6 @@ export default function Home() {
         }
     }, [isReady, activeBassInstrument, handleSetBassInstrument]);
     
-    const handleTempoChange = useCallback((newTempo: number) => {
-        setCurrentTempo(newTempo);
-        setTempo(newTempo);
-    }, [setCurrentTempo, setTempo]);
-
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         let newKey = musicKey;
         let newScale = musicScale;
@@ -253,50 +264,27 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isReady]);
     
-    const updateVolumesAndSave = useCallback((newVolumes: Partial<Volumes>) => {
-        const mergedVolumes = { ...volumes, ...newVolumes };
-        setVolumes(mergedVolumes);
-        if (cookieConsent) {
-            saveVolumes(mergedVolumes);
-        }
-    }, [volumes, setVolumes, cookieConsent]);
-    
-    const handleMixerChange = useCallback((changedMixerVolumes: Partial<Volumes>) => {
-        updateVolumesAndSave(changedMixerVolumes);
-    }, [updateVolumesAndSave]);
-    
     const handleChannelEffectChange = useCallback((
         channel: 'melody' | 'bass', 
         effect: 'reverbSend' | 'distortion', 
         value: number
     ) => {
         setVolumes(prevVolumes => {
+            // Deep copy to avoid mutation
             const newVolumes = JSON.parse(JSON.stringify(prevVolumes));
-            const targetChannel = channel === 'bass' ? 'manualBass' : 'melody';
-            (newVolumes[targetChannel] as ChannelVolumes)[effect] = value;
-             if (channel === 'bass') {
-                 (newVolumes.latch as ChannelVolumes)[effect] = value;
-            }
-            if (cookieConsent) {
-                saveVolumes(newVolumes);
+            const targetChannelKey = channel === 'bass' ? 'manualBass' : 'melody';
+            
+            newVolumes[targetChannelKey][effect] = value;
+            if (channel === 'bass') {
+                newVolumes.latch[effect] = value;
             }
             return newVolumes;
         });
-    }, [cookieConsent, setVolumes]);
+    }, [setVolumes]);
     
-    const handleCompressorChangeCallback = useCallback((compressorSettings: CompressorSettings) => {
-        handleCompressorChange(compressorSettings);
-        updateVolumesAndSave({ compressor: compressorSettings });
-    }, [handleCompressorChange, updateVolumesAndSave]);
-    
-    const handleSwingChange = useCallback((swingValue: number) => {
-        setSwing(swingValue);
-        updateVolumesAndSave({ swing: swingValue });
-    }, [setSwing, updateVolumesAndSave]);
-
     const handleStartApp = useCallback(() => {
-        startApp();
-    }, [startApp]);
+        startApp(volumes);
+    }, [startApp, volumes]);
 
     const handleRecord = useCallback(() => {
         if (isRecording) {
@@ -373,7 +361,7 @@ export default function Home() {
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
             <div className="fixed inset-0 z-0">
-                 <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={currentTempo} />
+                 <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={volumes.tempo} />
             </div>
             
              <div className="relative z-10 flex h-full portrait:flex-col portrait:p-2 md:p-6 lg:p-8 landscape:flex-row landscape:p-1 landscape:gap-1">
@@ -464,13 +452,13 @@ export default function Home() {
                             activePattern={activePattern}
                             onPatternChange={handlePatternChange}
                             volumes={volumes}
-                            onMixerChange={handleMixerChange}
-                            onCompressorChange={handleCompressorChangeCallback}
+                            onMixerChange={setVolumes}
+                            onCompressorChange={handleCompressorChange}
                             isMobile={isMobile}
-                            tempo={currentTempo}
-                            setTempo={handleTempoChange}
-                            swing={volumes.swing || 0}
-                            setSwing={handleSwingChange}
+                            tempo={volumes.tempo}
+                            setTempo={setTempo}
+                            swing={volumes.swing}
+                            setSwing={setSwing}
                         />
                     </div>
                 </main>
@@ -480,17 +468,19 @@ export default function Home() {
                         activePattern={activePattern}
                         onPatternChange={handlePatternChange}
                         volumes={volumes}
-                        onMixerChange={handleMixerChange}
-                        onCompressorChange={handleCompressorChangeCallback}
+                        onMixerChange={setVolumes}
+                        onCompressorChange={handleCompressorChange}
                         isMobile={isMobile}
                         isLandscape={true}
-                        tempo={currentTempo}
-                        setTempo={handleTempoChange}
-                        swing={volumes.swing || 0}
-                        setSwing={handleSwingChange}
+                        tempo={volumes.tempo}
+                        setTempo={setTempo}
+                        swing={volumes.swing}
+                        setSwing={setSwing}
                     />
                 </div>
             </div>
         </div>
     );
 }
+
+    
