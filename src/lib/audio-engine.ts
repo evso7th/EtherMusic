@@ -294,27 +294,11 @@ export class AudioEngine {
         return impulse;
     }
     
-    public play() {
-        console.log("[AudioEngine] Play requested.");
-        if (!this.isInitialized || this.isPlaying || !this.context) return;
-        if (this.context.state === 'suspended') {
-            this.context.resume();
-        }
-        this.drumMachine.play();
-    }
-
-    public pause() {
-        console.log("[AudioEngine] Pause requested.");
-        if (!this.isInitialized || !this.isPlaying) return;
-        this.drumMachine.pause();
-    }
-
     public stopAllSounds() {
         if (!this.isInitialized) return;
         this.drumMachine.stop();
         this.nodes.forEach((node, name) => {
-             // We don't want to stop the drum worklet, just the synth voices
-            if (name !== 'drums') {
+             if (name !== 'drums') {
                 node.worklet.port.postMessage({ type: 'allNotesOff' });
             }
         });
@@ -449,17 +433,15 @@ export class AudioEngine {
     }
     
     public setBeatPattern(patternName: string) {
-        console.log(`[AudioEngine] setBeatPattern called with: ${patternName}`);
         this.drumMachine.setPattern(patternName);
         if (patternName === 'Off') {
-            this.pause();
+            this.drumMachine.stop();
         } else {
-            this.play();
+            this.drumMachine.play();
         }
     }
 
     public setTempo(newTempo: number) {
-        console.log(`[AudioEngine] setTempo called with: ${newTempo}`);
         this.drumMachine.setTempo(newTempo);
     }
 
@@ -495,10 +477,8 @@ export class AudioEngine {
                     throw new Error(`HTTP error! status: ${response.status} for ${url.split('/').pop()}`);
                 }
                 const arrayBuffer = await response.arrayBuffer();
-                // We decode in the main thread
-                const audioBuffer = await this.context.decodeAudioData(arrayBuffer.slice(0)); // slice to create a copy
+                const audioBuffer = await this.context.decodeAudioData(arrayBuffer.slice(0)); 
                 
-                // And send the raw channel data, which is a Float32Array, and transfer its ownership
                 const channelData = audioBuffer.getChannelData(0);
                 const message: DrumWorkerMessage = {
                     type: 'loadSample',
@@ -506,7 +486,6 @@ export class AudioEngine {
                     buffer: channelData.buffer,
                 };
                 drumWorklet.port.postMessage(message, [channelData.buffer]);
-                console.log(`[AudioEngine] Loaded and sent sample: ${name}`);
 
             } catch (error) {
                 console.error(`[AudioEngine] Failed to load or process drum sample: ${name}`, error);

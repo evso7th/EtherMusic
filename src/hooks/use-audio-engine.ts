@@ -75,18 +75,6 @@ export function useAudioEngine() {
         document.removeEventListener('touchstart', resumeAudio);
       };
     }, []);
-
-    const play = useCallback(() => {
-        if (!isReady || !audioEngine.current) return;
-        audioEngine.current.play();
-        setIsPlaying(true);
-    }, [isReady]);
-
-    const pause = useCallback(() => {
-        if (!isReady || !audioEngine.current) return;
-        audioEngine.current.pause();
-        setIsPlaying(false);
-    }, [isReady]);
     
     const stopAllSounds = useCallback(() => {
         if (!audioEngine.current) return;
@@ -99,7 +87,6 @@ export function useAudioEngine() {
     }, []);
 
     const setTempo = useCallback((tempo: number) => {
-        console.log("[useAudioEngine] Setting tempo to:", tempo);
         audioEngine.current?.setTempo(tempo);
     }, []);
 
@@ -109,7 +96,6 @@ export function useAudioEngine() {
     
     const setBeatPattern = useCallback((patternName: string) => {
         if (!audioEngine.current) return;
-        console.log(`[useAudioEngine] Setting beat pattern to: ${patternName}`);
         
         audioEngine.current.setBeatPattern(patternName);
         
@@ -155,8 +141,6 @@ export function useAudioEngine() {
         audioEngine: audioEngine.current,
         orbManager: orbManager.current,
         startApp,
-        play,
-        pause,
         stopAllSounds,
         setVolumes,
         setTempo,
