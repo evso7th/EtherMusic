@@ -175,7 +175,7 @@ export class AudioEngine {
             a.style.display = 'none';
             a.href = url;
             const date = new Date();
-            const dateString = `${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
+            const dateString = `${date.getFullYear()}${ (date.getMonth()+1).toString().padStart(2, '0') }${ date.getDate().toString().padStart(2, '0') }`;
             a.download = `EtherMusic-Session-${dateString}.webm`;
             a.click();
             window.URL.revokeObjectURL(url);
@@ -294,7 +294,7 @@ export class AudioEngine {
         return impulse;
     }
     
-    private play() {
+    public play() {
         console.log("[AudioEngine] Play requested.");
         if (!this.isInitialized || this.isPlaying || !this.context) return;
         if (this.context.state === 'suspended') {
@@ -303,9 +303,9 @@ export class AudioEngine {
         this.drumMachine.play();
     }
 
-    private pause() {
+    public pause() {
         console.log("[AudioEngine] Pause requested.");
-        if (!this.isInitialized) return;
+        if (!this.isInitialized || !this.isPlaying) return;
         this.drumMachine.pause();
     }
 

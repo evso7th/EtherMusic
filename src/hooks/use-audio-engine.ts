@@ -78,14 +78,12 @@ export function useAudioEngine() {
 
     const play = useCallback(() => {
         if (!isReady || !audioEngine.current) return;
-        // @ts-ignore
         audioEngine.current.play();
         setIsPlaying(true);
     }, [isReady]);
 
     const pause = useCallback(() => {
         if (!isReady || !audioEngine.current) return;
-        // @ts-ignore
         audioEngine.current.pause();
         setIsPlaying(false);
     }, [isReady]);
@@ -157,6 +155,8 @@ export function useAudioEngine() {
         audioEngine: audioEngine.current,
         orbManager: orbManager.current,
         startApp,
+        play,
+        pause,
         stopAllSounds,
         setVolumes,
         setTempo,
