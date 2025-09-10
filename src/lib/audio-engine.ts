@@ -201,7 +201,7 @@ export class AudioEngine {
         
         this.createDrumChannel();
         
-        await this.loadReverbImpulse();
+        this.loadReverbImpulse();
         
         await this.loadDrumSamples();
         
@@ -263,9 +263,9 @@ export class AudioEngine {
                  if (response.status === 404) {
                     console.log("[AudioEngine] Reverb impulse '/assets/sounds/impulses/space.wav' not found. Using a generated fallback reverb. This is expected if the file doesn't exist.");
                 } else {
+                    // Don't throw for other errors, just log and fallback.
                     console.error(`[AudioEngine] HTTP error! status: ${response.status}`);
                 }
-                // Don't re-throw, just proceed to fallback.
                 this.convolver.buffer = this.createFallbackReverb();
                 return;
             }
@@ -416,7 +416,10 @@ export class AudioEngine {
             this.nodes.get('manualBass')?.worklet.port.postMessage(message);
             this.nodes.get('latch')?.worklet.port.postMessage(message);
             
-            const newVolumes = this.getVolumes(); // Get a deep copy
+            // Create a deep copy to modify
+            const newVolumes = JSON.parse(JSON.stringify(this.volumes));
+            
+            // Update reverb and distortion for both bass channels from the preset
             newVolumes.manualBass.reverbSend = bassPresetParams.reverbSend ?? newVolumes.manualBass.reverbSend;
             newVolumes.manualBass.distortion = bassPresetParams.distortion ?? newVolumes.manualBass.distortion;
             newVolumes.latch.reverbSend = bassPresetParams.reverbSend ?? newVolumes.latch.reverbSend;
@@ -496,13 +499,14 @@ export class AudioEngine {
     public setVolumes(newVolumes: Volumes) {
         if (!this.isInitialized || !this.context) return;
         this.volumes = newVolumes;
+        const rampTime = this.context.currentTime + 0.05;
 
         this.applyVolumeForPart('melody', newVolumes.melody);
         this.applyVolumeForPart('manualBass', newVolumes.manualBass);
         this.applyVolumeForPart('latch', newVolumes.latch);
         this.applyVolumeForPart('drums', newVolumes.drums);
         
-        this.reverbReturnGain.gain.setValueAtTime(dbToGain(this.volumes.reverbReturn), this.context.currentTime);
+        this.reverbReturnGain.gain.linearRampToValueAtTime(dbToGain(this.volumes.reverbReturn), rampTime);
         this.setCompressorSettings(this.volumes.compressor);
         this.setSwing(this.volumes.swing ?? 0);
     }

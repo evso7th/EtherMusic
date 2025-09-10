@@ -125,13 +125,13 @@ export default function Home() {
     const [isClient, setIsClient] = useState(false);
     const [cookieConsent, setCookieConsent] = useState<boolean | undefined>(undefined);
     
+    const [volumes, setVolumesState] = useState<Volumes>(defaultVolumes);
+
     const {
         isAppStarted,
         isReady,
         isPlaying,
         audioEngine,
-        volumes, 
-        setVolumes,
         startApp,
         stopAllSounds,
         setBeatPattern,
@@ -142,11 +142,13 @@ export default function Home() {
         setMelodyInstrument,
         setBassInstrument,
         orbManager,
+        setVolumes,
         setTempo,
         setSwing,
         handleCompressorChange,
-    } = useAudioEngine({
-        initialVolumes: cookieConsent ? loadVolumes() : defaultVolumes
+    } = useAudioEngine({ 
+        initialVolumes: volumes,
+        onVolumesChanged: setVolumesState 
     });
     
     const [isRecording, setIsRecording] = useState(false);
@@ -168,7 +170,7 @@ export default function Home() {
             saveVolumes(mergedVolumes);
         }
     }, [volumes, setVolumes, cookieConsent]);
-
+    
     const handleCompressorChangeCallback = useCallback((compressorSettings: CompressorSettings) => {
         handleCompressorChange(compressorSettings);
         handleMixerChange({ compressor: compressorSettings });
@@ -181,15 +183,27 @@ export default function Home() {
 
     const onConsentChange = useCallback((consent: boolean) => {
         setCookieConsent(consent);
-        const newVolumes = consent ? loadVolumes() : defaultVolumes;
-        setVolumes(newVolumes);
-        setCurrentTempo(60); 
-        setTempo(60);
-        setSwing(newVolumes.swing);
-        if (!consent && typeof document !== 'undefined') {
-            document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        if (consent) {
+            const loadedVolumes = loadVolumes();
+            setVolumes(loadedVolumes);
+            if (audioEngine) {
+                audioEngine.setTempo(60);
+                audioEngine.setSwing(loadedVolumes.swing);
+            }
+            setCurrentTempo(60); 
+        } else {
+            setVolumes(defaultVolumes);
+            if (audioEngine) {
+                audioEngine.setTempo(60);
+                audioEngine.setSwing(defaultVolumes.swing);
+            }
+            setCurrentTempo(60);
+            if (typeof document !== 'undefined') {
+                document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            }
         }
-    }, [setVolumes, setTempo, setSwing]);
+    }, [audioEngine, setVolumes, setSwing]);
+
 
     useEffect(() => {
         setIsClient(true);
@@ -197,15 +211,24 @@ export default function Home() {
         if (consent !== null) {
             const initialConsent = consent === 'true';
             setCookieConsent(initialConsent);
-             if (initialConsent) {
-                const loadedVolumes = loadVolumes();
-                setVolumes(loadedVolumes);
+            if (initialConsent) {
+                setVolumesState(loadVolumes());
             }
         } else {
             setCookieConsent(undefined);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+    
+    useEffect(() => {
+        if(isReady) {
+            const loadedVolumes = cookieConsent ? loadVolumes() : defaultVolumes;
+            setVolumes(loadedVolumes);
+            setCurrentTempo(60); 
+            setTempo(60);
+            setSwing(loadedVolumes.swing);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isReady, cookieConsent]);
     
     useEffect(() => {
         if (isReady && activeMelodyInstrument) {
@@ -252,7 +275,7 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isReady]);
     
-    const handleChannelEffectChange = (
+    const handleChannelEffectChange = useCallback((
         channel: 'melody' | 'manualBass' | 'latch', 
         effect: 'reverbSend' | 'distortion', 
         value: number
@@ -261,13 +284,14 @@ export default function Home() {
         const updatedChannel = { ...newVolumes[channel], [effect]: value };
         newVolumes[channel] = updatedChannel;
 
-        if (channel === 'manualBass' || channel === 'latch') {
-            newVolumes.manualBass = { ...newVolumes.manualBass, [effect]: value };
+        if (channel === 'manualBass') {
             newVolumes.latch = { ...newVolumes.latch, [effect]: value };
+        } else if (channel === 'latch') {
+            newVolumes.manualBass = { ...newVolumes.manualBass, [effect]: value };
         }
         
         handleMixerChange(newVolumes);
-    };
+    }, [volumes, handleMixerChange]);
 
     const handleStartApp = useCallback(() => {
         startApp();
@@ -478,5 +502,3 @@ export default function Home() {
         </div>
     );
 }
-
-    

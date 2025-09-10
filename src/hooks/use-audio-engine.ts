@@ -8,11 +8,11 @@ import { OrbManager } from '@/lib/orb-manager';
 import type { Volumes, Instrument, BassInstrument, CompressorSettings } from '@/types';
 
 interface UseAudioEngineProps {
-    initialVolumes: Volumes;
     onVolumesChanged: (volumes: Volumes) => void;
+    initialVolumes: Volumes;
 }
 
-export function useAudioEngine({ initialVolumes, onVolumesChanged }: UseAudioEngineProps) {
+export function useAudioEngine({ onVolumesChanged, initialVolumes }: UseAudioEngineProps) {
     const { toast } = useToast();
     
     const [isAppStarted, setIsAppStarted] = useState(false);
@@ -34,7 +34,6 @@ export function useAudioEngine({ initialVolumes, onVolumesChanged }: UseAudioEng
                 if (context.state === 'suspended') {
                     await context.resume();
                 }
-                // Pass the onVolumesChanged callback to the engine
                 const engine = new AudioEngine(context, orbManager.current, onVolumesChanged);
                 await engine.initialize();
                 
@@ -84,7 +83,7 @@ export function useAudioEngine({ initialVolumes, onVolumesChanged }: UseAudioEng
     }, []);
 
     useEffect(() => {
-        if (isReady && audioEngine.current) {
+        if (isReady && audioEngine.current && initialVolumes) {
             audioEngine.current.setVolumes(initialVolumes);
         }
     }, [isReady, initialVolumes]);
@@ -123,13 +122,10 @@ export function useAudioEngine({ initialVolumes, onVolumesChanged }: UseAudioEng
         audioEngine.current?.setBassInstrument(instrumentName);
     }, []);
     
-    const handleCompressorChange = useCallback((compressorSettings: CompressorSettings) => {
-        audioEngine.current?.setCompressorSettings(compressorSettings);
-    }, []);
-    
     const setVolumes = useCallback((volumes: Volumes) => {
         audioEngine.current?.setVolumes(volumes);
-    }, []);
+        onVolumesChanged(volumes);
+    }, [onVolumesChanged]);
     
     const setTempo = useCallback((tempo: number) => {
         audioEngine.current?.setTempo(tempo);
@@ -138,17 +134,26 @@ export function useAudioEngine({ initialVolumes, onVolumesChanged }: UseAudioEng
     const setSwing = useCallback((swing: number) => {
         audioEngine.current?.setSwing(swing);
     }, []);
+    
+    const handleCompressorChange = useCallback((compressorSettings: CompressorSettings) => {
+        if(audioEngine.current) {
+            const currentVolumes = audioEngine.current.getVolumes();
+            const newVolumes = {...currentVolumes, compressor: compressorSettings};
+            audioEngine.current.setCompressorSettings(compressorSettings);
+            onVolumesChanged(newVolumes);
+        }
+    }, [onVolumesChanged]);
+    
 
     return {
         isAppStarted,
         isReady,
         isPlaying,
         audioEngine: audioEngine.current,
-        volumes: audioEngine.current?.getVolumes() ?? initialVolumes, 
-        setVolumes,
         orbManager: orbManager.current,
         startApp,
         stopAllSounds,
+        setVolumes,
         setTempo,
         setSwing,
         setMelodyInstrument,
