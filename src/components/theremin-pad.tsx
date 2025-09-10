@@ -111,18 +111,6 @@ export function ThereminPad({
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const isMobile = useIsMobile();
     
-    const [localEffects, setLocalEffects] = useState(effects);
-
-    useEffect(() => {
-        setLocalEffects(effects);
-    }, [effects]);
-
-    const handleEffectChange = (effect: keyof typeof localEffects, value: number) => {
-        const newLocalEffects = { ...localEffects, [effect]: value };
-        setLocalEffects(newLocalEffects);
-        onEffectChange(effect, value);
-    };
-
     // Manage orbs for latch mode
     useEffect(() => {
         if (type === 'bass' && orbManager) {
@@ -274,15 +262,15 @@ export function ThereminPad({
                                 <EffectControl
                                     label="Reverb Send"
                                     icon={Blend}
-                                    level={localEffects.reverbSend}
-                                    onLevelChange={(v) => handleEffectChange('reverbSend', v)}
+                                    level={effects.reverbSend}
+                                    onLevelChange={(v) => onEffectChange('reverbSend', v)}
                                     min={-48} max={0} step={1} unit="dB"
                                 />
                                 <EffectControl
                                     label="Distortion"
                                     icon={Waves}
-                                    level={localEffects.distortion}
-                                    onLevelChange={(v) => handleEffectChange('distortion', v)}
+                                    level={effects.distortion}
+                                    onLevelChange={(v) => onEffectChange('distortion', v)}
                                     min={0} max={100} step={1} unit="%"
                                 />
                             </div>

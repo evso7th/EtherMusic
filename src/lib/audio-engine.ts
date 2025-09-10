@@ -78,7 +78,6 @@ export class AudioEngine {
     public orbManager: OrbManager;
     private mediaRecorder: MediaRecorder | null = null;
     private recordedChunks: Blob[] = [];
-    private eventEmitter: Emitter<AudioEngineEvents>;
 
     private masterOut: GainNode;
     private preCompressorOut: GainNode;
@@ -89,7 +88,6 @@ export class AudioEngine {
     private convolver: ConvolverNode;
     
     private drumMachine: DrumMachine;
-    private drumWorklet: AudioWorkletNode | null = null;
 
     private nodes = new Map<SynthPartName | 'drums', { 
         worklet: AudioWorkletNode, 
@@ -122,7 +120,6 @@ export class AudioEngine {
     constructor(context: AudioContext, orbManager: OrbManager) {
         this.context = context;
         this.orbManager = orbManager;
-        this.eventEmitter = mitt<AudioEngineEvents>();
         
         this.masterOut = this.context.createGain();
         this.masterOut.connect(this.context.destination);
@@ -154,17 +151,9 @@ export class AudioEngine {
     public get isPlaying(): boolean {
         return this.drumMachine.isPlaying;
     }
-
-    public on(event: keyof AudioEngineEvents, handler: (payload: any) => void) {
-        this.eventEmitter.on(event, handler);
-    }
-    
-    public off(event: keyof AudioEngineEvents, handler: (payload: any) => void) {
-        this.eventEmitter.off(event, handler);
-    }
     
     public getVolumes(): Volumes {
-        return {...this.volumes};
+        return JSON.parse(JSON.stringify(this.volumes)); // Return a deep copy
     }
     
     public async initialize() {
@@ -214,7 +203,7 @@ export class AudioEngine {
         
         this.createDrumChannel();
         
-        this.loadReverbImpulse();
+        await this.loadReverbImpulse();
         
         await this.loadDrumSamples();
         
@@ -253,39 +242,35 @@ export class AudioEngine {
     private createDrumChannel() {
         if (!this.context) return;
 
-        this.drumWorklet = new AudioWorkletNode(this.context, 'drum-processor');
+        const worklet = new AudioWorkletNode(this.context, 'drum-processor');
         const gain = this.context.createGain();
         const reverbSend = this.context.createGain();
 
-        this.drumWorklet.connect(gain);
+        worklet.connect(gain);
         gain.connect(this.preCompressorOut);
         gain.connect(reverbSend).connect(this.reverbSend);
         
-        this.drumWorklet.port.onmessage = (e) => {
+        worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error('[DRUM WORKLET ERROR]', e.data.message);
             }
         };
         
-        this.nodes.set('drums', { worklet: this.drumWorklet, gain: gain, reverbSend: reverbSend });
+        this.nodes.set('drums', { worklet, gain, reverbSend });
     }
     
     private async loadReverbImpulse() {
         try {
             const response = await fetch('/assets/sounds/impulses/space.wav');
             if (!response.ok) {
-                // If the file is not found, we create a fallback reverb and avoid logging a scary error.
                 if (response.status === 404) {
                     console.warn("[AudioEngine] Reverb impulse '/assets/sounds/impulses/space.wav' not found. Using a generated fallback reverb. This is expected if the file doesn't exist.");
-                    this.convolver.buffer = this.createFallbackReverb();
-                } else {
-                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
-            } else {
-                const buffer = await response.arrayBuffer();
-                const audioBuffer = await this.context.decodeAudioData(buffer);
-                this.convolver.buffer = audioBuffer;
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
+            const buffer = await response.arrayBuffer();
+            const audioBuffer = await this.context.decodeAudioData(buffer);
+            this.convolver.buffer = audioBuffer;
         } catch (e) {
             console.warn("[AudioEngine] Could not load or decode reverb impulse, using fallback.", e);
             this.convolver.buffer = this.createFallbackReverb();
@@ -310,7 +295,6 @@ export class AudioEngine {
         if (!this.isInitialized) return;
         this.drumMachine.stop();
         this.nodes.forEach((node, name) => {
-             // We don't want to stop the drum worklet, just the synth voices
             if (name !== 'drums') {
                 node.worklet.port.postMessage({ type: 'allNotesOff' });
             }
@@ -422,7 +406,7 @@ export class AudioEngine {
         }
     }
     
-    public setBassInstrument(instrumentName: BassInstrument) {
+    public setBassInstrument(instrumentName: BassInstrument): Volumes {
         const preset = bassInstruments.find(i => i.id === instrumentName);
         if (preset) {
             const bassPresetParams = preset.params as BassInstrumentPresetParams;
@@ -431,17 +415,18 @@ export class AudioEngine {
             this.nodes.get('manualBass')?.worklet.port.postMessage(message);
             this.nodes.get('latch')?.worklet.port.postMessage(message);
             
-            // Create a new volume object based on the current state
-            const newVolumes: Volumes = JSON.parse(JSON.stringify(this.volumes));
-
+            // Update volumes based on preset and apply them
+            const newVolumes = JSON.parse(JSON.stringify(this.volumes));
             newVolumes.manualBass.reverbSend = bassPresetParams.reverbSend ?? newVolumes.manualBass.reverbSend;
             newVolumes.manualBass.distortion = bassPresetParams.distortion ?? newVolumes.manualBass.distortion;
             newVolumes.latch.reverbSend = bassPresetParams.reverbSend ?? newVolumes.latch.reverbSend;
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
-
             this.setVolumes(newVolumes);
-            this.eventEmitter.emit('volumesChanged', newVolumes);
+            
+            // Return the updated volumes object so the UI can sync
+            return newVolumes;
         }
+        return this.volumes;
     }
     
     public setBeatPattern(patternName: string) {
@@ -457,7 +442,7 @@ export class AudioEngine {
     }
     
     public playDrumSample(sampleName: string, volume: number = 1.0) {
-        const drumNode = this.nodes.get('drums');
+        const drumNode = this.nodes.get('drums')?.worklet;
         if (!drumNode) {
             return;
         }

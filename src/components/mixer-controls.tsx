@@ -52,7 +52,7 @@ type VolumeChannel = keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing'
 
 interface MixerControlsProps {
     volumes: Volumes;
-    onMixerChange: (newVolumes: Partial<Volumes>) => void;
+    onMixerChange: (newVolumes: Volumes) => void;
     onCompressorChange: (compressorSettings: CompressorSettings) => void;
     tempo: number;
     setTempo: (tempo: number) => void;
@@ -89,14 +89,14 @@ export function MixerControls({
 
     const handleChannelVolumeChange = (part: VolumeChannel, value: number) => {
         setLocalVolumes(prev => {
-            const newChannelVolumes = { ...(prev[part] as ChannelVolumes), gain: value };
+            const newChannelVolumes = { ...prev[part] as ChannelVolumes, gain: value };
             const newVolumes = { ...prev, [part]: newChannelVolumes };
 
             // Sync bass and latch volumes
             if (part === 'manualBass') {
-                newVolumes.latch.gain = value;
+                newVolumes.latch = { ...newVolumes.latch, gain: value };
             } else if (part === 'latch') {
-                newVolumes.manualBass.gain = value;
+                newVolumes.manualBass = { ...newVolumes.manualBass, gain: value };
             }
 
             return newVolumes;
