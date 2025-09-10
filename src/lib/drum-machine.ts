@@ -108,12 +108,10 @@ export class DrumMachine {
              if (newPattern.name !== 'Off') {
                 this.play();
             }
-        } else {
-             console.warn(`[DrumMachine] Pattern "${patternName}" not found.`);
         }
     }
 
-    private play() {
+    public play() {
         if (this.isPlaying || !this._pattern || this._pattern.sequence.length === 0) {
             return;
         }
@@ -135,8 +133,8 @@ export class DrumMachine {
     }
 
     private scheduler() {
-        const isFillMeasure = this.fills.length > 0 && this.measureCount === 3;
-        const currentPattern = isFillMeasure && this._pattern.type !== 'Meditative'
+        const isFillMeasure = this.fills.length > 0 && this._pattern.type !== 'Meditative' && this.measureCount === 3;
+        const currentPattern = isFillMeasure 
             ? this.fills[Math.floor(Math.random() * this.fills.length)] 
             : this._pattern;
 
@@ -168,7 +166,3 @@ export class DrumMachine {
         this.timeoutId = window.setTimeout(() => this.scheduler(), delay * 1000);
     }
 }
-
-    
-
-    

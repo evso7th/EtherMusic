@@ -291,22 +291,17 @@ export default function Home() {
         effect: 'reverbSend' | 'distortion', 
         value: number
     ) => {
-        setVolumesState(prevVolumes => {
-            const newVolumes = JSON.parse(JSON.stringify(prevVolumes));
-            const targetChannel = (channel === 'bass' ? 'manualBass' : channel) as 'melody' | 'manualBass' | 'latch';
-            
-            newVolumes[targetChannel][effect] = value;
-
-            if (targetChannel === 'manualBass') {
-                 newVolumes.latch[effect] = value;
-            } else if (targetChannel === 'latch') {
-                 newVolumes.manualBass[effect] = value;
-            }
-            
-            handleMixerChange(newVolumes);
-            return newVolumes;
+        handleMixerChange({
+            [channel]: {
+                ...volumes[channel],
+                [effect]: value
+            },
+            ...( (channel === 'manualBass' || channel === 'latch') && { 
+                manualBass: { ...volumes.manualBass, [effect]: value },
+                latch: { ...volumes.latch, [effect]: value }
+            })
         });
-    }, [handleMixerChange]);
+    }, [handleMixerChange, volumes]);
 
     const handleStartApp = useCallback(() => {
         startApp();
@@ -385,7 +380,7 @@ export default function Home() {
         )
     }
 
-    if (isAppStarted && (!isReady || !volumes)) {
+    if (isAppStarted && !isReady) {
         return <Preloader />;
     }
     

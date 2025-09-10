@@ -146,5 +146,3 @@ export interface AutopilotSettings {
         bass: BassInstrument;
     }
 }
-
-    

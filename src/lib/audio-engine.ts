@@ -263,8 +263,11 @@ export class AudioEngine {
                  if (response.status === 404) {
                     console.log("[AudioEngine] Reverb impulse '/assets/sounds/impulses/space.wav' not found. Using a generated fallback reverb. This is expected if the file doesn't exist.");
                 } else {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    console.error(`[AudioEngine] HTTP error! status: ${response.status}`);
                 }
+                // Don't re-throw, just proceed to fallback.
+                this.convolver.buffer = this.createFallbackReverb();
+                return;
             }
             const buffer = await response.arrayBuffer();
             const audioBuffer = await this.context.decodeAudioData(buffer);
@@ -478,13 +481,12 @@ export class AudioEngine {
         }
     }
 
-    private applyVolumeForPart(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' | 'autoplay' >, volumes: ChannelVolumes) {
-        const rampTime = this.context.currentTime + 0.05;
-    
+    private applyVolumeForPart(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' >, volumes: ChannelVolumes) {
         const nodeInfo = this.nodes.get(partName);
         if (nodeInfo) {
-            nodeInfo.gain.gain.linearRampToValueAtTime(dbToGain(volumes.gain), rampTime);
-            nodeInfo.reverbSend.gain.linearRampToValueAtTime(dbToGain(volumes.reverbSend), rampTime);
+            // Ramping is now handled inside the worklet for synths, but gain nodes are fine here.
+            nodeInfo.gain.gain.setValueAtTime(dbToGain(volumes.gain), this.context.currentTime);
+            nodeInfo.reverbSend.gain.setValueAtTime(dbToGain(volumes.reverbSend), this.context.currentTime);
             if (nodeInfo.distortion) {
                 nodeInfo.distortion.curve = createDistortionCurve(volumes.distortion);
             }
@@ -494,14 +496,13 @@ export class AudioEngine {
     public setVolumes(newVolumes: Volumes) {
         if (!this.isInitialized || !this.context) return;
         this.volumes = newVolumes;
-        const rampTime = this.context.currentTime + 0.05;
 
         this.applyVolumeForPart('melody', newVolumes.melody);
         this.applyVolumeForPart('manualBass', newVolumes.manualBass);
         this.applyVolumeForPart('latch', newVolumes.latch);
         this.applyVolumeForPart('drums', newVolumes.drums);
         
-        this.reverbReturnGain.gain.linearRampToValueAtTime(dbToGain(this.volumes.reverbReturn), rampTime);
+        this.reverbReturnGain.gain.setValueAtTime(dbToGain(this.volumes.reverbReturn), this.context.currentTime);
         this.setCompressorSettings(this.volumes.compressor);
         this.setSwing(this.volumes.swing ?? 0);
     }

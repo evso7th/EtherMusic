@@ -184,13 +184,10 @@ export function ThereminPad({
     
     const handleEffectChange = useCallback((effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => {
         setLocalEffects(prev => ({...prev, [effect]: value}));
-    }, []);
-
-    const handleEffectCommit = useCallback((effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => {
         const channelType = type === 'bass' ? 'manualBass' : type;
         onEffectChange(channelType, effect, value);
     }, [type, onEffectChange]);
-    
+
     const renderSettingsControls = () => {
         const triggerButton = (
              <Button variant="outline" size="sm" className={cn("h-8 capitalize",
@@ -282,7 +279,7 @@ export function ThereminPad({
                                     icon={Blend}
                                     level={localEffects.reverbSend}
                                     onLevelChange={(v) => handleEffectChange('reverbSend', v)}
-                                    onLevelCommit={(v) => handleEffectCommit('reverbSend', v)}
+                                    onLevelCommit={(v) => { /* Already handled by onLevelChange */ }}
                                     min={-48} max={0} step={1} unit="dB"
                                 />
                                 <EffectControl
@@ -290,7 +287,7 @@ export function ThereminPad({
                                     icon={Waves}
                                     level={localEffects.distortion}
                                     onLevelChange={(v) => handleEffectChange('distortion', v)}
-                                    onLevelCommit={(v) => handleEffectCommit('distortion', v)}
+                                    onLevelCommit={(v) => { /* Already handled by onLevelChange */ }}
                                     min={0} max={100} step={1} unit="%"
                                 />
                             </div>
@@ -367,4 +364,3 @@ export function ThereminPad({
         </Card>
     );
 }
-

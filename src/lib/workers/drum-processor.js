@@ -1,16 +1,22 @@
 
+// This script is designed to be loaded into an AudioWorklet.
+// It is responsible for playing back pre-loaded drum samples
+// with low latency and high performance, off the main thread.
+
 // A simple voice that plays a sample and then marks itself as finished.
 class Voice {
-    constructor(buffer, gain) {
+    constructor(buffer, gain, sampleRate) {
         this.buffer = buffer; // This is a Float32Array
         this.position = 0;
         this.gain = gain;
         this.isFinished = false;
-        // Add a simple fade-out to prevent clicks
-        this.releaseSamples = Math.floor(sampleRate * 0.01); // 10ms release
+        
+        // A very short release envelope (10ms) to prevent clicks at the end of samples.
+        this.releaseSamples = Math.floor(sampleRate * 0.01); 
+        this.envelope = 1.0;
     }
 
-    // This method processes a block of samples.
+    // This method processes a block of 128 samples (the standard render quantum).
     process(outputChannel) {
         if (this.isFinished) {
             return;
@@ -20,12 +26,11 @@ class Voice {
         const samplesToProcess = Math.min(outputChannel.length, remainingSamples);
 
         for (let i = 0; i < samplesToProcess; i++) {
-            let envelope = 1.0;
-            // Apply fade-out in the last few samples
+            // Apply a fade-out envelope only for the last few samples of the sound.
             if (this.position + i >= this.buffer.length - this.releaseSamples) {
-                envelope = (this.buffer.length - (this.position + i)) / this.releaseSamples;
+                this.envelope = (this.buffer.length - (this.position + i)) / this.releaseSamples;
             }
-            outputChannel[i] += this.buffer[this.position + i] * this.gain * envelope;
+            outputChannel[i] += this.buffer[this.position + i] * this.gain * this.envelope;
         }
 
         this.position += samplesToProcess;
@@ -41,7 +46,7 @@ class DrumProcessor extends AudioWorkletProcessor {
         super();
         this.buffers = new Map();
         this.voices = [];
-        // Increased maxVoices to handle more complex drum patterns and fills
+        // Increased maxVoices to handle more complex drum patterns and fills.
         this.maxVoices = 64; 
 
         this.port.onmessage = this.handleMessage.bind(this);
@@ -58,12 +63,10 @@ class DrumProcessor extends AudioWorkletProcessor {
                 const bufferToPlay = this.buffers.get(sampleName);
                 if (bufferToPlay) {
                     if (this.voices.length >= this.maxVoices) {
+                        // If the voice pool is full, remove the oldest voice to make room.
                         this.voices.shift();
                     }
-                    this.voices.push(new Voice(bufferToPlay, volume ?? 1.0));
-                } else {
-                    // This can be noisy, so we'll only log it if needed for debugging
-                    // this.port.postMessage({ type: 'error', message: `Sample '${sampleName}' not found.` });
+                    this.voices.push(new Voice(bufferToPlay, volume ?? 1.0, sampleRate));
                 }
             }
         } catch (e) {
@@ -79,30 +82,23 @@ class DrumProcessor extends AudioWorkletProcessor {
             return true; // Stop processing if there's no output channel.
         }
 
+        // It's more efficient to clear the buffer once.
         outputChannel.fill(0);
 
         if (this.voices.length === 0) {
             return true; // No active voices, nothing to do.
         }
         
-        // This is a more efficient way to manage active voices.
-        // It avoids creating a new array on every tick.
-        let activeVoiceCount = 0;
-        for (let i = 0; i < this.voices.length; i++) {
-            const voice = this.voices[i];
-            if (!voice.isFinished) {
-                voice.process(outputChannel);
-                // If the voice is still active after processing, keep it.
-                if (!voice.isFinished) {
-                    // Move the active voice to the front of the array.
-                    this.voices[activeVoiceCount++] = voice;
-                }
-            }
+        // Process each voice and add its output to the main output buffer.
+        for (const voice of this.voices) {
+            voice.process(outputChannel);
         }
-        // Truncate the array to only include active voices.
-        this.voices.length = activeVoiceCount;
+
+        // Filter out finished voices to keep the active voices array clean.
+        this.voices = this.voices.filter(v => !v.isFinished);
         
         // A simple limiter to prevent clipping and audio artifacts.
+        // This is a safety measure if many loud samples play at once.
         for (let i = 0; i < outputChannel.length; i++) {
             const sample = outputChannel[i];
             outputChannel[i] = Math.max(-1, Math.min(1, sample));
@@ -113,5 +109,3 @@ class DrumProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('drum-processor', DrumProcessor);
-
-    

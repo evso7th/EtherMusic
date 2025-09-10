@@ -8,10 +8,11 @@ import { OrbManager } from '@/lib/orb-manager';
 import type { Volumes, Instrument, BassInstrument, CompressorSettings } from '@/types';
 
 interface UseAudioEngineProps {
+    initialVolumes: Volumes;
     onVolumesChanged: (volumes: Volumes) => void;
 }
 
-export function useAudioEngine({ onVolumesChanged }: UseAudioEngineProps) {
+export function useAudioEngine({ initialVolumes, onVolumesChanged }: UseAudioEngineProps) {
     const { toast } = useToast();
     
     const [isAppStarted, setIsAppStarted] = useState(false);
@@ -33,6 +34,7 @@ export function useAudioEngine({ onVolumesChanged }: UseAudioEngineProps) {
                 if (context.state === 'suspended') {
                     await context.resume();
                 }
+                // Pass the onVolumesChanged callback to the engine
                 const engine = new AudioEngine(context, orbManager.current, onVolumesChanged);
                 await engine.initialize();
                 
@@ -80,6 +82,13 @@ export function useAudioEngine({ onVolumesChanged }: UseAudioEngineProps) {
         document.removeEventListener('touchstart', resumeAudio);
       };
     }, []);
+
+    useEffect(() => {
+        if (isReady && audioEngine.current) {
+            audioEngine.current.setVolumes(initialVolumes);
+        }
+    }, [isReady, initialVolumes]);
+
 
     const stopAllSounds = useCallback(() => {
         audioEngine.current?.stopAllSounds();
@@ -135,10 +144,11 @@ export function useAudioEngine({ onVolumesChanged }: UseAudioEngineProps) {
         isReady,
         isPlaying,
         audioEngine: audioEngine.current,
+        volumes: audioEngine.current?.getVolumes() ?? initialVolumes, 
+        setVolumes,
         orbManager: orbManager.current,
         startApp,
         stopAllSounds,
-        setVolumes,
         setTempo,
         setSwing,
         setMelodyInstrument,
