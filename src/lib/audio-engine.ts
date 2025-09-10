@@ -7,7 +7,6 @@ import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
 import { bassInstruments } from './bass-presets';
 import { DrumMachine } from './drum-machine';
-import mitt, { Emitter } from 'mitt';
 
 
 function dbToGain(db: number): number {
@@ -238,7 +237,6 @@ export class AudioEngine {
     
     private createDrumChannel() {
         if (!this.context) return;
-
         const worklet = new AudioWorkletNode(this.context, 'drum-processor');
         const gain = this.context.createGain();
         const reverbSend = this.context.createGain();
@@ -269,7 +267,7 @@ export class AudioEngine {
             const audioBuffer = await this.context.decodeAudioData(buffer);
             this.convolver.buffer = audioBuffer;
         } catch (e) {
-            console.warn("[AudioEngine] Could not load or decode reverb impulse, using fallback.", e);
+            console.error("[AudioEngine] Could not load or decode reverb impulse, using fallback.", e);
             this.convolver.buffer = this.createFallbackReverb();
         }
     }
@@ -412,7 +410,7 @@ export class AudioEngine {
             this.nodes.get('manualBass')?.worklet.port.postMessage(message);
             this.nodes.get('latch')?.worklet.port.postMessage(message);
             
-            const newVolumes = JSON.parse(JSON.stringify(this.volumes));
+            const newVolumes = this.getVolumes(); // Get a deep copy
             newVolumes.manualBass.reverbSend = bassPresetParams.reverbSend ?? newVolumes.manualBass.reverbSend;
             newVolumes.manualBass.distortion = bassPresetParams.distortion ?? newVolumes.manualBass.distortion;
             newVolumes.latch.reverbSend = bassPresetParams.reverbSend ?? newVolumes.latch.reverbSend;
@@ -437,7 +435,7 @@ export class AudioEngine {
     }
     
     public playDrumSample(sampleName: string, volume: number = 1.0) {
-        const drumNode = this.nodes.get('drums')?.worklet;
+        const drumNode = this.nodes.get('drums');
         if (!drumNode) {
             return;
         }
@@ -536,5 +534,3 @@ export class AudioEngine {
         }
     }
 }
-
-    

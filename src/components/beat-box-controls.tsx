@@ -22,7 +22,7 @@ interface BeatBoxControlsProps {
     activePattern: BeatPattern;
     onPatternChange: (pattern: BeatPattern) => void;
     volumes: Volumes;
-    onMixerChange: (volumes: Volumes) => void;
+    onMixerChange: (volumes: Partial<Volumes>) => void;
     onCompressorChange: (compressorSettings: CompressorSettings) => void;
     tempo: number;
     setTempo: (tempo: number) => void;
@@ -286,5 +286,3 @@ export function BeatBoxControls({
         </TooltipProvider>
     );
 }
-
-    

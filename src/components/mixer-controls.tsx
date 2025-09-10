@@ -52,7 +52,7 @@ type VolumeChannel = keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing'
 
 interface MixerControlsProps {
     initialVolumes: Volumes;
-    onMixerChange: (newVolumes: Volumes) => void;
+    onMixerChange: (newVolumes: Partial<Volumes>) => void;
     onCompressorChange: (compressorSettings: CompressorSettings) => void;
     initialTempo: number;
     onTempoChange: (tempo: number) => void;
@@ -73,15 +73,11 @@ export function MixerControls({
     closeDialog,
     isAutopilotMixer = false,
 }: MixerControlsProps) {
-    
-    // Local state to manage changes without causing re-renders in the whole app.
     const [localVolumes, setLocalVolumes] = useState(initialVolumes);
     const [localTempo, setLocalTempo] = useState(initialTempo);
     const [localSwing, setLocalSwing] = useState(initialSwing);
     const [localCompressor, setLocalCompressor] = useState(initialVolumes.compressor);
 
-    // This effect synchronizes the local state if the initial props change,
-    // which happens when the dialog is re-opened.
     useEffect(() => {
         setLocalVolumes(initialVolumes);
         setLocalCompressor(initialVolumes.compressor);
@@ -95,7 +91,6 @@ export function MixerControls({
             const newChannelVolumes = { ...(newVolumes[part] as ChannelVolumes), gain: value };
             newVolumes[part] = newChannelVolumes;
 
-            // Sync bass and latch volumes
             if (part === 'manualBass') {
                 newVolumes.latch = { ...newVolumes.latch, gain: value };
             } else if (part === 'latch') {
@@ -119,7 +114,6 @@ export function MixerControls({
     }, []);
 
     const handleApplyChanges = () => {
-        // Apply all changes at once
         onMixerChange(localVolumes);
         onCompressorChange(localCompressor);
         onTempoChange(localTempo);
@@ -169,16 +163,10 @@ export function MixerControls({
                     onVolumeChange={(v) => handleChannelVolumeChange('melody', v)}
                 />
                  <VolumeControl 
-                    label="Bass"
+                    label="Bass / Latch"
                     icon={Waves}
                     volume={localVolumes.manualBass.gain}
                     onVolumeChange={(v) => handleChannelVolumeChange('manualBass', v)}
-                />
-                <VolumeControl 
-                    label="Latch"
-                    icon={Anchor}
-                    volume={localVolumes.latch.gain}
-                    onVolumeChange={(v) => handleChannelVolumeChange('latch', v)}
                 />
                 <VolumeControl 
                     label="Drums"
@@ -252,5 +240,3 @@ export function MixerControls({
         </div>
     );
 }
-
-    
