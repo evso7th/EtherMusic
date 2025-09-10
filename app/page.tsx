@@ -18,9 +18,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
 import { melodyInstruments, defaultMelodyInstrument } from '@/lib/melody-presets';
 import { bassInstruments, defaultBassInstrument } from '@/lib/bass-presets';
-import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, ChannelVolumes, CompressorSettings, BeatPattern } from '@/types';
+import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, BeatPattern } from '@/types';
 import { cn } from '@/lib/utils';
-
 
 function getCookie(name: string): string | null {
     if (typeof document === 'undefined') return null;
@@ -48,9 +47,10 @@ export default function Home() {
     const isMobile = useIsMobile();
     const [isClient, setIsClient] = useState(false);
     
-    // Initialize volumes once, and only on the client
     const [initialVolumes] = useState<Volumes>(() => {
-        if (typeof window === 'undefined') return defaultVolumes;
+        if (typeof window === 'undefined') {
+            return defaultVolumes;
+        }
         return loadVolumes();
     });
 
@@ -89,7 +89,7 @@ export default function Home() {
     const onConsentChange = useCallback((consent: boolean) => {
         setCookieConsent(consent);
         const newVolumes = consent ? loadVolumes() : defaultVolumes;
-        setVolumes(newVolumes); // This comes from useAudioEngine now and updates the engine
+        setVolumes(newVolumes);
         
         if (!consent) {
              if (typeof document !== 'undefined') {
@@ -102,18 +102,15 @@ export default function Home() {
         setIsClient(true);
         const consent = getCookie("ethermusic_consent");
         if (consent !== null) {
-            setCookieConsent(consent === 'true');
+            const hasConsent = consent === 'true';
+            setCookieConsent(hasConsent);
+            if (isReady && hasConsent) {
+                setVolumes(loadVolumes());
+            }
         } else {
             setCookieConsent(undefined);
         }
-    }, []);
-
-    useEffect(() => {
-        if (isReady && cookieConsent !== undefined) {
-             const newVolumes = loadVolumes();
-             setVolumes(newVolumes);
-        }
-    }, [isReady, cookieConsent, setVolumes]);
+    }, [isReady, setVolumes]);
 
     useEffect(() => {
         if (isReady && activeMelodyInstrument) {
@@ -166,8 +163,8 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isReady]);
     
-    const handleMixerChange = useCallback((mixerState: Partial<Volumes> | ((v: Volumes) => Volumes)) => {
-        setVolumes(mixerState);
+    const handleMixerApply = useCallback((newVolumes: Volumes) => {
+        setVolumes(newVolumes);
     }, [setVolumes]);
     
     const handleChannelEffectChange = useCallback((
@@ -187,18 +184,6 @@ export default function Home() {
         });
     }, [setVolumes]);
     
-    const handleCompressorChange = useCallback((compressorSettings: CompressorSettings) => {
-        setVolumes(prev => ({...prev, compressor: compressorSettings }));
-    }, [setVolumes]);
-    
-    const handleTempoChange = useCallback((newTempo: number) => {
-        setVolumes(prev => ({ ...prev, tempo: newTempo }));
-    }, [setVolumes]);
-    
-    const handleSwingChange = useCallback((swingValue: number) => {
-        setVolumes(prev => ({ ...prev, swing: swingValue }));
-    }, [setVolumes]);
-
     const handleStartApp = useCallback(() => {
         startApp(initialVolumes);
     }, [startApp, initialVolumes]);
@@ -368,14 +353,9 @@ export default function Home() {
                         <BeatBoxControls
                             activePattern={activePattern}
                             onPatternChange={handlePatternChange}
-                            volumes={volumes}
-                            onMixerChange={handleMixerChange}
-                            onCompressorChange={handleCompressorChange}
+                            initialVolumes={volumes}
+                            onApply={handleMixerApply}
                             isMobile={isMobile}
-                            tempo={currentTempo}
-                            setTempo={handleTempoChange}
-                            swing={volumes.swing || 0}
-                            setSwing={handleSwingChange}
                         />
                     </div>
                 </main>
@@ -384,18 +364,14 @@ export default function Home() {
                      <BeatBoxControls
                         activePattern={activePattern}
                         onPatternChange={handlePatternChange}
-                        volumes={volumes}
-                        onMixerChange={handleMixerChange}
-                        onCompressorChange={handleCompressorChange}
+                        initialVolumes={volumes}
+                        onApply={handleMixerApply}
                         isMobile={isMobile}
                         isLandscape={true}
-                        tempo={currentTempo}
-                        setTempo={handleTempoChange}
-                        swing={volumes.swing || 0}
-                        setSwing={handleSwingChange}
                     />
                 </div>
             </div>
         </div>
     );
 }
+
