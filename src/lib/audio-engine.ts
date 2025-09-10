@@ -1,13 +1,12 @@
 
 'use client';
 
-import type { Volumes, Instrument, BassInstrument, CompressorSettings, InstrumentPreset, BassInstrumentPresetParams, ChannelVolumes, SynthNote, WorkerMessage, DrumWorkerMessage } from '@/types';
+import type { Volumes, Instrument, BassInstrument, CompressorSettings, BassInstrumentPresetParams, ChannelVolumes, SynthNote, WorkerMessage, DrumWorkerMessage } from '@/types';
 import { OrbManager } from './orb-manager';
 import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
 import { bassInstruments } from './bass-presets';
 import { DrumMachine } from './drum-machine';
-import mitt, { Emitter } from 'mitt';
 
 
 function dbToGain(db: number): number {
@@ -73,6 +72,7 @@ export class AudioEngine {
     public isInitialized = false;
     private context!: AudioContext;
     public orbManager: OrbManager;
+    private onVolumesChanged: (volumes: Volumes) => void;
     private mediaRecorder: MediaRecorder | null = null;
     private recordedChunks: Blob[] = [];
 
@@ -114,9 +114,10 @@ export class AudioEngine {
     private activePointers = new Map<number, { type: 'melody' | 'bass', noteId: number }>();
     private nextNoteId = 0;
     
-    constructor(context: AudioContext, orbManager: OrbManager) {
+    constructor(context: AudioContext, orbManager: OrbManager, onVolumesChanged: (volumes: Volumes) => void) {
         this.context = context;
         this.orbManager = orbManager;
+        this.onVolumesChanged = onVolumesChanged;
         
         this.masterOut = this.context.createGain();
         this.masterOut.connect(this.context.destination);
@@ -200,7 +201,7 @@ export class AudioEngine {
         
         this.createDrumChannel();
         
-        this.loadReverbImpulse();
+        await this.loadReverbImpulse();
         
         await this.loadDrumSamples();
         
@@ -259,11 +260,11 @@ export class AudioEngine {
         try {
             const response = await fetch('/assets/sounds/impulses/space.wav');
             if (!response.ok) {
-                // This is now an expected outcome if the file doesn't exist.
-                // We just log it and proceed to the fallback.
-                console.log("[AudioEngine] Reverb impulse '/assets/sounds/impulses/space.wav' not found. Using a generated fallback reverb. This is expected if the file doesn't exist.");
-                this.convolver.buffer = this.createFallbackReverb();
-                return;
+                 if (response.status === 404) {
+                    console.log("[AudioEngine] Reverb impulse '/assets/sounds/impulses/space.wav' not found. Using a generated fallback reverb. This is expected if the file doesn't exist.");
+                } else {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
             }
             const buffer = await response.arrayBuffer();
             const audioBuffer = await this.context.decodeAudioData(buffer);
@@ -403,7 +404,7 @@ export class AudioEngine {
         }
     }
     
-    public setBassInstrument(instrumentName: BassInstrument): Volumes | undefined {
+    public setBassInstrument(instrumentName: BassInstrument) {
         const preset = bassInstruments.find(i => i.id === instrumentName);
         if (preset) {
             const bassPresetParams = preset.params as BassInstrumentPresetParams;
@@ -419,9 +420,9 @@ export class AudioEngine {
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
             this.setVolumes(newVolumes);
-            return newVolumes;
+            // Notify the UI about the volume change from the preset
+            this.onVolumesChanged(newVolumes);
         }
-        return undefined;
     }
     
     public setBeatPattern(patternName: string) {
@@ -477,7 +478,7 @@ export class AudioEngine {
         }
     }
 
-    private applyVolumeForPart(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' >, volumes: ChannelVolumes) {
+    private applyVolumeForPart(partName: keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' | 'autoplay' >, volumes: ChannelVolumes) {
         const rampTime = this.context.currentTime + 0.05;
     
         const nodeInfo = this.nodes.get(partName);
@@ -536,5 +537,3 @@ export class AudioEngine {
         }
     }
 }
-
-    

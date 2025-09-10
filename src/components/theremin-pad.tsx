@@ -25,6 +25,7 @@ const EffectControl = ({
     icon: Icon,
     level,
     onLevelChange,
+    onLevelCommit,
     min,
     max,
     step,
@@ -34,6 +35,7 @@ const EffectControl = ({
     icon: React.ElementType,
     level: number,
     onLevelChange: (v: number) => void,
+    onLevelCommit: (v: number) => void,
     min: number,
     max: number,
     step: number,
@@ -52,6 +54,7 @@ const EffectControl = ({
                 step={step}
                 value={[level ?? 0]}
                 onValueChange={(v) => onLevelChange(v[0])}
+                onValueCommit={(v) => onLevelCommit(v[0])}
             />
         </div>
     </div>
@@ -111,10 +114,8 @@ export function ThereminPad({
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const isMobile = useIsMobile();
     
-    // Local state for effect controls to provide real-time feedback
     const [localEffects, setLocalEffects] = useState(effects);
 
-    // Sync local state when props change
     useEffect(() => {
         setLocalEffects(effects);
     }, [effects]);
@@ -180,12 +181,15 @@ export function ThereminPad({
             (event.target as HTMLElement).releasePointerCapture(event.pointerId);
         }
     }, [calculateInteraction, isDisabled, onInteraction, type, isLatchOn]);
-
-    const handleEffectChange = (effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => {
-        const channelType = type === 'bass' ? 'manualBass' : type;
+    
+    const handleEffectChange = useCallback((effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => {
         setLocalEffects(prev => ({...prev, [effect]: value}));
+    }, []);
+
+    const handleEffectCommit = useCallback((effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => {
+        const channelType = type === 'bass' ? 'manualBass' : type;
         onEffectChange(channelType, effect, value);
-    }
+    }, [type, onEffectChange]);
     
     const renderSettingsControls = () => {
         const triggerButton = (
@@ -278,6 +282,7 @@ export function ThereminPad({
                                     icon={Blend}
                                     level={localEffects.reverbSend}
                                     onLevelChange={(v) => handleEffectChange('reverbSend', v)}
+                                    onLevelCommit={(v) => handleEffectCommit('reverbSend', v)}
                                     min={-48} max={0} step={1} unit="dB"
                                 />
                                 <EffectControl
@@ -285,6 +290,7 @@ export function ThereminPad({
                                     icon={Waves}
                                     level={localEffects.distortion}
                                     onLevelChange={(v) => handleEffectChange('distortion', v)}
+                                    onLevelCommit={(v) => handleEffectCommit('distortion', v)}
                                     min={0} max={100} step={1} unit="%"
                                 />
                             </div>
@@ -362,4 +368,3 @@ export function ThereminPad({
     );
 }
 
-    
