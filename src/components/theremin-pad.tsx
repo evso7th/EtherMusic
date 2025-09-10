@@ -80,7 +80,7 @@ interface ThereminPadProps {
     onLatchToggle?: (checked: boolean) => void;
     orbManager?: OrbManager | null;
     effects: Omit<ChannelVolumes, 'gain'>;
-    onEffectChange: (channel: 'melody' | 'manualBass' | 'latch', effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => void;
+    onEffectChange: (channel: 'melody' | 'bass', effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => void;
 }
 
 const padTitles = {
@@ -183,8 +183,7 @@ export function ThereminPad({
     }, [calculateInteraction, isDisabled, onInteraction, type, isLatchOn]);
     
      const handleEffectCommit = useCallback((effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => {
-        const channelType = type === 'bass' ? 'manualBass' : type;
-        onEffectChange(channelType, effect, value);
+        onEffectChange(type, effect, value);
     }, [type, onEffectChange]);
 
     const renderSettingsControls = () => {

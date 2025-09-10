@@ -7,19 +7,30 @@ import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
 import type { Volumes, Instrument, BassInstrument, CompressorSettings } from '@/types';
 
-export function useAudioEngine(initialVolumes: Volumes) {
+// This function is now outside the component to avoid being part of the props
+function getCookie(name: string): string | null {
+    if (typeof document === 'undefined') return null;
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+    return null;
+}
+
+export function useAudioEngine(defaultVolumes: Volumes) {
     const { toast } = useToast();
     
     const [isAppStarted, setIsAppStarted] = useState(false);
     const [isReady, setIsReady] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
-    const [currentTempo, setCurrentTempo] = useState(60);
+    const [currentTempo, setCurrentTempo] = useState(defaultVolumes.swing);
 
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
-    const [volumes, setVolumes] = useState<Volumes>(initialVolumes);
     
-    const initializeAudioEngine = useCallback(async () => {
+    // The volumes state is now managed inside the hook, not passed in from Home.
+    const [volumes, setVolumesState] = useState<Volumes>(defaultVolumes);
+    
+    const initializeAudioEngine = useCallback(async (initialVols: Volumes) => {
         try {
             if (!orbManager.current) {
                 const padContainer = document.querySelector('main');
@@ -38,6 +49,9 @@ export function useAudioEngine(initialVolumes: Volumes) {
                     setIsPlaying(playing);
                 });
                 
+                engine.setVolumes(initialVols);
+                setCurrentTempo(initialVols.swing);
+                
                 audioEngine.current = engine;
             }
             
@@ -54,15 +68,14 @@ export function useAudioEngine(initialVolumes: Volumes) {
         }
     }, [toast]);
 
-    const startApp = useCallback(async () => {
+    const startApp = useCallback(async (initialVols: Volumes) => {
         if (isAppStarted) return;
         
         setIsAppStarted(true);
-        // Play a subtle transition sound
         const audio = new Audio('/assets/sounds/transition.webm');
         audio.play().catch(e => console.error("Error playing transition sound:", e));
         
-        await initializeAudioEngine();
+        await initializeAudioEngine(initialVols);
     }, [isAppStarted, initializeAudioEngine]);
 
     useEffect(() => {
@@ -79,15 +92,30 @@ export function useAudioEngine(initialVolumes: Volumes) {
       };
     }, []);
 
-    // Effect to apply volumes when they change
-    useEffect(() => {
-        if (audioEngine.current) {
-            audioEngine.current.setVolumes(volumes);
-        }
-    }, [volumes]);
-
     const stopAllSounds = useCallback(() => {
         audioEngine.current?.stopAllSounds();
+    }, []);
+
+    const setVolumes = useCallback((newVolumes: Partial<Volumes> | ((v: Volumes) => Partial<Volumes>)) => {
+        setVolumesState(prev => {
+            const updatedPartial = typeof newVolumes === 'function' ? newVolumes(prev) : newVolumes;
+            const updated = { ...prev, ...updatedPartial };
+            audioEngine.current?.setVolumes(updated);
+
+            // Also save to cookies if consent is given
+            if (getCookie("ethermusic_consent") === 'true') {
+                try {
+                    const cookieValue = JSON.stringify(updated);
+                    const date = new Date();
+                    date.setTime(date.getTime() + (365 * 24 * 60 * 60 * 1000));
+                    const expires = "; expires=" + date.toUTCString();
+                    document.cookie = "ethermusic_volumes=" + (cookieValue || "") + expires + "; path=/; SameSite=Lax";
+                } catch (e) {
+                    console.error("Failed to save volume settings to cookies", e);
+                }
+            }
+            return updated;
+        });
     }, []);
 
     const setTempo = useCallback((tempo: number) => {
@@ -96,8 +124,7 @@ export function useAudioEngine(initialVolumes: Volumes) {
     }, []);
 
     const setSwing = useCallback((swing: number) => {
-        audioEngine.current?.setSwing(swing);
-        setVolumes(v => ({...v, swing}));
+        setVolumes({ swing });
     }, [setVolumes]);
     
     const setBeatPattern = useCallback((patternName: string) => {
@@ -125,18 +152,24 @@ export function useAudioEngine(initialVolumes: Volumes) {
         audioEngine.current?.setMelodyInstrument(instrumentName);
     }, []);
     
-    const setBassInstrument = useCallback((instrumentName: BassInstrument): Volumes | undefined => {
+    const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
         const newVolumes = audioEngine.current?.setBassInstrument(instrumentName);
         if (newVolumes) {
-            setVolumes(newVolumes);
+            setVolumesState(newVolumes); // Update internal state directly
+             if (getCookie("ethermusic_consent") === 'true') {
+                 try {
+                    setCookie("ethermusic_volumes", JSON.stringify(newVolumes), 365);
+                 } catch (e) {
+                    console.error("Failed to save volume settings to cookies", e);
+                 }
+            }
         }
-        return newVolumes;
     }, []);
     
     const handleCompressorChange = useCallback((compressorSettings: CompressorSettings) => {
-        audioEngine.current?.setCompressorSettings(compressorSettings);
         setVolumes(v => ({...v, compressor: compressorSettings }));
     }, [setVolumes]);
+    
 
     return {
         isAppStarted,
@@ -159,6 +192,5 @@ export function useAudioEngine(initialVolumes: Volumes) {
         handleThereminInteraction,
         handleCompressorChange,
         currentTempo,
-        setCurrentTempo
     };
 }

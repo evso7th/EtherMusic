@@ -36,7 +36,7 @@ export function CookieConsent({ onConsentChange }: CookieConsentProps) {
         if (consent === null) {
             setShowConsent(true);
         } else {
-             // Defer the call to avoid state updates during render, which can cause loops
+            // Deferring this call slightly to ensure it doesn't run during a render cycle
             setTimeout(() => onConsentChange(consent === 'true'), 0);
         }
     }, [onConsentChange]);
@@ -74,5 +74,3 @@ export function CookieConsent({ onConsentChange }: CookieConsentProps) {
         </div>
     );
 }
-
-    

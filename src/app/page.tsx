@@ -30,17 +30,6 @@ function getCookie(name: string): string | null {
     return null;
 }
 
-function setCookie(name: string, value: string, days: number) {
-    if (typeof document === 'undefined') return;
-    let expires = "";
-    if (days) {
-        const date = new Date();
-        date.setTime(date.getTime() + (days*24*60*60*1000));
-        expires = "; expires=" + date.toUTCString();
-    }
-    document.cookie = name + "=" + (value || "")  + expires + "; path=/; SameSite=Lax";
-}
-
 const defaultVolumes: Volumes = { 
     melody: { gain: 0, reverbSend: -18, distortion: 0 },
     manualBass: { gain: -25, reverbSend: -48, distortion: 0 },
@@ -94,17 +83,6 @@ function loadVolumes(): Volumes {
     }
 }
 
-function saveVolumes(volumes: Volumes) {
-    if (typeof window === 'undefined' || getCookie("ethermusic_consent") !== 'true') {
-        return;
-    }
-    try {
-        setCookie("ethermusic_volumes", JSON.stringify(volumes), 365);
-    } catch (e) {
-        console.error("Failed to save volume settings to cookies", e);
-    }
-}
-
 
 const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
 const MemoizedThereminPad = memo(ThereminPad);
@@ -123,9 +101,9 @@ export default function Home() {
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [isClient, setIsClient] = useState(false);
-    const [cookieConsent, setCookieConsent] = useState<boolean | undefined>(undefined);
     
-    const [volumes, setVolumesState] = useState<Volumes>(defaultVolumes);
+    // initialVolumes is now a stable reference thanks to useState initializer
+    const [initialVolumes] = useState<Volumes>(loadVolumes);
 
     const {
         isAppStarted,
@@ -140,8 +118,17 @@ export default function Home() {
         stopRecording,
         handleThereminInteraction,
         setMelodyInstrument,
+        setBassInstrument,
         orbManager,
-    } = useAudioEngine();
+        volumes,
+        setVolumes,
+        setTempo,
+        setSwing,
+        handleCompressorChange,
+        currentTempo,
+    } = useAudioEngine(initialVolumes);
+
+    const [cookieConsent, setCookieConsent] = useState<boolean | undefined>(undefined);
     
     const [isRecording, setIsRecording] = useState(false);
     const [activePattern, setActivePattern] = useState<BeatPattern>(beatPatterns.find(p => p.name === 'Off')!);
@@ -153,101 +140,58 @@ export default function Home() {
     const [activeBassInstrument, setActiveBassInstrument] = useState<BassInstrument>(defaultBassInstrument);
     
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
-    const [currentTempo, setCurrentTempo] = useState(60);
-    
-    const setVolumes = useCallback((newVolumes: Partial<Volumes> | ((v: Volumes) => Volumes)) => {
-        setVolumesState(prev => {
-            const updated = typeof newVolumes === 'function' ? newVolumes(prev) : {...prev, ...newVolumes};
-            audioEngine?.setVolumes(updated);
-            if (cookieConsent) {
-                saveVolumes(updated);
-            }
-            return updated;
-        });
-    }, [audioEngine, cookieConsent]);
-
-    const setTempo = useCallback((newTempo: number) => {
-        setCurrentTempo(newTempo);
-        audioEngine?.setTempo(newTempo);
-    }, [audioEngine]);
-
-    const setSwing = useCallback((swingValue: number) => {
-        setVolumes(v => ({...v, swing: swingValue}));
-        audioEngine?.setSwing(swingValue);
-    }, [audioEngine, setVolumes]);
-
-    const handleCompressorChange = useCallback((compressorSettings: CompressorSettings) => {
-        setVolumes(v => ({...v, compressor: compressorSettings}));
-        audioEngine?.setCompressorSettings(compressorSettings);
-    }, [audioEngine, setVolumes]);
-
-    const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
-        const newVolumes = audioEngine?.setBassInstrument(instrumentName);
-        if (newVolumes) {
-            setVolumesState(newVolumes); // Directly set the state from the engine's return value
-             if (cookieConsent) {
-                saveVolumes(newVolumes);
-            }
-        }
-    }, [audioEngine, cookieConsent]);
 
     const onConsentChange = useCallback((consent: boolean) => {
         setCookieConsent(consent);
-        if (consent) {
-            const loadedVolumes = loadVolumes();
-            setVolumesState(loadedVolumes);
-            audioEngine?.setVolumes(loadedVolumes);
-            setCurrentTempo(60); 
-            audioEngine?.setTempo(60);
-            audioEngine?.setSwing(loadedVolumes.swing);
-        } else {
-            setVolumesState(defaultVolumes);
-            audioEngine?.setVolumes(defaultVolumes);
-            setCurrentTempo(60);
-            audioEngine?.setTempo(60);
-            if (typeof document !== 'undefined') {
+        const newVolumes = consent ? loadVolumes() : defaultVolumes;
+        setVolumes(newVolumes); // This now comes from useAudioEngine
+        
+        if (!consent) {
+             if (typeof document !== 'undefined') {
                 document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
             }
         }
-    }, [audioEngine]);
-
+    }, [setVolumes]);
 
     useEffect(() => {
         setIsClient(true);
         const consent = getCookie("ethermusic_consent");
         if (consent !== null) {
-            const initialConsent = consent === 'true';
-            setCookieConsent(initialConsent);
-            if (initialConsent) {
-                setVolumesState(loadVolumes());
-            }
+            setCookieConsent(consent === 'true');
         } else {
             setCookieConsent(undefined);
         }
     }, []);
-    
-    // Load settings from cookies into the audio engine once it's ready.
+
+    // Effect to apply initial loaded volumes when consent is known and engine is ready
     useEffect(() => {
-        if(isReady) {
-            const loadedVolumes = cookieConsent ? loadVolumes() : defaultVolumes;
-            setVolumesState(loadedVolumes);
-            audioEngine?.setVolumes(loadedVolumes);
-            setCurrentTempo(60); 
-            audioEngine?.setTempo(60);
-            audioEngine?.setSwing(loadedVolumes.swing);
+        if (isReady && cookieConsent !== undefined) {
+            const newVolumes = cookieConsent ? loadVolumes() : defaultVolumes;
+            setVolumes(newVolumes);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isReady, cookieConsent, audioEngine]); // Add audioEngine to dependency array
-    
+    }, [isReady, cookieConsent, setVolumes]);
+
     useEffect(() => {
         if (isReady && activeMelodyInstrument) {
             setMelodyInstrument(activeMelodyInstrument);
         }
+    }, [isReady, activeMelodyInstrument, setMelodyInstrument]);
+
+    const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
+        setActiveBassInstrument(instrumentId);
+        setBassInstrument(instrumentId);
+    }, [setBassInstrument]);
+
+    useEffect(() => {
         if (isReady && activeBassInstrument) {
-            setBassInstrument(activeBassInstrument);
+            handleSetBassInstrument(activeBassInstrument);
         }
-    }, [isReady, activeMelodyInstrument, activeBassInstrument, setMelodyInstrument, setBassInstrument]);
+    }, [isReady, activeBassInstrument, handleSetBassInstrument]);
     
+    const handleTempoChange = useCallback((newTempo: number) => {
+        setTempo(newTempo);
+    }, [setTempo]);
+
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         let newKey = musicKey;
         let newScale = musicScale;
@@ -280,28 +224,25 @@ export default function Home() {
     }, [isReady]);
     
     const handleChannelEffectChange = useCallback((
-        channel: 'melody' | 'manualBass' | 'latch', 
+        channel: 'melody' | 'bass', 
         effect: 'reverbSend' | 'distortion', 
         value: number
     ) => {
         setVolumes(prevVolumes => {
             const newVolumes = JSON.parse(JSON.stringify(prevVolumes));
-            (newVolumes[channel] as ChannelVolumes)[effect] = value;
-            
-            // Sync bass and latch effects
-            if (channel === 'manualBass') {
-                (newVolumes.latch as ChannelVolumes)[effect] = value;
-            } else if (channel === 'latch') {
-                (newVolumes.manualBass as ChannelVolumes)[effect] = value;
+            const targetChannel = channel === 'bass' ? 'manualBass' : 'melody';
+            (newVolumes[targetChannel] as ChannelVolumes)[effect] = value;
+             if (channel === 'bass') {
+                 (newVolumes.latch as ChannelVolumes)[effect] = value;
             }
-            
             return newVolumes;
         });
     }, [setVolumes]);
-
+    
     const handleStartApp = useCallback(() => {
-        startApp();
-    }, [startApp]);
+        // Pass the initial volumes to the startApp function
+        startApp(initialVolumes);
+    }, [startApp, initialVolumes]);
 
     const handleRecord = useCallback(() => {
         if (isRecording) {
@@ -328,11 +269,6 @@ export default function Home() {
         setActiveMelodyInstrument(instrumentId);
         setMelodyInstrument(instrumentId);
     }, [setMelodyInstrument]);
-
-    const handleBassInstrumentChange = useCallback((instrumentId: BassInstrument) => {
-        setActiveBassInstrument(instrumentId);
-        setBassInstrument(instrumentId);
-    }, [setBassInstrument]);
     
     const handleThereminInteractionCallback = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isReady || !audioEngine) return;
@@ -369,9 +305,9 @@ export default function Home() {
                     <p>&copy; 2024, EVS</p>
                     <p className="mt-2">v.2.1 "Maestro"</p>
                 </footer>
-                {cookieConsent === undefined || cookieConsent === false ? (
+                {cookieConsent === undefined && (
                     <CookieConsent onConsentChange={onConsentChange} />
-                ) : null}
+                )}
             </div>
         )
     }
@@ -380,10 +316,6 @@ export default function Home() {
         return <Preloader />;
     }
     
-    if (!volumes) {
-        return <Preloader />;
-    }
-
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
             <div className="fixed inset-0 z-0">
@@ -441,7 +373,7 @@ export default function Home() {
                             isPolyphonic
                             instruments={bassInstruments}
                             activeInstrument={activeBassInstrument}
-                            onInstrumentChange={handleBassInstrumentChange}
+                            onInstrumentChange={handleSetBassInstrument}
                             orbManager={orbManager}
                             effects={{
                                 reverbSend: volumes.manualBass.reverbSend,
@@ -482,7 +414,7 @@ export default function Home() {
                             onCompressorChange={handleCompressorChange}
                             isMobile={isMobile}
                             tempo={currentTempo}
-                            setTempo={setTempo}
+                            setTempo={handleTempoChange}
                             swing={volumes.swing || 0}
                             setSwing={setSwing}
                         />
@@ -499,7 +431,7 @@ export default function Home() {
                         isMobile={isMobile}
                         isLandscape={true}
                         tempo={currentTempo}
-                        setTempo={setTempo}
+                        setTempo={handleTempoChange}
                         swing={volumes.swing || 0}
                         setSwing={setSwing}
                     />

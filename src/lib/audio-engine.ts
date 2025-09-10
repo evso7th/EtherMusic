@@ -92,21 +92,7 @@ export class AudioEngine {
         distortion?: WaveShaperNode,
     }>();
         
-    private volumes: Volumes = { 
-        melody: { gain: 0, reverbSend: -18, distortion: 0 },
-        manualBass: { gain: -25, reverbSend: -48, distortion: 0 },
-        latch: { gain: -25, reverbSend: -48, distortion: 0 },
-        drums: { gain: -20, reverbSend: -48, distortion: 0 },
-        reverbReturn: -25,
-        compressor: {
-            enabled: true,
-            threshold: -70,
-            ratio: 7,
-            attack: 0.003,
-            release: 0.25
-        },
-        swing: 0.33,
-    };
+    private volumes!: Volumes;
     private isBassLatchOn: boolean = false;
     private latchEngine = new LatchEngine();
     
@@ -202,9 +188,7 @@ export class AudioEngine {
         this.loadReverbImpulse();
         
         await this.loadDrumSamples();
-        
-        this.setVolumes(this.volumes);
-        
+                
         this.isInitialized = true;
     }
 
@@ -259,7 +243,7 @@ export class AudioEngine {
             const response = await fetch('/assets/sounds/impulses/space.wav');
             if (!response.ok) {
                  if (response.status === 404) {
-                    console.warn("[AudioEngine] Reverb impulse '/assets/sounds/impulses/space.wav' not found. Using a generated fallback reverb. This is expected if the file doesn't exist.");
+                    console.log("[AudioEngine] Reverb impulse '/assets/sounds/impulses/space.wav' not found. Using a generated fallback reverb. This is expected if the file doesn't exist.");
                  } else {
                     console.error(`[AudioEngine] HTTP error! status: ${response.status}`);
                  }
@@ -361,18 +345,18 @@ export class AudioEngine {
     }
 
      private processLatchResult(result: LatchToggleResult) {
-        const latchNode = this.nodes.get('latch')?.worklet;
+        const latchNode = this.nodes.get('latch');
         if (!latchNode) return;
         
         if (result.noteOff) {
-            latchNode.port.postMessage({ type: 'noteOff', id: result.noteOff.id });
+            latchNode.worklet.port.postMessage({ type: 'noteOff', id: result.noteOff.id });
         }
         if (result.noteToAnimateRemove) {
             this.orbManager.removeOrb(result.noteToAnimateRemove.id);
         }
         
         if (result.noteOn) {
-            latchNode.port.postMessage({ type: 'noteOn', note: result.noteOn });
+            latchNode.worklet.port.postMessage({ type: 'noteOn', note: result.noteOn });
         }
         if (result.noteToAnimateAdd) {
             this.orbManager.addOrb(result.noteToAnimateAdd.id, 'latch', result.noteToAnimateAdd.x, result.noteToAnimateAdd.y);
@@ -404,10 +388,10 @@ export class AudioEngine {
         }
     }
     
-    public setBassInstrument(instrumentName: BassInstrument): Volumes {
-        const newVolumes = this.getVolumes(); // Start with current volumes
+    public setBassInstrument(instrumentName: BassInstrument): Volumes | undefined {
         const preset = bassInstruments.find(i => i.id === instrumentName);
         if (preset) {
+            const newVolumes = this.getVolumes(); // Start with current volumes
             const bassPresetParams = preset.params as BassInstrumentPresetParams;
             const message: WorkerMessage = { type: 'setPreset', preset: bassPresetParams };
             
@@ -421,8 +405,9 @@ export class AudioEngine {
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
             this.setVolumes(newVolumes);
+            return newVolumes;
         }
-        return newVolumes;
+        return undefined;
     }
     
     public setBeatPattern(patternName: string) {
