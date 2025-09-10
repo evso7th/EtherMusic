@@ -77,17 +77,15 @@ export function useAudioEngine() {
     }, []);
 
     const play = useCallback(() => {
-        console.log("[useAudioEngine] Play requested.");
-        if (!isReady || !audioEngine.current) {
-            return;
-        }
+        if (!isReady || !audioEngine.current) return;
+        // @ts-ignore
         audioEngine.current.play();
         setIsPlaying(true);
     }, [isReady]);
 
     const pause = useCallback(() => {
-        console.log("[useAudioEngine] Pause requested.");
         if (!isReady || !audioEngine.current) return;
+        // @ts-ignore
         audioEngine.current.pause();
         setIsPlaying(false);
     }, [isReady]);
@@ -114,23 +112,13 @@ export function useAudioEngine() {
     const setBeatPattern = useCallback((patternName: string) => {
         if (!audioEngine.current) return;
         console.log(`[useAudioEngine] Setting beat pattern to: ${patternName}`);
-        const wasPlaying = audioEngine.current.isPlaying;
+        
         audioEngine.current.setBeatPattern(patternName);
+        
+        const isPlaying = patternName !== 'Off';
+        setIsPlaying(isPlaying);
 
-        if (patternName !== 'Off') {
-            if (!wasPlaying) {
-                 console.log("[useAudioEngine] Pattern set to ON, calling play().");
-                 play();
-            }
-             setIsPlaying(true);
-        } else {
-            if (wasPlaying) {
-                console.log("[useAudioEngine] Pattern set to OFF, calling pause().");
-                pause();
-            }
-             setIsPlaying(false);
-        }
-    }, [play, pause]);
+    }, []);
     
     const setBassLatch = useCallback((isOn: boolean) => {
         audioEngine.current?.setBassLatch(isOn);

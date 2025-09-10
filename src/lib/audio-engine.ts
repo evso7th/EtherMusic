@@ -294,16 +294,16 @@ export class AudioEngine {
         return impulse;
     }
     
-    public play() {
+    private play() {
         console.log("[AudioEngine] Play requested.");
-        if (!this.isInitialized || !this.context) return;
+        if (!this.isInitialized || this.isPlaying || !this.context) return;
         if (this.context.state === 'suspended') {
             this.context.resume();
         }
         this.drumMachine.play();
     }
 
-    public pause() {
+    private pause() {
         console.log("[AudioEngine] Pause requested.");
         if (!this.isInitialized) return;
         this.drumMachine.pause();
@@ -573,19 +573,6 @@ export class AudioEngine {
             this.mediaRecorder.stop();
         }
     }
-
-    public fadeOutAndStop(durationSeconds: number) {
-        if (!this.masterOut || !this.context) return;
-        const now = this.context.currentTime;
-        this.masterOut.gain.cancelScheduledValues(now);
-        this.masterOut.gain.setValueAtTime(this.masterOut.gain.value, now);
-        this.masterOut.gain.linearRampToValueAtTime(0, now + durationSeconds);
-        setTimeout(() => {
-            this.stopAllSounds();
-            if (this.masterOut && this.context) {
-                 this.masterOut.gain.cancelScheduledValues(this.context.currentTime);
-                 this.masterOut.gain.setValueAtTime(1, this.context.currentTime);
-            }
-        }, (durationSeconds + 0.5) * 1000);
-    }
 }
+
+    
