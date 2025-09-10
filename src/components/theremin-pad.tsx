@@ -77,7 +77,7 @@ interface ThereminPadProps {
     onLatchToggle?: (checked: boolean) => void;
     orbManager?: OrbManager | null;
     effects: Omit<ChannelVolumes, 'gain'>;
-    onEffectChange: (effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => void;
+    onEffectChange: (channel: 'melody' | 'manualBass' | 'latch', effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => void;
 }
 
 const padTitles = {
@@ -172,6 +172,11 @@ export function ThereminPad({
             (event.target as HTMLElement).releasePointerCapture(event.pointerId);
         }
     }, [calculateInteraction, isDisabled, onInteraction, type, isLatchOn]);
+
+    const handleEffectChange = (effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => {
+        const channel = type === 'bass' ? 'manualBass' : 'melody';
+        onEffectChange(channel, effect, value);
+    }
     
     const renderSettingsControls = () => {
         const triggerButton = (
@@ -263,14 +268,14 @@ export function ThereminPad({
                                     label="Reverb Send"
                                     icon={Blend}
                                     level={effects.reverbSend}
-                                    onLevelChange={(v) => onEffectChange('reverbSend', v)}
+                                    onLevelChange={(v) => handleEffectChange('reverbSend', v)}
                                     min={-48} max={0} step={1} unit="dB"
                                 />
                                 <EffectControl
                                     label="Distortion"
                                     icon={Waves}
                                     level={effects.distortion}
-                                    onLevelChange={(v) => onEffectChange('distortion', v)}
+                                    onLevelChange={(v) => handleEffectChange('distortion', v)}
                                     min={0} max={100} step={1} unit="%"
                                 />
                             </div>
@@ -347,3 +352,5 @@ export function ThereminPad({
         </Card>
     );
 }
+
+    

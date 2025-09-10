@@ -51,46 +51,49 @@ const VolumeControl = ({
 type VolumeChannel = keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' >;
 
 interface MixerControlsProps {
-    volumes: Volumes;
+    initialVolumes: Volumes;
     onMixerChange: (newVolumes: Volumes) => void;
     onCompressorChange: (compressorSettings: CompressorSettings) => void;
-    tempo: number;
-    setTempo: (tempo: number) => void;
-    swing: number;
-    setSwing: (swing: number) => void;
+    initialTempo: number;
+    onTempoChange: (tempo: number) => void;
+    initialSwing: number;
+    onSwingChange: (swing: number) => void;
     closeDialog: () => void;
     isAutopilotMixer?: boolean;
 }
 
 export function MixerControls({ 
-    volumes: initialVolumes, 
+    initialVolumes, 
     onMixerChange,
     onCompressorChange,
-    tempo,
-    setTempo,
-    swing,
-    setSwing,
+    initialTempo,
+    onTempoChange,
+    initialSwing,
+    onSwingChange,
     closeDialog,
     isAutopilotMixer = false,
 }: MixerControlsProps) {
     
+    // Local state to manage changes without causing re-renders in the whole app.
     const [localVolumes, setLocalVolumes] = useState(initialVolumes);
-    const [localTempo, setLocalTempo] = useState(tempo);
-    const [localSwing, setLocalSwing] = useState(swing);
+    const [localTempo, setLocalTempo] = useState(initialTempo);
+    const [localSwing, setLocalSwing] = useState(initialSwing);
     const [localCompressor, setLocalCompressor] = useState(initialVolumes.compressor);
 
-    // This effect ensures that if the mixer is re-opened, it reflects the current global state.
+    // This effect synchronizes the local state if the initial props change,
+    // which happens when the dialog is re-opened.
     useEffect(() => {
         setLocalVolumes(initialVolumes);
         setLocalCompressor(initialVolumes.compressor);
-        setLocalTempo(tempo);
-        setLocalSwing(swing);
-    }, [initialVolumes, tempo, swing]);
+        setLocalTempo(initialTempo);
+        setLocalSwing(initialSwing);
+    }, [initialVolumes, initialTempo, initialSwing]);
 
     const handleChannelVolumeChange = (part: VolumeChannel, value: number) => {
         setLocalVolumes(prev => {
-            const newChannelVolumes = { ...prev[part] as ChannelVolumes, gain: value };
-            const newVolumes = { ...prev, [part]: newChannelVolumes };
+            const newVolumes = { ...prev };
+            const newChannelVolumes = { ...(newVolumes[part] as ChannelVolumes), gain: value };
+            newVolumes[part] = newChannelVolumes;
 
             // Sync bass and latch volumes
             if (part === 'manualBass') {
@@ -116,10 +119,11 @@ export function MixerControls({
     }, []);
 
     const handleApplyChanges = () => {
+        // Apply all changes at once
         onMixerChange(localVolumes);
         onCompressorChange(localCompressor);
-        setTempo(localTempo);
-        setSwing(localSwing);
+        onTempoChange(localTempo);
+        onSwingChange(localSwing);
         closeDialog();
     };
 
@@ -248,3 +252,5 @@ export function MixerControls({
         </div>
     );
 }
+
+    

@@ -7,19 +7,20 @@ import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
 import type { Volumes, Instrument, BassInstrument, CompressorSettings } from '@/types';
 
-export function useAudioEngine() {
+interface UseAudioEngineProps {
+    onVolumesChanged?: (volumes: Volumes) => void;
+}
+
+export function useAudioEngine({ onVolumesChanged }: UseAudioEngineProps = {}) {
     const { toast } = useToast();
     
     const [isAppStarted, setIsAppStarted] = useState(false);
     const [isReady, setIsReady] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
-    
+
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
     
-    // The main state is now managed here and passed down
-    const [volumes, setVolumesState] = useState<Volumes | null>(null);
-
     const initializeAudioEngine = useCallback(async () => {
         try {
             if (!orbManager.current) {
@@ -40,7 +41,7 @@ export function useAudioEngine() {
                 });
                 
                 audioEngine.current = engine;
-                setVolumesState(engine.getVolumes()); // Initialize volumes from the engine
+                onVolumesChanged?.(engine.getVolumes()); 
             }
             
             setIsReady(true);
@@ -54,7 +55,7 @@ export function useAudioEngine() {
                 variant: "destructive"
             });
         }
-    }, [toast]);
+    }, [toast, onVolumesChanged]);
 
     const startApp = useCallback(async () => {
         if (isAppStarted) return;
@@ -82,13 +83,11 @@ export function useAudioEngine() {
     }, []);
 
     const stopAllSounds = useCallback(() => {
-        if (!audioEngine.current) return;
-        audioEngine.current.stopAllSounds();
+        audioEngine.current?.stopAllSounds();
     }, []);
 
-    const setVolumes = useCallback((newVolumes: Volumes) => {
-        audioEngine.current?.setVolumes(newVolumes);
-        setVolumesState(newVolumes); // Keep local state in sync
+    const setVolumes = useCallback((volumes: Volumes) => {
+        audioEngine.current?.setVolumes(volumes);
     }, []);
 
     const setTempo = useCallback((tempo: number) => {
@@ -100,8 +99,7 @@ export function useAudioEngine() {
     }, []);
     
     const setBeatPattern = useCallback((patternName: string) => {
-        if (!audioEngine.current) return;
-        audioEngine.current.setBeatPattern(patternName);
+        audioEngine.current?.setBeatPattern(patternName);
     }, []);
     
     const setBassLatch = useCallback((isOn: boolean) => {
@@ -127,9 +125,7 @@ export function useAudioEngine() {
     
     const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
         const newVolumes = audioEngine.current?.setBassInstrument(instrumentName);
-        if (newVolumes) {
-            setVolumesState(newVolumes);
-        }
+        return newVolumes;
     }, []);
     
     const handleCompressorChange = useCallback((compressorSettings: CompressorSettings) => {
@@ -143,10 +139,9 @@ export function useAudioEngine() {
         isPlaying,
         audioEngine: audioEngine.current,
         orbManager: orbManager.current,
-        volumes, // Expose volumes state
-        setVolumes, // Expose setVolumes to update from UI
         startApp,
         stopAllSounds,
+        setVolumes,
         setTempo,
         setSwing,
         setMelodyInstrument,
@@ -159,3 +154,5 @@ export function useAudioEngine() {
         handleCompressorChange,
     };
 }
+
+    

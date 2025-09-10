@@ -1,59 +1,45 @@
 
 // public/workers/drum-processor.js
-console.log('[DrumProcessor] Script loaded');
-
-/**
- * A simple voice that plays a sample buffer.
- */
 class Voice {
-  constructor(buffer, gain) {
-    this.buffer = buffer; // This is a Float32Array
-    this.position = 0;
-    this.gain = gain;
-    this.isFinished = false;
-  }
-
-  /**
-   * Renders a block of audio.
-   * @param {Float32Array} outputBuffer The buffer to write the output to.
-   */
-  process(outputBuffer) {
-    if (this.isFinished) {
-      return;
+    constructor(buffer, gain) {
+        this.buffer = buffer; // This is a Float32Array
+        this.position = 0;
+        this.gain = gain;
+        this.isFinished = false;
     }
 
-    const remainingSamples = this.buffer.length - this.position;
-    const samplesToProcess = Math.min(outputBuffer.length, remainingSamples);
+    process(outputBuffer) {
+        if (this.isFinished) {
+            return;
+        }
 
-    for (let i = 0; i < samplesToProcess; i++) {
-      // Simple linear fade-out over the last 100 samples to prevent clicks
-      const envelope = (this.buffer.length - (this.position + i)) > 100 
-          ? 1.0 
-          : (this.buffer.length - (this.position + i)) / 100;
-      outputBuffer[i] += this.buffer[this.position + i] * this.gain * envelope;
+        const remainingSamples = this.buffer.length - this.position;
+        const samplesToProcess = Math.min(outputBuffer.length, remainingSamples);
+
+        for (let i = 0; i < samplesToProcess; i++) {
+            // Simple linear fade-out over the last 100 samples to prevent clicks
+            const envelope = (this.buffer.length - (this.position + i)) > 100 
+                ? 1.0 
+                : (this.buffer.length - (this.position + i)) / 100;
+            outputBuffer[i] += this.buffer[this.position + i] * this.gain * envelope;
+        }
+        
+        this.position += samplesToProcess;
+        
+        if (this.position >= this.buffer.length) {
+            this.isFinished = true;
+        }
     }
-    
-    this.position += samplesToProcess;
-    
-    if (this.position >= this.buffer.length) {
-      this.isFinished = true;
-    }
-  }
 }
 
-/**
- * An AudioWorkletProcessor for playing drum samples.
- * It receives decoded audio buffers from the main thread and plays them on command.
- */
 class DrumProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.buffers = new Map();
     this.voices = [];
-    this.maxVoices = 20;
+    this.maxVoices = 32; // Increased polyphony
 
     this.port.onmessage = this.handleMessage.bind(this);
-    this.port.postMessage({ type: 'log', message: '[DrumProcessor] Initialized and ready.' });
   }
 
   handleMessage(event) {
@@ -66,7 +52,6 @@ class DrumProcessor extends AudioWorkletProcessor {
       } else if (type === 'playSample' && sampleName) {
         const bufferToPlay = this.buffers.get(sampleName);
         if (bufferToPlay) {
-          // Voice stealing: remove the oldest voice if we exceed the limit
           if (this.voices.length >= this.maxVoices) {
             this.voices.shift();
           }
@@ -89,35 +74,32 @@ class DrumProcessor extends AudioWorkletProcessor {
       return true;
     }
 
-    // Clear the output buffer for this block
     outputChannel.fill(0);
 
     if (this.voices.length === 0) {
       return true;
     }
     
-    // Process each active voice
-    this.voices = this.voices.filter(voice => {
-        if (voice.isFinished) {
-            return false; // Remove finished voices
-        }
-        
-        // This is a simplified process. A more robust implementation would
-        // process sample-by-sample within the voice itself. For this app,
-        // this is sufficient and avoids per-sample iteration in JS.
-        const voiceOutput = new Float32Array(outputChannel.length).fill(0);
-        voice.process(voiceOutput);
+    // Process each active voice and accumulate its output
+    for(const voice of this.voices) {
+        if (!voice.isFinished) {
+            // A temporary buffer for this voice's output for this block
+            const voiceOutput = new Float32Array(outputChannel.length).fill(0);
+            voice.process(voiceOutput);
 
-        for (let i = 0; i < outputChannel.length; i++) {
-            outputChannel[i] += voiceOutput[i];
+            // Mix into the main output buffer
+            for (let i = 0; i < outputChannel.length; i++) {
+                outputChannel[i] += voiceOutput[i];
+            }
         }
+    }
 
-        return !voice.isFinished;
-    });
+    // Remove finished voices
+    this.voices = this.voices.filter(voice => !voice.isFinished);
     
-    // A simple hard limiter to prevent clipping, just in case
+    // Simple hard limiter to prevent clipping
     for (let i = 0; i < outputChannel.length; i++) {
-      outputChannel[i] = Math.max(-1, Math.min(1, outputChannel[i]));
+        outputChannel[i] = Math.max(-1, Math.min(1, outputChannel[i]));
     }
 
     return true; // Keep the processor alive
@@ -125,3 +107,5 @@ class DrumProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('drum-processor', DrumProcessor);
+
+    

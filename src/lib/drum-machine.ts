@@ -55,7 +55,7 @@ export class DrumMachine {
     private _tempo: number = 90;
     private _swing: number = 0; // 0 = no swing, 1 = max swing
     private _pattern: BeatPattern;
-    private timeoutId: NodeJS.Timeout | null = null;
+    private timeoutId: number | null = null;
     private step: number = 0;
     private measureCount: number = 0;
     private fills: Readonly<BeatPattern[]>;
@@ -65,7 +65,7 @@ export class DrumMachine {
     constructor(audioEngine: AudioEngine) {
         this.audioEngine = audioEngine;
         this._pattern = beatPatterns.find(p => p.name === 'Off')!;
-        this.fills = beatPatterns.filter(p => p.type === 'Fill');
+        this.fills = beatPatterns.filter(p => p.type === 'Fill' && p.sequence.length > 0);
         this.eventEmitter = mitt<DrumMachineEvents>();
     }
 
@@ -136,7 +136,7 @@ export class DrumMachine {
 
     private scheduler() {
         const isFillMeasure = this.fills.length > 0 && this.measureCount === 3;
-        const currentPattern = isFillMeasure 
+        const currentPattern = isFillMeasure && this._pattern.type !== 'Meditative'
             ? this.fills[Math.floor(Math.random() * this.fills.length)] 
             : this._pattern;
 
@@ -165,6 +165,8 @@ export class DrumMachine {
             this.measureCount = (this.measureCount + 1) % 4; // Cycle through 4 measures
         }
 
-        this.timeoutId = setTimeout(() => this.scheduler(), delay * 1000);
+        this.timeoutId = window.setTimeout(() => this.scheduler(), delay * 1000);
     }
 }
+
+    

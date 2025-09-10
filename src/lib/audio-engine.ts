@@ -68,9 +68,6 @@ const DRUM_SAMPLES: Record<string, string> = {
     'p15': '/assets/sounds/drums/perc-015.wav',
 };
 
-type AudioEngineEvents = {
-    volumesChanged: Volumes;
-};
 
 export class AudioEngine {
     public isInitialized = false;
@@ -264,7 +261,7 @@ export class AudioEngine {
             const response = await fetch('/assets/sounds/impulses/space.wav');
             if (!response.ok) {
                 if (response.status === 404) {
-                    console.warn("[AudioEngine] Reverb impulse '/assets/sounds/impulses/space.wav' not found. Using a generated fallback reverb. This is expected if the file doesn't exist.");
+                     console.log("[AudioEngine] Reverb impulse '/assets/sounds/impulses/space.wav' not found. Using a generated fallback reverb. This is expected if the file doesn't exist.");
                 }
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -406,7 +403,7 @@ export class AudioEngine {
         }
     }
     
-    public setBassInstrument(instrumentName: BassInstrument): Volumes {
+    public setBassInstrument(instrumentName: BassInstrument): Volumes | undefined {
         const preset = bassInstruments.find(i => i.id === instrumentName);
         if (preset) {
             const bassPresetParams = preset.params as BassInstrumentPresetParams;
@@ -415,18 +412,16 @@ export class AudioEngine {
             this.nodes.get('manualBass')?.worklet.port.postMessage(message);
             this.nodes.get('latch')?.worklet.port.postMessage(message);
             
-            // Update volumes based on preset and apply them
             const newVolumes = JSON.parse(JSON.stringify(this.volumes));
             newVolumes.manualBass.reverbSend = bassPresetParams.reverbSend ?? newVolumes.manualBass.reverbSend;
             newVolumes.manualBass.distortion = bassPresetParams.distortion ?? newVolumes.manualBass.distortion;
             newVolumes.latch.reverbSend = bassPresetParams.reverbSend ?? newVolumes.latch.reverbSend;
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
-            this.setVolumes(newVolumes);
             
-            // Return the updated volumes object so the UI can sync
+            this.setVolumes(newVolumes);
             return newVolumes;
         }
-        return this.volumes;
+        return undefined;
     }
     
     public setBeatPattern(patternName: string) {
@@ -541,3 +536,5 @@ export class AudioEngine {
         }
     }
 }
+
+    
