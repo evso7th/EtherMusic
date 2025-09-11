@@ -83,7 +83,6 @@ export function loadVolumes(): Volumes {
     }
 }
 
-// Create the emitter outside of the hook to ensure it's a stable singleton.
 const emitter = mitt<AudioEngineEvents>();
 
 export function useAudioEngine() {
@@ -106,7 +105,7 @@ export function useAudioEngine() {
         }
     }, []);
     
-    const initializeAudioEngine = useCallback(async (vols: Volumes) => {
+    const initializeAudioEngine = useCallback(async () => {
         try {
             if (!orbManager.current) {
                 const padContainer = document.querySelector('main');
@@ -122,10 +121,11 @@ export function useAudioEngine() {
                 const engine = new AudioEngine(context, orbManager.current, emitter);
                 await engine.initialize();
                 
-                engine.setVolumes(vols);
+                const currentVolumes = loadVolumes();
+                engine.setVolumes(currentVolumes);
+                setVolumesState(currentVolumes);
+
                 audioEngine.current = engine;
-            } else {
-                audioEngine.current.setVolumes(vols);
             }
             
             setIsReady(true);
@@ -148,10 +148,8 @@ export function useAudioEngine() {
         const audio = new Audio('/assets/sounds/transition.webm');
         audio.play().catch(e => console.error("Error playing transition sound:", e));
         
-        // Pass the currently loaded volumes during initialization
-        await initializeAudioEngine(loadVolumes());
+        await initializeAudioEngine();
     }, [isAppStarted, initializeAudioEngine]);
-
 
     useEffect(() => {
         const onPlayStateChanged = (playing: boolean) => {
@@ -169,18 +167,15 @@ export function useAudioEngine() {
             emitter.off('volumesChanged', onVolumesChanged);
         }
     }, []);
-
     
     const setVolumes = useCallback((newVolumes: Volumes | ((prev: Volumes) => Volumes)) => {
-        setVolumesState(prev => {
-            const updated = typeof newVolumes === 'function' ? newVolumes(prev) : newVolumes;
-            if (audioEngine.current) {
-                audioEngine.current.setVolumes(updated);
-            }
-            saveVolumes(updated);
-            return updated;
-        });
-    }, []);
+        const updatedVolumes = typeof newVolumes === 'function' ? newVolumes(volumes) : newVolumes;
+        if (audioEngine.current) {
+            audioEngine.current.setVolumes(updatedVolumes);
+        }
+        saveVolumes(updatedVolumes);
+        setVolumesState(updatedVolumes);
+    }, [volumes]);
 
     const stopAllSounds = useCallback(() => {
         audioEngine.current?.stopAllSounds();
@@ -213,19 +208,15 @@ export function useAudioEngine() {
     
     const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
         if(audioEngine.current){
-            const newVolumes = audioEngine.current.setBassInstrument(instrumentName);
-            if (newVolumes) {
-              setVolumes(newVolumes); // Update state via the centralized setter
-            }
+            audioEngine.current.setBassInstrument(instrumentName);
         }
-    }, [setVolumes]);
+    }, []);
 
     return {
         isAppStarted,
         isReady,
         isPlaying,
         audioEngine: audioEngine.current,
-        emitter,
         orbManager: orbManager.current,
         startApp,
         stopAllSounds,

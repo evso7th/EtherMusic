@@ -1,8 +1,7 @@
 
-import { useState, useEffect } from 'react';
+import { CSSProperties } from 'react';
 import styles from './orbital-animation.module.css';
 import { cn } from '@/lib/utils';
-import type { CSSProperties } from 'react';
 
 interface OrbitalAnimationProps {
   isPlaying: boolean;

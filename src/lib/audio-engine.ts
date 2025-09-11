@@ -122,7 +122,7 @@ export class AudioEngine {
         this.convolver.connect(this.reverbReturnGain);
         this.reverbReturnGain.connect(this.preCompressorOut);
 
-        this.drumMachine = new DrumMachine(this, this.emitter);
+        this.drumMachine = new DrumMachine(this, emitter);
     }
     
     getContext() {

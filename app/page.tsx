@@ -148,7 +148,6 @@ export default function Home() {
         value: number
     ) => {
         setVolumes(prevVolumes => {
-            if (!prevVolumes) return defaultVolumes; // Should not happen with new init logic
             const newVolumes = JSON.parse(JSON.stringify(prevVolumes));
             const targetChannelKey = channel === 'bass' ? 'manualBass' : 'melody';
             
@@ -195,6 +194,15 @@ export default function Home() {
         handleThereminInteraction(type, data, state);
     }, [isReady, audioEngine, handleThereminInteraction]);
 
+    const handlePlayPause = useCallback(() => {
+        if (!audioEngine) return;
+        if (audioEngine.isPlaying) {
+            audioEngine.getDrumMachine().stop();
+        } else {
+            audioEngine.getDrumMachine().play();
+        }
+    }, [audioEngine]);
+
     if (!isClient) {
         return <Preloader />;
     }
@@ -232,7 +240,7 @@ export default function Home() {
         )
     }
 
-    if (isAppStarted && (!isReady || !volumes)) {
+    if (isAppStarted && !isReady) {
         return <Preloader />;
     }
     
@@ -275,10 +283,10 @@ export default function Home() {
                          <PlaybackControls
                             isPlaying={isPlaying}
                             isRecording={isRecording}
+                            onPlayPause={handlePlayPause}
                             onRecord={handleRecord}
                             onExit={stopAllSounds}
                             isReady={isReady}
-                            audioEngine={audioEngine}
                         />
                     </div>
                 </header>
@@ -327,4 +335,3 @@ export default function Home() {
     );
 }
 
-    

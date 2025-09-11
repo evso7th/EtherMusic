@@ -1,6 +1,6 @@
 
 import type { AudioEngine } from './audio-engine';
-import type { BeatPattern, Volumes } from '@/types';
+import type { BeatPattern, AudioEngineEvents } from '@/types';
 import type { Emitter } from 'mitt';
 
 
@@ -46,11 +46,6 @@ export const beatPatterns: Readonly<BeatPattern[]> = [
     { name: 'Off', type: 'System', length: 1, sequence: [] },
 ];
 
-type AudioEngineEvents = {
-    playStateChanged: boolean;
-    volumesChanged: Volumes;
-};
-
 export class DrumMachine {
     private audioEngine: AudioEngine;
     private _tempo: number = 90;
@@ -61,7 +56,6 @@ export class DrumMachine {
     private measureCount: number = 0;
     private fills: Readonly<BeatPattern[]>;
     private emitter: Emitter<AudioEngineEvents>;
-
     
     constructor(audioEngine: AudioEngine, emitter: Emitter<AudioEngineEvents>) {
         this.audioEngine = audioEngine;
@@ -104,6 +98,9 @@ export class DrumMachine {
 
     public play() {
         if (this.isPlaying || !this._pattern || this._pattern.sequence.length === 0) {
+            if (this._pattern.name === 'Off') {
+                this.stop();
+            }
             return;
         }
         
@@ -124,7 +121,7 @@ export class DrumMachine {
     }
 
     private scheduler() {
-        const isFillMeasure = this.fills.length > 0 && this._pattern.type !== 'Meditative' && this.measureCount === 3;
+        const isFillMeasure = this.fills.length > 0 && this._pattern.type === 'Classic' && (this.measureCount === 3 || this.measureCount === 7);
         const currentPattern = isFillMeasure 
             ? this.fills[Math.floor(Math.random() * this.fills.length)] 
             : this._pattern;
@@ -151,7 +148,7 @@ export class DrumMachine {
         this.step = (this.step + 1);
         if (this.step >= totalSteps) {
             this.step = 0;
-            this.measureCount = (this.measureCount + 1) % 4; // Cycle through 4 measures
+            this.measureCount = (this.measureCount + 1) % 8; // Cycle through 8 measures for less repetitive fills
         }
 
         this.timeoutId = window.setTimeout(() => this.scheduler(), delay * 1000);

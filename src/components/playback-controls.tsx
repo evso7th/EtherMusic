@@ -18,17 +18,14 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
-import type { AudioEngine } from "@/lib/audio-engine";
-import type { Emitter } from "mitt";
-import type { AudioEngineEvents } from "@/hooks/use-audio-engine";
 
 interface PlaybackControlsProps {
+    isPlaying: boolean;
     isRecording: boolean;
+    onPlayPause: () => void;
     onRecord: () => void;
     onExit: () => void;
     isReady: boolean;
-    audioEngine: AudioEngine | null;
-    emitter: Emitter<AudioEngineEvents> | null;
 }
 
 const ControlButton = ({ tooltipText, children, isMobile, ...props }: { tooltipText: string, children: React.ReactNode, isMobile: boolean } & React.ComponentProps<typeof Button>) => {
@@ -49,30 +46,14 @@ const ControlButton = ({ tooltipText, children, isMobile, ...props }: { tooltipT
 
 
 export function PlaybackControls({ 
+    isPlaying,
     isRecording, 
+    onPlayPause,
     onRecord, 
     onExit,
-    isReady,
-    audioEngine,
-    emitter
+    isReady 
 }: PlaybackControlsProps) {
     const isMobile = useIsMobile();
-    const [isPlaying, setIsPlaying] = React.useState(audioEngine?.isPlaying || false);
-
-    React.useEffect(() => {
-        if (!emitter) return;
-
-        const onPlayStateChanged = (playing: boolean) => {
-            setIsPlaying(playing);
-        };
-
-        setIsPlaying(audioEngine?.isPlaying || false);
-
-        emitter.on('playStateChanged', onPlayStateChanged);
-        return () => {
-            emitter.off('playStateChanged', onPlayStateChanged);
-        };
-    }, [emitter, audioEngine]);
     
     const handleExit = () => {
         onExit();
@@ -88,20 +69,11 @@ export function PlaybackControls({
         }
     };
     
-    const handlePlayPause = () => {
-        if (!audioEngine) return;
-        if (isPlaying) {
-            audioEngine.getDrumMachine().stop();
-        } else {
-            audioEngine.getDrumMachine().play();
-        }
-    }
-
     return (
         <TooltipProvider>
              <ControlButton
                 tooltipText={isPlaying ? "Pause" : "Play"}
-                onClick={handlePlayPause}
+                onClick={onPlayPause}
                 variant="outline"
                 size="icon" 
                 className="w-10 h-10 rounded-full"
