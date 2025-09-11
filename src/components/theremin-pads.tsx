@@ -1,7 +1,7 @@
 
 "use client";
 
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { ThereminPad } from '@/components/theremin-pad';
 import { bassInstruments } from '@/lib/bass-presets';
 import { melodyInstruments } from '@/lib/melody-presets';
@@ -44,6 +44,17 @@ const ThereminPadsComponent = ({
     musicScale,
     onScaleChange
 }: ThereminPadsProps) => {
+
+    const bassEffects = useMemo(() => ({
+        reverbSend: volumes.manualBass.reverbSend,
+        distortion: volumes.manualBass.distortion,
+    }), [volumes.manualBass.reverbSend, volumes.manualBass.distortion]);
+
+    const melodyEffects = useMemo(() => ({
+        reverbSend: volumes.melody.reverbSend,
+        distortion: volumes.melody.distortion,
+    }), [volumes.melody.reverbSend, volumes.melody.distortion]);
+
     return (
         <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-2 landscape:grid-cols-2 landscape:gap-1">
             <ThereminPad
@@ -58,10 +69,7 @@ const ThereminPadsComponent = ({
                 activeInstrument={activeBassInstrument}
                 onInstrumentChange={onInstrumentChange}
                 orbManager={orbManager}
-                effects={{
-                    reverbSend: volumes.manualBass.reverbSend,
-                    distortion: volumes.manualBass.distortion,
-                }}
+                effects={bassEffects}
                 onEffectChange={onEffectChange}
             />
             <ThereminPad
@@ -81,10 +89,7 @@ const ThereminPadsComponent = ({
                 onInstrumentChange={onMelodyInstrumentChange}
                 isPolyphonic
                 orbManager={orbManager}
-                effects={{
-                    reverbSend: volumes.melody.reverbSend,
-                    distortion: volumes.melody.distortion,
-                }}
+                effects={melodyEffects}
                 onEffectChange={onEffectChange}
             />
         </div>
@@ -92,3 +97,5 @@ const ThereminPadsComponent = ({
 };
 
 export const ThereminPads = memo(ThereminPadsComponent);
+
+    

@@ -80,27 +80,29 @@ export default function Home() {
 
     const onConsentChange = useCallback((consent: boolean) => {
         setCookieConsent(consent);
-        const newVolumes = consent ? loadVolumes() : defaultVolumes;
-        setVolumes(newVolumes); 
+        if (isReady && audioEngine) {
+            const newVolumes = consent ? loadVolumes() : defaultVolumes;
+            audioEngine.setVolumes(newVolumes);
+            setVolumes(newVolumes); 
+        }
         
         if (!consent) {
              if (typeof document !== 'undefined') {
                 document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
             }
         }
-    }, [setVolumes]);
-
+    }, [setVolumes, isReady, audioEngine]);
+    
     useEffect(() => {
         setIsClient(true);
         const consent = getCookie("ethermusic_consent");
         if (consent !== null) {
-            const hasConsent = consent === 'true';
-            setCookieConsent(hasConsent);
+            setCookieConsent(consent === 'true');
         } else {
             setCookieConsent(undefined);
         }
     }, []);
-    
+
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         const isKey = (k: string): k is MusicKey => Object.keys(ALL_NOTES).includes(k);
         const isScale = (s: string): s is MusicScale => Object.keys(SCALES).includes(s);
@@ -119,7 +121,7 @@ export default function Home() {
             setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
         }
     }, [isReady, musicKey, musicScale]);
-    
+
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
         setBassInstrument(instrumentId);
@@ -136,7 +138,7 @@ export default function Home() {
             handleSetBassInstrument(activeBassInstrument);
         }
     }, [isReady, activeBassInstrument, handleSetBassInstrument]);
-    
+
     const handleMixerApply = useCallback((newVolumes: Volumes) => {
         setVolumes(newVolumes);
     }, [setVolumes]);
@@ -289,7 +291,7 @@ export default function Home() {
                         activeBassInstrument={activeBassInstrument}
                         onInstrumentChange={handleSetBassInstrument}
                         orbManager={orbManager}
-                        volumes={volumes}
+                        volumes={volumes!}
                         onEffectChange={handleChannelEffectChange}
                         activeMelodyInstrument={activeMelodyInstrument}
                         onMelodyInstrumentChange={handleMelodyInstrumentChange}
@@ -302,7 +304,7 @@ export default function Home() {
                         <BeatBoxControls
                             activePattern={activePattern}
                             onPatternChange={handlePatternChange}
-                            initialVolumes={volumes}
+                            volumes={volumes!}
                             onApply={handleMixerApply}
                             isMobile={isMobile}
                         />
@@ -313,7 +315,7 @@ export default function Home() {
                      <BeatBoxControls
                         activePattern={activePattern}
                         onPatternChange={handlePatternChange}
-                        initialVolumes={volumes}
+                        volumes={volumes!}
                         onApply={handleMixerApply}
                         isMobile={isMobile}
                         isLandscape={true}
@@ -323,3 +325,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
