@@ -8,7 +8,6 @@ import { melodyInstruments } from './melody-presets';
 import { bassInstruments } from './bass-presets';
 import { DrumMachine } from './drum-machine';
 import type { Emitter } from 'mitt';
-
 // @ts-ignore
 import synthWorkletUrl from './workers/synth-processor.js';
 // @ts-ignore
@@ -29,7 +28,7 @@ function createDistortionCurve(amount: number): Float32Array {
     const n_samples = 44100;
     const curve = new Float32Array(n_samples);
     const deg = Math.PI / 180;
-    for (let i = 0; < n_samples; ++i) {
+    for (let i = 0; i < n_samples; ++i) {
         const x = i * 2 / n_samples - 1;
         curve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
     }
@@ -178,10 +177,10 @@ export class AudioEngine {
         };
 
         try {
-             await Promise.all([
+            await Promise.all([
                 this.context.audioWorklet.addModule(synthWorkletUrl),
                 this.context.audioWorklet.addModule(drumWorkletUrl),
-             ]);
+            ]);
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
             throw new Error("Could not load core audio components. Please try refreshing the page.");
@@ -336,7 +335,7 @@ export class AudioEngine {
                         const nodeToStop = this.nodes.get(partName);
                         if (nodeToStop) {
                             const message: WorkerMessage = { type: 'noteOff', id: pInfo.noteId };
-                            nodeToStop.port.postMessage(message);
+                            nodeToStop.worklet.port.postMessage(message);
                         }
                         this.orbManager.removeOrb(pId);
                         this.activePointers.delete(pId);

@@ -41,7 +41,7 @@
 }
 
 .circle.pulsating {
-  animation: pulse var(--pulse-duration) infinite ease-in-out;
+  animation: pulse var(--pulse-duration, 2s) infinite ease-in-out;
 }
 
 
@@ -105,3 +105,5 @@
     box-shadow: 0 0 140px 10px hsl(var(--primary)), inset 0 0 140px 10px hsl(var(--primary));
   }
 }
+
+    

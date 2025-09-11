@@ -85,19 +85,20 @@ class Voice {
     initLayers() {
         this.layers = [];
         const createLayer = (layerConfig, baseFreq, isMainOsc) => {
-            const freq = (layerConfig.freqMult !== undefined ? baseFreq * layerConfig.freqMult : baseFreq);
-            const detunedFreq = freq * Math.pow(2, (layerConfig.detune || 0) / 1200);
             const envConfig = isMainOsc ? this.preset.envelope : (layerConfig.envelope || this.preset.envelope);
-
+            const attackSamples = Math.max(1, (envConfig.attack || 0.01) * this.sampleRate);
+            const releaseSamples = Math.max(1, (envConfig.release || 0.5) * this.sampleRate);
+            const decaySamples = Math.max(1, (envConfig.decay || 0.1) * this.sampleRate);
+            
             return {
                 osc: new Oscillator(layerConfig.type || 'sine', this.sampleRate),
                 level: layerConfig.level ?? 1.0,
                 freqMult: layerConfig.freqMult || 1,
                 detune: layerConfig.detune || 0,
                 env: {
-                    attackInc: 1.0 / Math.max(1, (envConfig.attack || 0.01) * this.sampleRate),
-                    decayRate: envConfig.decay > 0 ? (1.0 - (envConfig.sustain ?? 1.0)) / (envConfig.decay * this.sampleRate) : 1,
-                    releaseSamples: Math.max(1, (envConfig.release || 0.5) * this.sampleRate),
+                    attackInc: 1.0 / attackSamples,
+                    decayRate: envConfig.decay > 0 ? (1.0 - (envConfig.sustain ?? 1.0)) / decaySamples : 1,
+                    releaseRate: 1.0 / releaseSamples,
                     sustainLevel: envConfig.sustain ?? 1.0,
                     state: 'attack',
                     currentValue: 0,
@@ -141,8 +142,12 @@ class Voice {
             case 'highpass': b0 = (1 + cos_w0) / 2; b1 = -(1 + cos_w0); b2 = (1 + cos_w0) / 2; a0 = 1 + alpha; a1 = -2 * cos_w0; a2 = 1 - alpha; break;
             case 'bandpass': b0 = alpha; b1 = 0; b2 = -alpha; a0 = 1 + alpha; a1 = -2 * cos_w0; a2 = 1 - alpha; break;
             case 'notch': b0 = 1; b1 = -2 * cos_w0; b2 = 1; a0 = 1 + alpha; a1 = -2 * cos_w0; a2 = 1 - alpha; break;
+            default:
+                this.filter.active = false;
+                return;
         }
         this.filter.a0=a0; this.filter.a1=a1; this.filter.a2=a2; this.filter.b0=b0; this.filter.b1=b1; this.filter.b2=b2;
+        this.filter.active = true;
     }
 
     initLFO(vibrato) {
@@ -161,7 +166,7 @@ class Voice {
     }
 
     processFilter(inputSample) {
-        if (!this.filter) return inputSample;
+        if (!this.filter || !this.filter.active) return inputSample;
         const f = this.filter;
         // This is a direct form II transposed biquad filter implementation.
         // It's computationally efficient for real-time audio processing.
@@ -177,7 +182,7 @@ class Voice {
         if (this.isReleasing && env.state !== 'release') {
             env.state = 'release';
             env.releaseStartValue = env.currentValue;
-            env.releaseRate = env.currentValue / Math.max(1, env.releaseSamples);
+            env.releaseRate = env.releaseStartValue / Math.max(1, env.releaseSamples);
         }
 
         switch (env.state) {
@@ -186,9 +191,9 @@ class Voice {
                 if (env.currentValue >= 1.0) { env.currentValue = 1.0; env.state = 'decay'; }
                 break;
             case 'decay':
-                if (env.sustainLevel < 1.0) { // Avoid decay if sustain is full
-                    env.currentValue -= env.decayRate;
-                    if (env.currentValue <= env.sustainLevel) { env.currentValue = env.sustainLevel; env.state = 'sustain'; }
+                if (env.currentValue > env.sustainLevel) {
+                     env.currentValue -= env.decayRate;
+                     if (env.currentValue <= env.sustainLevel) { env.currentValue = env.sustainLevel; env.state = 'sustain'; }
                 } else {
                     env.state = 'sustain';
                 }
@@ -334,9 +339,6 @@ class SynthProcessor extends AudioWorkletProcessor {
         if (voiceCount === 0) {
             return true;
         }
-
-        this.logCounter++;
-        let peakLevel = 0;
         
         for (let i = 0; i < outputChannel.length; i++) {
             let sample = 0;
@@ -348,26 +350,11 @@ class SynthProcessor extends AudioWorkletProcessor {
                 }
             }
             
-            const absSample = Math.abs(sample);
-            if (absSample > peakLevel) {
-                peakLevel = absSample;
-            }
-            
             // Attenuation based on number of voices to prevent clipping before compressor
             const attenuation = 1 / (1 + Math.max(0, voiceCount - 1) * 0.5);
             
             // Soft clipping using tanh as a final safety net
-            outputChannel[i] = Math.tanh(sample * attenuation * 0.7);
-        }
-
-        // Log active voices and peak level periodically for debugging.
-        if (this.logCounter >= 200 && this.voices.size > 0) {
-            const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
-            this.port.postMessage({
-                type: 'debug',
-                message: `Active voices: ${this.voices.size}. Freqs: [${activeFrequencies.join(', ')}]. Peak: ${peakLevel.toFixed(4)}`
-            });
-            this.logCounter = 0;
+            outputChannel[i] = Math.tanh(sample * attenuation);
         }
         
         return true;

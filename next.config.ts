@@ -1,7 +1,5 @@
 
 import type {NextConfig} from 'next';
-import WorkboxWebpackPlugin from 'workbox-webpack-plugin';
-import path from 'path';
 
 const nextConfig: NextConfig = {
   // This option includes the static export mode, but only for production builds.
@@ -22,24 +20,14 @@ const nextConfig: NextConfig = {
   },
   
   webpack(config, { isServer, dev }) {
-    // Rule for audio worklets
     config.module.rules.push({
-      test: /\.js$/,
-      include: path.resolve(__dirname, 'src/lib/workers'),
-      use: { loader: 'worker-loader' },
+      test: /src[\\/]lib[\\/]workers[\\/].*\.js$/,
+      loader: 'worker-loader',
+      options: {
+        filename: 'static/chunks/[name].[contenthash].js',
+        publicPath: '/_next/',
+      },
     });
-
-    if (!isServer && !dev) {
-        config.plugins.push(
-            new WorkboxWebpackPlugin.InjectManifest({
-                swSrc: path.join(__dirname, 'src', 'lib', 'sw.js'),
-                swDest: path.join(__dirname, 'out', 'sw.js'),
-                // We don't need to precache all the assets because we are in an SPA.
-                // We will cache them on demand.
-                injectionPoint: 'self.__WB_MANIFEST',
-            })
-        );
-    }
 
     return config;
   },

@@ -83,6 +83,7 @@ export function loadVolumes(): Volumes {
     }
 }
 
+// Global emitter to decouple audio state from React's render cycle
 const emitter = mitt<AudioEngineEvents>();
 
 export function useAudioEngine() {
@@ -94,8 +95,9 @@ export function useAudioEngine() {
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
     
-    // Initialize volumes state directly so it's never undefined.
-    const [volumes, setVolumesState] = useState<Volumes>(() => loadVolumes());
+    const [volumes, setVolumesState] = useState<Volumes | null>(null);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [currentTempo, setCurrentTempo] = useState(defaultVolumes.tempo);
     
     const initializeAudioEngine = useCallback(async () => {
         try {
@@ -109,19 +111,19 @@ export function useAudioEngine() {
                 if (context.state === 'suspended') {
                     await context.resume();
                 }
-
+                
                 const engine = new AudioEngine(context, orbManager.current, emitter);
                 await engine.initialize();
                 
                 const currentVolumes = loadVolumes();
                 engine.setVolumes(currentVolumes);
-                setVolumesState(currentVolumes);
+                setVolumesState(currentVolumes); // Initialize state after engine is ready
+                setCurrentTempo(currentVolumes.tempo);
 
                 audioEngine.current = engine;
             }
             
             setIsReady(true);
-            emitter.emit('playStateChanged', audioEngine.current.isPlaying);
             
         } catch(e) {
             console.error("Failed to initialize audio engine:", e);
@@ -144,15 +146,20 @@ export function useAudioEngine() {
     }, [isAppStarted, initializeAudioEngine]);
 
     useEffect(() => {
-        // This effect handles volume changes from the engine (e.g., from presets)
-        // and keeps the UI state in sync.
         const handleVolumesChanged = (newVolumes: Volumes) => {
             setVolumesState(newVolumes);
+            if (newVolumes.tempo !== currentTempo) {
+                setCurrentTempo(newVolumes.tempo);
+            }
+        };
+
+        const handlePlayStateChanged = (playing: boolean) => {
+            setIsPlaying(playing);
         };
         
         emitter.on('volumesChanged', handleVolumesChanged);
+        emitter.on('playStateChanged', handlePlayStateChanged);
         
-        // This effect ensures the audio context is resumed after user interaction.
         const resumeAudio = async () => {
             if (audioEngine.current?.isInitialized && audioEngine.current.getContext().state === 'suspended') {
                 await audioEngine.current.getContext().resume();
@@ -163,15 +170,15 @@ export function useAudioEngine() {
 
         return () => {
             emitter.off('volumesChanged', handleVolumesChanged);
+            emitter.off('playStateChanged', handlePlayStateChanged);
             document.removeEventListener('click', resumeAudio);
             document.removeEventListener('touchstart', resumeAudio);
         }
-    }, []);
+    }, [currentTempo]);
     
-    // This is the main function for updating volumes from the UI.
     const setVolumes = useCallback((newVolumes: Volumes | ((prev: Volumes) => Volumes)) => {
         setVolumesState(prev => {
-            const updated = typeof newVolumes === 'function' ? newVolumes(prev) : newVolumes;
+            const updated = typeof newVolumes === 'function' ? newVolumes(prev!) : newVolumes;
             if (audioEngine.current) {
                 audioEngine.current.setVolumes(updated);
             }
@@ -218,13 +225,12 @@ export function useAudioEngine() {
     return {
         isAppStarted,
         isReady,
-        // isPlaying is now managed locally in components that need it
+        isPlaying,
         audioEngine: audioEngine.current,
         orbManager: orbManager.current,
-        emitter,
         startApp,
         stopAllSounds,
-        volumes,
+        volumes: volumes ?? defaultVolumes,
         setVolumes,
         setMelodyInstrument,
         setBassInstrument,
@@ -233,6 +239,7 @@ export function useAudioEngine() {
         startRecording,
         stopRecording,
         handleThereminInteraction,
+        currentTempo,
     };
 }
 

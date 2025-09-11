@@ -4,8 +4,12 @@ import { CSSProperties, memo } from 'react';
 import styles from './orbital-animation.module.css';
 import { cn } from '@/lib/utils';
 
-function OrbitalAnimationComponent() {
-  const tempo = 90; // Fixed value for tempo
+interface OrbitalAnimationProps {
+  isPlaying: boolean;
+  tempo: number;
+}
+
+function OrbitalAnimationComponent({ isPlaying, tempo }: OrbitalAnimationProps) {
   const pulseDuration = 60 / tempo;
 
   const animationStyle: CSSProperties = {
@@ -18,13 +22,13 @@ function OrbitalAnimationComponent() {
       className={styles.view}
       style={animationStyle}
     >
-      <div className={cn(styles.plane)}>
+      <div className={cn(styles.plane, !isPlaying && styles.paused)}>
         {Array.from({ length: 5 }).map((_, i) => (
           <div 
             key={i} 
             className={cn(
               styles.circle,
-              styles.pulsating // Always pulsating
+              isPlaying && styles.pulsating
             )}
           ></div>
         ))}
@@ -34,3 +38,5 @@ function OrbitalAnimationComponent() {
 }
 
 export const OrbitalAnimation = memo(OrbitalAnimationComponent);
+
+    
