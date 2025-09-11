@@ -7,7 +7,7 @@ import { bassInstruments } from '@/lib/bass-presets';
 import { melodyInstruments } from '@/lib/melody-presets';
 import { ALL_NOTES, SCALES } from '@/lib/music';
 import type { OrbManager } from '@/lib/orb-manager';
-import type { MusicKey, MusicScale, Instrument, BassInstrument, ChannelVolumes } from '@/types';
+import type { MusicKey, MusicScale, Instrument, BassInstrument, Volumes, ChannelVolumes } from '@/types';
 
 interface ThereminPadsProps {
     onInteraction: (type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => void;
@@ -17,10 +17,7 @@ interface ThereminPadsProps {
     activeBassInstrument: BassInstrument;
     onInstrumentChange: (instrumentId: BassInstrument) => void;
     orbManager: OrbManager | null;
-    effects: {
-        melody: Omit<ChannelVolumes, 'gain'>;
-        bass: Omit<ChannelVolumes, 'gain'>;
-    };
+    volumes: Volumes;
     onEffectChange: (channel: 'melody' | 'bass', effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => void;
     activeMelodyInstrument: Instrument;
     onMelodyInstrumentChange: (instrumentId: Instrument) => void;
@@ -38,7 +35,7 @@ const ThereminPadsComponent = ({
     activeBassInstrument,
     onInstrumentChange,
     orbManager,
-    effects,
+    volumes,
     onEffectChange,
     activeMelodyInstrument,
     onMelodyInstrumentChange,
@@ -61,7 +58,10 @@ const ThereminPadsComponent = ({
                 activeInstrument={activeBassInstrument}
                 onInstrumentChange={onInstrumentChange}
                 orbManager={orbManager}
-                effects={effects.bass}
+                effects={{
+                    reverbSend: volumes.manualBass.reverbSend,
+                    distortion: volumes.manualBass.distortion,
+                }}
                 onEffectChange={onEffectChange}
             />
             <ThereminPad
@@ -81,7 +81,10 @@ const ThereminPadsComponent = ({
                 onInstrumentChange={onMelodyInstrumentChange}
                 isPolyphonic
                 orbManager={orbManager}
-                effects={effects.melody}
+                effects={{
+                    reverbSend: volumes.melody.reverbSend,
+                    distortion: volumes.melody.distortion,
+                }}
                 onEffectChange={onEffectChange}
             />
         </div>
@@ -89,5 +92,3 @@ const ThereminPadsComponent = ({
 };
 
 export const ThereminPads = memo(ThereminPadsComponent);
-
-    

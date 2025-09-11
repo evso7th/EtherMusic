@@ -266,5 +266,3 @@ const BeatBoxControlsComponent = ({
 };
 
 export const BeatBoxControls = memo(BeatBoxControlsComponent);
-
-    
