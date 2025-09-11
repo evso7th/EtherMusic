@@ -59,9 +59,9 @@ export class DrumMachine {
     
     constructor(audioEngine: AudioEngine, emitter: Emitter<AudioEngineEvents>) {
         this.audioEngine = audioEngine;
+        this.emitter = emitter;
         this._pattern = beatPatterns.find(p => p.name === 'Off')!;
         this.fills = beatPatterns.filter(p => p.type === 'Fill' && p.sequence.length > 0);
-        this.emitter = emitter;
     }
 
     public get isPlaying(): boolean {
@@ -154,3 +154,5 @@ export class DrumMachine {
         this.timeoutId = window.setTimeout(() => this.scheduler(), delay * 1000);
     }
 }
+
+    

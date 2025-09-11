@@ -51,7 +51,6 @@ export default function Home() {
         isReady,
         isPlaying,
         audioEngine,
-        emitter,
         startApp,
         stopAllSounds,
         setBeatPattern,
@@ -194,6 +193,15 @@ export default function Home() {
         if (!isReady || !audioEngine) return;
         handleThereminInteraction(type, data, state);
     }, [isReady, audioEngine, handleThereminInteraction]);
+    
+    const handlePlayPause = useCallback(() => {
+        if (!audioEngine) return;
+        if (audioEngine.isPlaying) {
+            audioEngine.getDrumMachine().stop();
+        } else {
+            audioEngine.getDrumMachine().play();
+        }
+    }, [audioEngine]);
 
     if (!isClient) {
         return <Preloader />;
@@ -273,11 +281,12 @@ export default function Home() {
                     </div>
                     <div className="flex items-center gap-1 md:gap-2 landscape:flex-col">
                          <PlaybackControls
+                            isPlaying={isPlaying}
                             isRecording={isRecording}
+                            onPlayPause={handlePlayPause}
                             onRecord={handleRecord}
                             onExit={stopAllSounds}
                             isReady={isReady}
-                            audioEngine={audioEngine}
                         />
                     </div>
                 </header>
@@ -325,3 +334,5 @@ export default function Home() {
         </div>
     );
 }
+
+    

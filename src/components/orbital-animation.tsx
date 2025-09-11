@@ -1,5 +1,5 @@
 
-import { CSSProperties } from 'react';
+import { CSSProperties, memo } from 'react';
 import styles from './orbital-animation.module.css';
 import { cn } from '@/lib/utils';
 
@@ -8,7 +8,7 @@ interface OrbitalAnimationProps {
   tempo: number;
 }
 
-export function OrbitalAnimation({ 
+function OrbitalAnimationComponent({ 
   isPlaying,
   tempo,
 }: OrbitalAnimationProps) {
@@ -39,3 +39,7 @@ export function OrbitalAnimation({
     </div>
   );
 }
+
+export const OrbitalAnimation = memo(OrbitalAnimationComponent);
+
+    

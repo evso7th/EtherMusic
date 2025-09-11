@@ -122,7 +122,7 @@ export class AudioEngine {
         this.convolver.connect(this.reverbReturnGain);
         this.reverbReturnGain.connect(this.preCompressorOut);
 
-        this.drumMachine = new DrumMachine(this, emitter);
+        this.drumMachine = new DrumMachine(this, this.emitter);
     }
     
     getContext() {
@@ -188,7 +188,7 @@ export class AudioEngine {
         
         this.createDrumChannel();
         
-        this.loadReverbImpulse();
+        await this.loadReverbImpulse();
         
         await this.loadDrumSamples();
                 
@@ -397,6 +397,7 @@ export class AudioEngine {
             newVolumes.latch.reverbSend = bassPresetParams.reverbSend ?? newVolumes.latch.reverbSend;
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
+            // Instead of returning, we now emit an event
             this.setVolumes(newVolumes);
         }
     }
@@ -483,7 +484,7 @@ export class AudioEngine {
         if (newVolumes.tempo !== undefined) {
             this.setTempo(newVolumes.tempo);
         }
-        this.emitter.emit('volumesChanged', this.volumes);
+        this.emitter.emit('volumesChanged', this.getVolumes());
     }
     
     public setCompressorSettings(compressorSettings: CompressorSettings) {
@@ -517,3 +518,5 @@ export class AudioEngine {
         }
     }
 }
+
+    

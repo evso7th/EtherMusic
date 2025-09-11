@@ -96,12 +96,14 @@ export function useAudioEngine() {
     const orbManager = useRef<OrbManager | null>(null);
     
     const [volumes, setVolumesState] = useState<Volumes>(defaultVolumes);
-    const currentTempo = volumes.tempo;
+    const [currentTempo, setCurrentTempo] = useState(defaultVolumes.tempo);
 
     useEffect(() => {
         const hasConsent = getCookie("ethermusic_consent") === 'true';
         if (hasConsent) {
-            setVolumesState(loadVolumes());
+            const loadedVols = loadVolumes();
+            setVolumesState(loadedVols);
+            setCurrentTempo(loadedVols.tempo);
         }
     }, []);
     
@@ -124,6 +126,7 @@ export function useAudioEngine() {
                 const currentVolumes = loadVolumes();
                 engine.setVolumes(currentVolumes);
                 setVolumesState(currentVolumes);
+                setCurrentTempo(currentVolumes.tempo);
 
                 audioEngine.current = engine;
             }
@@ -157,14 +160,26 @@ export function useAudioEngine() {
         };
         const onVolumesChanged = (newVolumes: Volumes) => {
             setVolumesState(newVolumes);
+            setCurrentTempo(newVolumes.tempo);
         };
         
         emitter.on('playStateChanged', onPlayStateChanged);
         emitter.on('volumesChanged', onVolumesChanged);
         
+        const resumeAudio = async () => {
+            if (audioEngine.current?.isInitialized && audioEngine.current.getContext().state === 'suspended') {
+                await audioEngine.current.getContext().resume();
+            }
+        };
+        document.addEventListener('click', resumeAudio, { once: true });
+        document.addEventListener('touchstart', resumeAudio, { once: true });
+
+
         return () => {
             emitter.off('playStateChanged', onPlayStateChanged);
             emitter.off('volumesChanged', onVolumesChanged);
+            document.removeEventListener('click', resumeAudio);
+            document.removeEventListener('touchstart', resumeAudio);
         }
     }, []);
     
@@ -175,6 +190,7 @@ export function useAudioEngine() {
         }
         saveVolumes(updatedVolumes);
         setVolumesState(updatedVolumes);
+        setCurrentTempo(updatedVolumes.tempo);
     }, [volumes]);
 
     const stopAllSounds = useCallback(() => {
@@ -218,6 +234,7 @@ export function useAudioEngine() {
         isPlaying,
         audioEngine: audioEngine.current,
         orbManager: orbManager.current,
+        emitter,
         startApp,
         stopAllSounds,
         volumes,
@@ -232,3 +249,5 @@ export function useAudioEngine() {
         currentTempo
     };
 }
+
+    
