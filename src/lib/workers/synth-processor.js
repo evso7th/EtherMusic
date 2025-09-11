@@ -1,5 +1,4 @@
 
-
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for all real-time synthesis, running in a high-priority
 // audio thread to ensure low-latency, glitch-free sound generation.
@@ -12,6 +11,7 @@ class Oscillator {
         this.lastOut = 0;
     }
 
+    // Polynomial Band-Limited Step function for anti-aliasing
     poly_blep(t, dt) {
         if (t < dt) {
             t /= dt;
@@ -210,6 +210,7 @@ class Voice {
             }
         });
 
+        // Normalize by the number of layers to prevent clipping inside the voice
         const numLayers = this.layers.length || 1;
         mixedSample /= numLayers;
         
@@ -264,11 +265,12 @@ class SynthProcessor extends AudioWorkletProcessor {
     noteOn(note) {
         if (this.voices.has(note.id)) {
             const existingVoice = this.voices.get(note.id);
-            existingVoice.isReleasing = false; 
-            existingVoice.layers.forEach(l => {
-                l.env.state = 'attack';
-                l.env.currentValue = 0;
-            });
+            if(existingVoice.isReleasing){
+                existingVoice.isReleasing = false;
+                existingVoice.layers.forEach(l => {
+                    l.env.state = 'attack';
+                });
+            }
             existingVoice.noteUpdate(note.frequency, note.volume);
             return;
         }
@@ -276,19 +278,20 @@ class SynthProcessor extends AudioWorkletProcessor {
         if (this.voices.size >= this.polyphony) {
             let oldestId;
             let oldestVoice = null;
+            let oldestTime = Infinity;
 
+            // Prioritize removing a voice that is already in its release phase
             for (const [id, voice] of this.voices.entries()) {
                 if (voice.isReleasing) {
                     oldestId = id;
-                    oldestVoice = voice;
-                    break; 
+                    break;
                 }
-                if (!oldestVoice || voice.startTime < oldestVoice.startTime) {
-                    oldestVoice = voice;
+                if (voice.startTime < oldestTime) {
+                    oldestTime = voice.startTime;
                     oldestId = id;
                 }
             }
-             if (oldestId) {
+            if (oldestId) {
                 this.voices.delete(oldestId);
             }
         }
@@ -329,8 +332,9 @@ class SynthProcessor extends AudioWorkletProcessor {
     
         outputChannel.fill(0);
         
-        const voiceCount = this.voices.size;
+        let voiceCount = this.voices.size;
         if (voiceCount === 0) {
+            this.peakLevel = 0;
             return true;
         }
         
@@ -341,6 +345,7 @@ class SynthProcessor extends AudioWorkletProcessor {
             for (const [id, voice] of this.voices.entries()) {
                 if (voice.isFinished) {
                     this.voices.delete(id);
+                    voiceCount--;
                 } else {
                     sample += voice.render();
                 }
@@ -350,16 +355,18 @@ class SynthProcessor extends AudioWorkletProcessor {
             if (absSample > currentPeak) {
                 currentPeak = absSample;
             }
-
+            
+            // Dynamic attenuation based on voice count
             const attenuation = 1 / (1 + Math.max(0, voiceCount - 1) * 0.25);
             
-            outputChannel[i] = Math.tanh(sample * attenuation * 0.8);
+            // Soft clipping using tanh as a final safety net
+            outputChannel[i] = Math.tanh(sample * attenuation * 0.7);
         }
         
         this.peakLevel = Math.max(this.peakLevel, currentPeak);
         
         this.logCounter++;
-        if (this.logCounter >= 200) { // Log every ~200 * 128 samples
+        if (this.logCounter >= 200) {
              if (this.voices.size > 0) {
                 const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
                 this.port.postMessage({
