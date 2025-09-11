@@ -19,6 +19,10 @@ class LatchProcessor extends AudioWorkletProcessor {
       stagger: 0,
     };
 
+    // Counter for throttling debug messages
+    this.debugCounter = 0;
+    this.debugInterval = 100; // Log every 100 process calls
+
     this.port.onmessage = (event) => {
       const { type, note, id, preset } = event.data;
       switch (type) {
@@ -102,9 +106,11 @@ class LatchProcessor extends AudioWorkletProcessor {
         }
     }
 
-    // Send a debug message occasionally
-    if (Math.random() < 0.01) {
-         this.port.postMessage({ 
+    // Send a debug message periodically
+    this.debugCounter++;
+    if (this.debugCounter >= this.debugInterval) {
+        this.debugCounter = 0;
+        this.port.postMessage({ 
             type: 'debug', 
             message: `Active voices: ${voiceCount}, Peak level: ${peak.toFixed(4)}`
         });
@@ -212,6 +218,8 @@ class Voice {
     processFilter(inputSample) {
         if (!this.filter) return inputSample;
         const f = this.filter;
+        // This is a direct form II transposed biquad filter implementation.
+        // It's computationally efficient for real-time audio processing.
         const outputSample = (f.b0/f.a0) * inputSample + f.x1;
         f.x1 = (f.b1/f.a0) * inputSample - (f.a1/f.a0) * outputSample + f.x2;
         f.x2 = (f.b2/f.a0) * inputSample - (f.a2/f.a0) * outputSample;
@@ -265,6 +273,4 @@ class Voice {
 }
 
 
-registerProcessor('latch-processor', SynthProcessor);
-
-    
+registerProcessor('latch-processor', LatchProcessor);
