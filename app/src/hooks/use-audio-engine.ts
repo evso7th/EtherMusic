@@ -82,6 +82,7 @@ export function loadVolumes(): Volumes {
     }
 }
 
+
 export function useAudioEngine(initialVolumes: Volumes) {
     const { toast } = useToast();
     
@@ -110,7 +111,8 @@ export function useAudioEngine(initialVolumes: Volumes) {
                 const engine = new AudioEngine(context, orbManager.current);
                 await engine.initialize();
                 
-                engine.getDrumMachine().on('playStateChanged', setIsPlaying);
+                const playStateCallback = (playing: boolean) => setIsPlaying(playing);
+                engine.getDrumMachine().on('playStateChanged', playStateCallback);
                 
                 engine.setVolumes(vols);
                 audioEngine.current = engine;
@@ -150,19 +152,11 @@ export function useAudioEngine(initialVolumes: Volumes) {
         document.addEventListener('click', resumeAudio, { once: true });
         document.addEventListener('touchstart', resumeAudio, { once: true });
 
-        const playStateCallback = (playing: boolean) => setIsPlaying(playing);
-        if (audioEngine.current) {
-            audioEngine.current.getDrumMachine().on('playStateChanged', playStateCallback);
-        }
-
         return () => {
             document.removeEventListener('click', resumeAudio);
             document.removeEventListener('touchstart', resumeAudio);
-            if (audioEngine.current) {
-                audioEngine.current.getDrumMachine().off('playStateChanged', playStateCallback);
-            }
         };
-    }, [isReady]); // Rerunning when isReady ensures the listener is attached after engine exists.
+    }, [isReady]);
     
     const setVolumes = useCallback((newVolumes: Volumes | ((prev: Volumes) => Volumes)) => {
         setVolumesState(prev => {
@@ -204,15 +198,13 @@ export function useAudioEngine(initialVolumes: Volumes) {
         audioEngine.current?.setMelodyInstrument(instrumentName);
     }, []);
     
-    const setBassInstrument = useCallback((instrumentName: BassInstrument): Volumes | undefined => {
+    const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
         if(audioEngine.current){
             const newVolumes = audioEngine.current.setBassInstrument(instrumentName);
             if (newVolumes) {
               setVolumes(newVolumes); // Update state via the centralized setter
-              return newVolumes
             }
         }
-        return undefined;
     }, [setVolumes]);
 
     return {
@@ -230,7 +222,7 @@ export function useAudioEngine(initialVolumes: Volumes) {
         setBeatPattern,
         setBassLatch,
         startRecording,
-stopRecording,
+        stopRecording,
         handleThereminInteraction,
         currentTempo
     };

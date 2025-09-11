@@ -30,7 +30,6 @@ const VolumeControl = memo(({
     step?: number,
     unit?: string,
 }) => {
-    // No console.log here to keep the console clean in production
     return (
         <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
@@ -77,6 +76,7 @@ export function MixerControls({
     const handleLocalVolumeChange = (update: Partial<Volumes> | ((v: Volumes) => Volumes)) => {
         setLocalVolumes(current => {
             const updated = typeof update === 'function' ? update(current) : { ...current, ...update };
+            console.log('[MixerControls] Local state updated:', updated);
             return updated;
         });
     }
@@ -99,7 +99,7 @@ export function MixerControls({
     };
     
     const handleReverbReturnChange = (value: number) => {
-        handleLocalVolumeChange({ reverbReturn: value });
+        handleLocalVolumeChange(prev => ({ ...prev, reverbReturn: value }));
     };
     
     const handleCompressorSettingChange = useCallback((setting: keyof CompressorSettings, value: any) => {
@@ -110,7 +110,6 @@ export function MixerControls({
     }, []);
 
     const handleApplyChanges = () => {
-        // Apply all changes at once
         onApply(localVolumes);
         closeDialog();
     };

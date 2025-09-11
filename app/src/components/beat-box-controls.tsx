@@ -21,7 +21,7 @@ import { beatPatterns } from "@/lib/drum-machine";
 interface BeatBoxControlsProps {
     activePattern: BeatPattern;
     onPatternChange: (pattern: BeatPattern) => void;
-    initialVolumes: Volumes;
+    volumes: Volumes;
     onApply: (newVolumes: Volumes) => void;
     isMobile: boolean;
     isLandscape?: boolean;
@@ -46,12 +46,11 @@ ControlButtonWithTooltip.displayName = 'ControlButtonWithTooltip';
 const BeatBoxControlsComponent = ({
     activePattern,
     onPatternChange,
-    initialVolumes,
+    volumes,
     onApply,
     isMobile,
     isLandscape = false,
 }: BeatBoxControlsProps) => {
-    console.log("--- Rendering: BeatBoxControls ---");
     const [isBeatsOpen, setIsBeatsOpen] = useState(false);
     const [isMixerOpen, setIsMixerOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<'Meditative' | 'Classic'>('Meditative');
@@ -74,10 +73,9 @@ const BeatBoxControlsComponent = ({
     const buttonSize = isMobile ? 'sm' : 'default';
 
     const ControlButtonWrapper = useCallback(({ tooltipText, ...props }: React.ComponentProps<typeof Button> & { tooltipText: string }) => {
-        const { ...buttonProps } = props;
-        if (isMobile) return <Button {...buttonProps} />;
+        if (isMobile) return <Button {...props} />;
         return (
-             <ControlButtonWithTooltip tooltipText={tooltipText} {...buttonProps} />
+             <ControlButtonWithTooltip tooltipText={tooltipText} {...props} />
         );
     }, [isMobile]);
 
@@ -158,7 +156,7 @@ const BeatBoxControlsComponent = ({
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="pr-4 py-4">
                                     <MixerControls 
-                                        initialVolumes={initialVolumes} 
+                                        initialVolumes={volumes} 
                                         onApply={onApply}
                                         closeDialog={() => setIsMixerOpen(false)}
                                     />
@@ -252,7 +250,7 @@ const BeatBoxControlsComponent = ({
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="pr-4 py-4">
                                     <MixerControls 
-                                        initialVolumes={initialVolumes}
+                                        initialVolumes={volumes}
                                         onApply={onApply}
                                         closeDialog={() => setIsMixerOpen(false)}
                                     />
