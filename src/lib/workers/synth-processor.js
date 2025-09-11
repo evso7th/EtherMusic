@@ -24,7 +24,6 @@ class Oscillator {
                 break;
             case 'square': {
                 sample = p < 0.5 ? 1 : -1;
-                // Poly-BLEP correction at discontinuities (0 and 0.5)
                 let t = p / phaseIncrement;
                 if (p < phaseIncrement) sample += t + t - t * t - 1.0;
                 t = (p - 0.5) / phaseIncrement;
@@ -33,7 +32,6 @@ class Oscillator {
             }
             case 'sawtooth': {
                 sample = 2 * p - 1;
-                 // Poly-BLEP correction at the discontinuity (wrap-around)
                 let t = p / phaseIncrement;
                 if (p < phaseIncrement) { 
                     t = p / phaseIncrement;
@@ -47,7 +45,6 @@ class Oscillator {
                 break;
             }
             case 'triangle':
-                // A more direct way to calculate triangle wave
                 sample = 2 * (p < 0.5 ? p : 1 - p) * 2 - 1;
                 break;
             default:
@@ -72,7 +69,6 @@ class Voice {
         this.volume = volume;
         this.preset = preset;
         
-        // Optimized portamento calculation
         this.portamentoSpeed = preset.portamento > 0 ? 1 - Math.exp(-1 / (preset.portamento * this.sampleRate * 0.1)) : 1;
 
         this.layers = [];
@@ -97,11 +93,10 @@ class Voice {
                 env: {
                     attackInc: 1.0 / attackSamples,
                     decayRate: envConfig.decay > 0 ? (1.0 - (envConfig.sustain ?? 1.0)) / decaySamples : 1,
-                    releaseSamples: releaseSamples,
+                    releaseRate: (envConfig.sustain ?? 1.0) / releaseSamples,
                     sustainLevel: envConfig.sustain ?? 1.0,
                     state: 'attack',
                     currentValue: 0,
-                    releaseStartValue: 0,
                 },
             };
         };
@@ -167,10 +162,8 @@ class Voice {
     processFilter(inputSample) {
         if (!this.filter || !this.filter.active) return inputSample;
         const f = this.filter;
-        // This is a direct form II transposed biquad filter implementation.
-        // It's computationally efficient for real-time audio processing.
         let outputSample = (f.b0/f.a0) * inputSample + f.y1;
-        if (isNaN(outputSample)) outputSample = 0; // Prevent NaN propagation
+        if (isNaN(outputSample)) outputSample = 0; 
         f.y1 = (f.b1/f.a0) * inputSample - (f.a1/f.a0) * outputSample + f.y2;
         f.y2 = (f.b2/f.a0) * inputSample - (f.a2/f.a0) * outputSample;
         return outputSample;
@@ -180,9 +173,7 @@ class Voice {
         const env = layer.env;
         if (this.isReleasing && env.state !== 'release') {
             env.state = 'release';
-            env.releaseStartValue = env.currentValue;
-            // Ensure releaseRate is calculated correctly and is not zero
-            env.releaseRate = env.releaseStartValue / Math.max(1, env.releaseSamples);
+            env.releaseRate = env.currentValue / Math.max(1, env.releaseSamples);
         }
 
         switch (env.state) {
@@ -214,7 +205,6 @@ class Voice {
             return 0;
         }
         
-        // Glide to the target frequency
         this.baseFrequency += (this.targetFrequency - this.baseFrequency) * this.portamentoSpeed;
 
         const lfoModulation = this.processLFO();
@@ -286,7 +276,6 @@ class SynthProcessor extends AudioWorkletProcessor {
             let oldestId = this.voices.keys().next().value;
             let oldestVoice = this.voices.get(oldestId);
             
-            // Prioritize replacing a releasing voice
             if (oldestVoice && !oldestVoice.isReleasing) {
                  for (const [id, voice] of this.voices.entries()) {
                     if (voice.isReleasing) {
@@ -319,7 +308,6 @@ class SynthProcessor extends AudioWorkletProcessor {
     allNotesOff() {
         this.voices.forEach(voice => {
             voice.isReleasing = true;
-            // Use a very short release to prevent clicks but kill the sound quickly.
             voice.layers.forEach(l => {
                 l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05); 
             });
@@ -358,19 +346,15 @@ class SynthProcessor extends AudioWorkletProcessor {
                 peakLevel = absSample;
             }
             
-            // Attenuation based on number of voices to prevent clipping before compressor
             const attenuation = 1 / (1 + Math.max(0, voiceCount - 1) * 0.5);
-            
-            // Soft clipping using tanh as a final safety net
-            outputChannel[i] = Math.tanh(sample * attenuation * 0.7);
+            outputChannel[i] = Math.tanh(sample * attenuation);
         }
-
-        // Log active voices and peak level periodically for debugging.
+        
         if (this.logCounter >= 200 && this.voices.size > 0) {
             const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
             this.port.postMessage({
                 type: 'debug',
-                message: `Active voices: ${this.voices.size}. Freqs: [${activeFrequencies.join(', ')}]. Peak: ${peakLevel.toFixed(4)}`
+                message: `Active voices: ${this.voices.size}. Frequencies: [${activeFrequencies.join(', ')}]. Peak level: ${peakLevel.toFixed(4)}`
             });
             this.logCounter = 0;
         }
