@@ -1,5 +1,6 @@
 
-import type { Volumes } from ".";
+
+import type { Emitter } from "mitt";
 
 // UI Component Props
 export type MusicKey = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B';
@@ -77,13 +78,6 @@ export type BeatPattern = {
 };
 
 
-// Volume settings for a single channel (instrument)
-export interface ChannelVolumes {
-  gain: number;
-  reverbSend: number; 
-  distortion: number; 
-}
-
 export interface CompressorSettings {
     enabled: boolean;
     threshold: number;
@@ -92,13 +86,21 @@ export interface CompressorSettings {
     release: number;
 }
 
+// Volume settings for a single channel (instrument)
+export interface ChannelVolumes {
+  gain: number;
+  reverbSend: number; 
+  distortion: number; 
+  compressor?: CompressorSettings;
+}
+
 export interface Volumes {
   melody: ChannelVolumes;
   manualBass: ChannelVolumes;
   latch: ChannelVolumes;
   drums: ChannelVolumes;
   reverbReturn: number; // in dB
-  compressor: CompressorSettings;
+  compressor: CompressorSettings; // Master compressor
   swing: number;
   tempo: number;
 }
@@ -154,4 +156,3 @@ export type AudioEngineEvents = {
     playStateChanged: boolean;
     volumesChanged: Volumes;
 };
-

@@ -19,17 +19,21 @@ function createDistortionCurve(amount: number): Float32Array {
     // Normalize amount to a range of 0-1
     const normalizedAmount = Math.max(0, Math.min(100, amount)) / 100;
     if (normalizedAmount === 0) {
-        return new Float32Array([-1, 1]); // Linear curve for no distortion
+        // Return a linear curve (no distortion) if amount is 0
+        const curve = new Float32Array(2);
+        curve[0] = -1;
+        curve[1] = 1;
+        return curve;
     }
     
-    const k = normalizedAmount * 100; // Increase the shaping factor for more pronounced effect
+    const k = normalizedAmount * 100; 
     const n_samples = 44100;
     const curve = new Float32Array(n_samples);
     const deg = Math.PI / 180;
     
     for (let i = 0; i < n_samples; i++) {
         const x = i * 2 / n_samples - 1;
-        // A classic waveshaping curve
+        // Classic waveshaping curve
         curve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
     }
     return curve;
@@ -84,7 +88,7 @@ export class AudioEngine {
 
     private masterOut: GainNode;
     private preCompressorOut: GainNode;
-    private compressor: DynamicsCompressorNode;
+    private masterCompressor: DynamicsCompressorNode;
     
     private reverbSend: GainNode;
     private reverbReturnGain: GainNode;
@@ -116,9 +120,9 @@ export class AudioEngine {
         
         this.preCompressorOut = this.context.createGain();
 
-        this.compressor = this.context.createDynamicsCompressor();
-        this.preCompressorOut.connect(this.compressor);
-        this.compressor.connect(this.masterOut);
+        this.masterCompressor = this.context.createDynamicsCompressor();
+        this.preCompressorOut.connect(this.masterCompressor);
+        this.masterCompressor.connect(this.masterOut);
 
         this.reverbSend = this.context.createGain();
         this.convolver = this.context.createConvolver();
@@ -211,7 +215,7 @@ export class AudioEngine {
         const distortion = this.context.createWaveShaper();
         distortion.curve = createDistortionCurve(0);
         distortion.oversample = '4x';
-
+        
         const gain = this.context.createGain();
         const reverbSend = this.context.createGain();
         
@@ -465,11 +469,13 @@ export class AudioEngine {
         }
     }
 
-    private applyVolumeForPart(partName: SynthPartName | 'drums', volumes: ChannelVolumes) {
+    private applyChannelSettings(partName: SynthPartName, volumes: ChannelVolumes) {
         const nodeInfo = this.nodes.get(partName);
         if (nodeInfo && volumes) {
+            const rampTime = this.context.currentTime + 0.01;
             nodeInfo.gain.gain.setTargetAtTime(dbToGain(volumes.gain), this.context.currentTime, 0.01);
             nodeInfo.reverbSend.gain.setTargetAtTime(dbToGain(volumes.reverbSend), this.context.currentTime, 0.01);
+
             if (nodeInfo.distortion) {
                 nodeInfo.distortion.curve = createDistortionCurve(volumes.distortion);
             }
@@ -479,14 +485,20 @@ export class AudioEngine {
     public setVolumes(newVolumes: Volumes) {
         if (!this.isInitialized || !this.context) return;
         this.volumes = newVolumes;
-        
-        this.applyVolumeForPart('melody', newVolumes.melody);
-        this.applyVolumeForPart('manualBass', newVolumes.manualBass);
-        this.applyVolumeForPart('latch', newVolumes.latch);
-        this.applyVolumeForPart('drums', newVolumes.drums);
-        
-        this.reverbReturnGain.gain.setTargetAtTime(dbToGain(newVolumes.reverbReturn), this.context.currentTime, 0.01);
-        this.setCompressorSettings(newVolumes.compressor);
+        const rampTime = this.context.currentTime + 0.01;
+
+        this.applyChannelSettings('melody', newVolumes.melody);
+        this.applyChannelSettings('manualBass', newVolumes.manualBass);
+        this.applyChannelSettings('latch', newVolumes.latch);
+
+        const drumsNode = this.nodes.get('drums');
+        if (drumsNode && newVolumes.drums) {
+             drumsNode.gain.gain.setTargetAtTime(dbToGain(newVolumes.drums.gain), this.context.currentTime, rampTime);
+             drumsNode.reverbSend.gain.setTargetAtTime(dbToGain(newVolumes.drums.reverbSend), this.context.currentTime, rampTime);
+        }
+
+        this.reverbReturnGain.gain.setTargetAtTime(dbToGain(newVolumes.reverbReturn), this.context.currentTime, rampTime);
+        this.setMasterCompressorSettings(newVolumes.compressor);
         if (newVolumes.swing !== undefined) {
             this.setSwing(newVolumes.swing);
         }
@@ -496,30 +508,20 @@ export class AudioEngine {
         this.emitter.emit('volumesChanged', this.getVolumes());
     }
     
-    public setCompressorSettings(compressorSettings: CompressorSettings) {
-        if (!this.isInitialized || !this.context || !this.compressor) return;
-        
-        const safeSettings = {
-            attack: 0.003,
-            knee: 30,
-            ratio: 12,
-            release: 0.25,
-            threshold: -24,
-            ...compressorSettings
-        };
-        this.volumes.compressor = safeSettings;
+    public setMasterCompressorSettings(compressorSettings: CompressorSettings) {
+        if (!this.isInitialized || !this.context || !this.masterCompressor) return;
+        this.volumes.compressor = compressorSettings;
+        const rampTime = 0.01; // Quick ramp to avoid clicks
 
-        const rampTime = 0.01;
-
-        if (safeSettings.enabled) {
-            this.compressor.threshold.setTargetAtTime(safeSettings.threshold, this.context.currentTime, rampTime);
-            this.compressor.knee.setTargetAtTime(safeSettings.knee, this.context.currentTime, rampTime);
-            this.compressor.ratio.setTargetAtTime(safeSettings.ratio, this.context.currentTime, rampTime);
-            this.compressor.attack.setTargetAtTime(safeSettings.attack, this.context.currentTime, rampTime);
-            this.compressor.release.setTargetAtTime(safeSettings.release, this.context.currentTime, rampTime);
+        if (compressorSettings.enabled) {
+            this.masterCompressor.threshold.setTargetAtTime(compressorSettings.threshold, this.context.currentTime, rampTime);
+            this.masterCompressor.knee.setTargetAtTime(0, this.context.currentTime, rampTime); // Hard knee for limiting
+            this.masterCompressor.ratio.setTargetAtTime(20, this.context.currentTime, rampTime); // High ratio for limiting
+            this.masterCompressor.attack.setTargetAtTime(compressorSettings.attack, this.context.currentTime, rampTime);
+            this.masterCompressor.release.setTargetAtTime(compressorSettings.release, this.context.currentTime, rampTime);
             this.preCompressorOut.disconnect();
-            this.preCompressorOut.connect(this.compressor);
-            this.compressor.connect(this.masterOut);
+            this.preCompressorOut.connect(this.masterCompressor);
+            this.masterCompressor.connect(this.masterOut);
         } else {
             this.preCompressorOut.disconnect();
             this.preCompressorOut.connect(this.masterOut);

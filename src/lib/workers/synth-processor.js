@@ -161,12 +161,13 @@ class Voice {
 
     processLayerEnvelope(layer) {
         const env = layer.env;
-        if (this.isReleasing && env.state !== 'release') {
-            env.state = 'release';
-            env.releaseStartValue = env.currentValue;
-            env.releaseRate = env.currentValue / Math.max(1, env.releaseSamples);
+        if (this.isReleasing) {
+          if (env.state !== 'release') { 
+              env.state = 'release'; 
+              env.releaseStartValue = env.currentValue; 
+              env.releaseRate = env.currentValue / Math.max(1, env.releaseSamples);
+          }
         }
-
         switch (env.state) {
             case 'attack':
                 env.currentValue += env.attackInc;
@@ -271,13 +272,16 @@ class SynthProcessor extends AudioWorkletProcessor {
 
         if (this.voices.size >= this.polyphony) {
             let oldestId;
+            let oldestTime = Infinity;
             for (const [id, voice] of this.voices.entries()) {
-                if (voice.isReleasing) {
+                 if (voice.isReleasing) { // Prioritize replacing a releasing voice
                     oldestId = id;
                     break;
                 }
+                // Fallback to oldest voice if no releasing voices are found
+                // This is a simplification; a better approach would be to track voice age
                 if (!oldestId) {
-                    oldestId = id;
+                   oldestId = id;
                 }
             }
             if (oldestId) {
@@ -305,6 +309,7 @@ class SynthProcessor extends AudioWorkletProcessor {
     allNotesOff() {
         this.voices.forEach(voice => {
             voice.release();
+            // Use a very short release to prevent clicks but kill the sound quickly.
             voice.layers.forEach(l => {
                 l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05); 
             });
@@ -320,8 +325,8 @@ class SynthProcessor extends AudioWorkletProcessor {
     
         outputChannel.fill(0);
         
-        if (this.voices.size === 0) {
-            this.peakLevel = 0; // Reset peak level when no voices are active
+        const voiceCount = this.voices.size;
+        if (voiceCount === 0) {
             return true;
         }
 
@@ -329,7 +334,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         
         for (let i = 0; i < outputChannel.length; i++) {
             let sample = 0;
-            for (const [id, voice] of this.voices) {
+            for (const [id, voice] of this.voices.entries()) {
                 if (voice.isFinished) {
                     this.voices.delete(id);
                 } else {
@@ -341,17 +346,20 @@ class SynthProcessor extends AudioWorkletProcessor {
             if (absSample > currentPeak) {
                 currentPeak = absSample;
             }
+
+            // Dynamic attenuation based on voice count.
+            // This is a simple but effective way to prevent clipping.
+            const attenuation = 1 / (1 + Math.max(0, voiceCount - 1) * 0.5);
+            let limitedSample = sample * attenuation * 0.7; // Apply some gain reduction
             
-            const voiceCount = this.voices.size || 1;
-            const attenuation = 1 / Math.sqrt(voiceCount);
-            
-            outputChannel[i] = Math.tanh(sample * attenuation * 0.7);
+            // Final hard clipping as a safety measure.
+            outputChannel[i] = Math.max(-1, Math.min(1, limitedSample));
         }
         
         this.peakLevel = Math.max(this.peakLevel, currentPeak);
         
         this.logCounter++;
-        if (this.logCounter >= 200) {
+        if (this.logCounter >= 200) { // Log every ~200 * 128 samples
              if (this.voices.size > 0) {
                 const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
                 this.port.postMessage({

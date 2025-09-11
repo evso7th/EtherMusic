@@ -44,7 +44,7 @@ export const defaultVolumes: Volumes = {
     latch: { gain: -6, reverbSend: -48, distortion: 0 },
     drums: { gain: -12, reverbSend: -48, distortion: 0 },
     reverbReturn: -25,
-    compressor: {
+    compressor: { // Master compressor
         enabled: true,
         threshold: -50,
         ratio: 12,
@@ -95,13 +95,7 @@ export function useAudioEngine() {
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
     
-    const [volumes, setVolumesState] = useState<Volumes>(() => {
-        // Initialize from cookies only on the client side
-        if (typeof window !== 'undefined' && getCookie("ethermusic_consent") === 'true') {
-            return loadVolumes();
-        }
-        return defaultVolumes;
-    });
+    const [volumes, setVolumesState] = useState<Volumes>(defaultVolumes);
 
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTempo, setCurrentTempo] = useState(volumes.tempo);
@@ -122,8 +116,10 @@ export function useAudioEngine() {
                 const engine = new AudioEngine(context, orbManager.current, emitter);
                 await engine.initialize();
                 
-                // The state is already initialized, just apply it to the engine
-                engine.setVolumes(volumes);
+                // Initialize volumes from cookies if consent is given
+                const initialVolumes = loadVolumes();
+                engine.setVolumes(initialVolumes);
+                setVolumesState(initialVolumes); 
 
                 audioEngine.current = engine;
             }
@@ -138,7 +134,7 @@ export function useAudioEngine() {
                 variant: "destructive"
             });
         }
-    }, [toast, volumes]);
+    }, [toast]);
 
     const startApp = useCallback(async () => {
         if (isAppStarted) return;
@@ -241,7 +237,7 @@ export function useAudioEngine() {
         orbManager: orbManager.current,
         startApp,
         stopAllSounds,
-        volumes: volumes ?? defaultVolumes,
+        volumes, // Directly return state
         setVolumes,
         setMelodyInstrument,
         setBassInstrument,
