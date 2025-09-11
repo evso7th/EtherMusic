@@ -78,6 +78,13 @@ export type BeatPattern = {
 };
 
 
+// Volume settings for a single channel (instrument)
+export interface ChannelVolumes {
+  gain: number;
+  reverbSend: number; 
+  distortion: number; 
+}
+
 export interface CompressorSettings {
     enabled: boolean;
     threshold: number;
@@ -86,21 +93,13 @@ export interface CompressorSettings {
     release: number;
 }
 
-// Volume settings for a single channel (instrument)
-export interface ChannelVolumes {
-  gain: number;
-  reverbSend: number; 
-  distortion: number; 
-  compressor?: CompressorSettings;
-}
-
 export interface Volumes {
   melody: ChannelVolumes;
   manualBass: ChannelVolumes;
   latch: ChannelVolumes;
   drums: ChannelVolumes;
   reverbReturn: number; // in dB
-  compressor: CompressorSettings; // Master compressor
+  compressor: CompressorSettings;
   swing: number;
   tempo: number;
 }

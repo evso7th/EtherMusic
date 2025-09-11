@@ -1,4 +1,5 @@
 
+
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for all real-time synthesis, running in a high-priority
 // audio thread to ensure low-latency, glitch-free sound generation.
@@ -210,8 +211,13 @@ class Voice {
                  mixedSample += oscSample * layer.level * envelopeValue;
             }
         });
+
+        // Normalize the mixed sample by the number of layers to prevent clipping inside the voice
+        const layerCount = this.layers.length > 0 ? this.layers.length : 1;
+        mixedSample /= layerCount;
         
         const filteredSample = this.processFilter(mixedSample);
+        
         return filteredSample * this.volume;
     }
 
@@ -272,21 +278,18 @@ class SynthProcessor extends AudioWorkletProcessor {
 
         if (this.voices.size >= this.polyphony) {
             let oldestId;
-            let oldestTime = Infinity;
+            // Prioritize replacing a releasing voice to prevent cutting off new notes
             for (const [id, voice] of this.voices.entries()) {
-                 if (voice.isReleasing) { // Prioritize replacing a releasing voice
+                 if (voice.isReleasing) {
                     oldestId = id;
                     break;
                 }
-                // Fallback to oldest voice if no releasing voices are found
-                // This is a simplification; a better approach would be to track voice age
-                if (!oldestId) {
-                   oldestId = id;
-                }
             }
-            if (oldestId) {
-                this.voices.delete(oldestId);
+             // If no releasing voices, replace the oldest one.
+            if (!oldestId) {
+                oldestId = this.voices.keys().next().value;
             }
+            this.voices.delete(oldestId);
         }
         const voice = new Voice(note.id, note.frequency, note.volume, this.preset, sampleRate);
         this.voices.set(note.id, voice);
@@ -329,7 +332,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         if (voiceCount === 0) {
             return true;
         }
-
+        
         let currentPeak = 0;
         
         for (let i = 0; i < outputChannel.length; i++) {
@@ -346,14 +349,9 @@ class SynthProcessor extends AudioWorkletProcessor {
             if (absSample > currentPeak) {
                 currentPeak = absSample;
             }
-
-            // Dynamic attenuation based on voice count.
-            // This is a simple but effective way to prevent clipping.
-            const attenuation = 1 / (1 + Math.max(0, voiceCount - 1) * 0.5);
-            let limitedSample = sample * attenuation * 0.7; // Apply some gain reduction
             
-            // Final hard clipping as a safety measure.
-            outputChannel[i] = Math.max(-1, Math.min(1, limitedSample));
+            // Hard clipping as a final safety measure.
+            outputChannel[i] = Math.max(-1, Math.min(1, sample));
         }
         
         this.peakLevel = Math.max(this.peakLevel, currentPeak);

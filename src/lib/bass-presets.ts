@@ -42,7 +42,7 @@ const classicBassPreset: BassInstrumentPreset = {
     description: "A sharp, rhythmic, classic bass guitar sound.",
     params: {
         oscillator: { type: 'sawtooth' },
-        envelope: { attack: 0.01, decay: 0.3, sustain: 0.9, release: 0.9 },
+        envelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.8 },
         filter: { Q: 2, frequency: 600, type: 'lowpass', gain: 6 },
         reverbSend: -48,
         distortion: 15,
@@ -128,3 +128,4 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
 ];
 
 export const defaultBassInstrument: BassInstrument = 'classicBass';
+

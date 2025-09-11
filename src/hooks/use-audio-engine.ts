@@ -44,9 +44,9 @@ export const defaultVolumes: Volumes = {
     latch: { gain: -6, reverbSend: -48, distortion: 0 },
     drums: { gain: -12, reverbSend: -48, distortion: 0 },
     reverbReturn: -25,
-    compressor: { // Master compressor
+    compressor: {
         enabled: true,
-        threshold: -50,
+        threshold: -24,
         ratio: 12,
         attack: 0.003,
         release: 0.25
@@ -95,7 +95,9 @@ export function useAudioEngine() {
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
     
-    const [volumes, setVolumesState] = useState<Volumes>(defaultVolumes);
+    const [volumes, setVolumesState] = useState<Volumes>(() =>
+        typeof window !== 'undefined' ? loadVolumes() : defaultVolumes
+    );
 
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTempo, setCurrentTempo] = useState(volumes.tempo);
@@ -116,10 +118,9 @@ export function useAudioEngine() {
                 const engine = new AudioEngine(context, orbManager.current, emitter);
                 await engine.initialize();
                 
-                // Initialize volumes from cookies if consent is given
-                const initialVolumes = loadVolumes();
-                engine.setVolumes(initialVolumes);
-                setVolumesState(initialVolumes); 
+                const currentVolumes = loadVolumes();
+                engine.setVolumes(currentVolumes);
+                setVolumesState(currentVolumes); 
 
                 audioEngine.current = engine;
             }
@@ -140,7 +141,6 @@ export function useAudioEngine() {
         if (isAppStarted) return;
         
         setIsAppStarted(true);
-        // Play a start-up sound if possible
         if (typeof window !== 'undefined') {
             const audio = new Audio('/assets/sounds/transition.webm');
             audio.play().catch(e => console.error("Error playing transition sound:", e));
@@ -237,7 +237,7 @@ export function useAudioEngine() {
         orbManager: orbManager.current,
         startApp,
         stopAllSounds,
-        volumes, // Directly return state
+        volumes,
         setVolumes,
         setMelodyInstrument,
         setBassInstrument,

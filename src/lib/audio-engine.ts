@@ -191,9 +191,9 @@ export class AudioEngine {
             throw new Error("Could not load core audio components. Please try refreshing the page.");
         }
         
-        this.createSynthChannel('melody', 10, 'synth-processor');
-        this.createSynthChannel('manualBass', 4, 'synth-processor');
-        this.createSynthChannel('latch', 4, 'synth-processor');
+        this.createSynthChannel('melody', 10);
+        this.createSynthChannel('manualBass', 4);
+        this.createSynthChannel('latch', 4);
         
         this.createDrumChannel();
         
@@ -204,10 +204,9 @@ export class AudioEngine {
         this.isInitialized = true;
     }
 
-    private createSynthChannel(part: SynthPartName, polyphony: number, processorName: string) {
+    private createSynthChannel(part: SynthPartName, polyphony: number) {
         if (!this.context) return;
-        
-        const worklet = new AudioWorkletNode(this.context, processorName, {
+        const worklet = new AudioWorkletNode(this.context, 'synth-processor', {
             processorOptions: { sampleRate: this.context.sampleRate, polyphony },
             outputChannelCount: [1]
         });
@@ -215,7 +214,7 @@ export class AudioEngine {
         const distortion = this.context.createWaveShaper();
         distortion.curve = createDistortionCurve(0);
         distortion.oversample = '4x';
-        
+
         const gain = this.context.createGain();
         const reverbSend = this.context.createGain();
         
@@ -472,7 +471,6 @@ export class AudioEngine {
     private applyChannelSettings(partName: SynthPartName, volumes: ChannelVolumes) {
         const nodeInfo = this.nodes.get(partName);
         if (nodeInfo && volumes) {
-            const rampTime = this.context.currentTime + 0.01;
             nodeInfo.gain.gain.setTargetAtTime(dbToGain(volumes.gain), this.context.currentTime, 0.01);
             nodeInfo.reverbSend.gain.setTargetAtTime(dbToGain(volumes.reverbSend), this.context.currentTime, 0.01);
 
@@ -485,7 +483,7 @@ export class AudioEngine {
     public setVolumes(newVolumes: Volumes) {
         if (!this.isInitialized || !this.context) return;
         this.volumes = newVolumes;
-        const rampTime = this.context.currentTime + 0.01;
+        const rampTime = 0.01;
 
         this.applyChannelSettings('melody', newVolumes.melody);
         this.applyChannelSettings('manualBass', newVolumes.manualBass);
@@ -511,17 +509,16 @@ export class AudioEngine {
     public setMasterCompressorSettings(compressorSettings: CompressorSettings) {
         if (!this.isInitialized || !this.context || !this.masterCompressor) return;
         this.volumes.compressor = compressorSettings;
-        const rampTime = 0.01; // Quick ramp to avoid clicks
+        const rampTime = 0.01;
 
         if (compressorSettings.enabled) {
             this.masterCompressor.threshold.setTargetAtTime(compressorSettings.threshold, this.context.currentTime, rampTime);
-            this.masterCompressor.knee.setTargetAtTime(0, this.context.currentTime, rampTime); // Hard knee for limiting
-            this.masterCompressor.ratio.setTargetAtTime(20, this.context.currentTime, rampTime); // High ratio for limiting
+            this.masterCompressor.knee.setTargetAtTime(0, this.context.currentTime, rampTime); 
+            this.masterCompressor.ratio.setTargetAtTime(20, this.context.currentTime, rampTime); 
             this.masterCompressor.attack.setTargetAtTime(compressorSettings.attack, this.context.currentTime, rampTime);
             this.masterCompressor.release.setTargetAtTime(compressorSettings.release, this.context.currentTime, rampTime);
             this.preCompressorOut.disconnect();
             this.preCompressorOut.connect(this.masterCompressor);
-            this.masterCompressor.connect(this.masterOut);
         } else {
             this.preCompressorOut.disconnect();
             this.preCompressorOut.connect(this.masterOut);
