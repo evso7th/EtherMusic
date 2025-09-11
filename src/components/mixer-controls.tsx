@@ -10,6 +10,7 @@ import { useState, useCallback, useEffect, memo } from 'react';
 import type { Volumes, CompressorSettings, ChannelVolumes } from '@/types';
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
+import { defaultVolumes } from "@/hooks/use-audio-engine";
 
 const VolumeControl = memo(({
     label,
@@ -54,29 +55,28 @@ VolumeControl.displayName = 'VolumeControl';
 type VolumeChannel = keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' | 'tempo' >;
 
 interface MixerControlsProps {
-    volumes: Volumes;
+    initialVolumes: Volumes;
     onApply: (newVolumes: Volumes) => void;
     closeDialog: () => void;
     isAutopilotMixer?: boolean;
 }
 
 export const MixerControls = ({ 
-    volumes, 
+    initialVolumes, 
     onApply,
     closeDialog,
     isAutopilotMixer = false,
 }: MixerControlsProps) => {
     
-    const [localVolumes, setLocalVolumes] = useState(volumes);
+    const [localVolumes, setLocalVolumes] = useState(initialVolumes || defaultVolumes);
 
     useEffect(() => {
-        setLocalVolumes(volumes);
-    }, [volumes]);
+        setLocalVolumes(initialVolumes || defaultVolumes);
+    }, [initialVolumes]);
 
     const handleLocalVolumeChange = useCallback((update: Partial<Volumes> | ((v: Volumes) => Volumes)) => {
         setLocalVolumes(current => {
             const updated = typeof update === 'function' ? update(current) : { ...current, ...update };
-            // console.log("Mixer local state updated", updated);
             return updated;
         });
     }, []);
