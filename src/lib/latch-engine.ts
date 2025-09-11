@@ -11,8 +11,8 @@ export type LatchToggleResult = {
     action: 'added' | 'removed' | 'none';
     noteOn?: Note;
     noteOff?: Note;
-    noteToAnimateAdd?: { id: number; x: number; y: number; type: 'add' };
-    noteToAnimateRemove?: { id: number; type: 'remove' };
+    noteToAnimateAdd?: { id: number; x: number; y: number; };
+    noteToAnimateRemove?: { id: number };
 };
 
 interface TapData {
@@ -30,8 +30,7 @@ export class LatchEngine {
     private findNearbyNoteIndex(x: number, y: number): number {
         return this.activeNotes.findIndex(note => {
             const distSq = (note.x - x) ** 2 + (note.y - y) ** 2;
-            const isNearby = distSq < TAP_RADIUS_SQUARED;
-            return isNearby;
+            return distSq < TAP_RADIUS_SQUARED;
         });
     }
 
@@ -46,17 +45,17 @@ export class LatchEngine {
             return {
                 action: 'removed',
                 noteOff: noteToRemove,
-                noteToAnimateRemove: { id: noteToRemove.id, type: 'remove' }
+                noteToAnimateRemove: { id: noteToRemove.id }
             };
         }
         
         let noteToTurnOff: Note | undefined;
-        let noteToAnimateRemove: { id: number, type: 'remove' } | undefined;
+        let noteToAnimateRemove: { id: number } | undefined;
 
         if (this.activeNotes.length >= MAX_LATCH_NOTES) {
             noteToTurnOff = this.activeNotes.shift(); 
             if (noteToTurnOff) {
-                noteToAnimateRemove = { id: noteToTurnOff.id, type: 'remove' };
+                noteToAnimateRemove = { id: noteToTurnOff.id };
             }
         }
         
@@ -68,7 +67,7 @@ export class LatchEngine {
             action: 'added',
             noteOn: newNote,
             noteOff: noteToTurnOff,
-            noteToAnimateAdd: { id: newNote.id, x, y, type: 'add' },
+            noteToAnimateAdd: { id: newNote.id, x, y },
             noteToAnimateRemove: noteToAnimateRemove
         };
         

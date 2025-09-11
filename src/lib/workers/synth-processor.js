@@ -26,26 +26,40 @@ class Oscillator {
             case 'square': {
                 sample = p < 0.5 ? 1 : -1;
                 let t = p / phaseIncrement;
-                if (p < phaseIncrement) sample += t + t - t * t - 1.0;
+                if (p < phaseIncrement) { // at 0
+                     t = p / phaseIncrement;
+                     sample += t * t - 2 * t + 1;
+                } else if (p > 1 - phaseIncrement) { // at 1
+                    t = (p - 1.0) / phaseIncrement;
+                    sample += t * t + 2 * t + 1;
+                }
+                
                 t = (p - 0.5) / phaseIncrement;
-                if (p >= 0.5 && p < 0.5 + phaseIncrement) sample -= t + t - t * t - 1.0;
+                if (p >= 0.5 && p < 0.5 + phaseIncrement) { // at 0.5
+                    sample -= t * t - 2 * t + 1;
+                } else if (p < 0.5 && p > 0.5 - phaseIncrement) { // at 0.5 from other side
+                    t = (p - 0.5 + 1.0) / phaseIncrement;
+                    sample -= t*t + 2*t + 1;
+                }
                 break;
             }
             case 'sawtooth': {
                 sample = 2 * p - 1;
+                 // Poly-BLEP correction at the discontinuity (wrap-around)
                 let t = p / phaseIncrement;
                 if (p < phaseIncrement) { 
                     t = p / phaseIncrement;
-                    const poly_blep = t * t - 2 * t + 1;
+                    const poly_blep = t*t - 2*t + 1;
                     sample -= poly_blep;
                 } else if (p > 1 - phaseIncrement) { 
                     t = (p - 1.0) / phaseIncrement;
-                    const poly_blep = t * t + 2 * t + 1;
-                    sample -= poly_blep;
+                    const poly_blep = t*t + 2*t + 1;
+                    sample += poly_blep;
                 }
                 break;
             }
             case 'triangle':
+                // A more direct way to calculate triangle wave
                 sample = 2 * (p < 0.5 ? p : 1 - p) * 2 - 1;
                 break;
             default:
@@ -70,6 +84,7 @@ class Voice {
         this.volume = volume;
         this.preset = preset;
         
+        // Optimized portamento calculation
         this.portamentoSpeed = preset.portamento > 0 ? 1 - Math.exp(-1 / (preset.portamento * this.sampleRate * 0.1)) : 1;
 
         this.layers = [];
@@ -93,12 +108,11 @@ class Voice {
                 detune: layerConfig.detune || 0,
                 env: {
                     attackInc: 1.0 / attackSamples,
-                    decayRate: envConfig.decay > 0 ? (1.0 - (envConfig.sustain ?? 1.0)) / decaySamples : 1,
-                    releaseRate: (envConfig.sustain ?? 1.0) / releaseSamples,
+                    decayRate: envConfig.sustain < 1.0 ? Math.pow(envConfig.sustain, 1 / decaySamples) : 1.0,
+                    releaseRate: Math.pow(0.0001, 1/releaseSamples),
                     sustainLevel: envConfig.sustain ?? 1.0,
                     state: 'attack',
                     currentValue: 0,
-                    releaseLevel: 1.0,
                 },
             };
         };
@@ -142,7 +156,7 @@ class Voice {
                 this.filter.active = false;
                 return;
         }
-        this.filter.a0=a0; this.filter.a1=a1; this.filter.a2=a2; this.filter.b0=b0; this.filter.b1=b1; this.filter.b2=b2;
+        this.filter.b0=b0/a0; this.filter.b1=b1/a0; this.filter.b2=b2/a0; this.filter.a1=a1/a0; this.filter.a2=a2/a0;
         this.filter.active = true;
     }
 
@@ -164,19 +178,21 @@ class Voice {
     processFilter(inputSample) {
         if (!this.filter || !this.filter.active) return inputSample;
         const f = this.filter;
-        let outputSample = (f.b0/f.a0) * inputSample + f.y1;
-        if (isNaN(outputSample)) outputSample = 0; 
-        f.y1 = (f.b1/f.a0) * inputSample - (f.a1/f.a0) * outputSample + f.y2;
-        f.y2 = (f.b2/f.a0) * inputSample - (f.a2/f.a0) * outputSample;
-        return outputSample;
+        
+        const y0 = f.b0 * inputSample + f.b1 * f.x1 + f.b2 * f.x2 - f.a1 * f.y1 - f.a2 * f.y2;
+        
+        f.x2 = f.x1;
+        f.x1 = inputSample;
+        f.y2 = f.y1;
+        f.y1 = y0;
+        
+        return isNaN(y0) ? 0 : y0;
     }
 
     processLayerEnvelope(layer) {
         const env = layer.env;
         if (this.isReleasing && env.state !== 'release') {
             env.state = 'release';
-            env.releaseStartValue = env.currentValue;
-            env.releaseRate = env.currentValue / Math.max(1, env.releaseSamples);
         }
 
         switch (env.state) {
@@ -185,16 +201,12 @@ class Voice {
                 if (env.currentValue >= 1.0) { env.currentValue = 1.0; env.state = 'decay'; }
                 break;
             case 'decay':
-                if (env.sustainLevel < 1.0) { // Avoid decay if sustain is full
-                    env.currentValue -= env.decayRate;
-                    if (env.currentValue <= env.sustainLevel) { env.currentValue = env.sustainLevel; env.state = 'sustain'; }
-                } else {
-                    env.state = 'sustain';
-                }
+                env.currentValue *= env.decayRate;
+                if (env.currentValue <= env.sustainLevel) { env.currentValue = env.sustainLevel; env.state = 'sustain'; }
                 break;
             case 'release':
-                env.currentValue -= env.releaseRate;
-                if (env.currentValue <= 0) { env.currentValue = 0; }
+                env.currentValue *= env.releaseRate;
+                if (env.currentValue <= 0.0001) { env.currentValue = 0; }
                 break;
         }
         return env.currentValue;
@@ -202,8 +214,8 @@ class Voice {
 
     render() {
         if (this.isFinished) return 0;
-        
-        if (this.isReleasing && this.layers.every(l => l.env.currentValue <= 0.0001)) {
+
+        if (this.isReleasing && this.layers.every(l => l.env.currentValue === 0)) {
             this.isFinished = true;
             return 0;
         }
@@ -238,7 +250,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.voices = new Map();
         this.polyphony = options.processorOptions?.polyphony || 8;
         this.preset = this.getDefaultPreset();
-        
+        this.logCounter = 0;
         this.port.onmessage = this.handleMessage.bind(this);
     }
 
@@ -279,6 +291,7 @@ class SynthProcessor extends AudioWorkletProcessor {
             let oldestId = this.voices.keys().next().value;
             let oldestVoice = this.voices.get(oldestId);
             
+            // Prioritize replacing a releasing voice
             if (oldestVoice && !oldestVoice.isReleasing) {
                  for (const [id, voice] of this.voices.entries()) {
                     if (voice.isReleasing) {
@@ -311,14 +324,17 @@ class SynthProcessor extends AudioWorkletProcessor {
     allNotesOff() {
         this.voices.forEach(voice => {
             voice.isReleasing = true;
+            // Use a very short release to prevent clicks but kill the sound quickly.
             voice.layers.forEach(l => {
-                l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05); 
+                if (l.env.releaseSamples > sampleRate * 0.05) {
+                    l.env.releaseSamples = sampleRate * 0.05;
+                }
             });
         });
     }
 
     process(inputs, outputs, parameters) {
-        const outputChannel = outputs[0][0];
+        const outputChannel = outputs[0]?.[0];
         
         if (!outputChannel) {
             return true;
@@ -331,6 +347,8 @@ class SynthProcessor extends AudioWorkletProcessor {
             return true;
         }
 
+        let peakLevel = 0;
+        
         for (let i = 0; i < outputChannel.length; i++) {
             let sample = 0;
             for (const [id, voice] of this.voices) {
@@ -341,8 +359,27 @@ class SynthProcessor extends AudioWorkletProcessor {
                 }
             }
             
-            const attenuation = 1 / Math.max(1, Math.sqrt(this.voices.size));
+            const absSample = Math.abs(sample);
+            if (absSample > peakLevel) {
+                peakLevel = absSample;
+            }
+            
+            // Attenuation based on number of voices to prevent clipping before compressor
+            const attenuation = 1 / (1 + Math.max(0, voiceCount - 1) * 0.5);
+            
+            // Soft clipping using tanh as a final safety net
             outputChannel[i] = Math.tanh(sample * attenuation);
+        }
+
+        // Log active voices and peak level periodically for debugging.
+        this.logCounter++;
+        if (this.logCounter >= 200 && this.voices.size > 0) {
+            const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
+            this.port.postMessage({
+                type: 'debug',
+                message: `Active voices: ${this.voices.size}. Frequencies: [${activeFrequencies.join(', ')}]. Peak level: ${peakLevel.toFixed(4)}`
+            });
+            this.logCounter = 0;
         }
         
         return true;

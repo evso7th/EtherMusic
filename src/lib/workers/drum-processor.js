@@ -1,5 +1,4 @@
 
-
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for playing back pre-loaded drum samples
 // with low latency and high performance, off the main thread.
@@ -23,6 +22,7 @@ class Voice {
         const samplesToProcess = Math.min(outputChannel.length, remainingSamples);
 
         for (let i = 0; i < samplesToProcess; i++) {
+            // Add the sample to the output buffer, scaled by gain.
             outputChannel[i] += this.buffer[this.position + i] * this.gain;
         }
 
@@ -60,6 +60,8 @@ class DrumProcessor extends AudioWorkletProcessor {
                         this.voices.shift();
                     }
                     this.voices.push(new Voice(bufferToPlay, volume ?? 1.0));
+                } else {
+                     this.port.postMessage({ type: 'error', message: `[DrumProcessor] Sample not found: ${sampleName}` });
                 }
             }
         } catch (e) {
@@ -82,16 +84,21 @@ class DrumProcessor extends AudioWorkletProcessor {
             return true; // No active voices, nothing to do.
         }
         
+        let activeVoiceCount = 0;
         // Process each voice and add its output to the main output buffer.
-        // A simple limiter is also applied.
         for (const voice of this.voices) {
-            voice.process(outputChannel);
+            if (!voice.isFinished) {
+                voice.process(outputChannel);
+                activeVoiceCount++;
+            }
         }
 
         // Filter out finished voices to keep the active voices array clean.
-        this.voices = this.voices.filter(v => !v.isFinished);
+        if (activeVoiceCount !== this.voices.length) {
+            this.voices = this.voices.filter(v => !v.isFinished);
+        }
         
-        // A simple limiter to prevent clipping and audio artifacts.
+        // A simple hard limiter to prevent clipping.
         // This is a safety measure if many loud samples play at once.
         for (let i = 0; i < outputChannel.length; i++) {
             const sample = outputChannel[i];
