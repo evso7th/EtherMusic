@@ -10,9 +10,9 @@ import { DrumMachine } from './drum-machine';
 import type { Emitter } from 'mitt';
 
 // @ts-ignore
-import synthWorkletUrl from 'public/worklets/synth.worklet.js';
+import synthWorkletUrl from './workers/synth-processor.js';
 // @ts-ignore
-import drumWorkletUrl from 'public/worklets/drum.worklet.js';
+import drumWorkletUrl from './workers/drum-processor.js';
 
 
 function dbToGain(db: number): number {
@@ -29,7 +29,7 @@ function createDistortionCurve(amount: number): Float32Array {
     const n_samples = 44100;
     const curve = new Float32Array(n_samples);
     const deg = Math.PI / 180;
-    for (let i = 0; i < n_samples; ++i) {
+    for (let i = 0; < n_samples; ++i) {
         const x = i * 2 / n_samples - 1;
         curve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
     }
@@ -534,3 +534,5 @@ export class AudioEngine {
         }
     }
 }
+
+    

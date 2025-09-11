@@ -85,9 +85,9 @@ class Voice {
     initLayers() {
         this.layers = [];
         const createLayer = (layerConfig, baseFreq, isMainOsc) => {
-            const freq = (layerConfig.freqMult !== undefined ? baseFreq * layerConfig.freqMult : baseFreq);
-            const detunedFreq = freq * Math.pow(2, (layerConfig.detune || 0) / 1200);
             const envConfig = isMainOsc ? this.preset.envelope : (layerConfig.envelope || this.preset.envelope);
+            const attackSamples = Math.max(1, (envConfig.attack || 0.01) * this.sampleRate);
+            const releaseSamples = Math.max(1, (envConfig.release || 0.5) * this.sampleRate);
 
             return {
                 osc: new Oscillator(layerConfig.type || 'sine', this.sampleRate),
@@ -95,9 +95,9 @@ class Voice {
                 freqMult: layerConfig.freqMult || 1,
                 detune: layerConfig.detune || 0,
                 env: {
-                    attackInc: 1.0 / Math.max(1, (envConfig.attack || 0.01) * this.sampleRate),
+                    attackInc: 1.0 / attackSamples,
                     decayRate: envConfig.decay > 0 ? (1.0 - (envConfig.sustain ?? 1.0)) / (envConfig.decay * this.sampleRate) : 1,
-                    releaseSamples: Math.max(1, (envConfig.release || 0.5) * this.sampleRate),
+                    releaseSamples: releaseSamples,
                     sustainLevel: envConfig.sustain ?? 1.0,
                     state: 'attack',
                     currentValue: 0,

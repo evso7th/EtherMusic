@@ -24,7 +24,8 @@ const nextConfig: NextConfig = {
   webpack(config, { isServer, dev }) {
     // Rule for audio worklets
     config.module.rules.push({
-      test: /\.worklet\.js$/,
+      test: /\.js$/,
+      include: path.resolve(__dirname, 'src/lib/workers'),
       use: { loader: 'worker-loader' },
     });
 
@@ -45,3 +46,5 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
+    
