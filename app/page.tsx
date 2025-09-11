@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
 import { melodyInstruments, defaultMelodyInstrument } from '@/lib/melody-presets';
 import { bassInstruments, defaultBassInstrument } from '@/lib/bass-presets';
-import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, BeatPattern } from '@/types';
+import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, ChannelVolumes, BeatPattern } from '@/types';
 import { cn } from '@/lib/utils';
 
 function getCookie(name: string): string | null {
@@ -113,8 +113,11 @@ export default function Home() {
 
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
-        setBassInstrument(instrumentId);
-    }, [setBassInstrument]);
+        const newVolumesForBass = setBassInstrument(instrumentId);
+        if (newVolumesForBass) {
+            setVolumes(newVolumesForBass);
+        }
+    }, [setBassInstrument, setVolumes]);
     
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         let newKey = musicKey;
@@ -339,5 +342,7 @@ export default function Home() {
         </div>
     );
 }
+
+    
 
     

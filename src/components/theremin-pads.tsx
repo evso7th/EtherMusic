@@ -7,82 +7,81 @@ import { bassInstruments } from '@/lib/bass-presets';
 import { melodyInstruments } from '@/lib/melody-presets';
 import { ALL_NOTES, SCALES } from '@/lib/music';
 import type { OrbManager } from '@/lib/orb-manager';
-import type { MusicKey, MusicScale, Instrument, BassInstrument, ChannelVolumes, Volumes } from '@/types';
+import type { MusicKey, MusicScale, Instrument, BassInstrument, ChannelVolumes } from '@/types';
 
 interface ThereminPadsProps {
-    handleThereminInteraction: (type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => void;
+    onInteraction: (type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => void;
     allowedFrequencies: { melody: number[], bass: number[] };
-    isBassLatchOn: boolean;
+    isLatchOn: boolean;
     onLatchToggle: (isOn: boolean) => void;
     activeBassInstrument: BassInstrument;
-    handleSetBassInstrument: (instrumentId: BassInstrument) => void;
+    onInstrumentChange: (instrumentId: BassInstrument) => void;
     orbManager: OrbManager | null;
-    volumes: Volumes;
+    effects: {
+        melody: Omit<ChannelVolumes, 'gain'>;
+        bass: Omit<ChannelVolumes, 'gain'>;
+    };
     onEffectChange: (channel: 'melody' | 'bass', effect: keyof Omit<ChannelVolumes, 'gain'>, value: number) => void;
     activeMelodyInstrument: Instrument;
-    handleMelodyInstrumentChange: (instrumentId: Instrument) => void;
+    onMelodyInstrumentChange: (instrumentId: Instrument) => void;
     musicKey: MusicKey;
-    handleHarmonyChange: (keyOrScale: MusicKey | MusicScale) => void;
+    onKeyChange: (key: MusicKey) => void;
     musicScale: MusicScale;
+    onScaleChange: (scale: MusicScale) => void;
 }
 
 const ThereminPadsComponent = ({
-    handleThereminInteraction,
+    onInteraction,
     allowedFrequencies,
-    isBassLatchOn,
+    isLatchOn,
     onLatchToggle,
     activeBassInstrument,
-    handleSetBassInstrument,
+    onInstrumentChange,
     orbManager,
-    volumes,
+    effects,
     onEffectChange,
     activeMelodyInstrument,
-    handleMelodyInstrumentChange,
+    onMelodyInstrumentChange,
     musicKey,
-    handleHarmonyChange,
-    musicScale
+    onKeyChange,
+    musicScale,
+    onScaleChange
 }: ThereminPadsProps) => {
     return (
         <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-2 landscape:grid-cols-2 landscape:gap-1">
             <ThereminPad
                 type="bass"
-                onInteraction={handleThereminInteraction}
+                onInteraction={onInteraction}
                 allowedFrequencies={allowedFrequencies.bass}
                 color="hsl(var(--accent))"
-                isLatchOn={isBassLatchOn}
+                isLatchOn={isLatchOn}
                 onLatchToggle={onLatchToggle}
                 isPolyphonic
                 instruments={bassInstruments}
                 activeInstrument={activeBassInstrument}
-                onInstrumentChange={handleSetBassInstrument}
+                onInstrumentChange={onInstrumentChange}
                 orbManager={orbManager}
-                effects={{
-                    reverbSend: volumes.manualBass.reverbSend,
-                    distortion: volumes.manualBass.distortion,
-                }}
+                effects={effects.bass}
                 onEffectChange={onEffectChange}
             />
             <ThereminPad
                 type="melody"
-                onInteraction={handleThereminInteraction}
+                onInteraction={onInteraction}
                 allowedFrequencies={allowedFrequencies.melody}
                 color="hsl(var(--primary))"
                 isLatchOn={false}
                 musicKeys={Object.keys(ALL_NOTES) as MusicKey[]}
                 activeKey={musicKey}
-                onKeyChange={handleHarmonyChange}
+                onKeyChange={onKeyChange}
                 musicScales={Object.keys(SCALES) as MusicScale[]}
                 activeScale={musicScale}
-                onScaleChange={handleHarmonyChange}
+                onScaleChange={onScaleChange}
                 instruments={melodyInstruments}
                 activeInstrument={activeMelodyInstrument}
-                onInstrumentChange={handleMelodyInstrumentChange}
+                onInstrumentChange={onMelodyInstrumentChange}
                 isPolyphonic
                 orbManager={orbManager}
-                effects={{
-                    reverbSend: volumes.melody.reverbSend,
-                    distortion: volumes.melody.distortion,
-                }}
+                effects={effects.melody}
                 onEffectChange={onEffectChange}
             />
         </div>
