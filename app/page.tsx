@@ -47,14 +47,6 @@ export default function Home() {
     const isMobile = useIsMobile();
     const [isClient, setIsClient] = useState(false);
     
-    // Lazy initialization for initialVolumes
-    const [initialVolumes] = useState<Volumes>(() => {
-        if (typeof window !== 'undefined') {
-            return loadVolumes();
-        }
-        return defaultVolumes;
-    });
-
     const {
         isAppStarted,
         isReady,
@@ -72,7 +64,7 @@ export default function Home() {
         orbManager,
         volumes,
         setVolumes,
-    } = useAudioEngine(initialVolumes);
+    } = useAudioEngine();
     
     const [cookieConsent, setCookieConsent] = useState<boolean | undefined>(undefined);
     const [isRecording, setIsRecording] = useState(false);
@@ -113,11 +105,8 @@ export default function Home() {
 
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
-        const newVolumesForBass = setBassInstrument(instrumentId);
-        if (newVolumesForBass) {
-            setVolumes(newVolumesForBass);
-        }
-    }, [setBassInstrument, setVolumes]);
+        setBassInstrument(instrumentId);
+    }, [setBassInstrument]);
     
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         let newKey = musicKey;
@@ -171,8 +160,8 @@ export default function Home() {
     }, [setVolumes]);
     
     const handleStartApp = useCallback(() => {
-        startApp(initialVolumes);
-    }, [startApp, initialVolumes]);
+        startApp();
+    }, [startApp]);
 
     const handleRecord = useCallback(() => {
         if (isRecording) {
@@ -241,7 +230,7 @@ export default function Home() {
         )
     }
 
-    if (isAppStarted && !isReady) {
+    if (isAppStarted && (!isReady || !volumes)) {
         return <Preloader />;
     }
     
@@ -299,16 +288,7 @@ export default function Home() {
                         activeBassInstrument={activeBassInstrument}
                         onInstrumentChange={handleSetBassInstrument}
                         orbManager={orbManager}
-                        effects={{
-                            bass: {
-                                reverbSend: volumes.manualBass.reverbSend,
-                                distortion: volumes.manualBass.distortion,
-                            },
-                            melody: {
-                                reverbSend: volumes.melody.reverbSend,
-                                distortion: volumes.melody.distortion,
-                            }
-                        }}
+                        volumes={volumes!}
                         onEffectChange={handleChannelEffectChange}
                         activeMelodyInstrument={activeMelodyInstrument}
                         onMelodyInstrumentChange={handleMelodyInstrumentChange}
@@ -321,7 +301,7 @@ export default function Home() {
                         <BeatBoxControls
                             activePattern={activePattern}
                             onPatternChange={handlePatternChange}
-                            volumes={volumes}
+                            volumes={volumes!}
                             onApply={handleMixerApply}
                             isMobile={isMobile}
                         />
@@ -332,7 +312,7 @@ export default function Home() {
                      <BeatBoxControls
                         activePattern={activePattern}
                         onPatternChange={handlePatternChange}
-                        volumes={volumes}
+                        volumes={volumes!}
                         onApply={handleMixerApply}
                         isMobile={isMobile}
                         isLandscape={true}
@@ -342,7 +322,3 @@ export default function Home() {
         </div>
     );
 }
-
-    
-
-    

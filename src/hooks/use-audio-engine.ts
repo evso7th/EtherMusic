@@ -83,7 +83,7 @@ export function loadVolumes(): Volumes {
 }
 
 
-export function useAudioEngine() {
+export function useAudioEngine(initialVolumes: Volumes | undefined = undefined) {
     const { toast } = useToast();
     
     const [isAppStarted, setIsAppStarted] = useState(false);
@@ -93,9 +93,9 @@ export function useAudioEngine() {
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
     
-    const [volumes, setVolumesState] = useState<Volumes>(() => loadVolumes());
+    const [volumes, setVolumesState] = useState<Volumes>(initialVolumes || defaultVolumes);
     
-    const initializeAudioEngine = useCallback(async () => {
+    const initializeAudioEngine = useCallback(async (vols: Volumes) => {
         try {
             if (!orbManager.current) {
                 const padContainer = document.querySelector('main');
@@ -112,10 +112,10 @@ export function useAudioEngine() {
                 
                 engine.getDrumMachine().on('playStateChanged', setIsPlaying);
                 
-                engine.setVolumes(volumes);
+                engine.setVolumes(vols);
                 audioEngine.current = engine;
             } else {
-                audioEngine.current.setVolumes(volumes);
+                audioEngine.current.setVolumes(vols);
             }
             
             setIsReady(true);
@@ -129,7 +129,7 @@ export function useAudioEngine() {
                 variant: "destructive"
             });
         }
-    }, [toast, volumes]);
+    }, [toast]);
 
     const startApp = useCallback(async () => {
         if (isAppStarted) return;
@@ -138,7 +138,10 @@ export function useAudioEngine() {
         const audio = new Audio('/assets/sounds/transition.webm');
         audio.play().catch(e => console.error("Error playing transition sound:", e));
         
-        await initializeAudioEngine();
+        // Load volumes on start, which might come from cookies
+        const newVolumes = loadVolumes();
+        setVolumesState(newVolumes);
+        await initializeAudioEngine(newVolumes);
     }, [isAppStarted, initializeAudioEngine]);
 
     useEffect(() => {
@@ -226,7 +229,7 @@ export function useAudioEngine() {
         setBeatPattern,
         setBassLatch,
         startRecording,
-        stopRecording,
+stopRecording,
         handleThereminInteraction,
     };
 }
