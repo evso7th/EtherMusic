@@ -191,10 +191,10 @@ class Voice {
     }
 
     render() {
+        if (this.isFinished) return 0;
         if (this.isReleasing && this.layers.every(l => l.env.currentValue <= 0.0001)) {
             this.isFinished = true;
         }
-        if (this.isFinished) return 0;
         
         this.baseFrequency += (this.targetFrequency - this.baseFrequency) * this.portamentoSpeed;
         const lfoModulation = this.processLFO();
@@ -210,7 +210,6 @@ class Voice {
             }
         });
 
-        // Normalize by the number of layers to prevent clipping inside the voice
         const numLayers = this.layers.length || 1;
         mixedSample /= numLayers;
         
@@ -280,7 +279,6 @@ class SynthProcessor extends AudioWorkletProcessor {
             let oldestVoice = null;
             let oldestTime = Infinity;
 
-            // Prioritize removing a voice that is already in its release phase
             for (const [id, voice] of this.voices.entries()) {
                 if (voice.isReleasing) {
                     oldestId = id;
@@ -345,7 +343,6 @@ class SynthProcessor extends AudioWorkletProcessor {
             for (const [id, voice] of this.voices.entries()) {
                 if (voice.isFinished) {
                     this.voices.delete(id);
-                    voiceCount--;
                 } else {
                     sample += voice.render();
                 }
@@ -355,18 +352,15 @@ class SynthProcessor extends AudioWorkletProcessor {
             if (absSample > currentPeak) {
                 currentPeak = absSample;
             }
-            
-            // Dynamic attenuation based on voice count
-            const attenuation = 1 / (1 + Math.max(0, voiceCount - 1) * 0.25);
-            
-            // Soft clipping using tanh as a final safety net
+
+            const attenuation = 1 / (1 + Math.max(0, this.voices.size - 1) * 0.25);
             outputChannel[i] = Math.tanh(sample * attenuation * 0.7);
         }
-        
+
         this.peakLevel = Math.max(this.peakLevel, currentPeak);
         
         this.logCounter++;
-        if (this.logCounter >= 200) {
+        if (this.logCounter >= 200) { 
              if (this.voices.size > 0) {
                 const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
                 this.port.postMessage({
@@ -394,5 +388,3 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
-
-    
