@@ -46,18 +46,11 @@ export default function Home() {
     const isMobile = useIsMobile();
     const [isClient, setIsClient] = useState(false);
     
-    const [initialVolumes] = useState<Volumes>(() => {
-        if (typeof window === 'undefined') {
-            return defaultVolumes;
-        }
-        return loadVolumes();
-    });
-
     const {
         isAppStarted,
         isReady,
-        isPlaying,
         audioEngine,
+        emitter,
         startApp,
         stopAllSounds,
         setBeatPattern,
@@ -70,8 +63,7 @@ export default function Home() {
         orbManager,
         volumes,
         setVolumes,
-        currentTempo,
-    } = useAudioEngine(initialVolumes);
+    } = useAudioEngine();
     
     const [cookieConsent, setCookieConsent] = useState<boolean | undefined>(undefined);
     const [isRecording, setIsRecording] = useState(false);
@@ -103,13 +95,10 @@ export default function Home() {
         if (consent !== null) {
             const hasConsent = consent === 'true';
             setCookieConsent(hasConsent);
-            if (isReady && hasConsent) {
-                setVolumes(loadVolumes());
-            }
         } else {
             setCookieConsent(undefined);
         }
-    }, [isReady, setVolumes]);
+    }, []);
 
     useEffect(() => {
         if (isReady && activeMelodyInstrument) {
@@ -119,8 +108,10 @@ export default function Home() {
 
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
-        setBassInstrument(instrumentId);
-    }, [setBassInstrument]);
+        if (isReady) {
+            setBassInstrument(instrumentId);
+        }
+    }, [setBassInstrument, isReady]);
 
     useEffect(() => {
         if (isReady && activeBassInstrument) {
@@ -140,12 +131,10 @@ export default function Home() {
     }, []);
 
     useEffect(() => {
-        if (isReady) {
-            const bassFreqs = getScaleFrequencies(musicKey, musicScale, [2, 3]);
-            const melodyFreqs = getScaleFrequencies(musicKey, musicScale, [2, 3, 4]);
-            setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
-        }
-    }, [isReady, musicKey, musicScale]);
+        const bassFreqs = getScaleFrequencies(musicKey, musicScale, [2, 3]);
+        const melodyFreqs = getScaleFrequencies(musicKey, musicScale, [2, 3, 4]);
+        setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
+    }, [musicKey, musicScale]);
     
     const handleMixerApply = useCallback((newVolumes: Volumes) => {
         setVolumes(newVolumes);
@@ -169,8 +158,8 @@ export default function Home() {
     }, [setVolumes]);
     
     const handleStartApp = useCallback(() => {
-        startApp(initialVolumes);
-    }, [startApp, initialVolumes]);
+        startApp();
+    }, [startApp]);
 
     const handleRecord = useCallback(() => {
         if (isRecording) {
@@ -203,6 +192,7 @@ export default function Home() {
         handleThereminInteraction(type, data, state);
     }, [isReady, audioEngine, handleThereminInteraction]);
 
+
     if (!isClient) {
         return <Preloader />;
     }
@@ -216,14 +206,14 @@ export default function Home() {
                     <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
                 </div>
                 <div className={cn("absolute inset-0 z-0 transition-opacity duration-1000", isAppStarted ? 'opacity-100' : 'opacity-30')}>
-                    <MemoizedOrbitalAnimation isPlaying={false} tempo={120}/>
+                    <MemoizedOrbitalAnimation />
                 </div>
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
                         <h1 className="text-4xl md:text-5xl font-bold text-primary">EtherMusic</h1>
                         <p className="text-sm md:text-base text-white/80 font-light mt-2 tracking-wide">Neuro Meditation Processor</p>
                     </div>
-                    <Button size="lg" onClick={() => startApp(initialVolumes)}>
+                    <Button size="lg" onClick={handleStartApp}>
                         Start Meditation
                         <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
@@ -247,7 +237,7 @@ export default function Home() {
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
             <div className="fixed inset-0 z-0">
-                 <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={currentTempo} />
+                 <MemoizedOrbitalAnimation />
             </div>
             
              <div className="relative z-10 flex h-full portrait:flex-col portrait:p-2 md:p-6 lg:p-8 landscape:flex-row landscape:p-1 landscape:gap-1">
@@ -281,6 +271,8 @@ export default function Home() {
                     </div>
                     <div className="flex items-center gap-1 md:gap-2 landscape:flex-col">
                          <PlaybackControls
+                            emitter={emitter}
+                            audioEngine={audioEngine}
                             isRecording={isRecording}
                             onRecord={handleRecord}
                             onExit={stopAllSounds}
@@ -311,7 +303,7 @@ export default function Home() {
                         <BeatBoxControls
                             activePattern={activePattern}
                             onPatternChange={handlePatternChange}
-                            initialVolumes={volumes}
+                            volumes={volumes}
                             onApply={handleMixerApply}
                             isMobile={isMobile}
                         />
@@ -322,7 +314,7 @@ export default function Home() {
                      <BeatBoxControls
                         activePattern={activePattern}
                         onPatternChange={handlePatternChange}
-                        initialVolumes={volumes}
+                        volumes={volumes}
                         onApply={handleMixerApply}
                         isMobile={isMobile}
                         isLandscape={true}
