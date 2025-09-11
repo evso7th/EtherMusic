@@ -7,6 +7,7 @@ import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
 import { bassInstruments } from './bass-presets';
 import { DrumMachine } from './drum-machine';
+import type { Emitter } from 'mitt';
 
 
 function dbToGain(db: number): number {
@@ -67,6 +68,9 @@ const DRUM_SAMPLES: Record<string, string> = {
     'p15': '/assets/sounds/drums/perc-015.wav',
 };
 
+type AudioEngineEvents = {
+    'playStateChanged': boolean;
+};
 
 export class AudioEngine {
     public isInitialized = false;
@@ -99,7 +103,7 @@ export class AudioEngine {
     private activePointers = new Map<number, { type: 'melody' | 'bass', noteId: number }>();
     private nextNoteId = 0;
     
-    constructor(context: AudioContext, orbManager: OrbManager) {
+    constructor(context: AudioContext, orbManager: OrbManager, emitter: Emitter<AudioEngineEvents>) {
         this.context = context;
         this.orbManager = orbManager;
         
@@ -119,7 +123,7 @@ export class AudioEngine {
         this.convolver.connect(this.reverbReturnGain);
         this.reverbReturnGain.connect(this.preCompressorOut);
 
-        this.drumMachine = new DrumMachine(this);
+        this.drumMachine = new DrumMachine(this, emitter);
     }
     
     getContext() {
@@ -185,7 +189,7 @@ export class AudioEngine {
         
         this.createDrumChannel();
         
-        await this.loadReverbImpulse();
+        this.loadReverbImpulse();
         
         await this.loadDrumSamples();
                 
@@ -239,7 +243,15 @@ export class AudioEngine {
     }
     
     private async loadReverbImpulse() {
-        this.convolver.buffer = this.createFallbackReverb();
+        try {
+            const response = await fetch('/assets/sounds/impulses/space.wav');
+            if (!response.ok) throw new Error('Reverb impulse not found');
+            const arrayBuffer = await response.arrayBuffer();
+            this.convolver.buffer = await this.context.decodeAudioData(arrayBuffer);
+        } catch (error) {
+            console.warn("[AudioEngine] Reverb impulse '/assets/sounds/impulses/space.wav' not found. Using a generated fallback reverb. This is expected if the file doesn't exist.");
+            this.convolver.buffer = this.createFallbackReverb();
+        }
     }
 
     private createFallbackReverb(): AudioBuffer {
@@ -386,7 +398,7 @@ export class AudioEngine {
             newVolumes.latch.reverbSend = bassPresetParams.reverbSend ?? newVolumes.latch.reverbSend;
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
-            this.setVolumes(newVolumes);
+            // This now returns the updated volume settings to be set in the hook
             return newVolumes;
         }
         return undefined;
@@ -471,8 +483,12 @@ export class AudioEngine {
         
         this.reverbReturnGain.gain.linearRampToValueAtTime(dbToGain(newVolumes.reverbReturn), rampTime);
         this.setCompressorSettings(newVolumes.compressor);
-        this.setSwing(newVolumes.swing);
-        this.setTempo(newVolumes.tempo);
+        if (newVolumes.swing !== undefined) {
+            this.setSwing(newVolumes.swing);
+        }
+        if (newVolumes.tempo !== undefined) {
+            this.setTempo(newVolumes.tempo);
+        }
     }
     
     public setCompressorSettings(compressorSettings: CompressorSettings) {
@@ -506,5 +522,3 @@ export class AudioEngine {
         }
     }
 }
-
-    

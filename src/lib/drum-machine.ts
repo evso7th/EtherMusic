@@ -1,7 +1,7 @@
 
 import type { AudioEngine } from './audio-engine';
 import type { BeatPattern } from '@/types';
-import mitt, { Emitter } from 'mitt';
+import type { Emitter } from 'mitt';
 
 
 export const beatPatterns: Readonly<BeatPattern[]> = [
@@ -62,19 +62,11 @@ export class DrumMachine {
     private eventEmitter: Emitter<DrumMachineEvents>;
 
     
-    constructor(audioEngine: AudioEngine) {
+    constructor(audioEngine: AudioEngine, emitter: Emitter<DrumMachineEvents>) {
         this.audioEngine = audioEngine;
         this._pattern = beatPatterns.find(p => p.name === 'Off')!;
         this.fills = beatPatterns.filter(p => p.type === 'Fill' && p.sequence.length > 0);
-        this.eventEmitter = mitt<DrumMachineEvents>();
-    }
-
-    public on(event: keyof DrumMachineEvents, handler: (payload: any) => void) {
-        this.eventEmitter.on(event, handler);
-    }
-    
-    public off(event: keyof DrumMachineEvents, handler: (payload: any) => void) {
-        this.eventEmitter.off(event, handler);
+        this.eventEmitter = emitter;
     }
 
     public get isPlaying(): boolean {
