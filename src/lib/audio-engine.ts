@@ -117,12 +117,6 @@ export class AudioEngine {
         this.preCompressorOut = this.context.createGain();
 
         this.compressor = this.context.createDynamicsCompressor();
-        this.compressor.threshold.value = -24; // A reasonable starting point
-        this.compressor.knee.value = 30;      
-        this.compressor.ratio.value = 12;      
-        this.compressor.attack.value = 0.003;  
-        this.compressor.release.value = 0.25;  
-
         this.preCompressorOut.connect(this.compressor);
         this.compressor.connect(this.masterOut);
 
@@ -184,10 +178,10 @@ export class AudioEngine {
         };
 
         try {
-            await Promise.all([
+             await Promise.all([
                 this.context.audioWorklet.addModule('/worklets/synth-processor.js'),
                 this.context.audioWorklet.addModule('/worklets/drum-processor.js'),
-            ]);
+             ]);
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
             throw new Error("Could not load core audio components. Please try refreshing the page.");
@@ -413,7 +407,7 @@ export class AudioEngine {
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
             this.setVolumes(newVolumes);
-            return newVolumes; // Return the modified volumes
+            return newVolumes;
         }
         return undefined;
     }
@@ -504,14 +498,25 @@ export class AudioEngine {
     
     public setCompressorSettings(compressorSettings: CompressorSettings) {
         if (!this.isInitialized || !this.context || !this.compressor) return;
-        this.volumes.compressor = compressorSettings;
+        
+        const safeSettings = {
+            attack: 0.003,
+            knee: 30,
+            ratio: 12,
+            release: 0.25,
+            threshold: -24,
+            ...compressorSettings
+        };
+        this.volumes.compressor = safeSettings;
+
         const rampTime = 0.01;
 
-        if (compressorSettings.enabled) {
-            this.compressor.threshold.setTargetAtTime(compressorSettings.threshold, this.context.currentTime, rampTime);
-            this.compressor.ratio.setTargetAtTime(compressorSettings.ratio, this.context.currentTime, rampTime);
-            this.compressor.attack.setTargetAtTime(compressorSettings.attack, this.context.currentTime, rampTime);
-            this.compressor.release.setTargetAtTime(compressorSettings.release, this.context.currentTime, rampTime);
+        if (safeSettings.enabled) {
+            this.compressor.threshold.setTargetAtTime(safeSettings.threshold, this.context.currentTime, rampTime);
+            this.compressor.knee.setTargetAtTime(safeSettings.knee, this.context.currentTime, rampTime);
+            this.compressor.ratio.setTargetAtTime(safeSettings.ratio, this.context.currentTime, rampTime);
+            this.compressor.attack.setTargetAtTime(safeSettings.attack, this.context.currentTime, rampTime);
+            this.compressor.release.setTargetAtTime(safeSettings.release, this.context.currentTime, rampTime);
             this.preCompressorOut.disconnect();
             this.preCompressorOut.connect(this.compressor);
             this.compressor.connect(this.masterOut);

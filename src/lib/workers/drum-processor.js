@@ -39,7 +39,6 @@ class DrumProcessor extends AudioWorkletProcessor {
         super();
         this.buffers = new Map();
         this.voices = [];
-        // Increased maxVoices to handle more complex drum patterns and fills.
         this.maxVoices = 64; 
 
         this.port.onmessage = this.handleMessage.bind(this);
@@ -56,7 +55,6 @@ class DrumProcessor extends AudioWorkletProcessor {
                 const bufferToPlay = this.buffers.get(sampleName);
                 if (bufferToPlay) {
                     if (this.voices.length >= this.maxVoices) {
-                        // If the voice pool is full, remove the oldest voice to make room.
                         this.voices.shift();
                     }
                     this.voices.push(new Voice(bufferToPlay, volume ?? 1.0));
@@ -74,37 +72,31 @@ class DrumProcessor extends AudioWorkletProcessor {
     process(inputs, outputs, parameters) {
         const outputChannel = outputs[0]?.[0];
         if (!outputChannel) {
-            return true; // Stop processing if there's no output channel.
+            return true;
         }
 
-        // It's more efficient to clear the buffer once.
         outputChannel.fill(0);
 
         if (this.voices.length === 0) {
-            return true; // No active voices, nothing to do.
+            return true;
         }
         
         let activeVoices = [];
-        // Process each voice and add its output to the main output buffer.
         for (const voice of this.voices) {
             if (!voice.isFinished) {
-                // The voice.process method now adds directly to the outputChannel
                 voice.process(outputChannel);
                 activeVoices.push(voice);
             }
         }
 
-        // Update the voices array with only the active ones.
         this.voices = activeVoices;
         
-        // A simple hard limiter to prevent clipping and audio artifacts.
-        // This is a safety measure if many loud samples play at once.
         for (let i = 0; i < outputChannel.length; i++) {
             const sample = outputChannel[i];
             outputChannel[i] = Math.max(-1, Math.min(1, sample));
         }
 
-        return true; // Keep the processor alive.
+        return true;
     }
 }
 

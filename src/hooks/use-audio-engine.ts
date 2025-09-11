@@ -95,9 +95,16 @@ export function useAudioEngine() {
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
     
-    const [volumes, setVolumesState] = useState<Volumes>(defaultVolumes);
+    const [volumes, setVolumesState] = useState<Volumes>(() => {
+        // Initialize from cookies only on the client side
+        if (typeof window !== 'undefined' && getCookie("ethermusic_consent") === 'true') {
+            return loadVolumes();
+        }
+        return defaultVolumes;
+    });
+
     const [isPlaying, setIsPlaying] = useState(false);
-    const [currentTempo, setCurrentTempo] = useState(defaultVolumes.tempo);
+    const [currentTempo, setCurrentTempo] = useState(volumes.tempo);
     
     const initializeAudioEngine = useCallback(async () => {
         try {
@@ -115,10 +122,8 @@ export function useAudioEngine() {
                 const engine = new AudioEngine(context, orbManager.current, emitter);
                 await engine.initialize();
                 
-                const currentVolumes = loadVolumes();
-                engine.setVolumes(currentVolumes);
-                setVolumesState(currentVolumes); // Initialize state after engine is ready
-                setCurrentTempo(currentVolumes.tempo);
+                // The state is already initialized, just apply it to the engine
+                engine.setVolumes(volumes);
 
                 audioEngine.current = engine;
             }
@@ -133,14 +138,17 @@ export function useAudioEngine() {
                 variant: "destructive"
             });
         }
-    }, [toast]);
+    }, [toast, volumes]);
 
     const startApp = useCallback(async () => {
         if (isAppStarted) return;
         
         setIsAppStarted(true);
-        const audio = new Audio('/assets/sounds/transition.webm');
-        audio.play().catch(e => console.error("Error playing transition sound:", e));
+        // Play a start-up sound if possible
+        if (typeof window !== 'undefined') {
+            const audio = new Audio('/assets/sounds/transition.webm');
+            audio.play().catch(e => console.error("Error playing transition sound:", e));
+        }
         
         await initializeAudioEngine();
     }, [isAppStarted, initializeAudioEngine]);
