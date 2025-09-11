@@ -333,6 +333,7 @@ class SynthProcessor extends AudioWorkletProcessor {
             let oldestId = this.voices.keys().next().value;
             let oldestVoice = this.voices.get(oldestId);
             
+            // Prioritize replacing a releasing voice
             if (oldestVoice && !oldestVoice.isReleasing) {
                  for (const [id, voice] of this.voices.entries()) {
                     if (voice.isReleasing) {
@@ -405,9 +406,11 @@ class SynthProcessor extends AudioWorkletProcessor {
                 currentPeak = absSample;
             }
             
-            // Apply the limiter
-            const limitedSample = this.limiter.process(sample);
-            outputChannel[i] = limitedSample;
+            // Apply a voice-based attenuator before the final limiter
+            const attenuation = 1 / (1 + Math.max(0, voiceCount - 1) * 0.5);
+            
+            // Apply a soft clipper (tanh) as a final safety measure to prevent harsh clipping
+            outputChannel[i] = Math.tanh(sample * attenuation * 0.7);
         }
         
         if (currentPeak > this.peakLevel) {
@@ -421,7 +424,7 @@ class SynthProcessor extends AudioWorkletProcessor {
                 const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
                 this.port.postMessage({
                     type: 'debug',
-                    message: `Active voices: ${this.voices.size}. Frequencies: [${activeFrequencies.join(', ')}]. Peak level: ${this.peakLevel.toFixed(4)}`
+                    message: `Active voices: ${this.voices.size}. Freqs: [${activeFrequencies.join(', ')}]. Peak: ${this.peakLevel.toFixed(4)}`
                 });
             }
             this.logCounter = 0;
