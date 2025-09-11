@@ -236,17 +236,15 @@ export function useAudioEngine() {
         orbManager: orbManager.current,
         startApp,
         stopAllSounds,
-        volumes: volumes || defaultVolumes,
+        volumes,
         setVolumes,
+        currentTempo,
         setMelodyInstrument,
         setBassInstrument,
         setBeatPattern,
         setBassLatch,
         startRecording,
-stopRecording,
+        stopRecording,
         handleThereminInteraction,
-        currentTempo,
     };
 }
-
-    

@@ -408,7 +408,7 @@ export class AudioEngine {
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
             this.setVolumes(newVolumes);
-            return newVolumes; // Return the modified volumes
+            return newVolumes;
         }
         return undefined;
     }
@@ -503,13 +503,16 @@ export class AudioEngine {
         
         this.volumes.compressor = compressorSettings;
     
+        // Disconnect and reconnect to apply the enabled/disabled state.
         this.preCompressorOut.disconnect();
         if (compressorSettings.enabled) {
             this.preCompressorOut.connect(this.limiter);
             this.limiter.connect(this.masterOut);
 
             const rampTime = this.context.currentTime + 0.02;
+            // Set limiter properties. A high ratio and fast attack/release make it a "brickwall" limiter.
             this.limiter.threshold.setTargetAtTime(compressorSettings.threshold, this.context.currentTime, rampTime);
+            this.limiter.knee.setTargetAtTime(0, this.context.currentTime, rampTime); // Hard knee for limiting
             this.limiter.ratio.setTargetAtTime(compressorSettings.ratio, this.context.currentTime, rampTime);
             this.limiter.attack.setTargetAtTime(compressorSettings.attack, this.context.currentTime, rampTime);
             this.limiter.release.setTargetAtTime(compressorSettings.release, this.context.currentTime, rampTime);

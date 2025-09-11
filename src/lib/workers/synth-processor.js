@@ -210,8 +210,11 @@ class Voice {
             }
         });
         
+        // Normalize by number of layers to prevent clipping inside the voice
         const numLayers = this.layers.length || 1;
-        mixedSample /= numLayers;
+        if (numLayers > 1) {
+             mixedSample /= numLayers;
+        }
 
         const filteredSample = this.processFilter(mixedSample);
         
@@ -233,7 +236,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.peakLevel = 0;
 
         this.port.onmessage = this.handleMessage.bind(this);
-        console.log(`[SynthProcessor] Created with polyphony: ${this.polyphony}`);
+        this.port.postMessage({type: 'debug', message: `[SynthProcessor] Created with polyphony: ${this.polyphony}`});
     }
 
     handleMessage(event) {
@@ -268,7 +271,10 @@ class SynthProcessor extends AudioWorkletProcessor {
             // Re-trigger envelope if the voice was releasing
             if(voice.isReleasing){
                 voice.isReleasing = false;
-                voice.layers.forEach(l => l.env.state = 'attack');
+                voice.layers.forEach(l => {
+                    l.env.state = 'attack';
+                    l.env.currentValue = 0;
+                });
             }
             voice.noteUpdate(note.frequency, note.volume);
             return;
@@ -313,8 +319,8 @@ class SynthProcessor extends AudioWorkletProcessor {
 
     allNotesOff() {
         this.voices.forEach(voice => {
-            voice.isReleasing = true;
-            // Short release to prevent clicks
+            voice.release();
+            // Use a very short release to prevent clicks but kill the sound quickly.
             voice.layers.forEach(l => {
                 l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05); 
             });
@@ -350,9 +356,7 @@ class SynthProcessor extends AudioWorkletProcessor {
                 currentPeak = absSample;
             }
             
-            // Attenuation based on number of voices to prevent clipping before compressor
             const attenuation = 1 / (1 + Math.max(0, this.voices.size - 1) * 0.25);
-            
             outputChannel[i] = Math.tanh(sample * attenuation);
         }
 
