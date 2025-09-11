@@ -234,6 +234,8 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.polyphony = options.processorOptions?.polyphony || 8;
         this.preset = this.getDefaultPreset();
         
+        this.logCounter = 0;
+
         this.port.onmessage = this.handleMessage.bind(this);
     }
 
@@ -320,23 +322,37 @@ class SynthProcessor extends AudioWorkletProcessor {
         if (voiceCount === 0) {
             return true;
         }
-        
-        // Simple attenuation based on the number of voices to prevent clipping.
-        // It's a non-linear curve, more aggressive for more voices.
-        const attenuation = 1 / (1 + Math.max(0, voiceCount - 1) * 0.25);
+
+        this.logCounter++;
+
+        let peakLevel = 0;
+        let activeFrequencies = [];
 
         for (let i = 0; i < outputChannel.length; i++) {
             let sample = 0;
             for (const [id, voice] of this.voices) {
-                sample += voice.render();
+                const voiceSample = voice.render();
+                sample += voiceSample;
                 if (voice.isFinished) {
                     this.voices.delete(id);
                 }
             }
             
-            const attenuatedSample = sample * attenuation;
-            // Apply a soft clipping (tanh) as a final safety measure.
-            outputChannel[i] = Math.tanh(attenuatedSample); 
+            const absSample = Math.abs(sample);
+            if (absSample > peakLevel) {
+                peakLevel = absSample;
+            }
+
+            outputChannel[i] = Math.tanh(sample * 0.5); // Soft clipping to prevent harsh distortion
+        }
+
+        if (this.logCounter % 100 === 0 && this.voices.size > 0) {
+            activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
+            this.port.postMessage({
+                type: 'debug',
+                message: `Active voices: ${this.voices.size}. Frequencies: [${activeFrequencies.join(', ')}]. Peak level: ${peakLevel.toFixed(4)}`
+            });
+            this.logCounter = 0;
         }
         
         return true;

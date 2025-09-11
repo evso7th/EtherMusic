@@ -174,8 +174,8 @@ export class AudioEngine {
 
         try {
              await Promise.all([
-                this.context.audioWorklet.addModule('/workers/synth-processor.js'),
-                this.context.audioWorklet.addModule('/workers/drum-processor.js'),
+                this.context.audioWorklet.addModule('/worklets/synth-processor.js'),
+                this.context.audioWorklet.addModule('/worklets/drum-processor.js'),
              ]);
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
@@ -219,6 +219,8 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
+            } else if (e.data.type === 'debug') {
+                console.log(`[DEBUG-${part.toUpperCase()}]`, e.data.message);
             }
         };
 
@@ -469,6 +471,7 @@ export class AudioEngine {
     private applyVolumeForPart(partName: SynthPartName | 'drums', volumes: ChannelVolumes) {
         const nodeInfo = this.nodes.get(partName);
         if (nodeInfo && volumes) {
+            // Ramping is now handled inside the worklet for synths, but gain nodes are fine here.
             nodeInfo.gain.gain.setValueAtTime(dbToGain(volumes.gain), this.context.currentTime);
             nodeInfo.reverbSend.gain.setValueAtTime(dbToGain(volumes.reverbSend), this.context.currentTime);
             if (nodeInfo.distortion) {
@@ -495,7 +498,6 @@ export class AudioEngine {
         if (newVolumes.tempo !== undefined) {
             this.setTempo(newVolumes.tempo);
         }
-        this.emitter.emit('volumesChanged', this.getVolumes());
     }
     
     public setCompressorSettings(compressorSettings: CompressorSettings) {
