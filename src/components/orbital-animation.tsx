@@ -1,14 +1,45 @@
 
+import { useState, useEffect } from 'react';
 import styles from './orbital-animation.module.css';
 import { cn } from '@/lib/utils';
 import type { CSSProperties } from 'react';
+import type { AudioEngine } from '@/lib/audio-engine';
 
 interface OrbitalAnimationProps {
-  isPlaying?: boolean;
-  tempo?: number;
+  audioEngine?: AudioEngine | null;
 }
 
-export function OrbitalAnimation({ isPlaying = false, tempo = 120 }: OrbitalAnimationProps) {
+export function OrbitalAnimation({ audioEngine }: OrbitalAnimationProps) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [tempo, setTempo] = useState(120);
+
+  useEffect(() => {
+    if (!audioEngine) {
+      setIsPlaying(false);
+      return;
+    }
+
+    // Set initial state from engine
+    setIsPlaying(audioEngine.isPlaying);
+    setTempo(audioEngine.getVolumes().tempo);
+
+    const handlePlayStateChange = (playing: boolean) => {
+      setIsPlaying(playing);
+    };
+
+    const handleVolumeChange = (volumes: any) => {
+      setTempo(volumes.tempo);
+    };
+
+    audioEngine.emitter.on('playStateChanged', handlePlayStateChange);
+    audioEngine.emitter.on('volumesChanged', handleVolumeChange);
+
+    return () => {
+      audioEngine.emitter.off('playStateChanged', handlePlayStateChange);
+      audioEngine.emitter.off('volumesChanged', handleVolumeChange);
+    };
+  }, [audioEngine]);
+
   const pulseDuration = 60 / tempo;
 
   const animationStyle: CSSProperties = {
@@ -21,7 +52,7 @@ export function OrbitalAnimation({ isPlaying = false, tempo = 120 }: OrbitalAnim
       className={styles.view}
       style={animationStyle}
     >
-      <div className={styles.plane}>
+      <div className={cn(styles.plane, !isPlaying && styles.paused)}>
         {Array.from({ length: 5 }).map((_, i) => (
           <div 
             key={i} 

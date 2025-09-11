@@ -1,6 +1,6 @@
 
 import type { AudioEngine } from './audio-engine';
-import type { BeatPattern } from '@/types';
+import type { BeatPattern, Volumes } from '@/types';
 import type { Emitter } from 'mitt';
 
 
@@ -46,8 +46,9 @@ export const beatPatterns: Readonly<BeatPattern[]> = [
     { name: 'Off', type: 'System', length: 1, sequence: [] },
 ];
 
-type DrumMachineEvents = {
+type AudioEngineEvents = {
     playStateChanged: boolean;
+    volumesChanged: Volumes;
 };
 
 export class DrumMachine {
@@ -59,14 +60,14 @@ export class DrumMachine {
     private step: number = 0;
     private measureCount: number = 0;
     private fills: Readonly<BeatPattern[]>;
-    private eventEmitter: Emitter<DrumMachineEvents>;
+    private emitter: Emitter<AudioEngineEvents>;
 
     
-    constructor(audioEngine: AudioEngine, emitter: Emitter<DrumMachineEvents>) {
+    constructor(audioEngine: AudioEngine, emitter: Emitter<AudioEngineEvents>) {
         this.audioEngine = audioEngine;
         this._pattern = beatPatterns.find(p => p.name === 'Off')!;
         this.fills = beatPatterns.filter(p => p.type === 'Fill' && p.sequence.length > 0);
-        this.eventEmitter = emitter;
+        this.emitter = emitter;
     }
 
     public get isPlaying(): boolean {
@@ -108,7 +109,7 @@ export class DrumMachine {
         
         this.step = 0; 
         this.measureCount = 0;
-        this.eventEmitter.emit('playStateChanged', true);
+        this.emitter.emit('playStateChanged', true);
         this.scheduler();
     }
     
@@ -118,7 +119,7 @@ export class DrumMachine {
             this.timeoutId = null;
             this.step = 0;
             this.measureCount = 0;
-            this.eventEmitter.emit('playStateChanged', false);
+            this.emitter.emit('playStateChanged', false);
         }
     }
 
@@ -156,5 +157,3 @@ export class DrumMachine {
         this.timeoutId = window.setTimeout(() => this.scheduler(), delay * 1000);
     }
 }
-
-    

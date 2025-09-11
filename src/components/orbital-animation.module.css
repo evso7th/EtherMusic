@@ -23,6 +23,10 @@
   animation: rotate 20s infinite linear;
 }
 
+.plane.paused {
+  animation-play-state: paused;
+}
+
 .circle {
   width: 240px;
   height: 240px;
@@ -31,11 +35,15 @@
   border-radius: 100%;
   box-sizing: border-box;
   box-shadow: 0 0 120px hsl(var(--primary)), inset 0 0 120px hsl(var(--primary));
+  /* Base animation state */
+  transform: scale(1);
+  transition: transform 0.1s ease-out;
 }
 
 .circle.pulsating {
   animation: pulse var(--pulse-duration) infinite ease-in-out;
 }
+
 
 .circle::before,
 .circle::after {
@@ -91,9 +99,11 @@
 @keyframes pulse {
   0%,
   100% {
-    transform: scale(1);
+    /* The base scale is handled by the .circle class */
+    box-shadow: 0 0 120px hsl(var(--primary)), inset 0 0 120px hsl(var(--primary));
   }
   50% {
-    transform: scale(1.05);
+    /* Pulsate the shadow to be more intense */
+    box-shadow: 0 0 140px 10px hsl(var(--accent)), inset 0 0 140px 10px hsl(var(--accent));
   }
 }

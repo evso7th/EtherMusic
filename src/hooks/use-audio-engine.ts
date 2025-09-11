@@ -84,7 +84,8 @@ export function loadVolumes(): Volumes {
 }
 
 type AudioEngineEvents = {
-    'playStateChanged': boolean;
+    playStateChanged: boolean;
+    volumesChanged: Volumes;
 };
 
 export function useAudioEngine(initialVolumes: Volumes) {
@@ -92,13 +93,11 @@ export function useAudioEngine(initialVolumes: Volumes) {
     
     const [isAppStarted, setIsAppStarted] = useState(false);
     const [isReady, setIsReady] = useState(false);
-    const [isPlaying, setIsPlaying] = useState(false);
     
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
     
     const [volumes, setVolumesState] = useState<Volumes>(initialVolumes);
-    const [currentTempo, setCurrentTempo] = useState(initialVolumes.tempo);
     
     const initializeAudioEngine = useCallback(async (vols: Volumes) => {
         try {
@@ -113,25 +112,19 @@ export function useAudioEngine(initialVolumes: Volumes) {
                     await context.resume();
                 }
                 const emitter = mitt<AudioEngineEvents>();
-                emitter.on('playStateChanged', (playing) => {
-                    setIsPlaying(playing);
-                });
-
+                
                 const engine = new AudioEngine(context, orbManager.current, emitter);
                 await engine.initialize();
                 
                 engine.setVolumes(vols);
                 setVolumesState(vols);
-                setCurrentTempo(vols.tempo);
                 audioEngine.current = engine;
             } else {
                 audioEngine.current.setVolumes(vols);
                 setVolumesState(vols);
-                setCurrentTempo(vols.tempo);
             }
             
             setIsReady(true);
-            setIsPlaying(audioEngine.current.isPlaying);
             
         } catch(e) {
             console.error("Failed to initialize audio engine:", e);
@@ -174,7 +167,6 @@ export function useAudioEngine(initialVolumes: Volumes) {
             audioEngine.current.setVolumes(updated);
         }
         setVolumesState(updated);
-        setCurrentTempo(updated.tempo);
         saveVolumes(updated);
     }, [volumes]);
 
@@ -219,7 +211,6 @@ export function useAudioEngine(initialVolumes: Volumes) {
     return {
         isAppStarted,
         isReady,
-        isPlaying,
         audioEngine: audioEngine.current,
         orbManager: orbManager.current,
         startApp,
@@ -233,8 +224,5 @@ export function useAudioEngine(initialVolumes: Volumes) {
         startRecording,
         stopRecording,
         handleThereminInteraction,
-        currentTempo
     };
 }
-
-    

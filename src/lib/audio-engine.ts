@@ -69,13 +69,15 @@ const DRUM_SAMPLES: Record<string, string> = {
 };
 
 type AudioEngineEvents = {
-    'playStateChanged': boolean;
+    playStateChanged: boolean;
+    volumesChanged: Volumes;
 };
 
 export class AudioEngine {
     public isInitialized = false;
     private context!: AudioContext;
     public orbManager: OrbManager;
+    public emitter: Emitter<AudioEngineEvents>;
     private mediaRecorder: MediaRecorder | null = null;
     private recordedChunks: Blob[] = [];
 
@@ -106,6 +108,7 @@ export class AudioEngine {
     constructor(context: AudioContext, orbManager: OrbManager, emitter: Emitter<AudioEngineEvents>) {
         this.context = context;
         this.orbManager = orbManager;
+        this.emitter = emitter;
         
         this.masterOut = this.context.createGain();
         this.masterOut.connect(this.context.destination);
@@ -123,7 +126,7 @@ export class AudioEngine {
         this.convolver.connect(this.reverbReturnGain);
         this.reverbReturnGain.connect(this.preCompressorOut);
 
-        this.drumMachine = new DrumMachine(this, emitter);
+        this.drumMachine = new DrumMachine(this, this.emitter);
     }
     
     getContext() {
@@ -398,7 +401,7 @@ export class AudioEngine {
             newVolumes.latch.reverbSend = bassPresetParams.reverbSend ?? newVolumes.latch.reverbSend;
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
-            // This now returns the updated volume settings to be set in the hook
+            this.setVolumes(newVolumes);
             return newVolumes;
         }
         return undefined;
@@ -441,8 +444,6 @@ export class AudioEngine {
                     throw new Error(`HTTP error! status: ${response.status} for ${url.split('/').pop()}`);
                 }
                 const arrayBuffer = await response.arrayBuffer();
-                // This is a synchronous decode, which is fine inside an async function on the main thread
-                // but would block if this were a more complex operation.
                 const audioBuffer = await this.context.decodeAudioData(arrayBuffer.slice(0)); 
                 
                 const channelData = audioBuffer.getChannelData(0);
@@ -462,7 +463,6 @@ export class AudioEngine {
     private applyVolumeForPart(partName: SynthPartName | 'drums', volumes: ChannelVolumes) {
         const nodeInfo = this.nodes.get(partName);
         if (nodeInfo && volumes) {
-            // Ramping is now handled inside the worklet for synths, but gain nodes are fine here.
             nodeInfo.gain.gain.setValueAtTime(dbToGain(volumes.gain), this.context.currentTime);
             nodeInfo.reverbSend.gain.setValueAtTime(dbToGain(volumes.reverbSend), this.context.currentTime);
             if (nodeInfo.distortion) {
@@ -489,6 +489,7 @@ export class AudioEngine {
         if (newVolumes.tempo !== undefined) {
             this.setTempo(newVolumes.tempo);
         }
+        this.emitter.emit('volumesChanged', this.volumes);
     }
     
     public setCompressorSettings(compressorSettings: CompressorSettings) {
