@@ -306,8 +306,8 @@ class SynthProcessor extends AudioWorkletProcessor {
 
     allNotesOff() {
         this.voices.forEach(voice => {
+            // A very short release to prevent clicks, but ensures voices are terminated quickly.
             voice.isReleasing = true;
-            // Use a very short release to prevent clicks but kill the sound quickly.
             voice.layers.forEach(l => {
                 l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05); 
             });

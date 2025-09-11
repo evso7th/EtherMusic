@@ -9,6 +9,11 @@ import { bassInstruments } from './bass-presets';
 import { DrumMachine } from './drum-machine';
 import type { Emitter } from 'mitt';
 
+// @ts-ignore
+import synthWorkletUrl from 'public/worklets/synth.worklet.js';
+// @ts-ignore
+import drumWorkletUrl from 'public/worklets/drum.worklet.js';
+
 
 function dbToGain(db: number): number {
     if (db <= -48) return 0;
@@ -174,17 +179,17 @@ export class AudioEngine {
 
         try {
              await Promise.all([
-                this.context.audioWorklet.addModule('/worklets/synth-processor.js'),
-                this.context.audioWorklet.addModule('/worklets/drum-processor.js'),
+                this.context.audioWorklet.addModule(synthWorkletUrl),
+                this.context.audioWorklet.addModule(drumWorkletUrl),
              ]);
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
             throw new Error("Could not load core audio components. Please try refreshing the page.");
         }
         
-        this.createSynthChannel('melody', 10);
-        this.createSynthChannel('manualBass', 4);
-        this.createSynthChannel('latch', 4);
+        this.createSynthChannel('melody', 10, 'synth-processor');
+        this.createSynthChannel('manualBass', 4, 'synth-processor');
+        this.createSynthChannel('latch', 4, 'synth-processor');
         
         this.createDrumChannel();
         
@@ -195,10 +200,8 @@ export class AudioEngine {
         this.isInitialized = true;
     }
 
-    private createSynthChannel(part: SynthPartName, polyphony: number) {
+    private createSynthChannel(part: SynthPartName, polyphony: number, processorName: string) {
         if (!this.context) return;
-        
-        const processorName = 'synth-processor';
         
         const worklet = new AudioWorkletNode(this.context, processorName, {
             processorOptions: { sampleRate: this.context.sampleRate, polyphony },
@@ -531,5 +534,3 @@ export class AudioEngine {
         }
     }
 }
-
-    

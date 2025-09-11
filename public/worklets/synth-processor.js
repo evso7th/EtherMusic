@@ -1,3 +1,4 @@
+
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for all real-time synthesis, running in a high-priority
 // audio thread to ensure low-latency, glitch-free sound generation.
@@ -304,15 +305,13 @@ class SynthProcessor extends AudioWorkletProcessor {
         }
     }
 
-    allNotesOff() {
-        this.voices.forEach(voice => {
-            voice.isReleasing = true;
-            // Use a very short release to prevent clicks but kill the sound quickly.
-            voice.layers.forEach(l => {
-                l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05); 
-            });
-        });
-    }
+allNotesOff() {
+    this.voices.forEach(voice => {
+        // A very short release to prevent clicks, but ensures voices are terminated quickly.
+        voice.preset.envelope.release = 0.05;
+        voice.isReleasing = true;
+    });
+}
 
     process(inputs, outputs, parameters) {
         const outputChannel = outputs[0][0];
@@ -329,15 +328,16 @@ class SynthProcessor extends AudioWorkletProcessor {
         }
 
         this.logCounter++;
+
         let peakLevel = 0;
         
         for (let i = 0; i < outputChannel.length; i++) {
             let sample = 0;
             for (const [id, voice] of this.voices) {
+                const voiceSample = voice.render();
+                sample += voiceSample;
                 if (voice.isFinished) {
                     this.voices.delete(id);
-                } else {
-                    sample += voice.render();
                 }
             }
             
@@ -347,18 +347,17 @@ class SynthProcessor extends AudioWorkletProcessor {
             }
             
             // Attenuation based on number of voices to prevent clipping before compressor
-            const attenuation = 1 / (1 + Math.max(0, voiceCount - 1) * 0.5);
+            const attenuation = 1 / Math.sqrt(voiceCount > 1 ? voiceCount : 1);
             
             // Soft clipping using tanh as a final safety net
-            outputChannel[i] = Math.tanh(sample * attenuation * 0.7);
+            outputChannel[i] = Math.tanh(sample * attenuation);
         }
 
-        // Log active voices and peak level periodically for debugging.
-        if (this.logCounter >= 200 && this.voices.size > 0) {
+        if (this.logCounter >= 100 && this.voices.size > 0) {
             const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
             this.port.postMessage({
                 type: 'debug',
-                message: `Active voices: ${this.voices.size}. Freqs: [${activeFrequencies.join(', ')}]. Peak: ${peakLevel.toFixed(4)}`
+                message: `Active voices: ${this.voices.size}. Frequencies: [${activeFrequencies.join(', ')}]. Peak level: ${peakLevel.toFixed(4)}`
             });
             this.logCounter = 0;
         }

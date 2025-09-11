@@ -22,6 +22,12 @@ const nextConfig: NextConfig = {
   },
   
   webpack(config, { isServer, dev }) {
+    // Rule for audio worklets
+    config.module.rules.push({
+      test: /\.worklet\.js$/,
+      use: { loader: 'worker-loader' },
+    });
+
     if (!isServer && !dev) {
         config.plugins.push(
             new WorkboxWebpackPlugin.InjectManifest({
@@ -33,6 +39,7 @@ const nextConfig: NextConfig = {
             })
         );
     }
+
     return config;
   },
 };
