@@ -68,58 +68,65 @@ export const MixerControls = ({
     isAutopilotMixer = false,
 }: MixerControlsProps) => {
     
-    console.log('[MixerControls] Rendering...');
     const [localVolumes, setLocalVolumes] = useState(initialVolumes || defaultVolumes);
-
-    const handleLocalVolumeChange = useCallback((update: Partial<Volumes> | ((v: Volumes) => Volumes)) => {
-        setLocalVolumes(current => {
-            const updated = typeof update === 'function' ? update(current) : { ...current, ...update };
-            console.log('[MixerControls] Local state updated:', updated);
-            return updated;
-        });
-    }, []);
-    
-    const handleChannelVolumeChange = useCallback((part: VolumeChannel, value: number) => {
-        handleLocalVolumeChange(prev => {
-            const newVolumes = JSON.parse(JSON.stringify(prev)); // Deep copy to be safe
-            const newChannelVolumes = { ...(newVolumes[part] as ChannelVolumes), gain: value };
-            newVolumes[part] = newChannelVolumes;
-
-            // Sync manualBass and latch gain sliders
-            if (part === 'manualBass') {
-                newVolumes.latch = { ...newVolumes.latch, gain: value };
-            } else if (part === 'latch') {
-                newVolumes.manualBass = { ...newVolumes.manualBass, gain: value };
-            }
-            
-            return newVolumes;
-        });
-    }, [handleLocalVolumeChange]);
-    
-    const handleReverbReturnChange = useCallback((value: number) => {
-        handleLocalVolumeChange(prev => ({ ...prev, reverbReturn: value }));
-    }, [handleLocalVolumeChange]);
-    
-    const handleCompressorSettingChange = useCallback((setting: keyof CompressorSettings, value: any) => {
-        handleLocalVolumeChange(prev => ({
-            ...prev,
-            compressor: { ...prev.compressor, [setting]: value }
-        }));
-    }, [handleLocalVolumeChange]);
-
-    const handleTempoChange = useCallback((v: number) => {
-        handleLocalVolumeChange(prev => ({...prev, tempo: v}));
-    }, [handleLocalVolumeChange]);
-
-    const handleSwingChange = useCallback((v: number) => {
-        handleLocalVolumeChange(prev => ({...prev, swing: v / 100}));
-    }, [handleLocalVolumeChange]);
-
 
     const handleApplyChanges = () => {
         onApply(localVolumes);
         closeDialog();
     };
+
+    const createChannelVolumeHandler = useCallback((part: VolumeChannel) => (value: number) => {
+        setLocalVolumes(prev => {
+            const newVolumes = JSON.parse(JSON.stringify(prev));
+            const newChannelVolumes = { ...(newVolumes[part] as ChannelVolumes), gain: value };
+            newVolumes[part] = newChannelVolumes;
+            if (part === 'manualBass') {
+                newVolumes.latch = { ...newVolumes.latch, gain: value };
+            } else if (part === 'latch') {
+                newVolumes.manualBass = { ...newVolumes.manualBass, gain: value };
+            }
+            return newVolumes;
+        });
+    }, []);
+
+    const handleMelodyGainChange = createChannelVolumeHandler('melody');
+    const handleManualBassGainChange = createChannelVolumeHandler('manualBass');
+    const handleLatchGainChange = createChannelVolumeHandler('latch');
+    const handleDrumsGainChange = createChannelVolumeHandler('drums');
+
+    const handleTempoChange = useCallback((v: number) => {
+        setLocalVolumes(prev => ({...prev, tempo: v}));
+    }, []);
+    
+    const handleSwingChange = useCallback((v: number) => {
+        setLocalVolumes(prev => ({...prev, swing: v / 100}));
+    }, []);
+
+    const handleReverbReturnChange = useCallback((value: number) => {
+        setLocalVolumes(prev => ({ ...prev, reverbReturn: value }));
+    }, []);
+    
+    const handleCompressorEnabledChange = useCallback((enabled: boolean) => {
+         setLocalVolumes(prev => ({
+            ...prev,
+            compressor: { ...prev.compressor, enabled }
+        }));
+    }, []);
+
+    const handleCompressorThresholdChange = useCallback((threshold: number) => {
+        setLocalVolumes(prev => ({
+            ...prev,
+            compressor: { ...prev.compressor, threshold }
+        }));
+    }, []);
+
+    const handleCompressorRatioChange = useCallback((ratio: number) => {
+         setLocalVolumes(prev => ({
+            ...prev,
+            compressor: { ...prev.compressor, ratio }
+        }));
+    }, []);
+
 
     return (
         <div className="space-y-6">
@@ -160,25 +167,25 @@ export const MixerControls = ({
                     label="Melody"
                     icon={Music}
                     volume={localVolumes.melody.gain}
-                    onVolumeChange={(v) => handleChannelVolumeChange('melody', v)}
+                    onVolumeChange={handleMelodyGainChange}
                 />
                  <VolumeControl 
                     label="Bass"
                     icon={Waves}
                     volume={localVolumes.manualBass.gain}
-                    onVolumeChange={(v) => handleChannelVolumeChange('manualBass', v)}
+                    onVolumeChange={handleManualBassGainChange}
                 />
                 <VolumeControl 
                     label="Latch"
                     icon={Anchor}
                     volume={localVolumes.latch.gain}
-                    onVolumeChange={(v) => handleChannelVolumeChange('latch', v)}
+                    onVolumeChange={handleLatchGainChange}
                 />
                 <VolumeControl 
                     label="Drums"
                     icon={Drum}
                     volume={localVolumes.drums.gain}
-                    onVolumeChange={(v) => handleChannelVolumeChange('drums', v)}
+                    onVolumeChange={handleDrumsGainChange}
                 />
             </div>
             
@@ -207,7 +214,7 @@ export const MixerControls = ({
                             <Switch
                                 id="compressor-switch"
                                 checked={localVolumes.compressor.enabled}
-                                onCheckedChange={(enabled) => handleCompressorSettingChange('enabled', enabled)}
+                                onCheckedChange={handleCompressorEnabledChange}
                             />
                         </div>
                         <div className={cn("space-y-4 transition-opacity", !localVolumes.compressor.enabled && "opacity-50 pointer-events-none")}>
@@ -215,7 +222,7 @@ export const MixerControls = ({
                                 label="Threshold"
                                 icon={Waves}
                                 volume={localVolumes.compressor.threshold}
-                                onVolumeChange={(v) => handleCompressorSettingChange('threshold', v)}
+                                onVolumeChange={handleCompressorThresholdChange}
                                 min={-100}
                                 max={0}
                                 step={1}
@@ -225,7 +232,7 @@ export const MixerControls = ({
                                 label="Ratio"
                                 icon={Waves}
                                 volume={localVolumes.compressor.ratio}
-                                onVolumeChange={(v) => handleCompressorSettingChange('ratio', v)}
+                                onVolumeChange={handleCompressorRatioChange}
                                 min={1}
                                 max={20}
                                 step={1}
