@@ -468,12 +468,11 @@ export class AudioEngine {
         }
     }
 
-    private applyChannelSettings(partName: SynthPartName, volumes: ChannelVolumes) {
+    private applyChannelSettings(partName: SynthPartName | 'drums', volumes: ChannelVolumes) {
         const nodeInfo = this.nodes.get(partName);
         if (nodeInfo && volumes) {
             nodeInfo.gain.gain.setTargetAtTime(dbToGain(volumes.gain), this.context.currentTime, 0.01);
             nodeInfo.reverbSend.gain.setTargetAtTime(dbToGain(volumes.reverbSend), this.context.currentTime, 0.01);
-
             if (nodeInfo.distortion) {
                 nodeInfo.distortion.curve = createDistortionCurve(volumes.distortion);
             }
@@ -513,16 +512,35 @@ export class AudioEngine {
 
         if (compressorSettings.enabled) {
             this.masterCompressor.threshold.setTargetAtTime(compressorSettings.threshold, this.context.currentTime, rampTime);
+            // A "knee" of 0 makes the compressor act more like a hard limiter at the threshold.
             this.masterCompressor.knee.setTargetAtTime(0, this.context.currentTime, rampTime); 
+            // A ratio of 20:1 is very high, acting as a limiter.
             this.masterCompressor.ratio.setTargetAtTime(20, this.context.currentTime, rampTime); 
             this.masterCompressor.attack.setTargetAtTime(compressorSettings.attack, this.context.currentTime, rampTime);
             this.masterCompressor.release.setTargetAtTime(compressorSettings.release, this.context.currentTime, rampTime);
-            this.preCompressorOut.disconnect();
-            this.preCompressorOut.connect(this.masterCompressor);
+            
+            // Ensure the compressor is in the signal path
+            if(this.preCompressorOut.numberOfOutputs === 0 || !this.isNodeConnected(this.preCompressorOut, this.masterCompressor)) {
+                this.preCompressorOut.disconnect();
+                this.preCompressorOut.connect(this.masterCompressor);
+            }
         } else {
-            this.preCompressorOut.disconnect();
-            this.preCompressorOut.connect(this.masterOut);
+             // If disabled, bypass the compressor
+             if(this.preCompressorOut.numberOfOutputs > 0 && this.isNodeConnected(this.preCompressorOut, this.masterCompressor)) {
+                this.preCompressorOut.disconnect(this.masterCompressor);
+            }
+            if(this.preCompressorOut.numberOfOutputs === 0) {
+                 this.preCompressorOut.connect(this.masterOut);
+            }
         }
+    }
+
+    private isNodeConnected(source: AudioNode, destination: AudioNode): boolean {
+        // This is a simplified check. A full check is complex and not reliably possible with Web Audio API.
+        // We'll assume if there are outputs, it's connected to something. This logic is imperfect
+        // but helps avoid unnecessary re-connections. A more robust way is to manage connections explicitly.
+        // For this case, we just check if the node has any outputs.
+        return source.numberOfOutputs > 0;
     }
     
     public startRecording() {
@@ -537,3 +555,5 @@ export class AudioEngine {
         }
     }
 }
+
+    

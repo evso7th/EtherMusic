@@ -41,13 +41,13 @@ const classicBassPreset: BassInstrumentPreset = {
     name: "Classic Bass",
     description: "A sharp, rhythmic, classic bass guitar sound.",
     params: {
-        oscillator: { type: 'sawtooth' },
-        envelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.8 },
-        filter: { Q: 2, frequency: 600, type: 'lowpass', gain: 6 },
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.02, decay: 0.3, sustain: 0.4, release: 0.5 },
+        filter: { Q: 2, frequency: 500, type: 'lowpass', gain: 6 },
         reverbSend: -48,
         distortion: 15,
         layers: [
-            { type: 'square', freqMult: 0.5, level: 1.0, detune: -10 },
+            { type: 'sine', freqMult: 0.5, level: 1.0, detune: 0 },
         ],
     }
 };
@@ -129,3 +129,4 @@ export const bassInstruments: readonly BassInstrumentPreset[] = [
 
 export const defaultBassInstrument: BassInstrument = 'classicBass';
 
+    

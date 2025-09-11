@@ -191,12 +191,10 @@ class Voice {
     }
 
     render() {
-        if (this.isFinished) return 0;
-        
         if (this.isReleasing && this.layers.every(l => l.env.currentValue <= 0.0001)) {
             this.isFinished = true;
-            return 0;
         }
+        if (this.isFinished) return 0;
         
         this.baseFrequency += (this.targetFrequency - this.baseFrequency) * this.portamentoSpeed;
         const lfoModulation = this.processLFO();
@@ -211,10 +209,6 @@ class Voice {
                  mixedSample += oscSample * layer.level * envelopeValue;
             }
         });
-
-        // Normalize the mixed sample by the number of layers to prevent clipping inside the voice
-        const layerCount = this.layers.length > 0 ? this.layers.length : 1;
-        mixedSample /= layerCount;
         
         const filteredSample = this.processFilter(mixedSample);
         
@@ -278,6 +272,7 @@ class SynthProcessor extends AudioWorkletProcessor {
 
         if (this.voices.size >= this.polyphony) {
             let oldestId;
+            let oldestTime = Infinity;
             // Prioritize replacing a releasing voice to prevent cutting off new notes
             for (const [id, voice] of this.voices.entries()) {
                  if (voice.isReleasing) {
@@ -349,9 +344,16 @@ class SynthProcessor extends AudioWorkletProcessor {
             if (absSample > currentPeak) {
                 currentPeak = absSample;
             }
-            
-            // Hard clipping as a final safety measure.
-            outputChannel[i] = Math.max(-1, Math.min(1, sample));
+
+            // The main fix: Attenuate the final mixed signal based on the number of active voices.
+            // This prevents clipping when multiple voices sum up.
+            // Using Math.sqrt(voiceCount) as a divisor provides a good balance - it's a common
+            // technique in mixers to prevent loudness from increasing linearly with voice count.
+            const normalizationFactor = voiceCount > 1 ? Math.sqrt(voiceCount) * 1.5 : 1;
+            const normalizedSample = sample / normalizationFactor;
+
+            // Final soft-clipping with tanh just in case, to prevent any harsh digital distortion.
+            outputChannel[i] = Math.tanh(normalizedSample * 0.9);
         }
         
         this.peakLevel = Math.max(this.peakLevel, currentPeak);
@@ -385,3 +387,5 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
+
+    
