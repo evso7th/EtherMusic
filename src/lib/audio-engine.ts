@@ -79,7 +79,7 @@ export class AudioEngine {
 
     private masterOut: GainNode;
     private preCompressorOut: GainNode;
-    private masterCompressor: DynamicsCompressorNode;
+    private limiter: DynamicsCompressorNode;
     
     private reverbSend: GainNode;
     private reverbReturnGain: GainNode;
@@ -111,9 +111,9 @@ export class AudioEngine {
         
         this.preCompressorOut = this.context.createGain();
 
-        this.masterCompressor = this.context.createDynamicsCompressor();
-        this.preCompressorOut.connect(this.masterCompressor);
-        this.masterCompressor.connect(this.masterOut);
+        this.limiter = this.context.createDynamicsCompressor();
+        this.preCompressorOut.connect(this.limiter);
+        this.limiter.connect(this.masterOut);
 
         this.reverbSend = this.context.createGain();
         this.convolver = this.context.createConvolver();
@@ -214,11 +214,10 @@ export class AudioEngine {
         gain.connect(reverbSend).connect(this.reverbSend);
         
         worklet.port.onmessage = (e) => {
-            if (e.data.type === 'error') {
-                console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
-            }
-             if (e.data.type === 'debug') {
+            if (e.data.type === 'debug') {
                 console.log(`[DEBUG-${part.toUpperCase()}] ${e.data.message}`);
+            } else if (e.data.type === 'error') {
+                console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
             }
         };
 
@@ -289,10 +288,12 @@ export class AudioEngine {
         if (!this.isInitialized) return;
         
         const partName = type === 'bass' ? (this.isBassLatchOn ? 'latch' : 'manualBass') : 'melody';
-        
+        console.log(`[Interaction] type: ${type}, state: ${state}, part: ${partName}, data:`, data);
+
         if (partName === 'latch') {
             if (state === 'down' && data) { 
                  const result = this.latchEngine.toggleNote(data);
+                 console.log('[LatchEngine] toggle result:', result);
                  this.processLatchResult(result);
             }
             return;
@@ -308,6 +309,7 @@ export class AudioEngine {
             this.activePointers.set(pointerId, { type, noteId });
             const note: SynthNote = { id: noteId, frequency: data.frequency, volume: data.volume };
             const message: WorkerMessage = { type: 'noteOn', note };
+            console.log(`[AudioEngine] -> ${partName} worklet:`, message);
             nodeInfo.worklet.port.postMessage(message);
             this.orbManager.addOrb(pointerId, type, data.x, data.y);
         } else if (state === 'move' && data) {
@@ -322,6 +324,7 @@ export class AudioEngine {
             const activePointer = this.activePointers.get(pointerId);
             if (activePointer) {
                 const message: WorkerMessage = { type: 'noteOff', id: activePointer.noteId };
+                console.log(`[AudioEngine] -> ${partName} worklet:`, message);
                 nodeInfo.worklet.port.postMessage(message);
                 this.activePointers.delete(pointerId);
                 this.orbManager.removeOrb(pointerId);
@@ -346,14 +349,18 @@ export class AudioEngine {
         if (!latchNode) return;
         
         if (result.noteOff) {
-            latchNode.worklet.port.postMessage({ type: 'noteOff', id: result.noteOff.id });
+            const message: WorkerMessage = { type: 'noteOff', id: result.noteOff.id };
+            console.log(`[AudioEngine] -> LATCH worklet:`, message);
+            latchNode.worklet.port.postMessage(message);
         }
         if (result.noteToAnimateRemove) {
             this.orbManager.removeOrb(result.noteToAnimateRemove.id);
         }
         
         if (result.noteOn) {
-            latchNode.worklet.port.postMessage({ type: 'noteOn', note: result.noteOn });
+            const message: WorkerMessage = { type: 'noteOn', note: result.noteOn };
+            console.log(`[AudioEngine] -> LATCH worklet:`, message);
+            latchNode.worklet.port.postMessage(message);
         }
         if (result.noteToAnimateAdd) {
             this.orbManager.addOrb(result.noteToAnimateAdd.id, 'latch', result.noteToAnimateAdd.x, result.noteToAnimateAdd.y);
@@ -492,18 +499,20 @@ export class AudioEngine {
     }
     
     public setMasterCompressorSettings(compressorSettings: CompressorSettings) {
-        if (!this.isInitialized || !this.context || !this.masterCompressor) return;
+        if (!this.isInitialized || !this.context || !this.limiter) return;
         
-        this.preCompressorOut.disconnect(); // Disconnect from whatever it was connected to
+        this.volumes.compressor = compressorSettings;
 
+        this.preCompressorOut.disconnect();
         if (compressorSettings.enabled) {
             const rampTime = this.context.currentTime + 0.02;
-            this.masterCompressor.threshold.setTargetAtTime(compressorSettings.threshold, this.context.currentTime, rampTime);
-            this.masterCompressor.ratio.setTargetAtTime(compressorSettings.ratio, this.context.currentTime, rampTime);
-            this.masterCompressor.attack.setTargetAtTime(compressorSettings.attack, this.context.currentTime, rampTime);
-            this.masterCompressor.release.setTargetAtTime(compressorSettings.release, this.context.currentTime, rampTime);
-            this.preCompressorOut.connect(this.masterCompressor);
-            this.masterCompressor.connect(this.masterOut);
+            this.limiter.threshold.setTargetAtTime(compressorSettings.threshold, this.context.currentTime, rampTime);
+            this.limiter.ratio.setTargetAtTime(compressorSettings.ratio, this.context.currentTime, rampTime);
+            this.limiter.attack.setTargetAtTime(compressorSettings.attack, this.context.currentTime, rampTime);
+            this.limiter.release.setTargetAtTime(compressorSettings.release, this.context.currentTime, rampTime);
+            
+            this.preCompressorOut.connect(this.limiter);
+            this.limiter.connect(this.masterOut);
         } else {
             this.preCompressorOut.connect(this.masterOut);
         }
@@ -521,5 +530,3 @@ export class AudioEngine {
         }
     }
 }
-
-    
