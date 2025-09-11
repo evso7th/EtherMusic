@@ -1,3 +1,4 @@
+
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for all real-time synthesis, running in a high-priority
 // audio thread to ensure low-latency, glitch-free sound generation.
@@ -209,6 +210,9 @@ class Voice {
             }
         });
         
+        const numLayers = this.layers.length || 1;
+        mixedSample /= numLayers;
+
         const filteredSample = this.processFilter(mixedSample);
         
         return filteredSample * this.volume;
@@ -255,20 +259,18 @@ class SynthProcessor extends AudioWorkletProcessor {
 
     applyPreset(preset) {
         this.preset = { ...this.getDefaultPreset(), ...preset };
-        // Immediately stop all voices to apply new preset cleanly
         this.allNotesOff();
     }
 
     noteOn(note) {
-        this.port.postMessage({ type: 'debug', message: `NoteOn received: id=${note.id}` });
         if (this.voices.has(note.id)) {
-            const existingVoice = this.voices.get(note.id);
+            const voice = this.voices.get(note.id);
             // Re-trigger envelope if the voice was releasing
-            if(existingVoice.isReleasing){
-                existingVoice.isReleasing = false;
-                existingVoice.layers.forEach(l => l.env.state = 'attack');
+            if(voice.isReleasing){
+                voice.isReleasing = false;
+                voice.layers.forEach(l => l.env.state = 'attack');
             }
-            existingVoice.noteUpdate(note.frequency, note.volume);
+            voice.noteUpdate(note.frequency, note.volume);
             return;
         }
 
@@ -287,7 +289,6 @@ class SynthProcessor extends AudioWorkletProcessor {
                 }
             }
             if (oldestId) {
-                this.port.postMessage({ type: 'debug', message: `Stealing voice: id=${oldestId}` });
                 this.voices.delete(oldestId);
             }
         }
@@ -304,7 +305,6 @@ class SynthProcessor extends AudioWorkletProcessor {
     }
 
     noteOff(id) {
-        this.port.postMessage({ type: 'debug', message: `NoteOff received: id=${id}` });
         const voice = this.voices.get(id);
         if (voice) {
             voice.release();
@@ -312,7 +312,6 @@ class SynthProcessor extends AudioWorkletProcessor {
     }
 
     allNotesOff() {
-        this.port.postMessage({ type: 'debug', message: 'AllNotesOff received' });
         this.voices.forEach(voice => {
             voice.isReleasing = true;
             // Short release to prevent clicks
@@ -351,8 +350,10 @@ class SynthProcessor extends AudioWorkletProcessor {
                 currentPeak = absSample;
             }
             
-            // Soft clipping using tanh as a final safety net
-            outputChannel[i] = Math.tanh(sample * 0.7); // Apply a bit of attenuation before clipping
+            // Attenuation based on number of voices to prevent clipping before compressor
+            const attenuation = 1 / (1 + Math.max(0, this.voices.size - 1) * 0.25);
+            
+            outputChannel[i] = Math.tanh(sample * attenuation);
         }
 
         if (currentPeak > this.peakLevel) {
@@ -360,7 +361,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         }
         
         this.logCounter++;
-        if (this.logCounter >= 200) { // Log every ~100ms
+        if (this.logCounter >= 200) { // Log every ~4-5 seconds
              if (this.voices.size > 0) {
                 const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
                 this.port.postMessage({

@@ -487,7 +487,7 @@ export class AudioEngine {
         this.applyChannelSettings('drums', newVolumes.drums);
         
         this.reverbReturnGain.gain.setTargetAtTime(dbToGain(newVolumes.reverbReturn), this.context.currentTime, 0.02);
-        this.setMasterCompressorSettings(newVolumes.compressor);
+        this.setMasterLimiterSettings(newVolumes.compressor);
 
         if (newVolumes.swing !== undefined) {
             this.setSwing(newVolumes.swing);
@@ -498,21 +498,21 @@ export class AudioEngine {
         this.emitter.emit('volumesChanged', this.getVolumes());
     }
     
-    public setMasterCompressorSettings(compressorSettings: CompressorSettings) {
+    public setMasterLimiterSettings(compressorSettings: CompressorSettings) {
         if (!this.isInitialized || !this.context || !this.limiter) return;
         
         this.volumes.compressor = compressorSettings;
-
+    
         this.preCompressorOut.disconnect();
         if (compressorSettings.enabled) {
+            this.preCompressorOut.connect(this.limiter);
+            this.limiter.connect(this.masterOut);
+
             const rampTime = this.context.currentTime + 0.02;
             this.limiter.threshold.setTargetAtTime(compressorSettings.threshold, this.context.currentTime, rampTime);
             this.limiter.ratio.setTargetAtTime(compressorSettings.ratio, this.context.currentTime, rampTime);
             this.limiter.attack.setTargetAtTime(compressorSettings.attack, this.context.currentTime, rampTime);
             this.limiter.release.setTargetAtTime(compressorSettings.release, this.context.currentTime, rampTime);
-            
-            this.preCompressorOut.connect(this.limiter);
-            this.limiter.connect(this.masterOut);
         } else {
             this.preCompressorOut.connect(this.masterOut);
         }
