@@ -3,7 +3,6 @@
 
 import { useState, useEffect, useCallback, memo } from 'react';
 import { Button } from "@/components/ui/button";
-import { ThereminPads } from '@/components/theremin-pads';
 import { BeatBoxControls } from '@/components/beat-box-controls';
 import { useToast } from "@/hooks/use-toast";
 import { OrbitalAnimation } from '@/components/orbital-animation';
@@ -18,8 +17,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
 import { melodyInstruments, defaultMelodyInstrument } from '@/lib/melody-presets';
 import { bassInstruments, defaultBassInstrument } from '@/lib/bass-presets';
-import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, ChannelVolumes, BeatPattern } from '@/types';
+import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, BeatPattern } from '@/types';
 import { cn } from '@/lib/utils';
+import { ThereminPads } from '@/components/theremin-pads';
 
 function getCookie(name: string): string | null {
     if (typeof document === 'undefined') return null;
@@ -30,7 +30,6 @@ function getCookie(name: string): string | null {
 }
 
 const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
-const MemoizedThereminPads = memo(ThereminPads);
 
 const Preloader = () => (
     <div className="absolute inset-0 bg-background flex items-center justify-center z-50">
@@ -47,6 +46,13 @@ export default function Home() {
     const isMobile = useIsMobile();
     const [isClient, setIsClient] = useState(false);
     
+    const [initialVolumes] = useState<Volumes>(() => {
+        if (typeof window === 'undefined') {
+            return defaultVolumes;
+        }
+        return loadVolumes();
+    });
+
     const {
         isAppStarted,
         isReady,
@@ -64,7 +70,8 @@ export default function Home() {
         orbManager,
         volumes,
         setVolumes,
-    } = useAudioEngine();
+        currentTempo,
+    } = useAudioEngine(initialVolumes);
     
     const [cookieConsent, setCookieConsent] = useState<boolean | undefined>(undefined);
     const [isRecording, setIsRecording] = useState(false);
@@ -80,68 +87,72 @@ export default function Home() {
 
     const onConsentChange = useCallback((consent: boolean) => {
         setCookieConsent(consent);
-        if (isReady && audioEngine) {
-            const newVolumes = consent ? loadVolumes() : defaultVolumes;
-            audioEngine.setVolumes(newVolumes);
-            setVolumes(newVolumes); 
-        }
+        const newVolumes = consent ? loadVolumes() : defaultVolumes;
+        setVolumes(newVolumes); 
         
         if (!consent) {
              if (typeof document !== 'undefined') {
                 document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
             }
         }
-    }, [setVolumes, isReady, audioEngine]);
-    
+    }, [setVolumes]);
+
     useEffect(() => {
         setIsClient(true);
         const consent = getCookie("ethermusic_consent");
         if (consent !== null) {
-            setCookieConsent(consent === 'true');
+            const hasConsent = consent === 'true';
+            setCookieConsent(hasConsent);
+            if (isReady && hasConsent) {
+                setVolumes(loadVolumes());
+            }
         } else {
             setCookieConsent(undefined);
         }
-    }, []);
+    }, [isReady, setVolumes]);
+
+    useEffect(() => {
+        if (isReady && activeMelodyInstrument) {
+            setMelodyInstrument(activeMelodyInstrument);
+        }
+    }, [isReady, activeMelodyInstrument, setMelodyInstrument]);
 
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
-        setBassInstrument(instrumentId);
-    }, [setBassInstrument]);
+        if (isReady) {
+            setBassInstrument(instrumentId);
+        }
+    }, [setBassInstrument, isReady]);
+
+    useEffect(() => {
+        if (isReady && activeBassInstrument) {
+            handleSetBassInstrument(activeBassInstrument);
+        }
+    }, [isReady, activeBassInstrument, handleSetBassInstrument]);
     
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
-        let newKey = musicKey;
-        let newScale = musicScale;
-    
         const isKey = (k: string): k is MusicKey => Object.keys(ALL_NOTES).includes(k);
         const isScale = (s: string): s is MusicScale => Object.keys(SCALES).includes(s);
 
         if (isKey(keyOrScale)) {
-            newKey = keyOrScale;
-            setMusicKey(newKey);
+            setMusicKey(keyOrScale);
         } else if (isScale(keyOrScale)) {
-            newScale = keyOrScale;
-            setMusicScale(newScale);
+            setMusicScale(keyOrScale);
         }
-    }, [musicKey, musicScale]);
-
-    useEffect(() => {
-        const bassFreqs = getScaleFrequencies(musicKey, musicScale, [2, 3]);
-        const melodyFreqs = getScaleFrequencies(musicKey, musicScale, [2, 3, 4]);
-        setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
-    }, [musicKey, musicScale]);
+    }, []);
 
     useEffect(() => {
         if (isReady) {
-            setMelodyInstrument(activeMelodyInstrument);
-            handleSetBassInstrument(activeBassInstrument);
+            const bassFreqs = getScaleFrequencies(musicKey, musicScale, [2, 3]);
+            const melodyFreqs = getScaleFrequencies(musicKey, musicScale, [2, 3, 4]);
+            setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isReady]);
-
+    }, [isReady, musicKey, musicScale]);
+    
     const handleMixerApply = useCallback((newVolumes: Volumes) => {
         setVolumes(newVolumes);
     }, [setVolumes]);
-
+    
     const handleChannelEffectChange = useCallback((
         channel: 'melody' | 'bass', 
         effect: 'reverbSend' | 'distortion', 
@@ -160,8 +171,8 @@ export default function Home() {
     }, [setVolumes]);
     
     const handleStartApp = useCallback(() => {
-        startApp();
-    }, [startApp]);
+        startApp(initialVolumes);
+    }, [startApp, initialVolumes]);
 
     const handleRecord = useCallback(() => {
         if (isRecording) {
@@ -190,8 +201,9 @@ export default function Home() {
     }, [setMelodyInstrument]);
     
     const handleThereminInteractionCallback = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
+        if (!isReady || !audioEngine) return;
         handleThereminInteraction(type, data, state);
-    }, [handleThereminInteraction]);
+    }, [isReady, audioEngine, handleThereminInteraction]);
 
     if (!isClient) {
         return <Preloader />;
@@ -206,14 +218,14 @@ export default function Home() {
                     <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
                 </div>
                 <div className={cn("absolute inset-0 z-0 transition-opacity duration-1000", isAppStarted ? 'opacity-100' : 'opacity-30')}>
-                    <MemoizedOrbitalAnimation />
+                    <MemoizedOrbitalAnimation isPlaying={false} tempo={120}/>
                 </div>
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
                         <h1 className="text-4xl md:text-5xl font-bold text-primary">EtherMusic</h1>
                         <p className="text-sm md:text-base text-white/80 font-light mt-2 tracking-wide">Neuro Meditation Processor</p>
                     </div>
-                    <Button size="lg" onClick={handleStartApp}>
+                    <Button size="lg" onClick={() => startApp(initialVolumes)}>
                         Start Meditation
                         <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
@@ -237,7 +249,7 @@ export default function Home() {
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
             <div className="fixed inset-0 z-0">
-                 <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={volumes.tempo} />
+                 <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={currentTempo} />
             </div>
             
              <div className="relative z-10 flex h-full portrait:flex-col portrait:p-2 md:p-6 lg:p-8 landscape:flex-row landscape:p-1 landscape:gap-1">
@@ -280,7 +292,7 @@ export default function Home() {
                 </header>
 
                  <main className="flex-grow flex flex-col gap-2 overflow-hidden">
-                    <MemoizedThereminPads
+                    <ThereminPads 
                         onInteraction={handleThereminInteractionCallback}
                         allowedFrequencies={allowedFrequencies}
                         isLatchOn={isBassLatchOn}
@@ -288,7 +300,7 @@ export default function Home() {
                         activeBassInstrument={activeBassInstrument}
                         onInstrumentChange={handleSetBassInstrument}
                         orbManager={orbManager}
-                        volumes={volumes!}
+                        volumes={volumes}
                         onEffectChange={handleChannelEffectChange}
                         activeMelodyInstrument={activeMelodyInstrument}
                         onMelodyInstrumentChange={handleMelodyInstrumentChange}
@@ -301,7 +313,7 @@ export default function Home() {
                         <BeatBoxControls
                             activePattern={activePattern}
                             onPatternChange={handlePatternChange}
-                            volumes={volumes!}
+                            initialVolumes={volumes}
                             onApply={handleMixerApply}
                             isMobile={isMobile}
                         />
@@ -312,7 +324,7 @@ export default function Home() {
                      <BeatBoxControls
                         activePattern={activePattern}
                         onPatternChange={handlePatternChange}
-                        volumes={volumes!}
+                        initialVolumes={volumes}
                         onApply={handleMixerApply}
                         isMobile={isMobile}
                         isLandscape={true}
@@ -322,3 +334,5 @@ export default function Home() {
         </div>
     );
 }
+
+    

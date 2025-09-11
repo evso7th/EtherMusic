@@ -20,7 +20,7 @@ import { beatPatterns } from "@/lib/drum-machine";
 interface BeatBoxControlsProps {
     activePattern: BeatPattern;
     onPatternChange: (pattern: BeatPattern) => void;
-    volumes: Volumes;
+    initialVolumes: Volumes;
     onApply: (newVolumes: Volumes) => void;
     isMobile: boolean;
     isLandscape?: boolean;
@@ -44,7 +44,7 @@ ControlButtonWithTooltip.displayName = 'ControlButtonWithTooltip';
 const BeatBoxControlsComponent = ({
     activePattern,
     onPatternChange,
-    volumes,
+    initialVolumes,
     onApply,
     isMobile,
     isLandscape = false,
@@ -154,7 +154,7 @@ const BeatBoxControlsComponent = ({
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="pr-4 py-4">
                                     <MixerControls 
-                                        initialVolumes={volumes} 
+                                        initialVolumes={initialVolumes} 
                                         onApply={onApply}
                                         closeDialog={() => setIsMixerOpen(false)}
                                     />
@@ -248,7 +248,7 @@ const BeatBoxControlsComponent = ({
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="pr-4 py-4">
                                     <MixerControls 
-                                        initialVolumes={volumes}
+                                        initialVolumes={initialVolumes}
                                         onApply={onApply}
                                         closeDialog={() => setIsMixerOpen(false)}
                                     />

@@ -76,7 +76,6 @@ export const MixerControls = ({
     const handleLocalVolumeChange = useCallback((update: Partial<Volumes> | ((v: Volumes) => Volumes)) => {
         setLocalVolumes(current => {
             const updated = typeof update === 'function' ? update(current) : { ...current, ...update };
-            console.log('Mixer local state updated', updated);
             return updated;
         });
     }, []);

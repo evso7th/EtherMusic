@@ -84,7 +84,7 @@ export class DrumMachine {
         const wasPlaying = this.isPlaying;
         if (wasPlaying) this.stop();
         this._swing = Math.max(0, Math.min(0.75, swing)); // Clamp swing between 0 and 0.75
-        if (wasPlaying) this.play();
+         if (wasPlaying) this.play();
     }
 
     public setPattern(patternName: string) {
@@ -156,3 +156,5 @@ export class DrumMachine {
         this.timeoutId = window.setTimeout(() => this.scheduler(), delay * 1000);
     }
 }
+
+    
