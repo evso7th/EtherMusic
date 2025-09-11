@@ -3,51 +3,17 @@ import { useState, useEffect } from 'react';
 import styles from './orbital-animation.module.css';
 import { cn } from '@/lib/utils';
 import type { CSSProperties } from 'react';
-import type { AudioEngine } from '@/lib/audio-engine';
-import type { Emitter } from 'mitt';
-import type { AudioEngineEvents } from '@/hooks/use-audio-engine';
 
 interface OrbitalAnimationProps {
-  audioEngine: AudioEngine | null;
-  emitter: Emitter<AudioEngineEvents> | null;
-  isPlaying?: boolean;
-  tempo?: number;
+  isPlaying: boolean;
+  tempo: number;
 }
 
 export function OrbitalAnimation({ 
-  audioEngine, 
-  emitter,
-  isPlaying: initialIsPlaying = false,
-  tempo: initialTempo = 120,
+  isPlaying,
+  tempo,
 }: OrbitalAnimationProps) {
-  const [isPlaying, setIsPlaying] = useState(initialIsPlaying);
-  const [tempo, setTempo] = useState(initialTempo);
-
-  useEffect(() => {
-    if (!emitter) return;
-
-    const onPlayStateChanged = (playing: boolean) => {
-      setIsPlaying(playing);
-    };
-    
-    const onVolumesChanged = (volumes: { tempo: number }) => {
-        setTempo(volumes.tempo);
-    };
-
-    setIsPlaying(audioEngine?.isPlaying || false);
-    if(audioEngine) {
-        setTempo(audioEngine.getVolumes().tempo)
-    }
-
-    emitter.on('playStateChanged', onPlayStateChanged);
-    emitter.on('volumesChanged', onVolumesChanged);
-
-    return () => {
-        emitter.off('playStateChanged', onPlayStateChanged);
-        emitter.off('volumesChanged', onVolumesChanged);
-    };
-  }, [emitter, audioEngine]);
-
+  
   const pulseDuration = 60 / tempo;
 
   const animationStyle: CSSProperties = {

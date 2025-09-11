@@ -5,7 +5,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
-import type { Volumes, Instrument, BassInstrument } from '@/types';
+import type { Volumes, Instrument, BassInstrument, AudioEngineEvents } from '@/types';
 import mitt, { Emitter } from 'mitt';
 
 function getCookie(name: string): string | null {
@@ -83,11 +83,6 @@ export function loadVolumes(): Volumes {
     }
 }
 
-export type AudioEngineEvents = {
-    playStateChanged: boolean;
-    volumesChanged: Volumes;
-};
-
 // Create the emitter outside of the hook to ensure it's a stable singleton.
 const emitter = mitt<AudioEngineEvents>();
 
@@ -96,11 +91,13 @@ export function useAudioEngine() {
     
     const [isAppStarted, setIsAppStarted] = useState(false);
     const [isReady, setIsReady] = useState(false);
+    const [isPlaying, setIsPlaying] = useState(false);
     
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
     
     const [volumes, setVolumesState] = useState<Volumes>(defaultVolumes);
+    const currentTempo = volumes.tempo;
 
     useEffect(() => {
         const hasConsent = getCookie("ethermusic_consent") === 'true';
@@ -108,8 +105,8 @@ export function useAudioEngine() {
             setVolumesState(loadVolumes());
         }
     }, []);
-
-    const initializeAudioEngine = useCallback(async () => {
+    
+    const initializeAudioEngine = useCallback(async (vols: Volumes) => {
         try {
             if (!orbManager.current) {
                 const padContainer = document.querySelector('main');
@@ -121,16 +118,18 @@ export function useAudioEngine() {
                 if (context.state === 'suspended') {
                     await context.resume();
                 }
-                
-                const engine = new AudioEngine(context, orbManager.current!, emitter);
+
+                const engine = new AudioEngine(context, orbManager.current, emitter);
                 await engine.initialize();
                 
-                engine.setVolumes(loadVolumes());
+                engine.setVolumes(vols);
                 audioEngine.current = engine;
+            } else {
+                audioEngine.current.setVolumes(vols);
             }
             
             setIsReady(true);
-            emitter.emit('playStateChanged', audioEngine.current.isPlaying);
+            setIsPlaying(audioEngine.current.isPlaying);
             
         } catch(e) {
             console.error("Failed to initialize audio engine:", e);
@@ -149,32 +148,39 @@ export function useAudioEngine() {
         const audio = new Audio('/assets/sounds/transition.webm');
         audio.play().catch(e => console.error("Error playing transition sound:", e));
         
-        await initializeAudioEngine();
+        // Pass the currently loaded volumes during initialization
+        await initializeAudioEngine(loadVolumes());
     }, [isAppStarted, initializeAudioEngine]);
 
-    useEffect(() => {
-        const resumeAudio = async () => {
-            if (audioEngine.current?.isInitialized && audioEngine.current.getContext().state === 'suspended') {
-                await audioEngine.current.getContext().resume();
-            }
-        };
-        document.addEventListener('click', resumeAudio, { once: true });
-        document.addEventListener('touchstart', resumeAudio, { once: true });
 
-        return () => {
-            document.removeEventListener('click', resumeAudio);
-            document.removeEventListener('touchstart', resumeAudio);
+    useEffect(() => {
+        const onPlayStateChanged = (playing: boolean) => {
+            setIsPlaying(playing);
         };
-    }, [isReady]);
+        const onVolumesChanged = (newVolumes: Volumes) => {
+            setVolumesState(newVolumes);
+        };
+        
+        emitter.on('playStateChanged', onPlayStateChanged);
+        emitter.on('volumesChanged', onVolumesChanged);
+        
+        return () => {
+            emitter.off('playStateChanged', onPlayStateChanged);
+            emitter.off('volumesChanged', onVolumesChanged);
+        }
+    }, []);
+
     
     const setVolumes = useCallback((newVolumes: Volumes | ((prev: Volumes) => Volumes)) => {
-        const updated = typeof newVolumes === 'function' ? newVolumes(volumes) : newVolumes;
-        setVolumesState(updated);
-        if (audioEngine.current) {
-            audioEngine.current.setVolumes(updated);
-        }
-        saveVolumes(updated);
-    }, [volumes]);
+        setVolumesState(prev => {
+            const updated = typeof newVolumes === 'function' ? newVolumes(prev) : newVolumes;
+            if (audioEngine.current) {
+                audioEngine.current.setVolumes(updated);
+            }
+            saveVolumes(updated);
+            return updated;
+        });
+    }, []);
 
     const stopAllSounds = useCallback(() => {
         audioEngine.current?.stopAllSounds();
@@ -202,33 +208,22 @@ export function useAudioEngine() {
     }, [isReady]);
 
     const setMelodyInstrument = useCallback((instrumentName: Instrument) => {
-        if (audioEngine.current) {
-            audioEngine.current.setMelodyInstrument(instrumentName);
-        }
+        audioEngine.current?.setMelodyInstrument(instrumentName);
     }, []);
     
     const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
         if(audioEngine.current){
-            // The setBassInstrument method now directly emits the volume change.
-            audioEngine.current.setBassInstrument(instrumentName);
+            const newVolumes = audioEngine.current.setBassInstrument(instrumentName);
+            if (newVolumes) {
+              setVolumes(newVolumes); // Update state via the centralized setter
+            }
         }
-    }, []);
-
-     // Listen to volume changes from the engine
-    useEffect(() => {
-        const onVolumesChanged = (newVolumes: Volumes) => {
-            setVolumesState(newVolumes);
-        };
-        emitter.on('volumesChanged', onVolumesChanged);
-        return () => {
-            emitter.off('volumesChanged', onVolumesChanged);
-        };
-    }, []);
-
+    }, [setVolumes]);
 
     return {
         isAppStarted,
         isReady,
+        isPlaying,
         audioEngine: audioEngine.current,
         emitter,
         orbManager: orbManager.current,
@@ -243,5 +238,6 @@ export function useAudioEngine() {
         startRecording,
         stopRecording,
         handleThereminInteraction,
+        currentTempo
     };
 }

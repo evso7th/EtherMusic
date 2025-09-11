@@ -49,6 +49,7 @@ export default function Home() {
     const {
         isAppStarted,
         isReady,
+        isPlaying,
         audioEngine,
         emitter,
         startApp,
@@ -63,6 +64,7 @@ export default function Home() {
         orbManager,
         volumes,
         setVolumes,
+        currentTempo,
     } = useAudioEngine();
     
     const [cookieConsent, setCookieConsent] = useState<boolean | undefined>(undefined);
@@ -206,7 +208,7 @@ export default function Home() {
                     <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
                 </div>
                 <div className={cn("absolute inset-0 z-0 transition-opacity duration-1000", isAppStarted ? 'opacity-100' : 'opacity-30')}>
-                    <MemoizedOrbitalAnimation isPlaying={false} tempo={120} audioEngine={null} emitter={null}/>
+                    <MemoizedOrbitalAnimation isPlaying={false} tempo={120}/>
                 </div>
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
@@ -237,7 +239,7 @@ export default function Home() {
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
             <div className="fixed inset-0 z-0">
-                 <MemoizedOrbitalAnimation audioEngine={audioEngine} emitter={emitter} />
+                 <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={currentTempo} />
             </div>
             
              <div className="relative z-10 flex h-full portrait:flex-col portrait:p-2 md:p-6 lg:p-8 landscape:flex-row landscape:p-1 landscape:gap-1">
@@ -276,7 +278,6 @@ export default function Home() {
                             onExit={stopAllSounds}
                             isReady={isReady}
                             audioEngine={audioEngine}
-                            emitter={emitter}
                         />
                     </div>
                 </header>
