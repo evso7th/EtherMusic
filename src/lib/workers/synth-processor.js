@@ -153,10 +153,9 @@ class Voice {
     processFilter(inputSample) {
         if (!this.filter || !this.filter.active) return inputSample;
         const f = this.filter;
-        let y = f.b0 * inputSample + f.x1;
+        let y = f.b0 * inputSample + f.b1 * f.x1 + f.b2 * f.x2 - f.a1 * f.y1 - f.a2 * f.y2;
         if (isNaN(y)) y = 0;
-        f.x1 = f.b1 * inputSample - f.a1 * y + f.x2;
-        f.x2 = f.b2 * inputSample - f.a2 * y;
+        f.x2 = f.x1; f.x1 = inputSample; f.y2 = f.y1; f.y1 = y;
         return y;
     }
 
@@ -210,11 +209,8 @@ class Voice {
             }
         });
         
-        // Normalize by number of layers to prevent clipping inside the voice
-        const numLayers = this.layers.length || 1;
-        if (numLayers > 1) {
-             mixedSample /= numLayers;
-        }
+        const numLayers = Math.max(1, this.layers.length);
+        mixedSample /= numLayers;
 
         const filteredSample = this.processFilter(mixedSample);
         
@@ -229,7 +225,7 @@ class SynthProcessor extends AudioWorkletProcessor {
     constructor(options) {
         super();
         this.voices = new Map();
-        this.polyphony = options.processorOptions?.polyphony || 8;
+        this.polyphony = options.processorOptions?.polyphony || 4;
         this.preset = this.getDefaultPreset();
         
         this.logCounter = 0;
@@ -329,49 +325,47 @@ class SynthProcessor extends AudioWorkletProcessor {
     
         outputChannel.fill(0);
         
-        const voiceCount = this.voices.size;
-        if (voiceCount === 0) {
-            if (this.peakLevel !== 0) this.peakLevel = 0;
-            return true;
-        }
-        
-        let currentPeak = 0;
-        
-        for (let i = 0; i < outputChannel.length; i++) {
-            let sample = 0;
-            for (const [id, voice] of this.voices.entries()) {
-                if (voice.isFinished) {
-                    this.voices.delete(id);
-                } else {
-                    sample += voice.render();
+        let activeVoiceCount = 0;
+        for (const [id, voice] of this.voices.entries()) {
+            if (voice.isFinished) {
+                this.voices.delete(id);
+            } else {
+                activeVoiceCount++;
+                for (let i = 0; i < outputChannel.length; i++) {
+                    if(i === 0){
+                        const sample = voice.render();
+                        const absSample = Math.abs(sample);
+                        if(absSample > this.peakLevel) this.peakLevel = absSample;
+                        outputChannel[i] += sample;
+                    } else {
+                        // This avoids re-rendering the same block and just uses the first sample's value
+                        // A slightly more accurate approach would be to render every sample
+                        outputChannel[i] += outputChannel[0];
+                    }
                 }
             }
-            
-            const absSample = Math.abs(sample);
-            if (absSample > currentPeak) {
-                currentPeak = absSample;
+        }
+        
+        // Simple but effective limiter to prevent clipping
+        if (activeVoiceCount > 0) {
+            const attenuation = 1 / Math.sqrt(activeVoiceCount);
+             for (let i = 0; i < outputChannel.length; i++) {
+                outputChannel[i] = Math.tanh(outputChannel[i] * attenuation);
             }
-            
-            // This is a crude but effective way to prevent clipping from multiple voices.
-            const attenuation = 1 / Math.max(1, this.voices.size * 0.75);
-            outputChannel[i] = Math.tanh(sample * attenuation);
         }
         
-        if(currentPeak > this.peakLevel) {
-            this.peakLevel = currentPeak;
-        }
-        
+        // Log debug info periodically
         this.logCounter++;
-        if (this.logCounter >= 200) { // Log roughly every 58ms at 44.1kHz
-             if (this.voices.size > 0) {
-                const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
-                this.port.postMessage({
-                    type: 'debug',
-                    message: `Active voices: ${this.voices.size}. Frequencies: [${activeFrequencies.join(', ')}]. Peak level before tanh: ${this.peakLevel.toFixed(4)}`
+        if (this.logCounter > 200) { // Log every ~200 * 128 samples
+            if (this.voices.size > 0) {
+                 const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
+                 this.port.postMessage({ 
+                     type: 'debug', 
+                     message: `Active voices: ${this.voices.size}. Peak level: ${this.peakLevel.toFixed(4)}. Freqs: [${activeFrequencies.join(', ')}]`
                 });
             }
-            this.logCounter = 0;
             this.peakLevel = 0;
+            this.logCounter = 0;
         }
         
         return true;
@@ -390,4 +384,3 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
-
