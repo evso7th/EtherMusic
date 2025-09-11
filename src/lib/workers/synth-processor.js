@@ -11,12 +11,16 @@ class Oscillator {
         this.lastOut = 0; // For integrated triangle
     }
 
+    // Poly-BLEP (Polynomial Band-Limited Step) for anti-aliasing.
+    // This reduces aliasing for waveforms with sharp edges (square, sawtooth).
     poly_blep(t, dt) {
         if (t < dt) {
             t /= dt;
+            // 2 * (t - t^2 / 2 - 0.5)
             return t + t - t * t - 1.0;
         } else if (t > 1.0 - dt) {
             t = (t - 1.0) / dt;
+            // 2 * (t^2 / 2 + t + 0.5)
             return t * t + t + t + 1.0;
         }
         return 0.0;
@@ -50,6 +54,7 @@ class Oscillator {
     }
 }
 
+// A single synthesizer voice, encapsulating oscillators, envelopes, and filters.
 class Voice {
     constructor(id, frequency, volume, preset, sampleRate) {
         this.id = id;
@@ -62,6 +67,7 @@ class Voice {
         this.volume = volume;
         this.preset = preset;
         
+        // Optimized portamento (glide) calculation. 1.0 means no glide.
         this.portamentoSpeed = preset.portamento > 0 ? 1 - Math.exp(-1 / (preset.portamento * this.sampleRate * 0.1)) : 1;
 
         this.layers = [];
@@ -108,7 +114,7 @@ class Voice {
             this.filter = null;
             return;
         }
-        this.filter = { ...filterConfig, y1: 0, y2: 0, x1: 0, x2: 0 };
+        this.filter = { ...filterConfig, y1: 0, y2: 0, x1: 0, x2: 0, active: false };
         this.updateFilterCoeffs();
     }
 
@@ -117,7 +123,7 @@ class Voice {
         const { type, Q, gain, frequency } = this.filter;
         const w0 = 2 * Math.PI * frequency / this.sampleRate;
         const cos_w0 = Math.cos(w0);
-        const alpha = Math.sin(w0) / (2 * Math.max(0.001, Q));
+        const alpha = Math.sin(w0) / (2 * Math.max(0.001, Q)); // Ensure Q is not zero
         
         let a0=1, a1=0, a2=0, b0=1, b1=0, b2=0;
 
@@ -152,15 +158,12 @@ class Voice {
     processFilter(inputSample) {
         if (!this.filter || !this.filter.active) return inputSample;
         const f = this.filter;
-        // This is a direct form II transposed biquad filter implementation.
-        // It's computationally efficient for real-time audio processing.
-        let y0 = (f.b0 * inputSample) + (f.b1 * f.x1) + (f.b2 * f.x2) - (f.a1 * f.y1) - (f.a2 * f.y2);
-        if (isNaN(y0)) y0 = 0; // Prevent NaN propagation
-        f.x2 = f.x1;
-        f.x1 = inputSample;
-        f.y2 = f.y1;
-        f.y1 = y0;
-        return y0;
+        // Direct Form II Transposed biquad filter implementation.
+        let y = f.b0 * inputSample + f.x1;
+        if (isNaN(y)) y = 0; // Prevent NaN propagation
+        f.x1 = f.b1 * inputSample - f.a1 * y + f.x2;
+        f.x2 = f.b2 * inputSample - f.a2 * y;
+        return y;
     }
 
     processLayerEnvelope(layer) {
@@ -262,34 +265,42 @@ class SynthProcessor extends AudioWorkletProcessor {
 
     applyPreset(preset) {
         this.preset = { ...this.getDefaultPreset(), ...preset };
-        this.allNotesOff();
+        // Force-release all voices to apply new sound settings
+        this.voices.forEach(voice => voice.release());
     }
 
     noteOn(note) {
+        // If voice already exists, re-trigger it with new params
         if (this.voices.has(note.id)) {
-            const voice = this.voices.get(note.id);
-            voice.noteUpdate(note.frequency, note.volume);
+            const existingVoice = this.voices.get(note.id);
+            existingVoice.isReleasing = false; // re-trigger attack
+            existingVoice.layers.forEach(l => {
+                l.env.state = 'attack';
+                l.env.currentValue = 0;
+            });
+            existingVoice.noteUpdate(note.frequency, note.volume);
             return;
         }
 
+        // Voice stealing logic
         if (this.voices.size >= this.polyphony) {
-            // Voice stealing: find the oldest voice that is in its release phase first.
             let oldestId;
-            let oldestVoiceIsReleasing = false;
+            let oldestVoice = null;
+            // Prioritize stealing a voice that is already in release phase
             for (const [id, voice] of this.voices.entries()) {
                 if (voice.isReleasing) {
                     oldestId = id;
-                    oldestVoiceIsReleasing = true;
                     break;
                 }
+                // Fallback to the very first voice in the map
+                if (!oldestId) {
+                    oldestId = id;
+                }
             }
-            // If no voice is releasing, just steal the oldest one.
-            if (!oldestVoiceIsReleasing) {
-                oldestId = this.voices.keys().next().value;
+            if (oldestId) {
+                this.voices.delete(oldestId);
             }
-             this.voices.delete(oldestId);
         }
-
         const voice = new Voice(note.id, note.frequency, note.volume, this.preset, sampleRate);
         this.voices.set(note.id, voice);
     }
@@ -310,11 +321,9 @@ class SynthProcessor extends AudioWorkletProcessor {
 
     allNotesOff() {
         this.voices.forEach(voice => {
-            if (!voice.isReleasing) {
-                voice.release();
-            }
+            voice.release();
+            // Use a very short release to prevent clicks but kill the sound quickly.
             voice.layers.forEach(l => {
-                // Use a very short release to prevent clicks but kill the sound quickly.
                 l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05); 
             });
         });
@@ -324,58 +333,61 @@ class SynthProcessor extends AudioWorkletProcessor {
         const outputChannel = outputs[0]?.[0];
         
         if (!outputChannel) {
-            return true; 
+            return true; // Stop processing if there's no output channel.
         }
     
         outputChannel.fill(0);
         
-        const voiceCount = this.voices.size;
-        if (voiceCount === 0) {
-            return true;
+        if (this.voices.size === 0) {
+            return true; // No active voices, nothing more to do.
         }
 
         let currentPeak = 0;
         
-        for (let i = 0; i < outputChannel.length; i++) {
-            let sample = 0;
-            for (const [id, voice] of this.voices) {
-                if (voice.isFinished) {
-                    this.voices.delete(id);
-                } else {
-                    sample += voice.render();
-                }
+        // Sum all active voices
+        for (const [id, voice] of this.voices) {
+            if (voice.isFinished) {
+                this.voices.delete(id);
+            } else {
+                 for (let i = 0; i < outputChannel.length; i++) {
+                    const sample = voice.render();
+                    outputChannel[i] += sample;
+                 }
             }
+        }
+
+        // Attenuate and limit the final signal
+        const voiceCount = this.voices.size;
+        const attenuation = 1 / (1 + Math.max(0, voiceCount - 1) * 0.4);
+        
+        for (let i = 0; i < outputChannel.length; i++) {
+            let sample = outputChannel[i];
             
+            // Track peak level before limiting
             const absSample = Math.abs(sample);
             if (absSample > currentPeak) {
                 currentPeak = absSample;
             }
 
-            // Attenuate based on number of voices to prevent clipping before the final limiter.
-            // This is a simple but effective form of compression.
-            const attenuation = 1 / (1 + Math.max(0, voiceCount - 1) * 0.4);
-            const attenuatedSample = sample * attenuation;
-
-            // Final safety net: a soft-clipper to prevent any harsh digital distortion.
-            const limitedSample = Math.tanh(attenuatedSample * 0.9);
-            outputChannel[i] = limitedSample;
+            // Apply attenuation and soft-clipping limiter
+            sample *= attenuation;
+            outputChannel[i] = Math.tanh(sample);
         }
         
-        if (currentPeak > this.peakLevel) {
-            this.peakLevel = currentPeak;
-        }
-
+        this.peakLevel = Math.max(this.peakLevel, currentPeak);
+        
+        // Log active voices and peak level periodically for debugging.
         this.logCounter++;
         if (this.logCounter >= 200) {
              if (this.voices.size > 0) {
                 const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
                 this.port.postMessage({
                     type: 'debug',
-                    message: `Active voices: ${this.voices.size}. Freqs: [${activeFrequencies.join(', ')}]. Peak level: ${this.peakLevel.toFixed(4)}`
+                    message: `Active voices: ${this.voices.size}. Frequencies: [${activeFrequencies.join(', ')}]. Peak level: ${this.peakLevel.toFixed(4)}`
                 });
             }
             this.logCounter = 0;
-            this.peakLevel = 0;
+            this.peakLevel = 0; // Reset peak for next logging interval
         }
         
         return true;
@@ -394,4 +406,3 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
-

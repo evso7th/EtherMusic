@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -39,14 +40,14 @@ function saveVolumes(volumes: Volumes) {
 
 export const defaultVolumes: Volumes = { 
     melody: { gain: 0, reverbSend: -18, distortion: 0 },
-    manualBass: { gain: -25, reverbSend: -48, distortion: 0 },
-    latch: { gain: -25, reverbSend: -48, distortion: 0 },
-    drums: { gain: -20, reverbSend: -48, distortion: 0 },
+    manualBass: { gain: -6, reverbSend: -48, distortion: 0 },
+    latch: { gain: -6, reverbSend: -48, distortion: 0 },
+    drums: { gain: -12, reverbSend: -48, distortion: 0 },
     reverbReturn: -25,
     compressor: {
         enabled: true,
-        threshold: -70,
-        ratio: 7,
+        threshold: -50,
+        ratio: 12,
         attack: 0.003,
         release: 0.25
     },

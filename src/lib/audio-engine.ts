@@ -343,7 +343,7 @@ export class AudioEngine {
                         const nodeToStop = this.nodes.get(partName);
                         if (nodeToStop) {
                             const message: WorkerMessage = { type: 'noteOff', id: pInfo.noteId };
-                            nodeToStop.worklet.port.postMessage(message);
+                            nodeToStop.port.postMessage(message);
                         }
                         this.orbManager.removeOrb(pId);
                         this.activePointers.delete(pId);
@@ -507,16 +507,16 @@ export class AudioEngine {
         this.volumes.compressor = compressorSettings;
         const rampTime = 0.01;
 
-        if (this.compressor.threshold) this.compressor.threshold.setTargetAtTime(compressorSettings.threshold, this.context.currentTime, rampTime);
-        if (this.compressor.ratio) this.compressor.ratio.setTargetAtTime(compressorSettings.ratio, this.context.currentTime, rampTime);
-        if (this.compressor.attack) this.compressor.attack.setTargetAtTime(compressorSettings.attack, this.context.currentTime, rampTime);
-        if (this.compressor.release) this.compressor.release.setTargetAtTime(compressorSettings.release, this.context.currentTime, rampTime);
-
-        this.preCompressorOut.disconnect();
         if (compressorSettings.enabled) {
+            this.compressor.threshold.setTargetAtTime(compressorSettings.threshold, this.context.currentTime, rampTime);
+            this.compressor.ratio.setTargetAtTime(compressorSettings.ratio, this.context.currentTime, rampTime);
+            this.compressor.attack.setTargetAtTime(compressorSettings.attack, this.context.currentTime, rampTime);
+            this.compressor.release.setTargetAtTime(compressorSettings.release, this.context.currentTime, rampTime);
+            this.preCompressorOut.disconnect();
             this.preCompressorOut.connect(this.compressor);
             this.compressor.connect(this.masterOut);
         } else {
+            this.preCompressorOut.disconnect();
             this.preCompressorOut.connect(this.masterOut);
         }
     }
@@ -533,4 +533,3 @@ export class AudioEngine {
         }
     }
 }
-
