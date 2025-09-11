@@ -17,12 +17,13 @@ function dbToGain(db: number): number {
 function createDistortionCurve(amount: number): Float32Array {
     const k = Math.max(0, Math.min(100, amount)) * 2;
     if (k === 0) {
+        // Return a linear curve when distortion is 0 to avoid artifacts
         return new Float32Array([ -1, 1 ]);
     }
     const n_samples = 44100;
     const curve = new Float32Array(n_samples);
     const deg = Math.PI / 180;
-    for (let i = 0; i < n_samples; i++) {
+    for (let i = 0; i < n_samples; ++i) {
         const x = i * 2 / n_samples - 1;
         curve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
     }
@@ -182,7 +183,7 @@ export class AudioEngine {
         
         this.createSynthChannel('melody', 10, 'synth-processor');
         this.createSynthChannel('manualBass', 4, 'synth-processor');
-        this.createSynthChannel('latch', 4, 'synth-processor');
+        this.createSynthChannel('latch', 8, 'synth-processor');
         
         this.createDrumChannel();
         
@@ -215,8 +216,6 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
-            } else if (e.data.type === 'debug') {
-                console.log(`[DEBUG-${part.toUpperCase()}]`, e.data.message);
             }
         };
 
@@ -467,6 +466,7 @@ export class AudioEngine {
     private applyVolumeForPart(partName: SynthPartName | 'drums', volumes: ChannelVolumes) {
         const nodeInfo = this.nodes.get(partName);
         if (nodeInfo && volumes) {
+            // Ramping is now handled inside the worklet for synths, but gain nodes are fine here.
             nodeInfo.gain.gain.setValueAtTime(dbToGain(volumes.gain), this.context.currentTime);
             nodeInfo.reverbSend.gain.setValueAtTime(dbToGain(volumes.reverbSend), this.context.currentTime);
             if (nodeInfo.distortion) {

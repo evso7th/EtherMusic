@@ -1,3 +1,4 @@
+
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for all real-time synthesis, running in a high-priority
 // audio thread to ensure low-latency, glitch-free sound generation.
@@ -97,6 +98,7 @@ class Voice {
                     sustainLevel: envConfig.sustain ?? 1.0,
                     state: 'attack',
                     currentValue: 0,
+                    releaseLevel: 1.0,
                 },
             };
         };
@@ -173,6 +175,7 @@ class Voice {
         const env = layer.env;
         if (this.isReleasing && env.state !== 'release') {
             env.state = 'release';
+            env.releaseStartValue = env.currentValue;
             env.releaseRate = env.currentValue / Math.max(1, env.releaseSamples);
         }
 
@@ -182,9 +185,9 @@ class Voice {
                 if (env.currentValue >= 1.0) { env.currentValue = 1.0; env.state = 'decay'; }
                 break;
             case 'decay':
-                if (env.currentValue > env.sustainLevel) {
-                     env.currentValue -= env.decayRate;
-                     if (env.currentValue <= env.sustainLevel) { env.currentValue = env.sustainLevel; env.state = 'sustain'; }
+                if (env.sustainLevel < 1.0) { // Avoid decay if sustain is full
+                    env.currentValue -= env.decayRate;
+                    if (env.currentValue <= env.sustainLevel) { env.currentValue = env.sustainLevel; env.state = 'sustain'; }
                 } else {
                     env.state = 'sustain';
                 }
@@ -235,7 +238,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.voices = new Map();
         this.polyphony = options.processorOptions?.polyphony || 8;
         this.preset = this.getDefaultPreset();
-        this.logCounter = 0;
+        
         this.port.onmessage = this.handleMessage.bind(this);
     }
 
@@ -328,9 +331,6 @@ class SynthProcessor extends AudioWorkletProcessor {
             return true;
         }
 
-        this.logCounter++;
-        let peakLevel = 0;
-        
         for (let i = 0; i < outputChannel.length; i++) {
             let sample = 0;
             for (const [id, voice] of this.voices) {
@@ -341,22 +341,8 @@ class SynthProcessor extends AudioWorkletProcessor {
                 }
             }
             
-            const absSample = Math.abs(sample);
-            if (absSample > peakLevel) {
-                peakLevel = absSample;
-            }
-            
-            const attenuation = 1 / (1 + Math.max(0, voiceCount - 1) * 0.5);
+            const attenuation = 1 / Math.max(1, Math.sqrt(this.voices.size));
             outputChannel[i] = Math.tanh(sample * attenuation);
-        }
-        
-        if (this.logCounter >= 200 && this.voices.size > 0) {
-            const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
-            this.port.postMessage({
-                type: 'debug',
-                message: `Active voices: ${this.voices.size}. Frequencies: [${activeFrequencies.join(', ')}]. Peak level: ${peakLevel.toFixed(4)}`
-            });
-            this.logCounter = 0;
         }
         
         return true;
