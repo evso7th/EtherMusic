@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -95,7 +94,7 @@ export function useAudioEngine() {
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
     
-    const [volumes, setVolumesState] = useState<Volumes | null>(null);
+    const [volumes, setVolumesState] = useState<Volumes>(defaultVolumes);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTempo, setCurrentTempo] = useState(defaultVolumes.tempo);
     
@@ -178,7 +177,7 @@ export function useAudioEngine() {
     
     const setVolumes = useCallback((newVolumes: Volumes | ((prev: Volumes) => Volumes)) => {
         setVolumesState(prev => {
-            const updated = typeof newVolumes === 'function' ? newVolumes(prev!) : newVolumes;
+            const updated = typeof newVolumes === 'function' ? newVolumes(prev) : newVolumes;
             if (audioEngine.current) {
                 audioEngine.current.setVolumes(updated);
             }
@@ -223,7 +222,7 @@ export function useAudioEngine() {
                 setVolumes(newVolumes);
             }
         }
-    }, []);
+    }, [setVolumes]);
 
     return {
         isAppStarted,

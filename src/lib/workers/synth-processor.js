@@ -76,7 +76,6 @@ class Voice {
             const envConfig = isMainOsc ? this.preset.envelope : (layerConfig.envelope || this.preset.envelope);
             const attackSamples = Math.max(1, (envConfig.attack || 0.001) * this.sampleRate);
             const releaseSamples = Math.max(1, (envConfig.release || 0.001) * this.sampleRate);
-            const decaySamples = Math.max(1, (envConfig.decay || 0.001) * this.sampleRate);
             
             return {
                 osc: new Oscillator(layerConfig.type || 'sine', this.sampleRate),
@@ -85,11 +84,12 @@ class Voice {
                 detune: layerConfig.detune || 0,
                 env: {
                     attackInc: 1.0 / attackSamples,
-                    decayRate: envConfig.sustain < 1.0 ? Math.pow(envConfig.sustain, 1 / decaySamples) : 1.0,
-                    releaseRate: Math.pow(0.0001, 1/releaseSamples),
+                    decayRate: envConfig.decay > 0 ? (1.0 - (envConfig.sustain ?? 1.0)) / (envConfig.decay * this.sampleRate) : 1,
+                    releaseSamples: releaseSamples,
                     sustainLevel: envConfig.sustain ?? 1.0,
                     state: 'attack',
                     currentValue: 0,
+                    releaseStartValue: 0,
                 },
             };
         };
@@ -152,25 +152,24 @@ class Voice {
     processFilter(inputSample) {
         if (!this.filter || !this.filter.active) return inputSample;
         const f = this.filter;
-        const y0 = f.b0 * inputSample + f.b1 * f.x1 + f.b2 * f.x2 - f.a1 * f.y1 - f.a2 * f.y2;
-        
+        // This is a direct form II transposed biquad filter implementation.
+        // It's computationally efficient for real-time audio processing.
+        let y0 = (f.b0 * inputSample) + (f.b1 * f.x1) + (f.b2 * f.x2) - (f.a1 * f.y1) - (f.a2 * f.y2);
+        if (isNaN(y0)) y0 = 0; // Prevent NaN propagation
         f.x2 = f.x1;
         f.x1 = inputSample;
         f.y2 = f.y1;
         f.y1 = y0;
-        
-        return isNaN(y0) ? 0 : y0;
+        return y0;
     }
 
     processLayerEnvelope(layer) {
         const env = layer.env;
         if (this.isReleasing && env.state !== 'release') {
-          if (env.state !== 'sustain' && env.state !== 'decay') {
-             env.releaseStartValue = 0;
-          } else {
-             env.releaseStartValue = env.currentValue;
-          }
-          env.state = 'release'; 
+            env.state = 'release';
+            env.releaseStartValue = env.currentValue;
+            // A faster calculation for the release rate to avoid division in the loop
+            env.releaseRate = env.currentValue / Math.max(1, env.releaseSamples);
         }
 
         switch (env.state) {
@@ -179,11 +178,15 @@ class Voice {
                 if (env.currentValue >= 1.0) { env.currentValue = 1.0; env.state = 'decay'; }
                 break;
             case 'decay':
-                env.currentValue -= env.decayRate;
-                if (env.currentValue <= env.sustainLevel) { env.currentValue = env.sustainLevel; env.state = 'sustain'; }
+                if (env.sustainLevel < 1.0) { // Avoid decay if sustain is full
+                    env.currentValue -= env.decayRate;
+                    if (env.currentValue <= env.sustainLevel) { env.currentValue = env.sustainLevel; env.state = 'sustain'; }
+                } else {
+                    env.state = 'sustain';
+                }
                 break;
             case 'release':
-                env.currentValue -= env.releaseStartValue / env.releaseSamples;
+                env.currentValue -= env.releaseRate;
                 if (env.currentValue <= 0) { env.currentValue = 0; }
                 break;
         }
@@ -191,11 +194,14 @@ class Voice {
     }
 
     render() {
-        if (this.isReleasing && this.layers.every(l => l.env.currentValue <= 0.0001)) {
-            this.isFinished = true;
-        }
         if (this.isFinished) return 0;
         
+        if (this.isReleasing && this.layers.every(l => l.env.currentValue <= 0.0001)) {
+            this.isFinished = true;
+            return 0;
+        }
+        
+        // Glide to the target frequency
         this.baseFrequency += (this.targetFrequency - this.baseFrequency) * this.portamentoSpeed;
 
         const lfoModulation = this.processLFO();
@@ -267,16 +273,19 @@ class SynthProcessor extends AudioWorkletProcessor {
         }
 
         if (this.voices.size >= this.polyphony) {
-            let oldestId = this.voices.keys().next().value;
-            let oldestVoice = this.voices.get(oldestId);
-
-            if (oldestVoice && !oldestVoice.isReleasing) {
-                 for (const [id, voice] of this.voices.entries()) {
-                    if (voice.isReleasing) {
-                        oldestId = id;
-                        break;
-                    }
+            // Voice stealing: find the oldest voice that is in its release phase first.
+            let oldestId;
+            let oldestVoiceIsReleasing = false;
+            for (const [id, voice] of this.voices.entries()) {
+                if (voice.isReleasing) {
+                    oldestId = id;
+                    oldestVoiceIsReleasing = true;
+                    break;
                 }
+            }
+            // If no voice is releasing, just steal the oldest one.
+            if (!oldestVoiceIsReleasing) {
+                oldestId = this.voices.keys().next().value;
             }
              this.voices.delete(oldestId);
         }
@@ -320,7 +329,8 @@ class SynthProcessor extends AudioWorkletProcessor {
     
         outputChannel.fill(0);
         
-        if (this.voices.size === 0) {
+        const voiceCount = this.voices.size;
+        if (voiceCount === 0) {
             return true;
         }
 
@@ -340,9 +350,15 @@ class SynthProcessor extends AudioWorkletProcessor {
             if (absSample > currentPeak) {
                 currentPeak = absSample;
             }
-            
-            // The output is sent to a native DynamicsCompressorNode, so we don't need to limit here.
-            outputChannel[i] = sample;
+
+            // Attenuate based on number of voices to prevent clipping before the final limiter.
+            // This is a simple but effective form of compression.
+            const attenuation = 1 / (1 + Math.max(0, voiceCount - 1) * 0.4);
+            const attenuatedSample = sample * attenuation;
+
+            // Final safety net: a soft-clipper to prevent any harsh digital distortion.
+            const limitedSample = Math.tanh(attenuatedSample * 0.9);
+            outputChannel[i] = limitedSample;
         }
         
         if (currentPeak > this.peakLevel) {
@@ -355,7 +371,7 @@ class SynthProcessor extends AudioWorkletProcessor {
                 const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
                 this.port.postMessage({
                     type: 'debug',
-                    message: `Active voices: ${this.voices.size}. Frequencies: [${activeFrequencies.join(', ')}]. Peak level: ${this.peakLevel.toFixed(4)}`
+                    message: `Active voices: ${this.voices.size}. Freqs: [${activeFrequencies.join(', ')}]. Peak level: ${this.peakLevel.toFixed(4)}`
                 });
             }
             this.logCounter = 0;
@@ -379,4 +395,3 @@ class SynthProcessor extends AudioWorkletProcessor {
 
 registerProcessor('synth-processor', SynthProcessor);
 
-    

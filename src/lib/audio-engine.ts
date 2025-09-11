@@ -117,8 +117,8 @@ export class AudioEngine {
         this.preCompressorOut = this.context.createGain();
 
         this.compressor = this.context.createDynamicsCompressor();
-        this.compressor.threshold.value = -50; 
-        this.compressor.knee.value = 0;      
+        this.compressor.threshold.value = -24; // A reasonable starting point
+        this.compressor.knee.value = 30;      
         this.compressor.ratio.value = 12;      
         this.compressor.attack.value = 0.003;  
         this.compressor.release.value = 0.25;  
@@ -505,13 +505,12 @@ export class AudioEngine {
     public setCompressorSettings(compressorSettings: CompressorSettings) {
         if (!this.isInitialized || !this.context || !this.compressor) return;
         this.volumes.compressor = compressorSettings;
-        
         const rampTime = 0.01;
 
-        this.compressor.threshold.setTargetAtTime(compressorSettings.threshold, this.context.currentTime, rampTime);
-        this.compressor.ratio.setTargetAtTime(compressorSettings.ratio, this.context.currentTime, rampTime);
-        this.compressor.attack.setTargetAtTime(compressorSettings.attack, this.context.currentTime, rampTime);
-        this.compressor.release.setTargetAtTime(compressorSettings.release, this.context.currentTime, rampTime);
+        if (this.compressor.threshold) this.compressor.threshold.setTargetAtTime(compressorSettings.threshold, this.context.currentTime, rampTime);
+        if (this.compressor.ratio) this.compressor.ratio.setTargetAtTime(compressorSettings.ratio, this.context.currentTime, rampTime);
+        if (this.compressor.attack) this.compressor.attack.setTargetAtTime(compressorSettings.attack, this.context.currentTime, rampTime);
+        if (this.compressor.release) this.compressor.release.setTargetAtTime(compressorSettings.release, this.context.currentTime, rampTime);
 
         this.preCompressorOut.disconnect();
         if (compressorSettings.enabled) {
@@ -535,4 +534,3 @@ export class AudioEngine {
     }
 }
 
-    
