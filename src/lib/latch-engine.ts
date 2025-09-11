@@ -3,7 +3,7 @@
 
 import type { Note } from '@/types';
 
-const MAX_LATCH_NOTES = 4;
+const MAX_LATCH_NOTES = 3;
 const TAP_RADIUS = 30; // Reduced radius for more precise tapping
 const TAP_RADIUS_SQUARED = TAP_RADIUS * TAP_RADIUS;
 
@@ -42,7 +42,7 @@ export class LatchEngine {
 
         if (existingNoteIndex > -1) {
             // Note exists, remove it
-            const noteToRemove = this.activeNotes.splice(existingNoteIndex, 1)[0];
+            const noteToRemove = this.activeNotes.splice(existingNote-index, 1)[0];
             return {
                 action: 'removed',
                 noteOff: noteToRemove,

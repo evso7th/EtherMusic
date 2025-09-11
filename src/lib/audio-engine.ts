@@ -408,7 +408,7 @@ export class AudioEngine {
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
             this.setVolumes(newVolumes);
-            return newVolumes; // Return the modified volumes
+            return newVolumes;
         }
         return undefined;
     }
@@ -503,7 +503,6 @@ export class AudioEngine {
         
         this.volumes.compressor = compressorSettings;
     
-        // Disconnect and reconnect to apply enabled/disabled state
         this.preLimiterOut.disconnect();
         if (compressorSettings.enabled) {
             this.preLimiterOut.connect(this.limiter);

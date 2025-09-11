@@ -1,3 +1,4 @@
+
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for all real-time synthesis, running in a high-priority
 // audio thread to ensure low-latency, glitch-free sound generation.
@@ -331,9 +332,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         
         const voiceCount = this.voices.size;
         if (voiceCount === 0) {
-            if (this.peakLevel !== 0) {
-                this.peakLevel = 0;
-            }
+            if (this.peakLevel !== 0) this.peakLevel = 0;
             return true;
         }
         
@@ -354,14 +353,13 @@ class SynthProcessor extends AudioWorkletProcessor {
                 currentPeak = absSample;
             }
             
-            // Dynamic attenuation based on number of voices
-            const attenuation = 1 / (1 + Math.max(0, this.voices.size - 1) * 0.25);
+            // Dynamic attenuation based on number of active (non-releasing) voices
+            const activeVoiceCount = Array.from(this.voices.values()).filter(v => !v.isReleasing).length;
+            const attenuation = 1 / (1 + Math.max(0, activeVoiceCount - 1) * 0.5);
             outputChannel[i] = Math.tanh(sample * attenuation);
         }
 
-        if (currentPeak > this.peakLevel) {
-            this.peakLevel = currentPeak;
-        }
+        this.peakLevel = Math.max(this.peakLevel, currentPeak);
         
         this.logCounter++;
         if (this.logCounter >= 200) { // Log roughly every 500ms
