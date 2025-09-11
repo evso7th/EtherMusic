@@ -174,8 +174,8 @@ export class AudioEngine {
 
         try {
              await Promise.all([
-                this.context.audioWorklet.addModule('/workers/synth-processor.js'),
-                this.context.audioWorklet.addModule('/workers/drum-processor.js'),
+                this.context.audioWorklet.addModule('workers/synth-processor.js'),
+                this.context.audioWorklet.addModule('workers/drum-processor.js'),
              ]);
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
@@ -503,7 +503,6 @@ export class AudioEngine {
         
         this.volumes.compressor = limiterSettings;
     
-        // Always disconnect preLimiterOut first to avoid multiple connections.
         this.preLimiterOut.disconnect();
 
         if (limiterSettings.enabled) {
@@ -511,11 +510,11 @@ export class AudioEngine {
             this.limiter.connect(this.masterOut);
     
             const now = this.context.currentTime;
-            this.limiter.threshold.setValueAtTime(limiterSettings.threshold, now);
-            this.limiter.knee.setValueAtTime(0, now);
-            this.limiter.ratio.setValueAtTime(20, now);
-            this.limiter.attack.setValueAtTime(0.003, now);
-            this.limiter.release.setValueAtTime(limiterSettings.release, now);
+            this.limiter.threshold.setTargetAtTime(limiterSettings.threshold, now, 0.01);
+            this.limiter.knee.setTargetAtTime(0, now, 0.01);
+            this.limiter.ratio.setTargetAtTime(20, now, 0.01);
+            this.limiter.attack.setTargetAtTime(0.003, now, 0.01);
+            this.limiter.release.setTargetAtTime(limiterSettings.release, now, 0.01);
         } else {
             this.preLimiterOut.connect(this.masterOut);
         }
