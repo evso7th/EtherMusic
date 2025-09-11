@@ -255,9 +255,27 @@ class SynthProcessor extends AudioWorkletProcessor {
     }
 
     noteOn(note) {
+        if (this.voices.has(note.id)) {
+            const voice = this.voices.get(note.id);
+            voice.noteUpdate(note.frequency, note.volume);
+            return;
+        }
+
         if (this.voices.size >= this.polyphony) {
-            const oldestId = this.voices.keys().next().value;
-            this.voices.delete(oldestId);
+            let oldestId = this.voices.keys().next().value;
+            let oldestVoice = this.voices.get(oldestId);
+            let foundReleasing = oldestVoice?.isReleasing;
+
+            if (!foundReleasing) {
+                for (const [id, voice] of this.voices.entries()) {
+                    if (voice.isReleasing) {
+                        oldestId = id;
+                        foundReleasing = true;
+                        break;
+                    }
+                }
+            }
+             this.voices.delete(oldestId);
         }
 
         const voice = new Voice(note.id, note.frequency, note.volume, this.preset, sampleRate);
@@ -295,6 +313,10 @@ class SynthProcessor extends AudioWorkletProcessor {
             return true;
         }
         
+        // This factor helps prevent clipping when multiple voices are active.
+        // It's a simple form of mixing/attenuation.
+        const attenuation = 1 / (1 + Math.max(0, this.voices.size - 1) * 0.5);
+
         for (let i = 0; i < outputChannel.length; i++) {
             let sample = 0;
             for (const [id, voice] of this.voices) {
@@ -303,8 +325,8 @@ class SynthProcessor extends AudioWorkletProcessor {
                     this.voices.delete(id);
                 }
             }
-            // Simple soft-clipper to prevent harsh distortion
-            outputChannel[i] = Math.tanh(sample);
+            // Apply attenuation and a soft-clipper to prevent harsh distortion
+            outputChannel[i] = Math.tanh(sample * attenuation);
         }
 
         return true;
