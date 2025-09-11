@@ -82,9 +82,7 @@ export function loadVolumes(): Volumes {
     }
 }
 
-
 export function useAudioEngine(initialVolumes: Volumes) {
-    console.log("--- Rendering: useAudioEngine ---");
     const { toast } = useToast();
     
     const [isAppStarted, setIsAppStarted] = useState(false);
@@ -144,25 +142,27 @@ export function useAudioEngine(initialVolumes: Volumes) {
     }, [isAppStarted, initializeAudioEngine]);
 
     useEffect(() => {
-      const engine = audioEngine.current;
-      const playStateCallback = (playing: boolean) => setIsPlaying(playing);
-      engine?.getDrumMachine().on('playStateChanged', playStateCallback);
+        const resumeAudio = async () => {
+            if (audioEngine.current?.isInitialized && audioEngine.current.getContext().state === 'suspended') {
+                await audioEngine.current.getContext().resume();
+            }
+        };
+        document.addEventListener('click', resumeAudio, { once: true });
+        document.addEventListener('touchstart', resumeAudio, { once: true });
 
-      const handleResume = async () => {
-        if (audioEngine.current?.isInitialized && audioEngine.current.getContext().state === 'suspended') {
-          await audioEngine.current.getContext().resume();
+        const playStateCallback = (playing: boolean) => setIsPlaying(playing);
+        if (audioEngine.current) {
+            audioEngine.current.getDrumMachine().on('playStateChanged', playStateCallback);
         }
-      };
-      
-      document.addEventListener('click', handleResume, { once: true });
-      document.addEventListener('touchstart', handleResume, { once: true });
 
-      return () => {
-        document.removeEventListener('click', handleResume);
-        document.removeEventListener('touchstart', handleResume);
-        engine?.getDrumMachine().off('playStateChanged', playStateCallback);
-      };
-    }, []);
+        return () => {
+            document.removeEventListener('click', resumeAudio);
+            document.removeEventListener('touchstart', resumeAudio);
+            if (audioEngine.current) {
+                audioEngine.current.getDrumMachine().off('playStateChanged', playStateCallback);
+            }
+        };
+    }, [isReady]); // Rerunning when isReady ensures the listener is attached after engine exists.
     
     const setVolumes = useCallback((newVolumes: Volumes | ((prev: Volumes) => Volumes)) => {
         setVolumesState(prev => {
@@ -230,7 +230,7 @@ export function useAudioEngine(initialVolumes: Volumes) {
         setBeatPattern,
         setBassLatch,
         startRecording,
-        stopRecording,
+stopRecording,
         handleThereminInteraction,
         currentTempo
     };
