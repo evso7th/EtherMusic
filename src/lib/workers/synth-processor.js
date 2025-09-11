@@ -76,10 +76,12 @@ class Voice {
     }
 
     initLayers() {
+        this.layers = [];
         const createLayer = (layerConfig, baseFreq, isMainOsc) => {
             const envConfig = isMainOsc ? this.preset.envelope : (layerConfig.envelope || this.preset.envelope);
             const attackSamples = Math.max(1, (envConfig.attack || 0.01) * this.sampleRate);
-            
+            const releaseSamples = Math.max(1, (envConfig.release || 0.5) * this.sampleRate);
+
             return {
                 osc: new Oscillator(layerConfig.type || 'sine', this.sampleRate),
                 level: layerConfig.level ?? 1.0,
@@ -88,7 +90,7 @@ class Voice {
                 env: {
                     attackInc: 1.0 / attackSamples,
                     decayRate: envConfig.decay > 0 ? (1.0 - (envConfig.sustain ?? 1.0)) / (envConfig.decay * this.sampleRate) : 1,
-                    releaseRate: envConfig.release > 0 ? (envConfig.sustainLevel ?? envConfig.sustain ?? 1.0) / (envConfig.release * this.sampleRate) : 1,
+                    releaseSamples: releaseSamples,
                     sustainLevel: envConfig.sustain ?? 1.0,
                     state: 'attack',
                     currentValue: 0,
@@ -156,10 +158,10 @@ class Voice {
         const f = this.filter;
         // This is a direct form II transposed biquad filter implementation.
         // It's computationally efficient for real-time audio processing.
-        const outputSample = (f.b0/f.a0) * inputSample + f.x1;
-        f.x1 = (f.b1/f.a0) * inputSample - (f.a1/f.a0) * outputSample + f.x2;
-        f.x2 = (f.b2/f.a0) * inputSample - (f.a2/f.a0) * outputSample;
-        return outputSample;
+        const outputSample = (f.b0/f.a0) * inputSample + f.y1;
+        f.y1 = (f.b1/f.a0) * inputSample - (f.a1/f.a0) * outputSample + f.y2;
+        f.y2 = (f.b2/f.a0) * inputSample - (f.a2/f.a0) * outputSample;
+        return isNaN(outputSample) ? 0 : outputSample;
     }
 
     processLayerEnvelope(layer) {
@@ -167,7 +169,7 @@ class Voice {
         if (this.isReleasing && env.state !== 'release') {
             env.state = 'release';
             env.releaseStartValue = env.currentValue;
-            env.releaseRate = env.currentValue / Math.max(1, this.preset.envelope.release * this.sampleRate);
+            env.releaseRate = env.currentValue / Math.max(1, env.releaseSamples);
         }
 
         switch (env.state) {
@@ -227,6 +229,9 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.polyphony = options.processorOptions?.polyphony || 8;
         this.preset = this.getDefaultPreset();
         
+        this.debugCounter = 0;
+        this.debugInterval = 100;
+
         this.port.onmessage = this.handleMessage.bind(this);
     }
 
@@ -316,10 +321,7 @@ class SynthProcessor extends AudioWorkletProcessor {
             return true;
         }
         
-        // This factor helps prevent clipping when multiple voices are active.
-        // It's a simple form of mixing/attenuation. It's a bit more gentle than a sqrt.
         const attenuation = 1 / (1 + Math.max(0, voiceCount - 1) * 0.25);
-
         let peak = 0;
 
         for (let i = 0; i < outputChannel.length; i++) {
@@ -332,7 +334,6 @@ class SynthProcessor extends AudioWorkletProcessor {
             }
             
             const attenuatedSample = sample * attenuation;
-            // Apply a soft-clipper (tanh) to prevent harsh distortion if it still overloads.
             const finalSample = Math.tanh(attenuatedSample * 1.2); 
             outputChannel[i] = finalSample
             
@@ -341,13 +342,16 @@ class SynthProcessor extends AudioWorkletProcessor {
                 peak = absSample;
             }
         }
-
-        // Send a debug message every 100 processing blocks or so to avoid spamming the console
-        if (Math.random() < 0.01) {
-             this.port.postMessage({ 
-                type: 'debug', 
-                message: `Active voices: ${voiceCount}, Peak level: ${peak.toFixed(4)}`
-            });
+        
+        this.debugCounter++;
+        if (this.debugCounter >= this.debugInterval) {
+            this.debugCounter = 0;
+            if (voiceCount > 0) {
+                this.port.postMessage({ 
+                    type: 'debug', 
+                    message: `Active voices: ${voiceCount}, Peak level: ${peak.toFixed(4)}`
+                });
+            }
         }
 
         return true;
@@ -366,5 +370,7 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
+
+    
 
     

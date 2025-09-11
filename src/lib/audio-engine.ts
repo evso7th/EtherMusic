@@ -175,7 +175,6 @@ export class AudioEngine {
         try {
              await Promise.all([
                 this.context.audioWorklet.addModule('/workers/synth-processor.js'),
-                this.context.audioWorklet.addModule('/workers/latch-processor.js'),
                 this.context.audioWorklet.addModule('/workers/drum-processor.js'),
              ]);
         } catch (e) {
@@ -199,7 +198,7 @@ export class AudioEngine {
     private createSynthChannel(part: SynthPartName, polyphony: number) {
         if (!this.context) return;
         
-        const processorName = part === 'latch' ? 'latch-processor' : 'synth-processor';
+        const processorName = 'synth-processor';
         
         const worklet = new AudioWorkletNode(this.context, processorName, {
             processorOptions: { sampleRate: this.context.sampleRate, polyphony },
@@ -404,7 +403,6 @@ export class AudioEngine {
             newVolumes.latch.reverbSend = bassPresetParams.reverbSend ?? newVolumes.latch.reverbSend;
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
-            // Instead of returning, we now emit an event
             this.setVolumes(newVolumes);
         }
     }
@@ -534,3 +532,5 @@ export class AudioEngine {
         }
     }
 }
+
+    
