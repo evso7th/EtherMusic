@@ -212,7 +212,6 @@ class Voice {
         
         const numLayers = this.layers.length || 1;
         if (numLayers > 1) {
-             // Normalizing by the number of layers to prevent clipping inside the voice
              mixedSample /= numLayers;
         }
 
@@ -352,12 +351,17 @@ class SynthProcessor extends AudioWorkletProcessor {
                 currentPeak = absSample;
             }
             
-            const attenuation = 1 / Math.max(1, this.voices.size);
+            // Attenuate based on number of voices to prevent clipping
+            const attenuation = 1 / Math.max(1, this.voices.size * 0.75);
             outputChannel[i] = Math.tanh(sample * attenuation);
         }
 
-        this.peakLevel = Math.max(this.peakLevel, currentPeak);
+        // Update peak level for logging
+        if(currentPeak > this.peakLevel) {
+            this.peakLevel = currentPeak;
+        }
         
+        // Log peak level periodically
         this.logCounter++;
         if (this.logCounter >= 200) {
              if (this.voices.size > 0) {
@@ -368,7 +372,7 @@ class SynthProcessor extends AudioWorkletProcessor {
                 });
             }
             this.logCounter = 0;
-            this.peakLevel = 0;
+            this.peakLevel = 0; // Reset peak for next logging interval
         }
         
         return true;
@@ -387,3 +391,5 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
+
+    

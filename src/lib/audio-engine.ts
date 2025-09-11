@@ -174,8 +174,8 @@ export class AudioEngine {
 
         try {
              await Promise.all([
-                this.context.audioWorklet.addModule('workers/synth-processor.js'),
-                this.context.audioWorklet.addModule('workers/drum-processor.js'),
+                this.context.audioWorklet.addModule('/workers/synth-processor.js'),
+                this.context.audioWorklet.addModule('/workers/drum-processor.js'),
              ]);
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
@@ -503,17 +503,19 @@ export class AudioEngine {
         
         this.volumes.compressor = limiterSettings;
     
+        // Always disconnect preLimiterOut first to avoid multiple connections.
         this.preLimiterOut.disconnect();
+
         if (limiterSettings.enabled) {
             this.preLimiterOut.connect(this.limiter);
             this.limiter.connect(this.masterOut);
-
-            const rampTime = this.context.currentTime + 0.02;
-            this.limiter.threshold.setTargetAtTime(limiterSettings.threshold, this.context.currentTime, rampTime);
-            this.limiter.knee.setTargetAtTime(0, this.context.currentTime, rampTime); 
-            this.limiter.ratio.setTargetAtTime(20, this.context.currentTime, rampTime); 
-            this.limiter.attack.setTargetAtTime(limiterSettings.attack, this.context.currentTime, rampTime);
-            this.limiter.release.setTargetAtTime(limiterSettings.release, this.context.currentTime, rampTime);
+    
+            const now = this.context.currentTime;
+            this.limiter.threshold.setValueAtTime(limiterSettings.threshold, now);
+            this.limiter.knee.setValueAtTime(0, now);
+            this.limiter.ratio.setValueAtTime(20, now);
+            this.limiter.attack.setValueAtTime(0.003, now);
+            this.limiter.release.setValueAtTime(limiterSettings.release, now);
         } else {
             this.preLimiterOut.connect(this.masterOut);
         }
@@ -531,3 +533,5 @@ export class AudioEngine {
         }
     }
 }
+
+    
