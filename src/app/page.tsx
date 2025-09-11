@@ -15,8 +15,8 @@ import { CookieConsent } from '@/components/cookie-consent';
 import { useAudioEngine, loadVolumes, defaultVolumes } from '@/hooks/use-audio-engine';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
-import { defaultMelodyInstrument } from '@/lib/melody-presets';
-import { defaultBassInstrument } from '@/lib/bass-presets';
+import { melodyInstruments, defaultMelodyInstrument } from '@/lib/melody-presets';
+import { bassInstruments, defaultBassInstrument } from '@/lib/bass-presets';
 import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, BeatPattern } from '@/types';
 import { cn } from '@/lib/utils';
 import { ThereminPads } from '@/components/theremin-pads';
@@ -97,7 +97,8 @@ export default function Home() {
         setIsClient(true);
         const consent = getCookie("ethermusic_consent");
         if (consent !== null) {
-            setCookieConsent(consent === 'true');
+            const hasConsent = consent === 'true';
+            setCookieConsent(hasConsent);
         } else {
             setCookieConsent(undefined);
         }
@@ -107,20 +108,28 @@ export default function Home() {
         const isKey = (k: string): k is MusicKey => Object.keys(ALL_NOTES).includes(k);
         const isScale = (s: string): s is MusicScale => Object.keys(SCALES).includes(s);
 
+        let newKey = musicKey;
+        let newScale = musicScale;
+
         if (isKey(keyOrScale)) {
+            newKey = keyOrScale;
             setMusicKey(keyOrScale);
         } else if (isScale(keyOrScale)) {
+            newScale = keyOrScale;
             setMusicScale(keyOrScale);
         }
-    }, []);
+    }, [musicKey, musicScale]);
 
     useEffect(() => {
-        if (isReady) {
-            const bassFreqs = getScaleFrequencies(musicKey, musicScale, [2, 3]);
-            const melodyFreqs = getScaleFrequencies(musicKey, musicScale, [2, 3, 4]);
-            setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
-        }
-    }, [isReady, musicKey, musicScale]);
+        const bassFreqs = getScaleFrequencies(musicKey, musicScale, [2, 3]);
+        const melodyFreqs = getScaleFrequencies(musicKey, musicScale, [2, 3, 4]);
+        setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
+    }, [musicKey, musicScale]);
+    
+    const handleSetMelodyInstrument = useCallback((instrumentId: Instrument) => {
+        setActiveMelodyInstrument(instrumentId);
+        setMelodyInstrument(instrumentId);
+    }, [setMelodyInstrument]);
 
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
@@ -185,12 +194,7 @@ export default function Home() {
         setIsBassLatchOn(isOn);
         setBassLatch(isOn);
     }, [setBassLatch]);
-    
-    const handleMelodyInstrumentChange = useCallback((instrumentId: Instrument) => {
-        setActiveMelodyInstrument(instrumentId);
-        setMelodyInstrument(instrumentId);
-    }, [setMelodyInstrument]);
-    
+        
     const handleThereminInteractionCallback = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isReady || !audioEngine) return;
         handleThereminInteraction(type, data, state);
@@ -283,7 +287,7 @@ export default function Home() {
                 </header>
 
                  <main className="flex-grow flex flex-col gap-2 overflow-hidden">
-                    <ThereminPads
+                    <ThereminPads 
                         onInteraction={handleThereminInteractionCallback}
                         allowedFrequencies={allowedFrequencies}
                         isLatchOn={isBassLatchOn}
@@ -291,10 +295,10 @@ export default function Home() {
                         activeBassInstrument={activeBassInstrument}
                         onInstrumentChange={handleSetBassInstrument}
                         orbManager={orbManager}
-                        volumes={volumes!}
+                        volumes={volumes}
                         onEffectChange={handleChannelEffectChange}
                         activeMelodyInstrument={activeMelodyInstrument}
-                        onMelodyInstrumentChange={handleMelodyInstrumentChange}
+                        onMelodyInstrumentChange={handleSetMelodyInstrument}
                         musicKey={musicKey}
                         onKeyChange={handleHarmonyChange}
                         musicScale={musicScale}
@@ -304,7 +308,7 @@ export default function Home() {
                         <BeatBoxControls
                             activePattern={activePattern}
                             onPatternChange={handlePatternChange}
-                            volumes={volumes!}
+                            volumes={volumes}
                             onApply={handleMixerApply}
                             isMobile={isMobile}
                         />
@@ -315,7 +319,7 @@ export default function Home() {
                      <BeatBoxControls
                         activePattern={activePattern}
                         onPatternChange={handlePatternChange}
-                        volumes={volumes!}
+                        volumes={volumes}
                         onApply={handleMixerApply}
                         isMobile={isMobile}
                         isLandscape={true}
@@ -325,5 +329,7 @@ export default function Home() {
         </div>
     );
 }
+
+    
 
     

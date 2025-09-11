@@ -67,15 +67,16 @@ export const MixerControls = ({
     isAutopilotMixer = false,
 }: MixerControlsProps) => {
     
-    const [localVolumes, setLocalVolumes] = useState(() => JSON.parse(JSON.stringify(initialVolumes)));
+    const [localVolumes, setLocalVolumes] = useState(initialVolumes);
 
     useEffect(() => {
-        setLocalVolumes(JSON.parse(JSON.stringify(initialVolumes)));
+        setLocalVolumes(initialVolumes);
     }, [initialVolumes]);
 
     const handleLocalVolumeChange = useCallback((update: Partial<Volumes> | ((v: Volumes) => Volumes)) => {
         setLocalVolumes(current => {
             const updated = typeof update === 'function' ? update(current) : { ...current, ...update };
+            console.log("Mixer local state updated", updated);
             return updated;
         });
     }, []);
