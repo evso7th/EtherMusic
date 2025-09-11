@@ -175,6 +175,7 @@ export class AudioEngine {
         try {
              await Promise.all([
                 this.context.audioWorklet.addModule('/workers/synth-processor.js'),
+                this.context.audioWorklet.addModule('/workers/latch-processor.js'),
                 this.context.audioWorklet.addModule('/workers/drum-processor.js'),
              ]);
         } catch (e) {
@@ -197,7 +198,10 @@ export class AudioEngine {
 
     private createSynthChannel(part: SynthPartName, polyphony: number) {
         if (!this.context) return;
-        const worklet = new AudioWorkletNode(this.context, 'synth-processor', {
+        
+        const processorName = part === 'latch' ? 'latch-processor' : 'synth-processor';
+        
+        const worklet = new AudioWorkletNode(this.context, processorName, {
             processorOptions: { sampleRate: this.context.sampleRate, polyphony },
             outputChannelCount: [1]
         });
@@ -215,10 +219,10 @@ export class AudioEngine {
         
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
-                console.error(`[SYNTH-WORKLET-${part}]`, e.data.message);
+                console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
             }
             if (e.data.type === 'debug') {
-                console.log(`[SYNTH-WORKLET-${part.toUpperCase()}]`, e.data.message);
+                console.log(`[WORKLET-DEBUG-${part.toUpperCase()}]`, e.data.message);
             }
         };
 
@@ -522,7 +526,5 @@ export class AudioEngine {
         }
     }
 }
-
-    
 
     
