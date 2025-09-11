@@ -5,8 +5,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
-import type { Volumes, Instrument, BassInstrument, ChannelVolumes, CompressorSettings } from '@/types';
-import mitt from 'mitt';
+import type { Volumes, Instrument, BassInstrument } from '@/types';
 
 function getCookie(name: string): string | null {
     if (typeof document === 'undefined') return null;
@@ -61,31 +60,21 @@ export function loadVolumes(): Volumes {
      if (!consent) return defaultVolumes;
      try {
         const savedVolumes = getCookie("ethermusic_volumes");
-        const volumes = savedVolumes ? JSON.parse(savedVolumes) : defaultVolumes;
+        if (!savedVolumes) return defaultVolumes;
         
-        if (!volumes.melody || typeof volumes.melody.gain !== 'number' || !volumes.compressor) {
-            return defaultVolumes; 
-        }
+        const parsed = JSON.parse(savedVolumes);
 
-        const ensureChannelSettings = (channel: Partial<ChannelVolumes> | undefined, defaults: ChannelVolumes): ChannelVolumes => ({
-            gain: typeof channel?.gain === 'number' ? channel.gain : defaults.gain,
-            reverbSend: typeof channel?.reverbSend === 'number' ? channel.reverbSend : defaults.reverbSend,
-            distortion: typeof channel?.distortion === 'number' ? channel.distortion : defaults.distortion,
-        });
-
-        const mergedVolumes: Volumes = {
+        // Deep merge with defaults to ensure all properties are present and valid
+        const merged = {
             ...defaultVolumes,
-            ...volumes,
-            melody: ensureChannelSettings(volumes.melody, defaultVolumes.melody),
-            manualBass: ensureChannelSettings(volumes.manualBass, defaultVolumes.manualBass),
-            latch: ensureChannelSettings(volumes.latch, defaultVolumes.latch),
-            drums: ensureChannelSettings(volumes.drums, defaultVolumes.drums),
-            compressor: { ...defaultVolumes.compressor, ...(volumes.compressor || {}) },
-            swing: typeof volumes.swing === 'number' ? volumes.swing : defaultVolumes.swing,
-            tempo: typeof volumes.tempo === 'number' ? volumes.tempo : defaultVolumes.tempo,
+            ...parsed,
+            melody: { ...defaultVolumes.melody, ...(parsed.melody || {}) },
+            manualBass: { ...defaultVolumes.manualBass, ...(parsed.manualBass || {}) },
+            latch: { ...defaultVolumes.latch, ...(parsed.latch || {}) },
+            drums: { ...defaultVolumes.drums, ...(parsed.drums || {}) },
+            compressor: { ...defaultVolumes.compressor, ...(parsed.compressor || {}) },
         };
-        
-        return mergedVolumes;
+        return merged;
 
     } catch (e) {
         console.error("Failed to load volume settings from cookies", e);
@@ -105,9 +94,9 @@ export function useAudioEngine(initialVolumes: Volumes) {
     const orbManager = useRef<OrbManager | null>(null);
     
     const [volumes, setVolumesState] = useState<Volumes>(initialVolumes);
-    const [currentTempo, setCurrentTempo] = useState(initialVolumes.tempo);
+    const currentTempo = volumes.tempo;
     
-    const initializeAudioEngine = useCallback(async (initialVols: Volumes) => {
+    const initializeAudioEngine = useCallback(async (vols: Volumes) => {
         try {
             if (!orbManager.current) {
                 const padContainer = document.querySelector('main');
@@ -124,8 +113,10 @@ export function useAudioEngine(initialVolumes: Volumes) {
                 
                 engine.getDrumMachine().on('playStateChanged', setIsPlaying);
                 
-                engine.setVolumes(initialVols);
+                engine.setVolumes(vols);
                 audioEngine.current = engine;
+            } else {
+                audioEngine.current.setVolumes(vols);
             }
             
             setIsReady(true);
@@ -171,21 +162,16 @@ export function useAudioEngine(initialVolumes: Volumes) {
       };
     }, []);
     
-    const setVolumes = useCallback((newVolumes: Partial<Volumes> | ((prev: Volumes) => Volumes)) => {
+    const setVolumes = useCallback((newVolumes: Volumes | ((prev: Volumes) => Volumes)) => {
         setVolumesState(prev => {
-            const updated = typeof newVolumes === 'function' ? newVolumes(prev) : { ...prev, ...newVolumes };
+            const updated = typeof newVolumes === 'function' ? newVolumes(prev) : newVolumes;
             if (audioEngine.current) {
                 audioEngine.current.setVolumes(updated);
             }
-            if (getCookie("ethermusic_consent") === 'true') {
-                saveVolumes(updated);
-            }
-            if(updated.tempo !== currentTempo) {
-                setCurrentTempo(updated.tempo);
-            }
+            saveVolumes(updated);
             return updated;
         });
-    }, [currentTempo]);
+    }, []);
 
     const stopAllSounds = useCallback(() => {
         audioEngine.current?.stopAllSounds();
@@ -247,3 +233,5 @@ export function useAudioEngine(initialVolumes: Volumes) {
         currentTempo
     };
 }
+
+    

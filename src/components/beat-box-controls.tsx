@@ -28,11 +28,10 @@ interface BeatBoxControlsProps {
 }
 
 const ControlButtonWithTooltip = memo(function ControlButtonWithTooltip({ tooltipText, children, ...props}: React.ComponentProps<typeof Button> & { tooltipText: string, children: React.ReactNode}) {
-    const { ...buttonProps } = props;
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <Button {...buttonProps}>{children}</Button>
+                <Button {...props}>{children}</Button>
             </TooltipTrigger>
             <TooltipContent>
                 <p>{tooltipText}</p>
@@ -73,10 +72,9 @@ const BeatBoxControlsComponent = ({
     const buttonSize = isMobile ? 'sm' : 'default';
 
     const ControlButtonWrapper = useCallback(({ tooltipText, ...props }: React.ComponentProps<typeof Button> & { tooltipText: string }) => {
-        const { ...buttonProps } = props;
-        if (isMobile) return <Button {...buttonProps} />;
+        if (isMobile) return <Button {...props} />;
         return (
-             <ControlButtonWithTooltip tooltipText={tooltipText} {...buttonProps} />
+             <ControlButtonWithTooltip tooltipText={tooltipText} {...props} />
         );
     }, [isMobile]);
 
@@ -269,3 +267,4 @@ const BeatBoxControlsComponent = ({
 
 export const BeatBoxControls = memo(BeatBoxControlsComponent);
 
+    

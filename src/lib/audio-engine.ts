@@ -7,7 +7,6 @@ import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
 import { bassInstruments } from './bass-presets';
 import { DrumMachine } from './drum-machine';
-import mitt, { Emitter } from 'mitt';
 
 
 function dbToGain(db: number): number {
@@ -240,7 +239,6 @@ export class AudioEngine {
     }
     
     private async loadReverbImpulse() {
-        // We no longer load from a file. We programmatically create the reverb.
         this.convolver.buffer = this.createFallbackReverb();
     }
 
@@ -374,10 +372,8 @@ export class AudioEngine {
     }
     
     public setBassInstrument(instrumentName: BassInstrument): Volumes | undefined {
-        if (!this.volumes) return undefined;
         const preset = bassInstruments.find(i => i.id === instrumentName);
-        
-        if (preset) {
+        if (preset && this.volumes) {
             const newVolumes = JSON.parse(JSON.stringify(this.volumes)); // Deep copy
             const bassPresetParams = preset.params as BassInstrumentPresetParams;
             const message: WorkerMessage = { type: 'setPreset', preset: bassPresetParams };
@@ -391,7 +387,7 @@ export class AudioEngine {
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
             this.setVolumes(newVolumes);
-            return newVolumes; // Return the modified volumes
+            return newVolumes;
         }
         return undefined;
     }
@@ -473,10 +469,10 @@ export class AudioEngine {
         this.applyVolumeForPart('latch', newVolumes.latch);
         this.applyVolumeForPart('drums', newVolumes.drums);
         
-        this.reverbReturnGain.gain.linearRampToValueAtTime(dbToGain(this.volumes.reverbReturn), rampTime);
-        this.setCompressorSettings(this.volumes.compressor);
-        this.setSwing(this.volumes.swing);
-        this.setTempo(this.volumes.tempo);
+        this.reverbReturnGain.gain.linearRampToValueAtTime(dbToGain(newVolumes.reverbReturn), rampTime);
+        this.setCompressorSettings(newVolumes.compressor);
+        this.setSwing(newVolumes.swing);
+        this.setTempo(newVolumes.tempo);
     }
     
     public setCompressorSettings(compressorSettings: CompressorSettings) {
@@ -510,3 +506,5 @@ export class AudioEngine {
         }
     }
 }
+
+    

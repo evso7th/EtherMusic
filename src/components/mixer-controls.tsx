@@ -86,6 +86,7 @@ export function MixerControls({
             const newChannelVolumes = { ...(newVolumes[part] as ChannelVolumes), gain: value };
             newVolumes[part] = newChannelVolumes;
 
+            // Sync manualBass and latch gain sliders
             if (part === 'manualBass') {
                 newVolumes.latch = { ...newVolumes.latch, gain: value };
             } else if (part === 'latch') {
@@ -97,7 +98,7 @@ export function MixerControls({
     };
     
     const handleReverbReturnChange = (value: number) => {
-        handleLocalVolumeChange({ reverbReturn: value });
+        handleLocalVolumeChange(prev => ({ ...prev, reverbReturn: value }));
     };
     
     const handleCompressorSettingChange = useCallback((setting: keyof CompressorSettings, value: any) => {
@@ -237,3 +238,4 @@ export function MixerControls({
     );
 }
 
+    

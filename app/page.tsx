@@ -161,7 +161,7 @@ export default function Home() {
             handleHarmonyChange(musicKey);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isReady]);
+    }, [isReady, handleHarmonyChange]);
     
     const handleMixerApply = useCallback((newVolumes: Volumes) => {
         setVolumes(newVolumes);
@@ -375,3 +375,4 @@ export default function Home() {
     );
 }
 
+    
