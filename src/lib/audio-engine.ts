@@ -117,6 +117,13 @@ export class AudioEngine {
         this.preCompressorOut = this.context.createGain();
 
         this.compressor = this.context.createDynamicsCompressor();
+        // More aggressive compressor settings to act as a limiter and prevent clipping
+        this.compressor.threshold.value = -50; 
+        this.compressor.knee.value = 0;      
+        this.compressor.ratio.value = 12;      
+        this.compressor.attack.value = 0.003;  
+        this.compressor.release.value = 0.25;  
+
         this.preCompressorOut.connect(this.compressor);
         this.compressor.connect(this.masterOut);
 
@@ -468,9 +475,8 @@ export class AudioEngine {
     private applyVolumeForPart(partName: SynthPartName | 'drums', volumes: ChannelVolumes) {
         const nodeInfo = this.nodes.get(partName);
         if (nodeInfo && volumes) {
-            // Ramping is now handled inside the worklet for synths, but gain nodes are fine here.
-            nodeInfo.gain.gain.setValueAtTime(dbToGain(volumes.gain), this.context.currentTime);
-            nodeInfo.reverbSend.gain.setValueAtTime(dbToGain(volumes.reverbSend), this.context.currentTime);
+            nodeInfo.gain.gain.setTargetAtTime(dbToGain(volumes.gain), this.context.currentTime, 0.01);
+            nodeInfo.reverbSend.gain.setTargetAtTime(dbToGain(volumes.reverbSend), this.context.currentTime, 0.01);
             if (nodeInfo.distortion) {
                 nodeInfo.distortion.curve = createDistortionCurve(volumes.distortion);
             }
@@ -480,14 +486,13 @@ export class AudioEngine {
     public setVolumes(newVolumes: Volumes) {
         if (!this.isInitialized || !this.context) return;
         this.volumes = newVolumes;
-        const rampTime = this.context.currentTime + 0.05;
-
+        
         this.applyVolumeForPart('melody', newVolumes.melody);
         this.applyVolumeForPart('manualBass', newVolumes.manualBass);
         this.applyVolumeForPart('latch', newVolumes.latch);
         this.applyVolumeForPart('drums', newVolumes.drums);
         
-        this.reverbReturnGain.gain.linearRampToValueAtTime(dbToGain(newVolumes.reverbReturn), rampTime);
+        this.reverbReturnGain.gain.setTargetAtTime(dbToGain(newVolumes.reverbReturn), this.context.currentTime, 0.01);
         this.setCompressorSettings(newVolumes.compressor);
         if (newVolumes.swing !== undefined) {
             this.setSwing(newVolumes.swing);
@@ -501,12 +506,12 @@ export class AudioEngine {
     public setCompressorSettings(compressorSettings: CompressorSettings) {
         if (!this.isInitialized || !this.context || !this.compressor) return;
         this.volumes.compressor = compressorSettings;
-        const rampTime = this.context.currentTime + 0.05;
+        const rampTime = this.context.currentTime + 0.01;
 
-        if (this.compressor.threshold) this.compressor.threshold.linearRampToValueAtTime(compressorSettings.threshold, rampTime);
-        if (this.compressor.ratio) this.compressor.ratio.linearRampToValueAtTime(compressorSettings.ratio, rampTime);
-        if (this.compressor.attack) this.compressor.attack.linearRampToValueAtTime(compressorSettings.attack, rampTime);
-        if (this.compressor.release) this.compressor.release.linearRampToValueAtTime(compressorSettings.release, rampTime);
+        if (this.compressor.threshold) this.compressor.threshold.setTargetAtTime(compressorSettings.threshold, this.context.currentTime, rampTime);
+        if (this.compressor.ratio) this.compressor.ratio.setTargetAtTime(compressorSettings.ratio, this.context.currentTime, rampTime);
+        if (this.compressor.attack) this.compressor.attack.setTargetAtTime(compressorSettings.attack, this.context.currentTime, rampTime);
+        if (this.compressor.release) this.compressor.release.setTargetAtTime(compressorSettings.release, this.context.currentTime, rampTime);
 
         this.preCompressorOut.disconnect();
         if (compressorSettings.enabled) {

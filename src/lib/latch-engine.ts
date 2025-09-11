@@ -3,7 +3,7 @@
 
 import type { Note } from '@/types';
 
-const MAX_LATCH_NOTES = 4; // Correctly limit to 4 notes as requested.
+const MAX_LATCH_NOTES = 4;
 const TAP_RADIUS = 40; 
 const TAP_RADIUS_SQUARED = TAP_RADIUS * TAP_RADIUS;
 
@@ -41,6 +41,7 @@ export class LatchEngine {
         const existingNoteIndex = this.findNearbyNoteIndex(x, y);
 
         if (existingNoteIndex > -1) {
+            // Note exists, remove it
             const noteToRemove = this.activeNotes.splice(existingNoteIndex, 1)[0];
             return {
                 action: 'removed',
@@ -49,10 +50,12 @@ export class LatchEngine {
             };
         }
         
+        // Note doesn't exist, add it
         let noteToTurnOff: Note | undefined;
         let noteToAnimateRemove: { id: number } | undefined;
 
         if (this.activeNotes.length >= MAX_LATCH_NOTES) {
+            // If we are at the limit, remove the oldest note
             noteToTurnOff = this.activeNotes.shift(); 
             if (noteToTurnOff) {
                 noteToAnimateRemove = { id: noteToTurnOff.id };

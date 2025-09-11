@@ -3,51 +3,14 @@
 // It is responsible for all real-time synthesis, running in a high-priority
 // audio thread to ensure low-latency, glitch-free sound generation.
 
-// A performance-optimized oscillator class.
 class Oscillator {
     constructor(type, sampleRate) {
         this.phase = 0;
         this.type = type;
         this.sampleRate = sampleRate;
+        this.lastOut = 0; // For integrated triangle
     }
 
-    // Generates a single sample for a given frequency.
-    process(frequency) {
-        let sample = 0;
-        const phaseIncrement = frequency / this.sampleRate;
-        const p = this.phase;
-
-        // Using Poly-BLEP (Polynomial Band-Limited Step) for anti-aliasing.
-        // This method adds a small polynomial correction at the discontinuities
-        // of square and sawtooth waves to reduce aliasing artifacts.
-        switch (this.type) {
-            case 'sine':
-                sample = Math.sin(p * 2 * Math.PI);
-                break;
-            case 'square':
-                sample = p < 0.5 ? 1 : -1;
-                sample += this.poly_blep(p, phaseIncrement);
-                sample -= this.poly_blep((p + 0.5) % 1.0, phaseIncrement);
-                break;
-            case 'sawtooth':
-                sample = 2 * p - 1;
-                sample -= this.poly_blep(p, phaseIncrement);
-                break;
-            case 'triangle':
-                 // Integrated triangle wave from the sawtooth
-                sample = 2 * p - 1;
-                sample -= this.poly_blep(p, phaseIncrement);
-                sample = phaseIncrement * sample + (1 - phaseIncrement) * this.lastOut;
-                this.lastOut = sample;
-                break;
-            default:
-                sample = Math.sin(p * 2 * Math.PI);
-        }
-        this.phase = (p + phaseIncrement) % 1.0;
-        return sample;
-    }
-
-    // Polynomial Band-Limited Step function.
     poly_blep(t, dt) {
         if (t < dt) {
             t /= dt;
@@ -58,10 +21,35 @@ class Oscillator {
         }
         return 0.0;
     }
+
+    process(frequency) {
+        let sample = 0;
+        const phaseIncrement = frequency / this.sampleRate;
+        
+        switch (this.type) {
+            case 'sine':
+                sample = Math.sin(this.phase * 2 * Math.PI);
+                break;
+            case 'square':
+                sample = this.phase < 0.5 ? 1 : -1;
+                sample += this.poly_blep(this.phase, phaseIncrement);
+                sample -= this.poly_blep((this.phase + 0.5) % 1.0, phaseIncrement);
+                break;
+            case 'sawtooth':
+                sample = 2 * this.phase - 1;
+                sample -= this.poly_blep(this.phase, phaseIncrement);
+                break;
+            case 'triangle':
+                 sample = 2 * (this.phase < 0.5 ? this.phase : 1.0 - this.phase) * 2 - 1;
+                break;
+            default:
+                sample = Math.sin(this.phase * 2 * Math.PI);
+        }
+        this.phase = (this.phase + phaseIncrement) % 1.0;
+        return sample;
+    }
 }
 
-
-// A single synthesizer voice, encapsulating oscillators, envelopes, and filters.
 class Voice {
     constructor(id, frequency, volume, preset, sampleRate) {
         this.id = id;
@@ -74,7 +62,6 @@ class Voice {
         this.volume = volume;
         this.preset = preset;
         
-        // Portamento: smooth transition between notes
         this.portamentoSpeed = preset.portamento > 0 ? 1 - Math.exp(-1 / (preset.portamento * this.sampleRate * 0.1)) : 1;
 
         this.layers = [];
@@ -87,7 +74,6 @@ class Voice {
         this.layers = [];
         const createLayer = (layerConfig, isMainOsc) => {
             const envConfig = isMainOsc ? this.preset.envelope : (layerConfig.envelope || this.preset.envelope);
-            // Ensure envelope times are not zero to prevent division by zero
             const attackSamples = Math.max(1, (envConfig.attack || 0.001) * this.sampleRate);
             const releaseSamples = Math.max(1, (envConfig.release || 0.001) * this.sampleRate);
             const decaySamples = Math.max(1, (envConfig.decay || 0.001) * this.sampleRate);
@@ -111,7 +97,9 @@ class Voice {
         if (this.preset.oscillator) {
             this.layers.push(createLayer({ ...this.preset.oscillator, level: 1.0, freqMult: 1.0, envelope: this.preset.envelope }, true));
         }
-        this.preset.layers?.forEach(layer => this.layers.push(createLayer(layer, false)));
+        if (this.preset.layers) {
+             this.preset.layers.forEach(layer => this.layers.push(createLayer(layer, false)));
+        }
     }
 
     initFilter() {
@@ -120,7 +108,6 @@ class Voice {
             this.filter = null;
             return;
         }
-        // Initialize filter state variables to prevent pops
         this.filter = { ...filterConfig, y1: 0, y2: 0, x1: 0, x2: 0 };
         this.updateFilterCoeffs();
     }
@@ -130,7 +117,7 @@ class Voice {
         const { type, Q, gain, frequency } = this.filter;
         const w0 = 2 * Math.PI * frequency / this.sampleRate;
         const cos_w0 = Math.cos(w0);
-        const alpha = Math.sin(w0) / (2 * Math.max(0.001, Q)); // Prevent Q from being zero
+        const alpha = Math.sin(w0) / (2 * Math.max(0.001, Q));
         
         let a0=1, a1=0, a2=0, b0=1, b1=0, b2=0;
 
@@ -143,7 +130,6 @@ class Voice {
             default: this.filter.active = false; return;
         }
 
-        // Pre-calculate coefficients divided by a0 for efficiency
         this.filter.b0=b0/a0; this.filter.b1=b1/a0; this.filter.b2=b2/a0; this.filter.a1=a1/a0; this.filter.a2=a2/a0;
         this.filter.active = true;
     }
@@ -166,8 +152,6 @@ class Voice {
     processFilter(inputSample) {
         if (!this.filter || !this.filter.active) return inputSample;
         const f = this.filter;
-        
-        // Direct Form I biquad filter implementation.
         const y0 = f.b0 * inputSample + f.b1 * f.x1 + f.b2 * f.x2 - f.a1 * f.y1 - f.a2 * f.y2;
         
         f.x2 = f.x1;
@@ -175,7 +159,7 @@ class Voice {
         f.y2 = f.y1;
         f.y1 = y0;
         
-        return isNaN(y0) ? 0 : y0; // Prevent NaN propagation
+        return isNaN(y0) ? 0 : y0;
     }
 
     processLayerEnvelope(layer) {
@@ -209,8 +193,7 @@ class Voice {
             return 0;
         }
         
-        // Apply portamento glide
-        this.baseFrequency = this.portamentoSpeed * this.baseFrequency + (1 - this.portamentoSpeed) * this.targetFrequency;
+        this.baseFrequency += (this.targetFrequency - this.baseFrequency) * this.portamentoSpeed;
 
         const lfoModulation = this.processLFO();
         
@@ -241,7 +224,6 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.polyphony = options.processorOptions?.polyphony || 8;
         this.preset = this.getDefaultPreset();
         
-        // -- For Debugging --
         this.logCounter = 0;
         this.peakLevel = 0;
 
@@ -281,10 +263,19 @@ class SynthProcessor extends AudioWorkletProcessor {
             return;
         }
 
-        // Voice stealing: if polyphony is exceeded, remove the oldest voice.
         if (this.voices.size >= this.polyphony) {
-            const oldestId = this.voices.keys().next().value;
-            this.voices.delete(oldestId);
+            let oldestId = this.voices.keys().next().value;
+            let oldestVoice = this.voices.get(oldestId);
+
+            if (oldestVoice && !oldestVoice.isReleasing) {
+                 for (const [id, voice] of this.voices.entries()) {
+                    if (voice.isReleasing) {
+                        oldestId = id;
+                        break;
+                    }
+                }
+            }
+             this.voices.delete(oldestId);
         }
 
         const voice = new Voice(note.id, note.frequency, note.volume, this.preset, sampleRate);
@@ -306,55 +297,56 @@ class SynthProcessor extends AudioWorkletProcessor {
     }
 
     allNotesOff() {
-        this.voices.forEach(voice => voice.release());
+        this.voices.forEach(voice => {
+            if (!voice.isReleasing) {
+                voice.release();
+            }
+            voice.layers.forEach(l => {
+                l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05);
+            });
+        });
     }
 
     process(inputs, outputs, parameters) {
         const outputChannel = outputs[0]?.[0];
         
         if (!outputChannel) {
-            return true; // Stop processing if there's no output.
+            return true; 
         }
     
         outputChannel.fill(0);
         
-        const voiceCount = this.voices.size;
-        if (voiceCount === 0) {
-            return true; // No active voices, nothing to do.
+        if (this.voices.size === 0) {
+            return true;
         }
 
         let currentPeak = 0;
         
         for (let i = 0; i < outputChannel.length; i++) {
             let sample = 0;
-            // Iterate over all active voices and sum their output.
             for (const [id, voice] of this.voices) {
                 if (voice.isFinished) {
-                    this.voices.delete(id); // Clean up finished voices.
+                    this.voices.delete(id);
                 } else {
                     sample += voice.render();
                 }
             }
-
-            // Track the peak level for debugging.
+            
             const absSample = Math.abs(sample);
             if (absSample > currentPeak) {
                 currentPeak = absSample;
             }
             
-            // Simple but effective soft-clipping to prevent harsh digital distortion.
-            // This is a hard limiter that shapes the waveform instead of just cutting it off.
-            outputChannel[i] = Math.tanh(sample * 0.5);
+            // The output is sent to a native DynamicsCompressorNode, so we don't need to limit here.
+            outputChannel[i] = sample;
         }
         
-        // Update peak level for logging.
         if (currentPeak > this.peakLevel) {
             this.peakLevel = currentPeak;
         }
 
-        // Log active voices and peak level periodically for debugging.
         this.logCounter++;
-        if (this.logCounter >= 200) { // Log roughly every 500ms
+        if (this.logCounter >= 200) {
              if (this.voices.size > 0) {
                 const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
                 this.port.postMessage({
@@ -366,7 +358,7 @@ class SynthProcessor extends AudioWorkletProcessor {
             this.peakLevel = 0;
         }
         
-        return true; // Keep the processor alive.
+        return true;
     }
     
     getDefaultPreset() {
