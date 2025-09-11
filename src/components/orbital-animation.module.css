@@ -99,11 +99,9 @@
 @keyframes pulse {
   0%,
   100% {
-    /* The base scale is handled by the .circle class */
     box-shadow: 0 0 120px hsl(var(--primary)), inset 0 0 120px hsl(var(--primary));
   }
   50% {
-    /* Pulsate the shadow to be more intense */
-    box-shadow: 0 0 140px 10px hsl(var(--accent)), inset 0 0 140px 10px hsl(var(--accent));
+    box-shadow: 0 0 140px 10px hsl(var(--primary)), inset 0 0 140px 10px hsl(var(--primary));
   }
 }
