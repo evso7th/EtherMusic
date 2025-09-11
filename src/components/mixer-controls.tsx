@@ -70,10 +70,6 @@ export const MixerControls = ({
     
     const [localVolumes, setLocalVolumes] = useState(initialVolumes || defaultVolumes);
 
-    useEffect(() => {
-        setLocalVolumes(initialVolumes || defaultVolumes);
-    }, [initialVolumes]);
-
     const handleLocalVolumeChange = useCallback((update: Partial<Volumes> | ((v: Volumes) => Volumes)) => {
         setLocalVolumes(current => {
             const updated = typeof update === 'function' ? update(current) : { ...current, ...update };
@@ -238,5 +234,3 @@ export const MixerControls = ({
         </div>
     );
 }
-
-    
