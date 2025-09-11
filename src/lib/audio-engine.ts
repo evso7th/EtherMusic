@@ -189,7 +189,7 @@ export class AudioEngine {
         
         this.createSynthChannel('melody', 10, 'synth-processor');
         this.createSynthChannel('manualBass', 4, 'synth-processor');
-        this.createSynthChannel('latch', 8, 'synth-processor');
+        this.createSynthChannel('latch', 4, 'synth-processor');
         
         this.createDrumChannel();
         
@@ -468,6 +468,7 @@ export class AudioEngine {
     private applyVolumeForPart(partName: SynthPartName | 'drums', volumes: ChannelVolumes) {
         const nodeInfo = this.nodes.get(partName);
         if (nodeInfo && volumes) {
+            // Ramping is now handled inside the worklet for synths, but gain nodes are fine here.
             nodeInfo.gain.gain.setValueAtTime(dbToGain(volumes.gain), this.context.currentTime);
             nodeInfo.reverbSend.gain.setValueAtTime(dbToGain(volumes.reverbSend), this.context.currentTime);
             if (nodeInfo.distortion) {

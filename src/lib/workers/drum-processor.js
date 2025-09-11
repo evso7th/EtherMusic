@@ -88,6 +88,7 @@ class DrumProcessor extends AudioWorkletProcessor {
         // Process each voice and add its output to the main output buffer.
         for (const voice of this.voices) {
             if (!voice.isFinished) {
+                // The voice.process method now adds directly to the outputChannel
                 voice.process(outputChannel);
                 activeVoices.push(voice);
             }
@@ -96,7 +97,7 @@ class DrumProcessor extends AudioWorkletProcessor {
         // Update the voices array with only the active ones.
         this.voices = activeVoices;
         
-        // A simple hard limiter to prevent clipping.
+        // A simple hard limiter to prevent clipping and audio artifacts.
         // This is a safety measure if many loud samples play at once.
         for (let i = 0; i < outputChannel.length; i++) {
             const sample = outputChannel[i];

@@ -3,8 +3,8 @@
 
 import type { Note } from '@/types';
 
-const MAX_LATCH_NOTES = 8;
-const TAP_RADIUS = 40; // Increased radius for easier tapping
+const MAX_LATCH_NOTES = 4; // Correctly limit to 4 notes as requested.
+const TAP_RADIUS = 40; 
 const TAP_RADIUS_SQUARED = TAP_RADIUS * TAP_RADIUS;
 
 export type LatchToggleResult = {
