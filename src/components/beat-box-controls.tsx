@@ -154,7 +154,7 @@ const BeatBoxControlsComponent = ({
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="pr-4 py-4">
                                     <MixerControls 
-                                        initialVolumes={volumes} 
+                                        volumes={volumes} 
                                         onApply={onApply}
                                         closeDialog={() => setIsMixerOpen(false)}
                                     />
@@ -248,7 +248,7 @@ const BeatBoxControlsComponent = ({
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="pr-4 py-4">
                                     <MixerControls 
-                                        initialVolumes={volumes}
+                                        volumes={volumes}
                                         onApply={onApply}
                                         closeDialog={() => setIsMixerOpen(false)}
                                     />

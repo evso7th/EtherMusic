@@ -3,7 +3,7 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { Circle, Power } from 'lucide-react';
+import { Circle, Power, Play, Pause } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -18,12 +18,15 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
+import type { AudioEngine } from "@/lib/audio-engine";
 
 interface PlaybackControlsProps {
+    isPlaying: boolean;
     isRecording: boolean;
     onRecord: () => void;
     onExit: () => void;
     isReady: boolean;
+    audioEngine: AudioEngine | null;
 }
 
 const ControlButton = ({ tooltipText, children, isMobile, ...props }: { tooltipText: string, children: React.ReactNode, isMobile: boolean } & React.ComponentProps<typeof Button>) => {
@@ -44,10 +47,12 @@ const ControlButton = ({ tooltipText, children, isMobile, ...props }: { tooltipT
 
 
 export function PlaybackControls({ 
+    isPlaying,
     isRecording, 
     onRecord, 
     onExit,
-    isReady 
+    isReady,
+    audioEngine,
 }: PlaybackControlsProps) {
     const isMobile = useIsMobile();
     
@@ -64,9 +69,31 @@ export function PlaybackControls({
             }
         }
     };
+    
+    const handlePlayPause = () => {
+        if (!audioEngine) return;
+        if (isPlaying) {
+            audioEngine.getDrumMachine().stop();
+        } else {
+            audioEngine.getDrumMachine().play();
+        }
+    }
 
     return (
         <TooltipProvider>
+             <ControlButton
+                tooltipText={isPlaying ? "Pause" : "Play"}
+                onClick={handlePlayPause}
+                variant="outline"
+                size="icon" 
+                className="w-10 h-10 rounded-full"
+                aria-label={isPlaying ? "Pause" : "Play"}
+                disabled={!isReady}
+                isMobile={isMobile}
+            >
+                {isPlaying ? <Pause className="w-5 h-5 md:w-6 md:h-6" /> : <Play className="w-5 h-5 md:w-6 md:h-6" />}
+            </ControlButton>
+
             <ControlButton
                 tooltipText="Record"
                 onClick={onRecord} 
@@ -116,3 +143,5 @@ export function PlaybackControls({
         </TooltipProvider>
     );
 }
+
+    

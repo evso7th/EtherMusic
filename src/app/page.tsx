@@ -80,85 +80,81 @@ export default function Home() {
 
     const onConsentChange = useCallback((consent: boolean) => {
         setCookieConsent(consent);
-        if (isReady && audioEngine) {
-            const newVolumes = consent ? loadVolumes() : defaultVolumes;
-            audioEngine.setVolumes(newVolumes);
-            setVolumes(newVolumes); 
-        }
+        const newVolumes = consent ? loadVolumes() : defaultVolumes;
+        setVolumes(newVolumes); 
         
         if (!consent) {
              if (typeof document !== 'undefined') {
                 document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
             }
         }
-    }, [setVolumes, isReady, audioEngine]);
-    
+    }, [setVolumes]);
+
     useEffect(() => {
         setIsClient(true);
         const consent = getCookie("ethermusic_consent");
         if (consent !== null) {
             const hasConsent = consent === 'true';
             setCookieConsent(hasConsent);
+            if (hasConsent) {
+                setVolumes(loadVolumes());
+            } else {
+                setVolumes(defaultVolumes);
+            }
         } else {
             setCookieConsent(undefined);
+            setVolumes(defaultVolumes);
         }
-    }, []);
+    }, [setVolumes]);
 
-    const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
-        const isKey = (k: string): k is MusicKey => Object.keys(ALL_NOTES).includes(k);
-        const isScale = (s: string): s is MusicScale => Object.keys(SCALES).includes(s);
-
-        let newKey = musicKey;
-        let newScale = musicScale;
-
-        if (isKey(keyOrScale)) {
-            newKey = keyOrScale;
-            setMusicKey(keyOrScale);
-        } else if (isScale(keyOrScale)) {
-            newScale = keyOrScale;
-            setMusicScale(keyOrScale);
-        }
-    }, [musicKey, musicScale]);
-
-    useEffect(() => {
-        const bassFreqs = getScaleFrequencies(musicKey, musicScale, [2, 3]);
-        const melodyFreqs = getScaleFrequencies(musicKey, musicScale, [2, 3, 4]);
-        setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
-    }, [musicKey, musicScale]);
-    
-    const handleSetMelodyInstrument = useCallback((instrumentId: Instrument) => {
-        setActiveMelodyInstrument(instrumentId);
-        setMelodyInstrument(instrumentId);
-    }, [setMelodyInstrument]);
-
-    const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
-        setActiveBassInstrument(instrumentId);
-        setBassInstrument(instrumentId);
-    }, [setBassInstrument]);
-    
     useEffect(() => {
         if (isReady && activeMelodyInstrument) {
             setMelodyInstrument(activeMelodyInstrument);
         }
     }, [isReady, activeMelodyInstrument, setMelodyInstrument]);
 
+    const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
+        setActiveBassInstrument(instrumentId);
+        if (isReady) {
+            setBassInstrument(instrumentId);
+        }
+    }, [setBassInstrument, isReady]);
+
     useEffect(() => {
         if (isReady && activeBassInstrument) {
             handleSetBassInstrument(activeBassInstrument);
         }
     }, [isReady, activeBassInstrument, handleSetBassInstrument]);
+    
+    const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
+        const isKey = (k: string): k is MusicKey => Object.keys(ALL_NOTES).includes(k);
+        const isScale = (s: string): s is MusicScale => Object.keys(SCALES).includes(s);
 
+        if (isKey(keyOrScale)) {
+            setMusicKey(keyOrScale);
+        } else if (isScale(keyOrScale)) {
+            setMusicScale(keyOrScale);
+        }
+    }, []);
+
+    useEffect(() => {
+        // No need to check for isReady here as getScaleFrequencies is pure
+        const bassFreqs = getScaleFrequencies(musicKey, musicScale, [2, 3]);
+        const melodyFreqs = getScaleFrequencies(musicKey, musicScale, [2, 3, 4]);
+        setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
+    }, [musicKey, musicScale]);
+    
     const handleMixerApply = useCallback((newVolumes: Volumes) => {
         setVolumes(newVolumes);
     }, [setVolumes]);
-
+    
     const handleChannelEffectChange = useCallback((
         channel: 'melody' | 'bass', 
         effect: 'reverbSend' | 'distortion', 
         value: number
     ) => {
         setVolumes(prevVolumes => {
-            if (!prevVolumes) return prevVolumes;
+            if (!prevVolumes) return defaultVolumes; // Should not happen with new init logic
             const newVolumes = JSON.parse(JSON.stringify(prevVolumes));
             const targetChannelKey = channel === 'bass' ? 'manualBass' : 'melody';
             
@@ -194,7 +190,12 @@ export default function Home() {
         setIsBassLatchOn(isOn);
         setBassLatch(isOn);
     }, [setBassLatch]);
-        
+    
+    const handleMelodyInstrumentChange = useCallback((instrumentId: Instrument) => {
+        setActiveMelodyInstrument(instrumentId);
+        setMelodyInstrument(instrumentId);
+    }, [setMelodyInstrument]);
+    
     const handleThereminInteractionCallback = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isReady || !audioEngine) return;
         handleThereminInteraction(type, data, state);
@@ -278,10 +279,12 @@ export default function Home() {
                     </div>
                     <div className="flex items-center gap-1 md:gap-2 landscape:flex-col">
                          <PlaybackControls
+                            isPlaying={isPlaying}
                             isRecording={isRecording}
                             onRecord={handleRecord}
                             onExit={stopAllSounds}
                             isReady={isReady}
+                            audioEngine={audioEngine}
                         />
                     </div>
                 </header>
@@ -295,10 +298,10 @@ export default function Home() {
                         activeBassInstrument={activeBassInstrument}
                         onInstrumentChange={handleSetBassInstrument}
                         orbManager={orbManager}
-                        volumes={volumes}
+                        volumes={volumes!}
                         onEffectChange={handleChannelEffectChange}
                         activeMelodyInstrument={activeMelodyInstrument}
-                        onMelodyInstrumentChange={handleSetMelodyInstrument}
+                        onMelodyInstrumentChange={handleMelodyInstrumentChange}
                         musicKey={musicKey}
                         onKeyChange={handleHarmonyChange}
                         musicScale={musicScale}
@@ -308,7 +311,7 @@ export default function Home() {
                         <BeatBoxControls
                             activePattern={activePattern}
                             onPatternChange={handlePatternChange}
-                            volumes={volumes}
+                            volumes={volumes!}
                             onApply={handleMixerApply}
                             isMobile={isMobile}
                         />
@@ -319,7 +322,7 @@ export default function Home() {
                      <BeatBoxControls
                         activePattern={activePattern}
                         onPatternChange={handlePatternChange}
-                        volumes={volumes}
+                        volumes={volumes!}
                         onApply={handleMixerApply}
                         isMobile={isMobile}
                         isLandscape={true}
@@ -329,7 +332,5 @@ export default function Home() {
         </div>
     );
 }
-
-    
 
     

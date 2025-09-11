@@ -6,40 +6,11 @@ import type { CSSProperties } from 'react';
 import type { AudioEngine } from '@/lib/audio-engine';
 
 interface OrbitalAnimationProps {
-  audioEngine?: AudioEngine | null;
+  isPlaying: boolean;
+  tempo: number;
 }
 
-export function OrbitalAnimation({ audioEngine }: OrbitalAnimationProps) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [tempo, setTempo] = useState(120);
-
-  useEffect(() => {
-    if (!audioEngine) {
-      setIsPlaying(false);
-      return;
-    }
-
-    // Set initial state from engine
-    setIsPlaying(audioEngine.isPlaying);
-    setTempo(audioEngine.getVolumes().tempo);
-
-    const handlePlayStateChange = (playing: boolean) => {
-      setIsPlaying(playing);
-    };
-
-    const handleVolumeChange = (volumes: any) => {
-      setTempo(volumes.tempo);
-    };
-
-    audioEngine.emitter.on('playStateChanged', handlePlayStateChange);
-    audioEngine.emitter.on('volumesChanged', handleVolumeChange);
-
-    return () => {
-      audioEngine.emitter.off('playStateChanged', handlePlayStateChange);
-      audioEngine.emitter.off('volumesChanged', handleVolumeChange);
-    };
-  }, [audioEngine]);
-
+export function OrbitalAnimation({ isPlaying, tempo }: OrbitalAnimationProps) {
   const pulseDuration = 60 / tempo;
 
   const animationStyle: CSSProperties = {
@@ -66,3 +37,5 @@ export function OrbitalAnimation({ audioEngine }: OrbitalAnimationProps) {
     </div>
   );
 }
+
+    

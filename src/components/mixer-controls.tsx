@@ -54,29 +54,29 @@ VolumeControl.displayName = 'VolumeControl';
 type VolumeChannel = keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' | 'tempo' >;
 
 interface MixerControlsProps {
-    initialVolumes: Volumes;
+    volumes: Volumes;
     onApply: (newVolumes: Volumes) => void;
     closeDialog: () => void;
     isAutopilotMixer?: boolean;
 }
 
 export const MixerControls = ({ 
-    initialVolumes, 
+    volumes, 
     onApply,
     closeDialog,
     isAutopilotMixer = false,
 }: MixerControlsProps) => {
     
-    const [localVolumes, setLocalVolumes] = useState(initialVolumes);
+    const [localVolumes, setLocalVolumes] = useState(volumes);
 
     useEffect(() => {
-        setLocalVolumes(initialVolumes);
-    }, [initialVolumes]);
+        setLocalVolumes(volumes);
+    }, [volumes]);
 
     const handleLocalVolumeChange = useCallback((update: Partial<Volumes> | ((v: Volumes) => Volumes)) => {
         setLocalVolumes(current => {
             const updated = typeof update === 'function' ? update(current) : { ...current, ...update };
-            console.log("Mixer local state updated", updated);
+            // console.log("Mixer local state updated", updated);
             return updated;
         });
     }, []);

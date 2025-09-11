@@ -100,8 +100,8 @@ export function useAudioEngine() {
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
     
-    const [volumes, setVolumesState] = useState<Volumes | undefined>(undefined);
-    const [currentTempo, setCurrentTempo] = useState(defaultVolumes.tempo);
+    const [volumes, setVolumesState] = useState<Volumes>(() => loadVolumes());
+    const [currentTempo, setCurrentTempo] = useState(volumes.tempo);
     
     const initializeAudioEngine = useCallback(async () => {
         try {
@@ -115,7 +115,7 @@ export function useAudioEngine() {
                 if (context.state === 'suspended') {
                     await context.resume();
                 }
-
+                
                 const engine = new AudioEngine(context, orbManager.current, emitter);
                 await engine.initialize();
                 
@@ -148,14 +148,13 @@ export function useAudioEngine() {
         await initializeAudioEngine();
     }, [isAppStarted, initializeAudioEngine]);
 
-     useEffect(() => {
-        const handlePlayStateChange = (playing: boolean) => {
-            setIsPlaying(playing);
-        };
+    useEffect(() => {
+        const handlePlayStateChange = (playing: boolean) => setIsPlaying(playing);
         const handleVolumeChange = (newVolumes: Volumes) => {
             setVolumesState(newVolumes);
             setCurrentTempo(newVolumes.tempo);
-        }
+        };
+
         emitter.on('playStateChanged', handlePlayStateChange);
         emitter.on('volumesChanged', handleVolumeChange);
 
@@ -187,6 +186,7 @@ export function useAudioEngine() {
         }
         saveVolumes(newVolumes);
         setCurrentTempo(newVolumes.tempo);
+        emitter.emit('volumesChanged', newVolumes);
     }, []);
 
     const stopAllSounds = useCallback(() => {
@@ -215,7 +215,9 @@ export function useAudioEngine() {
     }, [isReady]);
 
     const setMelodyInstrument = useCallback((instrumentName: Instrument) => {
-        audioEngine.current?.setMelodyInstrument(instrumentName);
+        if (audioEngine.current) {
+            audioEngine.current.setMelodyInstrument(instrumentName);
+        }
     }, []);
     
     const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
@@ -231,7 +233,6 @@ export function useAudioEngine() {
         isAppStarted,
         isReady,
         isPlaying,
-        currentTempo,
         audioEngine: audioEngine.current,
         orbManager: orbManager.current,
         startApp,
@@ -245,6 +246,7 @@ export function useAudioEngine() {
         startRecording,
         stopRecording,
         handleThereminInteraction,
+        currentTempo,
     };
 }
 
