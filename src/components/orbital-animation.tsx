@@ -1,42 +1,11 @@
 
 "use client";
-import { CSSProperties, memo, useEffect, useState } from 'react';
+import { CSSProperties, memo } from 'react';
 import styles from './orbital-animation.module.css';
 import { cn } from '@/lib/utils';
-import { useAudioEngine } from '@/hooks/use-audio-engine';
 
 function OrbitalAnimationComponent() {
-  const { emitter, volumes } = useAudioEngine();
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [tempo, setTempo] = useState(120);
-
-  useEffect(() => {
-    if (!emitter) return;
-
-    const handlePlayStateChange = (playing: boolean) => {
-      setIsPlaying(playing);
-    };
-    
-    const handleVolumesChange = (newVolumes: any) => {
-        if(newVolumes.tempo) {
-            setTempo(newVolumes.tempo);
-        }
-    };
-
-    emitter.on('playStateChanged', handlePlayStateChange);
-    emitter.on('volumesChanged', handleVolumesChange);
-    
-    // Set initial state from volumes if available
-    if(volumes) {
-      setTempo(volumes.tempo);
-    }
-
-    return () => {
-      emitter.off('playStateChanged', handlePlayStateChange);
-      emitter.off('volumesChanged', handleVolumesChange);
-    };
-  }, [emitter, volumes]);
-  
+  const tempo = 90; // Fixed value for tempo
   const pulseDuration = 60 / tempo;
 
   const animationStyle: CSSProperties = {
@@ -49,13 +18,13 @@ function OrbitalAnimationComponent() {
       className={styles.view}
       style={animationStyle}
     >
-      <div className={cn(styles.plane, !isPlaying && styles.paused)}>
+      <div className={cn(styles.plane)}>
         {Array.from({ length: 5 }).map((_, i) => (
           <div 
             key={i} 
             className={cn(
               styles.circle,
-               isPlaying && styles.pulsating
+              styles.pulsating // Always pulsating
             )}
           ></div>
         ))}
@@ -65,5 +34,3 @@ function OrbitalAnimationComponent() {
 }
 
 export const OrbitalAnimation = memo(OrbitalAnimationComponent);
-
-    
