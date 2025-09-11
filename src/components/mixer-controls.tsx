@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Waves, Drum, Anchor, Blend, AudioLines, Music, Clock, Shuffle } from 'lucide-react';
-import { useState, useCallback, useEffect, memo } from 'react';
+import { useState, useCallback, memo } from 'react';
 import type { Volumes, CompressorSettings, ChannelVolumes } from '@/types';
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
@@ -68,18 +68,16 @@ export const MixerControls = ({
     isAutopilotMixer = false,
 }: MixerControlsProps) => {
     
-    console.log('[MixerControls] Rendering...');
     const [localVolumes, setLocalVolumes] = useState(initialVolumes || defaultVolumes);
 
     const handleLocalVolumeChange = useCallback((update: Partial<Volumes> | ((v: Volumes) => Volumes)) => {
         setLocalVolumes(current => {
             const updated = typeof update === 'function' ? update(current) : { ...current, ...update };
-            console.log('[MixerControls] Local state updated:', updated);
             return updated;
         });
     }, []);
     
-    const handleChannelVolumeChange = (part: VolumeChannel, value: number) => {
+    const handleChannelVolumeChange = useCallback((part: VolumeChannel, value: number) => {
         handleLocalVolumeChange(prev => {
             const newVolumes = JSON.parse(JSON.stringify(prev)); // Deep copy to be safe
             const newChannelVolumes = { ...(newVolumes[part] as ChannelVolumes), gain: value };
@@ -94,11 +92,11 @@ export const MixerControls = ({
             
             return newVolumes;
         });
-    };
+    }, [handleLocalVolumeChange]);
     
-    const handleReverbReturnChange = (value: number) => {
+    const handleReverbReturnChange = useCallback((value: number) => {
         handleLocalVolumeChange(prev => ({ ...prev, reverbReturn: value }));
-    };
+    }, [handleLocalVolumeChange]);
     
     const handleCompressorSettingChange = useCallback((setting: keyof CompressorSettings, value: any) => {
         handleLocalVolumeChange(prev => ({
@@ -106,6 +104,15 @@ export const MixerControls = ({
             compressor: { ...prev.compressor, [setting]: value }
         }));
     }, [handleLocalVolumeChange]);
+
+    const handleTempoChange = useCallback((v: number) => {
+        handleLocalVolumeChange(prev => ({...prev, tempo: v}));
+    }, [handleLocalVolumeChange]);
+
+    const handleSwingChange = useCallback((v: number) => {
+        handleLocalVolumeChange(prev => ({...prev, swing: v / 100}));
+    }, [handleLocalVolumeChange]);
+
 
     const handleApplyChanges = () => {
         onApply(localVolumes);
@@ -121,7 +128,7 @@ export const MixerControls = ({
                             label="Tempo"
                             icon={Clock}
                             volume={localVolumes.tempo}
-                            onVolumeChange={(v) => handleLocalVolumeChange(prev => ({...prev, tempo: v}))}
+                            onVolumeChange={handleTempoChange}
                             min={30}
                             max={200}
                             step={1}
@@ -131,7 +138,7 @@ export const MixerControls = ({
                             label="Swing"
                             icon={Shuffle}
                             volume={(localVolumes.swing || 0) * 100}
-                            onVolumeChange={(v) => handleLocalVolumeChange(prev => ({...prev, swing: v / 100}))}
+                            onVolumeChange={handleSwingChange}
                             min={0}
                             max={75}
                             step={1}
