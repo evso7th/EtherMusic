@@ -1,7 +1,6 @@
 
 "use client";
 
-import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -21,18 +20,17 @@ import { beatPatterns } from "@/lib/drum-machine";
 interface BeatBoxControlsProps {
     activePattern: BeatPattern;
     onPatternChange: (pattern: BeatPattern) => void;
-    volumes: Volumes;
+    initialVolumes: Volumes;
     onApply: (newVolumes: Volumes) => void;
     isMobile: boolean;
     isLandscape?: boolean;
 }
 
 const ControlButtonWithTooltip = memo(function ControlButtonWithTooltip({ tooltipText, children, ...props}: React.ComponentProps<typeof Button> & { tooltipText: string, children: React.ReactNode}) {
-    const { ...buttonProps } = props;
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <Button {...buttonProps}>{children}</Button>
+                <Button {...props}>{children}</Button>
             </TooltipTrigger>
             <TooltipContent>
                 <p>{tooltipText}</p>
@@ -46,7 +44,7 @@ ControlButtonWithTooltip.displayName = 'ControlButtonWithTooltip';
 const BeatBoxControlsComponent = ({
     activePattern,
     onPatternChange,
-    volumes,
+    initialVolumes,
     onApply,
     isMobile,
     isLandscape = false,
@@ -156,7 +154,7 @@ const BeatBoxControlsComponent = ({
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="pr-4 py-4">
                                     <MixerControls 
-                                        initialVolumes={volumes} 
+                                        initialVolumes={initialVolumes} 
                                         onApply={onApply}
                                         closeDialog={() => setIsMixerOpen(false)}
                                     />
@@ -250,7 +248,7 @@ const BeatBoxControlsComponent = ({
                             <ScrollArea className="h-auto max-h-[70vh]">
                                 <div className="pr-4 py-4">
                                     <MixerControls 
-                                        initialVolumes={volumes}
+                                        initialVolumes={initialVolumes}
                                         onApply={onApply}
                                         closeDialog={() => setIsMixerOpen(false)}
                                     />
@@ -267,5 +265,3 @@ const BeatBoxControlsComponent = ({
 };
 
 export const BeatBoxControls = memo(BeatBoxControlsComponent);
-
-    

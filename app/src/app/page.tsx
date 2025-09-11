@@ -3,7 +3,6 @@
 
 import { useState, useEffect, useCallback, memo } from 'react';
 import { Button } from "@/components/ui/button";
-import { ThereminPads } from '@/components/theremin-pads';
 import { BeatBoxControls } from '@/components/beat-box-controls';
 import { useToast } from "@/hooks/use-toast";
 import { OrbitalAnimation } from '@/components/orbital-animation';
@@ -18,8 +17,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
 import { melodyInstruments, defaultMelodyInstrument } from '@/lib/melody-presets';
 import { bassInstruments, defaultBassInstrument } from '@/lib/bass-presets';
-import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, ChannelVolumes, BeatPattern } from '@/types';
+import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, BeatPattern } from '@/types';
 import { cn } from '@/lib/utils';
+import { ThereminPads } from '@/components/theremin-pads';
 
 function getCookie(name: string): string | null {
     if (typeof document === 'undefined') return null;
@@ -119,11 +119,8 @@ export default function Home() {
 
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
-        const newVolumesForBass = setBassInstrument(instrumentId);
-        if (newVolumesForBass) {
-            setVolumes(newVolumesForBass);
-        }
-    }, [setBassInstrument, setVolumes]);
+        setBassInstrument(instrumentId);
+    }, [setBassInstrument]);
 
     useEffect(() => {
         if (isReady && activeBassInstrument) {
@@ -219,14 +216,14 @@ export default function Home() {
                     <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
                 </div>
                 <div className={cn("absolute inset-0 z-0 transition-opacity duration-1000", isAppStarted ? 'opacity-100' : 'opacity-30')}>
-                    <MemoizedOrbitalAnimation />
+                    <MemoizedOrbitalAnimation isPlaying={false} tempo={120}/>
                 </div>
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
                         <h1 className="text-4xl md:text-5xl font-bold text-primary">EtherMusic</h1>
                         <p className="text-sm md:text-base text-white/80 font-light mt-2 tracking-wide">Neuro Meditation Processor</p>
                     </div>
-                    <Button size="lg" onClick={handleStartApp}>
+                    <Button size="lg" onClick={() => startApp(initialVolumes)}>
                         Start Meditation
                         <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
@@ -294,20 +291,21 @@ export default function Home() {
 
                  <main className="flex-grow flex flex-col gap-2 overflow-hidden">
                     <ThereminPads 
-                        handleThereminInteraction={handleThereminInteractionCallback}
+                        onInteraction={handleThereminInteractionCallback}
                         allowedFrequencies={allowedFrequencies}
-                        isBassLatchOn={isBassLatchOn}
+                        isLatchOn={isBassLatchOn}
                         onLatchToggle={handleLatchToggle}
                         activeBassInstrument={activeBassInstrument}
-                        handleSetBassInstrument={handleSetBassInstrument}
+                        onInstrumentChange={handleSetBassInstrument}
                         orbManager={orbManager}
                         volumes={volumes}
                         onEffectChange={handleChannelEffectChange}
                         activeMelodyInstrument={activeMelodyInstrument}
-                        handleMelodyInstrumentChange={handleMelodyInstrumentChange}
+                        onMelodyInstrumentChange={handleMelodyInstrumentChange}
                         musicKey={musicKey}
-                        handleHarmonyChange={handleHarmonyChange}
+                        onKeyChange={handleHarmonyChange}
                         musicScale={musicScale}
+                        onScaleChange={handleHarmonyChange}
                     />
                     <div className="flex-shrink-0 portrait:block landscape:hidden">
                         <BeatBoxControls
@@ -334,5 +332,3 @@ export default function Home() {
         </div>
     );
 }
-
-    

@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
 import type { Volumes, Instrument, BassInstrument } from '@/types';
+import mitt, { Emitter } from 'mitt';
 
 function getCookie(name: string): string | null {
     if (typeof document === 'undefined') return null;
@@ -82,6 +83,9 @@ export function loadVolumes(): Volumes {
     }
 }
 
+type AudioEngineEvents = {
+    'playStateChanged': boolean;
+};
 
 export function useAudioEngine(initialVolumes: Volumes) {
     const { toast } = useToast();
@@ -108,11 +112,13 @@ export function useAudioEngine(initialVolumes: Volumes) {
                 if (context.state === 'suspended') {
                     await context.resume();
                 }
-                const engine = new AudioEngine(context, orbManager.current);
+                const emitter = mitt<AudioEngineEvents>();
+                emitter.on('playStateChanged', (playing) => {
+                    setIsPlaying(playing);
+                });
+
+                const engine = new AudioEngine(context, orbManager.current, emitter);
                 await engine.initialize();
-                
-                const playStateCallback = (playing: boolean) => setIsPlaying(playing);
-                engine.getDrumMachine().on('playStateChanged', playStateCallback);
                 
                 engine.setVolumes(vols);
                 audioEngine.current = engine;
@@ -227,5 +233,3 @@ export function useAudioEngine(initialVolumes: Volumes) {
         currentTempo
     };
 }
-
-    

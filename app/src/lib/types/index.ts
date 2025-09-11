@@ -49,8 +49,8 @@ export interface InstrumentPresetParams extends BaseInstrumentParams {}
 
 // Bass instruments have their own effect settings that are part of the preset
 export interface BassInstrumentPresetParams extends BaseInstrumentParams {
-    reverbSend?: number; // in dBFS, e.g., -12
-    distortion?: number; // 0-100
+    reverbSend: number; // in dBFS, e.g., -12
+    distortion: number; // 0-100
 }
 
 
