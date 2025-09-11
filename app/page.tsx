@@ -11,7 +11,6 @@ import { PlaybackControls } from '@/components/playback-controls';
 import { ArrowRight } from 'lucide-react';
 import { HelpGuide } from "@/components/help-guide";
 import { beatPatterns } from '@/lib/drum-machine';
-import { CookieConsent } from '@/components/cookie-consent';
 import { useAudioEngine, loadVolumes, defaultVolumes } from '@/hooks/use-audio-engine';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
@@ -20,6 +19,7 @@ import { bassInstruments, defaultBassInstrument } from '@/lib/bass-presets';
 import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, BeatPattern } from '@/types';
 import { cn } from '@/lib/utils';
 import { ThereminPads } from '@/components/theremin-pads';
+import { CookieConsent } from '@/components/cookie-consent';
 
 function getCookie(name: string): string | null {
     if (typeof document === 'undefined') return null;

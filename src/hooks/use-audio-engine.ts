@@ -8,35 +8,7 @@ import { OrbManager } from '@/lib/orb-manager';
 import type { Volumes, Instrument, BassInstrument, AudioEngineEvents } from '@/types';
 import mitt, { Emitter } from 'mitt';
 
-function getCookie(name: string): string | null {
-    if (typeof document === 'undefined') return null;
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
-    return null;
-}
-
-function setCookie(name: string, value: string, days: number) {
-    if (typeof document === 'undefined') return;
-    let expires = "";
-    if (days) {
-        const date = new Date();
-        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-        expires = "; expires=" + date.toUTCString();
-    }
-    document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=Lax";
-}
-
-function saveVolumes(volumes: Volumes) {
-    if (typeof window === 'undefined' || getCookie("ethermusic_consent") !== 'true') {
-        return;
-    }
-    try {
-        setCookie("ethermusic_volumes", JSON.stringify(volumes), 365);
-    } catch (e) {
-        console.error("Failed to save volume settings to cookies", e);
-    }
-}
+// Removed all cookie-related functions (getCookie, setCookie, saveVolumes, loadVolumes)
 
 export const defaultVolumes: Volumes = { 
     melody: { gain: 0, reverbSend: -18, distortion: 0 },
@@ -46,42 +18,14 @@ export const defaultVolumes: Volumes = {
     reverbReturn: -25,
     compressor: {
         enabled: true,
-        threshold: -50,
-        ratio: 12,
+        threshold: -24, 
+        ratio: 7, 
         attack: 0.003,
         release: 0.25
     },
     swing: 0.33,
     tempo: 90,
 };
-
-export function loadVolumes(): Volumes {
-     if (typeof window === 'undefined') return defaultVolumes;
-     const consent = getCookie("ethermusic_consent") === 'true';
-     if (!consent) return defaultVolumes;
-     try {
-        const savedVolumes = getCookie("ethermusic_volumes");
-        if (!savedVolumes) return defaultVolumes;
-        
-        const parsed = JSON.parse(savedVolumes);
-
-        // Deep merge with defaults to ensure all properties are present and valid
-        const merged = {
-            ...defaultVolumes,
-            ...parsed,
-            melody: { ...defaultVolumes.melody, ...(parsed.melody || {}) },
-            manualBass: { ...defaultVolumes.manualBass, ...(parsed.manualBass || {}) },
-            latch: { ...defaultVolumes.latch, ...(parsed.latch || {}) },
-            drums: { ...defaultVolumes.drums, ...(parsed.drums || {}) },
-            compressor: { ...defaultVolumes.compressor, ...(parsed.compressor || {}) },
-        };
-        return merged;
-
-    } catch (e) {
-        console.error("Failed to load volume settings from cookies", e);
-        return defaultVolumes;
-    }
-}
 
 const emitter = mitt<AudioEngineEvents>();
 
@@ -94,9 +38,8 @@ export function useAudioEngine() {
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
     
-    const [volumes, setVolumesState] = useState<Volumes>(() =>
-        typeof window !== 'undefined' ? loadVolumes() : defaultVolumes
-    );
+    // Initialize volumes state directly with defaultVolumes.
+    const [volumes, setVolumesState] = useState<Volumes>(defaultVolumes);
 
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTempo, setCurrentTempo] = useState(volumes.tempo);
@@ -117,9 +60,9 @@ export function useAudioEngine() {
                 const engine = new AudioEngine(context, orbManager.current, emitter);
                 await engine.initialize();
                 
-                const currentVolumes = loadVolumes();
-                engine.setVolumes(currentVolumes);
-                setVolumesState(currentVolumes); 
+                // Set volumes directly, no longer loading from cookies.
+                engine.setVolumes(defaultVolumes);
+                setVolumesState(defaultVolumes); 
 
                 audioEngine.current = engine;
             }
@@ -185,7 +128,7 @@ export function useAudioEngine() {
             if (audioEngine.current) {
                 audioEngine.current.setVolumes(updated);
             }
-            saveVolumes(updated);
+            // saveVolumes call removed
             return updated;
         });
     }, []);

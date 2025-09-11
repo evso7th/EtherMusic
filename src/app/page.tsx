@@ -11,8 +11,7 @@ import { PlaybackControls } from '@/components/playback-controls';
 import { ArrowRight } from 'lucide-react';
 import { HelpGuide } from "@/components/help-guide";
 import { beatPatterns } from '@/lib/drum-machine';
-import { CookieConsent } from '@/components/cookie-consent';
-import { useAudioEngine, loadVolumes, defaultVolumes } from '@/hooks/use-audio-engine';
+import { useAudioEngine, defaultVolumes } from '@/hooks/use-audio-engine';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { getScaleFrequencies, ALL_NOTES, SCALES } from '@/lib/music';
 import { melodyInstruments, defaultMelodyInstrument } from '@/lib/melody-presets';
@@ -20,14 +19,6 @@ import { bassInstruments, defaultBassInstrument } from '@/lib/bass-presets';
 import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, BeatPattern } from '@/types';
 import { cn } from '@/lib/utils';
 import { ThereminPads } from '@/components/theremin-pads';
-
-function getCookie(name: string): string | null {
-    if (typeof document === 'undefined') return null;
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
-    return null;
-}
 
 const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
 
@@ -66,7 +57,6 @@ export default function Home() {
         currentTempo,
     } = useAudioEngine();
     
-    const [cookieConsent, setCookieConsent] = useState<boolean | undefined>(undefined);
     const [isRecording, setIsRecording] = useState(false);
     const [activePattern, setActivePattern] = useState<BeatPattern>(beatPatterns.find(p => p.name === 'Off')!);
     const [musicKey, setMusicKey] = useState<MusicKey>('G');
@@ -78,27 +68,8 @@ export default function Home() {
     
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
 
-    const onConsentChange = useCallback((consent: boolean) => {
-        setCookieConsent(consent);
-        if (consent) {
-            setVolumes(loadVolumes());
-        } else {
-            setVolumes(defaultVolumes);
-            if (typeof document !== 'undefined') {
-                document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-            }
-        }
-    }, [setVolumes]);
-
     useEffect(() => {
         setIsClient(true);
-        const consent = getCookie("ethermusic_consent");
-        if (consent !== null) {
-            const hasConsent = consent === 'true';
-            setCookieConsent(hasConsent);
-        } else {
-            setCookieConsent(undefined);
-        }
     }, []);
 
     useEffect(() => {
@@ -132,7 +103,6 @@ export default function Home() {
     }, []);
 
     useEffect(() => {
-        // No need to check for isReady here as getScaleFrequencies is pure
         const bassFreqs = getScaleFrequencies(musicKey, musicScale, [2, 3]);
         const melodyFreqs = getScaleFrequencies(musicKey, musicScale, [2, 3, 4]);
         setAllowedFrequencies({ melody: melodyFreqs, bass: bassFreqs });
@@ -233,9 +203,6 @@ export default function Home() {
                     <p>&copy; 2024, EVS</p>
                     <p className="mt-2">v.2.1 "Maestro"</p>
                 </footer>
-                {cookieConsent === undefined && (
-                    <CookieConsent onConsentChange={onConsentChange} />
-                )}
             </div>
         )
     }
@@ -331,11 +298,6 @@ export default function Home() {
                     />
                 </div>
             </div>
-             {cookieConsent === undefined && isAppStarted && (
-                <CookieConsent onConsentChange={onConsentChange} />
-            )}
         </div>
     );
 }
-
-    

@@ -1,16 +1,11 @@
-
 "use client";
 
-import { useState, useEffect } from "react";
-import { Button } from "./ui/button";
-import { cn } from "@/lib/utils";
+import { useState } from 'react';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
-function getCookie(name: string): string | null {
-    if (typeof document === 'undefined') return null;
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
-    return null;
+interface CookieConsentProps {
+  onConsentChange: (consent: boolean) => void;
 }
 
 function setCookie(name: string, value: string, days: number) {
@@ -24,53 +19,33 @@ function setCookie(name: string, value: string, days: number) {
     document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=Lax";
 }
 
-interface CookieConsentProps {
-    onConsentChange: (hasConsent: boolean) => void;
-}
-
 export function CookieConsent({ onConsentChange }: CookieConsentProps) {
-    const [showConsent, setShowConsent] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
 
-    useEffect(() => {
-        const consent = getCookie("ethermusic_consent");
-        if (consent === null) {
-            setShowConsent(true);
-        } else {
-            // Deferring this call slightly to ensure it doesn't run during a render cycle
-            setTimeout(() => onConsentChange(consent === 'true'), 0);
-        }
-    }, [onConsentChange]);
+  const handleConsent = (consent: boolean) => {
+    setCookie("ethermusic_consent", String(consent), 365);
+    onConsentChange(consent);
+    setIsVisible(false);
+  };
 
-    const acceptCookie = () => {
-        setShowConsent(false);
-        setCookie("ethermusic_consent", "true", 365);
-        onConsentChange(true);
-    };
+  if (!isVisible) {
+    return null;
+  }
 
-    const declineCookie = () => {
-        setShowConsent(false);
-        setCookie("ethermusic_consent", "false", 365);
-        onConsentChange(false);
-    };
-
-    if (!showConsent) {
-        return null;
-    }
-
-    return (
-        <div className={cn(
-            "fixed bottom-0 left-0 right-0 z-[100] flex items-center justify-center p-4",
-            "bg-background/80 backdrop-blur-sm"
-        )}>
-            <div className="max-w-xl w-full p-4 rounded-lg bg-card border border-border shadow-lg flex flex-col md:flex-row items-center gap-4">
-                <p className="text-sm text-card-foreground flex-grow">
-                    This site uses a cookie only to remember your mixer presets. We value your privacy and do not save or transmit any other data. If you decline, settings will reset on each visit.
-                </p>
-                <div className="flex-shrink-0 flex gap-2">
-                    <Button variant="outline" onClick={declineCookie}>No</Button>
-                    <Button onClick={acceptCookie}>Yes</Button>
-                </div>
-            </div>
-        </div>
-    );
+  return (
+    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 p-4 sm:items-center">
+      <Card className="w-full max-w-lg">
+        <CardHeader>
+          <CardTitle>We use cookies</CardTitle>
+          <CardDescription>
+            We use cookies to save your mixer settings for your next visit. By clicking "Accept", you agree to the use of cookies.
+          </CardDescription>
+        </CardHeader>
+        <CardFooter className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => handleConsent(false)}>Decline</Button>
+          <Button onClick={() => handleConsent(true)}>Accept</Button>
+        </CardFooter>
+      </Card>
+    </div>
+  );
 }

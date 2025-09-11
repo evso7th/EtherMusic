@@ -288,12 +288,12 @@ export class AudioEngine {
         if (!this.isInitialized) return;
         
         const partName = type === 'bass' ? (this.isBassLatchOn ? 'latch' : 'manualBass') : 'melody';
-        console.log(`[Interaction] type: ${type}, state: ${state}, part: ${partName.toUpperCase()}, data:`, data);
+        // console.log(`[Interaction] type: ${type}, state: ${state}, part: ${partName.toUpperCase()}, data:`, data);
 
         if (partName === 'latch') {
             if (state === 'down' && data) { 
                  const result = this.latchEngine.toggleNote(data);
-                 console.log('[LatchEngine] toggle result:', result);
+                 // console.log('[LatchEngine] toggle result:', result);
                  this.processLatchResult(result);
             }
             return;
@@ -309,7 +309,7 @@ export class AudioEngine {
             this.activePointers.set(pointerId, { type, noteId });
             const note: SynthNote = { id: noteId, frequency: data.frequency, volume: data.volume };
             const message: WorkerMessage = { type: 'noteOn', note };
-            console.log(`[AudioEngine] -> ${partName.toUpperCase()} worklet:`, message);
+            console.log(`[AudioEngine] NoteOn: ${partName.toUpperCase()} (ID: ${noteId}), ActiveNotes: ${this.activePointers.size}`);
             nodeInfo.worklet.port.postMessage(message);
             this.orbManager.addOrb(pointerId, type, data.x, data.y);
         } else if (state === 'move' && data) {
@@ -324,7 +324,7 @@ export class AudioEngine {
             const activePointer = this.activePointers.get(pointerId);
             if (activePointer) {
                 const message: WorkerMessage = { type: 'noteOff', id: activePointer.noteId };
-                console.log(`[AudioEngine] -> ${partName.toUpperCase()} worklet:`, message);
+                console.log(`[AudioEngine] NoteOff: ${partName.toUpperCase()} (ID: ${activePointer.noteId}), ActiveNotes: ${this.activePointers.size - 1}`);
                 nodeInfo.worklet.port.postMessage(message);
                 this.activePointers.delete(pointerId);
                 this.orbManager.removeOrb(pointerId);
@@ -350,7 +350,7 @@ export class AudioEngine {
         
         if (result.noteOff) {
             const message: WorkerMessage = { type: 'noteOff', id: result.noteOff.id };
-            console.log(`[AudioEngine] -> LATCH worklet:`, message);
+            console.log(`[AudioEngine] Latch NoteOff: (ID: ${result.noteOff.id})`);
             latchNode.worklet.port.postMessage(message);
         }
         if (result.noteToAnimateRemove) {
@@ -359,7 +359,7 @@ export class AudioEngine {
         
         if (result.noteOn) {
             const message: WorkerMessage = { type: 'noteOn', note: result.noteOn };
-            console.log(`[AudioEngine] -> LATCH worklet:`, message);
+            console.log(`[AudioEngine] Latch NoteOn: (ID: ${result.noteOn.id})`);
             latchNode.worklet.port.postMessage(message);
         }
         if (result.noteToAnimateAdd) {
@@ -500,7 +500,9 @@ export class AudioEngine {
     
     public setMasterLimiterSettings(limiterSettings: CompressorSettings) {
         if (!this.isInitialized || !this.context || !this.limiter) return;
-        
+
+        console.log("[AudioEngine] Applying Master Limiter Settings:", limiterSettings);
+
         this.volumes.compressor = limiterSettings;
     
         this.preLimiterOut.disconnect();
@@ -532,4 +534,3 @@ export class AudioEngine {
         }
     }
 }
-
