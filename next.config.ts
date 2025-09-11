@@ -25,12 +25,11 @@ const nextConfig: NextConfig = {
     if (isServer) {
         config.output.globalObject = 'self';
     }
-
-    // This rule is no longer needed as we are not using .worklet.js extension
-    // config.module.rules.push({
-    //   test: /\.worklet\.js$/,
-    //   use: { loader: 'worker-loader' },
-    // });
+    
+    config.module.rules.push({
+      test: /\.worker\.js$/,
+      use: { loader: 'worker-loader' },
+    });
 
     return config;
   },

@@ -236,7 +236,6 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.peakLevel = 0;
 
         this.port.onmessage = this.handleMessage.bind(this);
-        this.port.postMessage({type: 'debug', message: `[SynthProcessor] Created with polyphony: ${this.polyphony}`});
     }
 
     handleMessage(event) {
@@ -353,16 +352,14 @@ class SynthProcessor extends AudioWorkletProcessor {
                 currentPeak = absSample;
             }
             
-            // Dynamic attenuation based on number of active (non-releasing) voices
-            const activeVoiceCount = Array.from(this.voices.values()).filter(v => !v.isReleasing).length;
-            const attenuation = 1 / (1 + Math.max(0, activeVoiceCount - 1) * 0.5);
+            const attenuation = 1 / Math.max(1, this.voices.size);
             outputChannel[i] = Math.tanh(sample * attenuation);
         }
 
         this.peakLevel = Math.max(this.peakLevel, currentPeak);
         
         this.logCounter++;
-        if (this.logCounter >= 200) { // Log roughly every 500ms
+        if (this.logCounter >= 200) {
              if (this.voices.size > 0) {
                 const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
                 this.port.postMessage({

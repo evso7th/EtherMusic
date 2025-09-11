@@ -174,8 +174,8 @@ export class AudioEngine {
 
         try {
              await Promise.all([
-                this.context.audioWorklet.addModule('/workers/synth-processor.js'),
-                this.context.audioWorklet.addModule('/workers/drum-processor.js'),
+                this.context.audioWorklet.addModule('workers/synth-processor.js'),
+                this.context.audioWorklet.addModule('workers/drum-processor.js'),
              ]);
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
@@ -183,8 +183,8 @@ export class AudioEngine {
         }
         
         this.createSynthChannel('melody', 10);
-        this.createSynthChannel('manualBass', 4);
-        this.createSynthChannel('latch', 4);
+        this.createSynthChannel('manualBass', 3);
+        this.createSynthChannel('latch', 3);
         
         this.createDrumChannel();
         
@@ -498,23 +498,22 @@ export class AudioEngine {
         this.emitter.emit('volumesChanged', this.getVolumes());
     }
     
-    public setMasterLimiterSettings(compressorSettings: CompressorSettings) {
+    public setMasterLimiterSettings(limiterSettings: CompressorSettings) {
         if (!this.isInitialized || !this.context || !this.limiter) return;
         
-        this.volumes.compressor = compressorSettings;
+        this.volumes.compressor = limiterSettings;
     
         this.preLimiterOut.disconnect();
-        if (compressorSettings.enabled) {
+        if (limiterSettings.enabled) {
             this.preLimiterOut.connect(this.limiter);
             this.limiter.connect(this.masterOut);
 
-            // Set compressor to act as a limiter
             const rampTime = this.context.currentTime + 0.02;
-            this.limiter.threshold.setTargetAtTime(compressorSettings.threshold, this.context.currentTime, rampTime);
-            this.limiter.knee.setTargetAtTime(0, this.context.currentTime, rampTime); // Hard knee for limiting
-            this.limiter.ratio.setTargetAtTime(compressorSettings.ratio, this.context.currentTime, rampTime); // High ratio
-            this.limiter.attack.setTargetAtTime(compressorSettings.attack, this.context.currentTime, rampTime); // Fast attack
-            this.limiter.release.setTargetAtTime(compressorSettings.release, this.context.currentTime, rampTime);
+            this.limiter.threshold.setTargetAtTime(limiterSettings.threshold, this.context.currentTime, rampTime);
+            this.limiter.knee.setTargetAtTime(0, this.context.currentTime, rampTime); 
+            this.limiter.ratio.setTargetAtTime(20, this.context.currentTime, rampTime); 
+            this.limiter.attack.setTargetAtTime(limiterSettings.attack, this.context.currentTime, rampTime);
+            this.limiter.release.setTargetAtTime(limiterSettings.release, this.context.currentTime, rampTime);
         } else {
             this.preLimiterOut.connect(this.masterOut);
         }
