@@ -18,11 +18,14 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
+import type { AudioEngine } from "@/lib/audio-engine";
+import type { AudioEngineEvents } from "@/types";
+import type { Emitter } from "mitt";
 
 interface PlaybackControlsProps {
-    isPlaying: boolean;
+    audioEngine: AudioEngine | null;
+    emitter: Emitter<AudioEngineEvents> | null;
     isRecording: boolean;
-    onPlayPause: () => void;
     onRecord: () => void;
     onExit: () => void;
     isReady: boolean;
@@ -46,14 +49,35 @@ const ControlButton = ({ tooltipText, children, isMobile, ...props }: { tooltipT
 
 
 export function PlaybackControls({ 
-    isPlaying,
+    audioEngine,
+    emitter,
     isRecording, 
-    onPlayPause,
     onRecord, 
     onExit,
     isReady 
 }: PlaybackControlsProps) {
     const isMobile = useIsMobile();
+    const [isPlaying, setIsPlaying] = React.useState(false);
+
+    React.useEffect(() => {
+        if (!emitter) return;
+        const onPlayStateChanged = (playing: boolean) => {
+            setIsPlaying(playing);
+        };
+        emitter.on('playStateChanged', onPlayStateChanged);
+        return () => {
+            emitter.off('playStateChanged', onPlayStateChanged);
+        }
+    }, [emitter]);
+
+    const handlePlayPause = React.useCallback(() => {
+        if (!audioEngine) return;
+        if (audioEngine.isPlaying) {
+            audioEngine.getDrumMachine().stop();
+        } else {
+            audioEngine.getDrumMachine().play();
+        }
+    }, [audioEngine]);
     
     const handleExit = () => {
         onExit();
@@ -73,7 +97,7 @@ export function PlaybackControls({
         <TooltipProvider>
              <ControlButton
                 tooltipText={isPlaying ? "Pause" : "Play"}
-                onClick={onPlayPause}
+                onClick={handlePlayPause}
                 variant="outline"
                 size="icon" 
                 className="w-10 h-10 rounded-full"

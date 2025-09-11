@@ -90,22 +90,12 @@ export function useAudioEngine() {
     
     const [isAppStarted, setIsAppStarted] = useState(false);
     const [isReady, setIsReady] = useState(false);
-    const [isPlaying, setIsPlaying] = useState(false);
     
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
     
-    const [volumes, setVolumesState] = useState<Volumes>(defaultVolumes);
-    const [currentTempo, setCurrentTempo] = useState(defaultVolumes.tempo);
-
-    useEffect(() => {
-        const hasConsent = getCookie("ethermusic_consent") === 'true';
-        if (hasConsent) {
-            const loadedVols = loadVolumes();
-            setVolumesState(loadedVols);
-            setCurrentTempo(loadedVols.tempo);
-        }
-    }, []);
+    // Initialize volumes state directly so it's never undefined.
+    const [volumes, setVolumesState] = useState<Volumes>(() => loadVolumes());
     
     const initializeAudioEngine = useCallback(async () => {
         try {
@@ -126,13 +116,12 @@ export function useAudioEngine() {
                 const currentVolumes = loadVolumes();
                 engine.setVolumes(currentVolumes);
                 setVolumesState(currentVolumes);
-                setCurrentTempo(currentVolumes.tempo);
 
                 audioEngine.current = engine;
             }
             
             setIsReady(true);
-            setIsPlaying(audioEngine.current.isPlaying);
+            emitter.emit('playStateChanged', audioEngine.current.isPlaying);
             
         } catch(e) {
             console.error("Failed to initialize audio engine:", e);
@@ -155,17 +144,15 @@ export function useAudioEngine() {
     }, [isAppStarted, initializeAudioEngine]);
 
     useEffect(() => {
-        const onPlayStateChanged = (playing: boolean) => {
-            setIsPlaying(playing);
-        };
-        const onVolumesChanged = (newVolumes: Volumes) => {
+        // This effect handles volume changes from the engine (e.g., from presets)
+        // and keeps the UI state in sync.
+        const handleVolumesChanged = (newVolumes: Volumes) => {
             setVolumesState(newVolumes);
-            setCurrentTempo(newVolumes.tempo);
         };
         
-        emitter.on('playStateChanged', onPlayStateChanged);
-        emitter.on('volumesChanged', onVolumesChanged);
+        emitter.on('volumesChanged', handleVolumesChanged);
         
+        // This effect ensures the audio context is resumed after user interaction.
         const resumeAudio = async () => {
             if (audioEngine.current?.isInitialized && audioEngine.current.getContext().state === 'suspended') {
                 await audioEngine.current.getContext().resume();
@@ -174,24 +161,24 @@ export function useAudioEngine() {
         document.addEventListener('click', resumeAudio, { once: true });
         document.addEventListener('touchstart', resumeAudio, { once: true });
 
-
         return () => {
-            emitter.off('playStateChanged', onPlayStateChanged);
-            emitter.off('volumesChanged', onVolumesChanged);
+            emitter.off('volumesChanged', handleVolumesChanged);
             document.removeEventListener('click', resumeAudio);
             document.removeEventListener('touchstart', resumeAudio);
         }
     }, []);
     
+    // This is the main function for updating volumes from the UI.
     const setVolumes = useCallback((newVolumes: Volumes | ((prev: Volumes) => Volumes)) => {
-        const updatedVolumes = typeof newVolumes === 'function' ? newVolumes(volumes) : newVolumes;
-        if (audioEngine.current) {
-            audioEngine.current.setVolumes(updatedVolumes);
-        }
-        saveVolumes(updatedVolumes);
-        setVolumesState(updatedVolumes);
-        setCurrentTempo(updatedVolumes.tempo);
-    }, [volumes]);
+        setVolumesState(prev => {
+            const updated = typeof newVolumes === 'function' ? newVolumes(prev) : newVolumes;
+            if (audioEngine.current) {
+                audioEngine.current.setVolumes(updated);
+            }
+            saveVolumes(updated);
+            return updated;
+        });
+    }, []);
 
     const stopAllSounds = useCallback(() => {
         audioEngine.current?.stopAllSounds();
@@ -231,7 +218,7 @@ export function useAudioEngine() {
     return {
         isAppStarted,
         isReady,
-        isPlaying,
+        // isPlaying is now managed locally in components that need it
         audioEngine: audioEngine.current,
         orbManager: orbManager.current,
         emitter,
@@ -246,7 +233,6 @@ export function useAudioEngine() {
         startRecording,
         stopRecording,
         handleThereminInteraction,
-        currentTempo
     };
 }
 
