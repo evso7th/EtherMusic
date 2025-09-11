@@ -1,4 +1,3 @@
-
 // This AudioWorkletProcessor is DEPRECATED and no longer used.
 // The 'latch' synth channel now uses the main 'synth-processor.js'.
 // This file is kept for historical reference but can be safely removed.
@@ -9,15 +8,12 @@ class LatchProcessor extends AudioWorkletProcessor {
     this.port.onmessage = (event) => {
         // Log that this processor is deprecated if it's ever used.
         if (event.data.type === 'noteOn') {
-            this.port.postMessage({ 
-                type: 'error', 
-                message: 'LatchProcessor is deprecated and should not be used. Use SynthProcessor instead.'
-            });
+            console.error('DEPRECATED: LatchProcessor received a noteOn message. It should not be in use.');
         }
     };
   }
 
-  process(inputs, outputs, parameters) {
+  process() {
     // Return false to signal that this processor can be garbage-collected.
     return false;
   }

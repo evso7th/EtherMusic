@@ -1,5 +1,4 @@
 
-
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for all real-time synthesis, running in a high-priority
 // audio thread to ensure low-latency, glitch-free sound generation.
@@ -24,7 +23,7 @@ class Oscillator {
             case 'sine':
                 sample = Math.sin(p * 2 * Math.PI);
                 break;
-            case 'square':
+            case 'square': {
                 sample = p < 0.5 ? 1 : -1;
                 // Poly-BLEP correction at discontinuities (0 and 0.5)
                 let t = p / phaseIncrement;
@@ -32,14 +31,20 @@ class Oscillator {
                 t = (p - 0.5) / phaseIncrement;
                 if (p >= 0.5 && p < 0.5 + phaseIncrement) sample -= t + t - t * t - 1.0;
                 break;
-            case 'sawtooth':
+            }
+            case 'sawtooth': {
                 sample = 2 * p - 1;
                  // Poly-BLEP correction at the discontinuity (wrap-around)
-                if (p < phaseIncrement) {
-                    let t = p / phaseIncrement;
-                    sample -= t + t - t * t - 1.0;
+                let t = p / phaseIncrement;
+                if (p < t) { // Correction at the start
+                    t = p / phaseIncrement;
+                    sample += t * t - 2 * t + 1;
+                } else if (p > 1 - phaseIncrement) { // Correction at the end
+                    t = (p - 1.0) / phaseIncrement;
+                    sample += t * t + 2 * t + 1;
                 }
                 break;
+            }
             case 'triangle':
                 // A more direct way to calculate triangle wave
                 sample = 2 * (p < 0.5 ? p : 1 - p) * 2 - 1;
@@ -115,7 +120,7 @@ class Voice {
             this.filter = null;
             return;
         }
-        this.filter = { ...filterConfig, x1: 0, x2: 0, y1: 0, y2: 0 };
+        this.filter = { ...filterConfig, y1: 0, y2: 0 };
         this.updateFilterCoeffs();
     }
 
@@ -229,9 +234,6 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.polyphony = options.processorOptions?.polyphony || 8;
         this.preset = this.getDefaultPreset();
         
-        this.debugCounter = 0;
-        this.debugInterval = 100;
-
         this.port.onmessage = this.handleMessage.bind(this);
     }
 
@@ -271,13 +273,11 @@ class SynthProcessor extends AudioWorkletProcessor {
         if (this.voices.size >= this.polyphony) {
             let oldestId = this.voices.keys().next().value;
             let oldestVoice = this.voices.get(oldestId);
-            let foundReleasing = oldestVoice?.isReleasing;
-
-            if (!foundReleasing) {
-                for (const [id, voice] of this.voices.entries()) {
+            
+            if (oldestVoice && !oldestVoice.isReleasing) {
+                 for (const [id, voice] of this.voices.entries()) {
                     if (voice.isReleasing) {
                         oldestId = id;
-                        foundReleasing = true;
                         break;
                     }
                 }
@@ -321,8 +321,9 @@ class SynthProcessor extends AudioWorkletProcessor {
             return true;
         }
         
+        // Simple attenuation based on the number of voices to prevent clipping.
+        // It's a non-linear curve, more aggressive for more voices.
         const attenuation = 1 / (1 + Math.max(0, voiceCount - 1) * 0.25);
-        let peak = 0;
 
         for (let i = 0; i < outputChannel.length; i++) {
             let sample = 0;
@@ -334,26 +335,10 @@ class SynthProcessor extends AudioWorkletProcessor {
             }
             
             const attenuatedSample = sample * attenuation;
-            const finalSample = Math.tanh(attenuatedSample * 1.2); 
-            outputChannel[i] = finalSample
-            
-            const absSample = Math.abs(finalSample);
-            if (absSample > peak) {
-                peak = absSample;
-            }
+            // Apply a soft clipping (tanh) as a final safety measure.
+            outputChannel[i] = Math.tanh(attenuatedSample); 
         }
         
-        this.debugCounter++;
-        if (this.debugCounter >= this.debugInterval) {
-            this.debugCounter = 0;
-            if (voiceCount > 0) {
-                this.port.postMessage({ 
-                    type: 'debug', 
-                    message: `Active voices: ${voiceCount}, Peak level: ${peak.toFixed(4)}`
-                });
-            }
-        }
-
         return true;
     }
     
@@ -370,7 +355,5 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
-
-    
 
     

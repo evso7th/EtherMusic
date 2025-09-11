@@ -5,15 +5,11 @@
 
 // A simple voice that plays a sample and then marks itself as finished.
 class Voice {
-    constructor(buffer, gain, sampleRate) {
+    constructor(buffer, gain) {
         this.buffer = buffer; // This is a Float32Array
         this.position = 0;
         this.gain = gain;
         this.isFinished = false;
-        
-        // A very short release envelope (10ms) to prevent clicks at the end of samples.
-        this.releaseSamples = Math.floor(sampleRate * 0.01); 
-        this.envelope = 1.0;
     }
 
     // This method processes a block of 128 samples (the standard render quantum).
@@ -26,11 +22,7 @@ class Voice {
         const samplesToProcess = Math.min(outputChannel.length, remainingSamples);
 
         for (let i = 0; i < samplesToProcess; i++) {
-            // Apply a fade-out envelope only for the last few samples of the sound.
-            if (this.position + i >= this.buffer.length - this.releaseSamples) {
-                this.envelope = (this.buffer.length - (this.position + i)) / this.releaseSamples;
-            }
-            outputChannel[i] += this.buffer[this.position + i] * this.gain * this.envelope;
+            outputChannel[i] += this.buffer[this.position + i] * this.gain;
         }
 
         this.position += samplesToProcess;
@@ -66,7 +58,7 @@ class DrumProcessor extends AudioWorkletProcessor {
                         // If the voice pool is full, remove the oldest voice to make room.
                         this.voices.shift();
                     }
-                    this.voices.push(new Voice(bufferToPlay, volume ?? 1.0, sampleRate));
+                    this.voices.push(new Voice(bufferToPlay, volume ?? 1.0));
                 }
             }
         } catch (e) {
@@ -90,6 +82,7 @@ class DrumProcessor extends AudioWorkletProcessor {
         }
         
         // Process each voice and add its output to the main output buffer.
+        // A simple limiter is also applied.
         for (const voice of this.voices) {
             voice.process(outputChannel);
         }
@@ -109,3 +102,5 @@ class DrumProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('drum-processor', DrumProcessor);
+
+    
