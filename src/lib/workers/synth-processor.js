@@ -209,6 +209,10 @@ class Voice {
                  mixedSample += oscSample * layer.level * envelopeValue;
             }
         });
+
+        // Normalize by number of layers to prevent clipping inside the voice
+        const numLayers = this.layers.length || 1;
+        mixedSample /= numLayers;
         
         const filteredSample = this.processFilter(mixedSample);
         
@@ -272,7 +276,6 @@ class SynthProcessor extends AudioWorkletProcessor {
 
         if (this.voices.size >= this.polyphony) {
             let oldestId;
-            let oldestTime = Infinity;
             // Prioritize replacing a releasing voice to prevent cutting off new notes
             for (const [id, voice] of this.voices.entries()) {
                  if (voice.isReleasing) {
@@ -344,16 +347,9 @@ class SynthProcessor extends AudioWorkletProcessor {
             if (absSample > currentPeak) {
                 currentPeak = absSample;
             }
-
-            // The main fix: Attenuate the final mixed signal based on the number of active voices.
-            // This prevents clipping when multiple voices sum up.
-            // Using Math.sqrt(voiceCount) as a divisor provides a good balance - it's a common
-            // technique in mixers to prevent loudness from increasing linearly with voice count.
-            const normalizationFactor = voiceCount > 1 ? Math.sqrt(voiceCount) * 1.5 : 1;
-            const normalizedSample = sample / normalizationFactor;
-
-            // Final soft-clipping with tanh just in case, to prevent any harsh digital distortion.
-            outputChannel[i] = Math.tanh(normalizedSample * 0.9);
+            
+            // Final soft-clipping with tanh as a safety net.
+            outputChannel[i] = Math.tanh(sample * 0.8);
         }
         
         this.peakLevel = Math.max(this.peakLevel, currentPeak);
@@ -388,4 +384,3 @@ class SynthProcessor extends AudioWorkletProcessor {
 
 registerProcessor('synth-processor', SynthProcessor);
 
-    

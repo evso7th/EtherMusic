@@ -48,6 +48,7 @@ const classicBassPreset: BassInstrumentPreset = {
         distortion: 15,
         layers: [
             { type: 'sine', freqMult: 0.5, level: 1.0, detune: 0 },
+            { type: 'sawtooth', freqMult: 1, level: 0.2, detune: 5 },
         ],
     }
 };
