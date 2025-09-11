@@ -165,7 +165,12 @@ class Voice {
     processLayerEnvelope(layer) {
         const env = layer.env;
         if (this.isReleasing && env.state !== 'release') {
-            env.state = 'release';
+          if (env.state !== 'sustain' && env.state !== 'decay') {
+             env.releaseStartValue = 0;
+          } else {
+             env.releaseStartValue = env.currentValue;
+          }
+          env.state = 'release'; 
         }
 
         switch (env.state) {
@@ -174,24 +179,22 @@ class Voice {
                 if (env.currentValue >= 1.0) { env.currentValue = 1.0; env.state = 'decay'; }
                 break;
             case 'decay':
-                env.currentValue *= env.decayRate;
+                env.currentValue -= env.decayRate;
                 if (env.currentValue <= env.sustainLevel) { env.currentValue = env.sustainLevel; env.state = 'sustain'; }
                 break;
             case 'release':
-                env.currentValue *= env.releaseRate;
-                if (env.currentValue < 0.00001) { env.currentValue = 0; }
+                env.currentValue -= env.releaseStartValue / env.releaseSamples;
+                if (env.currentValue <= 0) { env.currentValue = 0; }
                 break;
         }
         return env.currentValue;
     }
 
     render() {
-        if (this.isFinished) return 0;
-
-        if (this.isReleasing && this.layers.every(l => l.env.currentValue === 0)) {
+        if (this.isReleasing && this.layers.every(l => l.env.currentValue <= 0.0001)) {
             this.isFinished = true;
-            return 0;
         }
+        if (this.isFinished) return 0;
         
         this.baseFrequency += (this.targetFrequency - this.baseFrequency) * this.portamentoSpeed;
 
@@ -302,7 +305,8 @@ class SynthProcessor extends AudioWorkletProcessor {
                 voice.release();
             }
             voice.layers.forEach(l => {
-                l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05);
+                // Use a very short release to prevent clicks but kill the sound quickly.
+                l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05); 
             });
         });
     }
@@ -374,3 +378,5 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
+
+    

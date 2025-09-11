@@ -117,7 +117,6 @@ export class AudioEngine {
         this.preCompressorOut = this.context.createGain();
 
         this.compressor = this.context.createDynamicsCompressor();
-        // More aggressive compressor settings to act as a limiter and prevent clipping
         this.compressor.threshold.value = -50; 
         this.compressor.knee.value = 0;      
         this.compressor.ratio.value = 12;      
@@ -185,10 +184,10 @@ export class AudioEngine {
         };
 
         try {
-             await Promise.all([
+            await Promise.all([
                 this.context.audioWorklet.addModule('/worklets/synth-processor.js'),
                 this.context.audioWorklet.addModule('/worklets/drum-processor.js'),
-             ]);
+            ]);
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
             throw new Error("Could not load core audio components. Please try refreshing the page.");
@@ -344,7 +343,7 @@ export class AudioEngine {
                         const nodeToStop = this.nodes.get(partName);
                         if (nodeToStop) {
                             const message: WorkerMessage = { type: 'noteOff', id: pInfo.noteId };
-                            nodeToStop.port.postMessage(message);
+                            nodeToStop.worklet.port.postMessage(message);
                         }
                         this.orbManager.removeOrb(pId);
                         this.activePointers.delete(pId);
@@ -506,12 +505,13 @@ export class AudioEngine {
     public setCompressorSettings(compressorSettings: CompressorSettings) {
         if (!this.isInitialized || !this.context || !this.compressor) return;
         this.volumes.compressor = compressorSettings;
-        const rampTime = this.context.currentTime + 0.01;
+        
+        const rampTime = 0.01;
 
-        if (this.compressor.threshold) this.compressor.threshold.setTargetAtTime(compressorSettings.threshold, this.context.currentTime, rampTime);
-        if (this.compressor.ratio) this.compressor.ratio.setTargetAtTime(compressorSettings.ratio, this.context.currentTime, rampTime);
-        if (this.compressor.attack) this.compressor.attack.setTargetAtTime(compressorSettings.attack, this.context.currentTime, rampTime);
-        if (this.compressor.release) this.compressor.release.setTargetAtTime(compressorSettings.release, this.context.currentTime, rampTime);
+        this.compressor.threshold.setTargetAtTime(compressorSettings.threshold, this.context.currentTime, rampTime);
+        this.compressor.ratio.setTargetAtTime(compressorSettings.ratio, this.context.currentTime, rampTime);
+        this.compressor.attack.setTargetAtTime(compressorSettings.attack, this.context.currentTime, rampTime);
+        this.compressor.release.setTargetAtTime(compressorSettings.release, this.context.currentTime, rampTime);
 
         this.preCompressorOut.disconnect();
         if (compressorSettings.enabled) {
@@ -534,3 +534,5 @@ export class AudioEngine {
         }
     }
 }
+
+    
