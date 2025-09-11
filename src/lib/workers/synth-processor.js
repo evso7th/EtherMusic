@@ -210,7 +210,6 @@ class Voice {
             }
         });
 
-        // Normalize by number of layers to prevent clipping inside the voice
         const numLayers = this.layers.length || 1;
         mixedSample /= numLayers;
         
@@ -276,20 +275,25 @@ class SynthProcessor extends AudioWorkletProcessor {
 
         if (this.voices.size >= this.polyphony) {
             let oldestId;
-            // Prioritize replacing a releasing voice to prevent cutting off new notes
+            let oldestVoice = null;
+
             for (const [id, voice] of this.voices.entries()) {
-                 if (voice.isReleasing) {
+                if (voice.isReleasing) {
                     oldestId = id;
-                    break;
+                    oldestVoice = voice;
+                    break; 
+                }
+                if (!oldestVoice || voice.startTime < oldestVoice.startTime) {
+                    oldestVoice = voice;
+                    oldestId = id;
                 }
             }
-             // If no releasing voices, replace the oldest one.
-            if (!oldestId) {
-                oldestId = this.voices.keys().next().value;
+             if (oldestId) {
+                this.voices.delete(oldestId);
             }
-            this.voices.delete(oldestId);
         }
         const voice = new Voice(note.id, note.frequency, note.volume, this.preset, sampleRate);
+        voice.startTime = currentTime; 
         this.voices.set(note.id, voice);
     }
     
@@ -310,7 +314,6 @@ class SynthProcessor extends AudioWorkletProcessor {
     allNotesOff() {
         this.voices.forEach(voice => {
             voice.release();
-            // Use a very short release to prevent clicks but kill the sound quickly.
             voice.layers.forEach(l => {
                 l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05); 
             });
@@ -347,9 +350,10 @@ class SynthProcessor extends AudioWorkletProcessor {
             if (absSample > currentPeak) {
                 currentPeak = absSample;
             }
+
+            const attenuation = 1 / (1 + Math.max(0, voiceCount - 1) * 0.25);
             
-            // Final soft-clipping with tanh as a safety net.
-            outputChannel[i] = Math.tanh(sample * 0.8);
+            outputChannel[i] = Math.tanh(sample * attenuation * 0.8);
         }
         
         this.peakLevel = Math.max(this.peakLevel, currentPeak);
@@ -384,3 +388,4 @@ class SynthProcessor extends AudioWorkletProcessor {
 
 registerProcessor('synth-processor', SynthProcessor);
 
+    

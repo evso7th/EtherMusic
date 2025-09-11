@@ -16,24 +16,15 @@ function dbToGain(db: number): number {
 }
 
 function createDistortionCurve(amount: number): Float32Array {
-    // Normalize amount to a range of 0-1
-    const normalizedAmount = Math.max(0, Math.min(100, amount)) / 100;
-    if (normalizedAmount === 0) {
-        // Return a linear curve (no distortion) if amount is 0
-        const curve = new Float32Array(2);
-        curve[0] = -1;
-        curve[1] = 1;
-        return curve;
+    const k = Math.max(0, Math.min(100, amount)) * 2;
+    if (k === 0) {
+        return new Float32Array([ -1, 1 ]);
     }
-    
-    const k = normalizedAmount * 100; 
     const n_samples = 44100;
     const curve = new Float32Array(n_samples);
     const deg = Math.PI / 180;
-    
-    for (let i = 0; i < n_samples; i++) {
+    for (let i = 0; i < n_samples; ++i) {
         const x = i * 2 / n_samples - 1;
-        // Classic waveshaping curve
         curve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
     }
     return curve;
@@ -183,8 +174,8 @@ export class AudioEngine {
 
         try {
              await Promise.all([
-                this.context.audioWorklet.addModule('/worklets/synth-processor.js'),
-                this.context.audioWorklet.addModule('/worklets/drum-processor.js'),
+                this.context.audioWorklet.addModule('/workers/synth-processor.js'),
+                this.context.audioWorklet.addModule('/workers/drum-processor.js'),
              ]);
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
@@ -507,25 +498,20 @@ export class AudioEngine {
     
     public setMasterCompressorSettings(compressorSettings: CompressorSettings) {
         if (!this.isInitialized || !this.context || !this.masterCompressor) return;
-        
         this.volumes.compressor = compressorSettings;
-        const rampTime = 0.01; // Fast ramp to avoid audible changes
-    
-        // Disconnect everything from preCompressorOut to re-route safely
+        const rampTime = 0.01;
+
         this.preCompressorOut.disconnect();
-    
+        
         if (compressorSettings.enabled) {
             this.masterCompressor.threshold.setTargetAtTime(compressorSettings.threshold, this.context.currentTime, rampTime);
-            this.masterCompressor.knee.setTargetAtTime(30, this.context.currentTime, rampTime);
-            this.masterCompressor.ratio.setTargetAtTime(12, this.context.currentTime, rampTime);
+            this.masterCompressor.ratio.setTargetAtTime(compressorSettings.ratio, this.context.currentTime, rampTime);
             this.masterCompressor.attack.setTargetAtTime(compressorSettings.attack, this.context.currentTime, rampTime);
             this.masterCompressor.release.setTargetAtTime(compressorSettings.release, this.context.currentTime, rampTime);
-    
-            // Connect the main signal path through the compressor
+            
             this.preCompressorOut.connect(this.masterCompressor);
             this.masterCompressor.connect(this.masterOut);
         } else {
-            // If disabled, bypass the compressor and connect directly to the master output
             this.preCompressorOut.connect(this.masterOut);
         }
     }
@@ -543,3 +529,4 @@ export class AudioEngine {
     }
 }
 
+    

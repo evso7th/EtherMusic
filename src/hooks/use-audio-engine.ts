@@ -46,7 +46,7 @@ export const defaultVolumes: Volumes = {
     reverbReturn: -25,
     compressor: {
         enabled: true,
-        threshold: -24,
+        threshold: -50,
         ratio: 12,
         attack: 0.003,
         release: 0.25
@@ -83,7 +83,6 @@ export function loadVolumes(): Volumes {
     }
 }
 
-// Global emitter to decouple audio state from React's render cycle
 const emitter = mitt<AudioEngineEvents>();
 
 export function useAudioEngine() {
@@ -237,7 +236,7 @@ export function useAudioEngine() {
         orbManager: orbManager.current,
         startApp,
         stopAllSounds,
-        volumes,
+        volumes: volumes || defaultVolumes,
         setVolumes,
         setMelodyInstrument,
         setBassInstrument,
@@ -249,3 +248,5 @@ export function useAudioEngine() {
         currentTempo,
     };
 }
+
+    
