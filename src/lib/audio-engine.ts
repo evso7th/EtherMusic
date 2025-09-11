@@ -8,11 +8,6 @@ import { melodyInstruments } from './melody-presets';
 import { bassInstruments } from './bass-presets';
 import { DrumMachine } from './drum-machine';
 import type { Emitter } from 'mitt';
-// @ts-ignore
-import synthWorkletUrl from './workers/synth-processor.js';
-// @ts-ignore
-import drumWorkletUrl from './workers/drum-processor.js';
-
 
 function dbToGain(db: number): number {
     if (db <= -48) return 0;
@@ -177,10 +172,10 @@ export class AudioEngine {
         };
 
         try {
-            await Promise.all([
-                this.context.audioWorklet.addModule(synthWorkletUrl),
-                this.context.audioWorklet.addModule(drumWorkletUrl),
-            ]);
+             await Promise.all([
+                this.context.audioWorklet.addModule('/worklets/synth-processor.js'),
+                this.context.audioWorklet.addModule('/worklets/drum-processor.js'),
+             ]);
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
             throw new Error("Could not load core audio components. Please try refreshing the page.");
@@ -533,5 +528,3 @@ export class AudioEngine {
         }
     }
 }
-
-    

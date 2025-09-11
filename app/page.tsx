@@ -80,11 +80,11 @@ export default function Home() {
 
     const onConsentChange = useCallback((consent: boolean) => {
         setCookieConsent(consent);
-        const newVolumes = consent ? loadVolumes() : defaultVolumes;
-        setVolumes(newVolumes); 
-        
-        if (!consent) {
-             if (typeof document !== 'undefined') {
+        if (consent) {
+            setVolumes(loadVolumes());
+        } else {
+            setVolumes(defaultVolumes);
+            if (typeof document !== 'undefined') {
                 document.cookie = "ethermusic_volumes=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
             }
         }
@@ -96,10 +96,14 @@ export default function Home() {
         if (consent !== null) {
             const hasConsent = consent === 'true';
             setCookieConsent(hasConsent);
+            // This ensures that on initial load with consent, volumes are set correctly
+            if(hasConsent) {
+                setVolumes(loadVolumes());
+            }
         } else {
             setCookieConsent(undefined);
         }
-    }, []);
+    }, [setVolumes]);
 
     useEffect(() => {
         if (isReady && activeMelodyInstrument) {
@@ -109,7 +113,7 @@ export default function Home() {
 
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
-        if (isReady) {
+        if (isReady && setBassInstrument) {
             setBassInstrument(instrumentId);
         }
     }, [setBassInstrument, isReady]);
@@ -196,12 +200,12 @@ export default function Home() {
 
     const handlePlayPause = useCallback(() => {
         if (!audioEngine) return;
-        if (audioEngine.isPlaying) {
+        if (isPlaying) {
             audioEngine.getDrumMachine().stop();
         } else {
             audioEngine.getDrumMachine().play();
         }
-    }, [audioEngine]);
+    }, [audioEngine, isPlaying]);
 
     if (!isClient) {
         return <Preloader />;
@@ -215,8 +219,8 @@ export default function Home() {
                 <div className="absolute top-4 right-4 z-20">
                     <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
                 </div>
-                <div className={cn("absolute inset-0 z-0 transition-opacity duration-1000", isAppStarted ? 'opacity-100' : 'opacity-30')}>
-                    <MemoizedOrbitalAnimation isPlaying={false} tempo={120}/>
+                <div className={cn("absolute inset-0 z-0 transition-opacity duration-1000", 'opacity-30')}>
+                     <MemoizedOrbitalAnimation isPlaying={false} tempo={defaultVolumes.tempo}/>
                 </div>
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
@@ -233,9 +237,9 @@ export default function Home() {
                     <p>&copy; 2024, EVS</p>
                     <p className="mt-2">v.2.1 "Maestro"</p>
                 </footer>
-                {cookieConsent === undefined || cookieConsent === false ? (
+                {cookieConsent === undefined && (
                     <CookieConsent onConsentChange={onConsentChange} />
-                ) : null}
+                )}
             </div>
         )
     }
@@ -331,7 +335,9 @@ export default function Home() {
                     />
                 </div>
             </div>
+             {cookieConsent === undefined && isAppStarted && (
+                <CookieConsent onConsentChange={onConsentChange} />
+            )}
         </div>
     );
 }
-

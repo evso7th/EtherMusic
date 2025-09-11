@@ -218,7 +218,10 @@ export function useAudioEngine() {
     
     const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
         if(audioEngine.current){
-            audioEngine.current.setBassInstrument(instrumentName);
+            const newVolumes = audioEngine.current.setBassInstrument(instrumentName);
+            if (newVolumes) {
+                setVolumes(newVolumes);
+            }
         }
     }, []);
 
@@ -242,5 +245,3 @@ export function useAudioEngine() {
         currentTempo,
     };
 }
-
-    

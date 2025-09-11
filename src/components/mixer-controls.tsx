@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Waves, Drum, Anchor, Blend, AudioLines, Music, Clock, Shuffle } from 'lucide-react';
-import { useState, useCallback, memo } from 'react';
+import { useState, useCallback, useEffect, memo } from 'react';
 import type { Volumes, CompressorSettings, ChannelVolumes } from '@/types';
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
@@ -70,6 +70,10 @@ export const MixerControls = ({
     
     const [localVolumes, setLocalVolumes] = useState(initialVolumes || defaultVolumes);
 
+    useEffect(() => {
+        setLocalVolumes(initialVolumes);
+    }, [initialVolumes]);
+
     const handleApplyChanges = () => {
         onApply(localVolumes);
         closeDialog();
@@ -109,27 +113,12 @@ export const MixerControls = ({
         setLocalVolumes(prev => ({ ...prev, reverbReturn: value }));
     }, []);
     
-    const handleCompressorEnabledChange = useCallback((enabled: boolean) => {
-         setLocalVolumes(prev => ({
-            ...prev,
-            compressor: { ...prev.compressor, enabled }
-        }));
-    }, []);
-
-    const handleCompressorThresholdChange = useCallback((threshold: number) => {
+    const handleCompressorSettingChange = useCallback((setting: keyof CompressorSettings, value: any) => {
         setLocalVolumes(prev => ({
             ...prev,
-            compressor: { ...prev.compressor, threshold }
+            compressor: { ...(prev.compressor || defaultVolumes.compressor), [setting]: value }
         }));
     }, []);
-
-    const handleCompressorRatioChange = useCallback((ratio: number) => {
-         setLocalVolumes(prev => ({
-            ...prev,
-            compressor: { ...prev.compressor, ratio }
-        }));
-    }, []);
-
 
     return (
         <div className="space-y-6">
@@ -205,7 +194,7 @@ export const MixerControls = ({
                 />
             </div>
 
-            {!isAutopilotMixer && (
+            {!isAutopilotMixer && localVolumes.compressor && (
                 <>
                     <Separator />
                     <div className="space-y-4">
@@ -217,7 +206,7 @@ export const MixerControls = ({
                             <Switch
                                 id="compressor-switch"
                                 checked={localVolumes.compressor.enabled}
-                                onCheckedChange={handleCompressorEnabledChange}
+                                onCheckedChange={(enabled) => handleCompressorSettingChange('enabled', enabled)}
                             />
                         </div>
                         <div className={cn("space-y-4 transition-opacity", !localVolumes.compressor.enabled && "opacity-50 pointer-events-none")}>
@@ -225,7 +214,7 @@ export const MixerControls = ({
                                 label="Threshold"
                                 icon={Waves}
                                 volume={localVolumes.compressor.threshold}
-                                onVolumeChange={handleCompressorThresholdChange}
+                                onVolumeChange={(threshold) => handleCompressorSettingChange('threshold', threshold)}
                                 min={-100}
                                 max={0}
                                 step={1}
@@ -235,7 +224,7 @@ export const MixerControls = ({
                                 label="Ratio"
                                 icon={Waves}
                                 volume={localVolumes.compressor.ratio}
-                                onVolumeChange={handleCompressorRatioChange}
+                                onVolumeChange={(ratio) => handleCompressorSettingChange('ratio', ratio)}
                                 min={1}
                                 max={20}
                                 step={1}

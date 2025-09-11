@@ -1,4 +1,3 @@
-
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for all real-time synthesis, running in a high-priority
 // audio thread to ensure low-latency, glitch-free sound generation.
@@ -84,7 +83,7 @@ class Voice {
 
     initLayers() {
         this.layers = [];
-        const createLayer = (layerConfig, baseFreq, isMainOsc) => {
+        const createLayer = (layerConfig, isMainOsc) => {
             const envConfig = isMainOsc ? this.preset.envelope : (layerConfig.envelope || this.preset.envelope);
             const attackSamples = Math.max(1, (envConfig.attack || 0.01) * this.sampleRate);
             const releaseSamples = Math.max(1, (envConfig.release || 0.5) * this.sampleRate);
@@ -98,7 +97,7 @@ class Voice {
                 env: {
                     attackInc: 1.0 / attackSamples,
                     decayRate: envConfig.decay > 0 ? (1.0 - (envConfig.sustain ?? 1.0)) / decaySamples : 1,
-                    releaseRate: 1.0 / releaseSamples,
+                    releaseSamples: releaseSamples,
                     sustainLevel: envConfig.sustain ?? 1.0,
                     state: 'attack',
                     currentValue: 0,
@@ -109,11 +108,11 @@ class Voice {
 
         if (this.preset.oscillator) {
             const mainOscConfig = { ...this.preset.oscillator, level: 1.0, freqMult: 1.0, envelope: this.preset.envelope };
-            this.layers.push(createLayer(mainOscConfig, this.baseFrequency, true));
+            this.layers.push(createLayer(mainOscConfig, true));
         }
 
         if (this.preset.layers) {
-            this.preset.layers.forEach(layer => this.layers.push(createLayer(layer, this.baseFrequency, false)));
+            this.preset.layers.forEach(layer => this.layers.push(createLayer(layer, false)));
         }
     }
 
@@ -182,6 +181,7 @@ class Voice {
         if (this.isReleasing && env.state !== 'release') {
             env.state = 'release';
             env.releaseStartValue = env.currentValue;
+            // Ensure releaseRate is calculated correctly and is not zero
             env.releaseRate = env.releaseStartValue / Math.max(1, env.releaseSamples);
         }
 
@@ -339,6 +339,9 @@ class SynthProcessor extends AudioWorkletProcessor {
         if (voiceCount === 0) {
             return true;
         }
+
+        this.logCounter++;
+        let peakLevel = 0;
         
         for (let i = 0; i < outputChannel.length; i++) {
             let sample = 0;
@@ -350,11 +353,26 @@ class SynthProcessor extends AudioWorkletProcessor {
                 }
             }
             
+            const absSample = Math.abs(sample);
+            if (absSample > peakLevel) {
+                peakLevel = absSample;
+            }
+            
             // Attenuation based on number of voices to prevent clipping before compressor
             const attenuation = 1 / (1 + Math.max(0, voiceCount - 1) * 0.5);
             
             // Soft clipping using tanh as a final safety net
-            outputChannel[i] = Math.tanh(sample * attenuation);
+            outputChannel[i] = Math.tanh(sample * attenuation * 0.7);
+        }
+
+        // Log active voices and peak level periodically for debugging.
+        if (this.logCounter >= 200 && this.voices.size > 0) {
+            const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
+            this.port.postMessage({
+                type: 'debug',
+                message: `Active voices: ${this.voices.size}. Freqs: [${activeFrequencies.join(', ')}]. Peak: ${peakLevel.toFixed(4)}`
+            });
+            this.logCounter = 0;
         }
         
         return true;
@@ -373,5 +391,3 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
-
-    

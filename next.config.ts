@@ -2,8 +2,8 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  // This option includes the static export mode, but only for production builds.
-  output: process.env.NODE_ENV === 'production' ? 'export' : undefined,
+  // This option enables static export for production builds.
+  output: 'export',
   
   // Disables Next.js image optimization, which is required for static export.
   images: {
@@ -19,14 +19,16 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   
-  webpack(config, { isServer, dev }) {
+  // This is the correct way to handle worklets in Next.js
+  webpack(config, { isServer }) {
+    // This is required to make audio worklets work with SSR
+    if (isServer) {
+        config.output.globalObject = 'self';
+    }
+
     config.module.rules.push({
-      test: /src[\\/]lib[\\/]workers[\\/].*\.js$/,
-      loader: 'worker-loader',
-      options: {
-        filename: 'static/chunks/[name].[contenthash].js',
-        publicPath: '/_next/',
-      },
+      test: /\.worklet\.js$/,
+      use: { loader: 'worker-loader' },
     });
 
     return config;
@@ -34,5 +36,3 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
-
-    

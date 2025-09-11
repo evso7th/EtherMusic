@@ -82,16 +82,14 @@ class DrumProcessor extends AudioWorkletProcessor {
             return true; // No active voices, nothing to do.
         }
         
-        let activeVoices = [];
-
+        // Process each voice and add its output to the main output buffer.
+        // A simple limiter is also applied.
         for (const voice of this.voices) {
-            if (!voice.isFinished) {
-                voice.process(outputChannel);
-                activeVoices.push(voice);
-            }
+            voice.process(outputChannel);
         }
 
-        this.voices = activeVoices;
+        // Filter out finished voices to keep the active voices array clean.
+        this.voices = this.voices.filter(v => !v.isFinished);
         
         // A simple limiter to prevent clipping and audio artifacts.
         // This is a safety measure if many loud samples play at once.
@@ -105,5 +103,3 @@ class DrumProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('drum-processor', DrumProcessor);
-
-    
