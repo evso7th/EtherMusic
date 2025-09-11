@@ -401,7 +401,7 @@ export class AudioEngine {
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
             this.setVolumes(newVolumes);
-            return newVolumes;
+            return newVolumes; // Return the modified volumes
         }
         return undefined;
     }
@@ -473,14 +473,13 @@ export class AudioEngine {
     public setVolumes(newVolumes: Volumes) {
         if (!this.isInitialized || !this.context) return;
         this.volumes = newVolumes;
-        const rampTime = 0.02; // Smoother transition
 
         this.applyChannelSettings('melody', newVolumes.melody);
         this.applyChannelSettings('manualBass', newVolumes.manualBass);
         this.applyChannelSettings('latch', newVolumes.latch);
         this.applyChannelSettings('drums', newVolumes.drums);
         
-        this.reverbReturnGain.gain.setTargetAtTime(dbToGain(newVolumes.reverbReturn), this.context.currentTime, rampTime);
+        this.reverbReturnGain.gain.setTargetAtTime(dbToGain(newVolumes.reverbReturn), this.context.currentTime, 0.02);
         this.setMasterCompressorSettings(newVolumes.compressor);
 
         if (newVolumes.swing !== undefined) {
@@ -494,17 +493,15 @@ export class AudioEngine {
     
     public setMasterCompressorSettings(compressorSettings: CompressorSettings) {
         if (!this.isInitialized || !this.context || !this.masterCompressor) return;
-        this.volumes.compressor = compressorSettings;
-        const rampTime = 0.02;
-
-        this.preCompressorOut.disconnect();
         
+        this.preCompressorOut.disconnect(); // Disconnect from whatever it was connected to
+
         if (compressorSettings.enabled) {
+            const rampTime = this.context.currentTime + 0.02;
             this.masterCompressor.threshold.setTargetAtTime(compressorSettings.threshold, this.context.currentTime, rampTime);
             this.masterCompressor.ratio.setTargetAtTime(compressorSettings.ratio, this.context.currentTime, rampTime);
             this.masterCompressor.attack.setTargetAtTime(compressorSettings.attack, this.context.currentTime, rampTime);
             this.masterCompressor.release.setTargetAtTime(compressorSettings.release, this.context.currentTime, rampTime);
-            
             this.preCompressorOut.connect(this.masterCompressor);
             this.masterCompressor.connect(this.masterOut);
         } else {
@@ -524,3 +521,5 @@ export class AudioEngine {
         }
     }
 }
+
+    

@@ -243,7 +243,7 @@ export function useAudioEngine() {
         setBeatPattern,
         setBassLatch,
         startRecording,
-        stopRecording,
+stopRecording,
         handleThereminInteraction,
         currentTempo,
     };
