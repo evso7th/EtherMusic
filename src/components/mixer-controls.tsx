@@ -61,12 +61,12 @@ interface MixerControlsProps {
     isAutopilotMixer?: boolean;
 }
 
-export const MixerControls = ({ 
+export function MixerControls({ 
     initialVolumes, 
     onApply,
     closeDialog,
     isAutopilotMixer = false,
-}: MixerControlsProps) => {
+}: MixerControlsProps) {
     
     const [localVolumes, setLocalVolumes] = useState(initialVolumes || defaultVolumes);
 

@@ -8,8 +8,6 @@ import { OrbManager } from '@/lib/orb-manager';
 import type { Volumes, Instrument, BassInstrument, AudioEngineEvents } from '@/types';
 import mitt, { Emitter } from 'mitt';
 
-// Removed all cookie-related functions (getCookie, setCookie, saveVolumes, loadVolumes)
-
 export const defaultVolumes: Volumes = { 
     melody: { gain: 0, reverbSend: -18, distortion: 0 },
     manualBass: { gain: -6, reverbSend: -48, distortion: 0 },
@@ -26,6 +24,11 @@ export const defaultVolumes: Volumes = {
     swing: 0.33,
     tempo: 90,
 };
+
+// This function is kept to avoid breaking imports, but it now just returns defaults.
+export function loadVolumes(): Volumes {
+     return defaultVolumes;
+}
 
 const emitter = mitt<AudioEngineEvents>();
 
@@ -48,7 +51,9 @@ export function useAudioEngine() {
         try {
             if (!orbManager.current) {
                 const padContainer = document.querySelector('main');
-                orbManager.current = new OrbManager(padContainer);
+                if (padContainer) {
+                    orbManager.current = new OrbManager(padContainer);
+                }
             }
 
             if (!audioEngine.current) {
