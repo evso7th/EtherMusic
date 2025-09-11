@@ -75,24 +75,27 @@ export const MixerControls = ({
         closeDialog();
     };
 
-    const createChannelVolumeHandler = useCallback((part: VolumeChannel) => (value: number) => {
+    const handleChannelVolumeChange = useCallback((part: VolumeChannel, value: number) => {
         setLocalVolumes(prev => {
-            const newVolumes = JSON.parse(JSON.stringify(prev));
+            const newVolumes = JSON.parse(JSON.stringify(prev)); // Deep copy to be safe
             const newChannelVolumes = { ...(newVolumes[part] as ChannelVolumes), gain: value };
             newVolumes[part] = newChannelVolumes;
+
+            // Sync manualBass and latch gain sliders
             if (part === 'manualBass') {
                 newVolumes.latch = { ...newVolumes.latch, gain: value };
             } else if (part === 'latch') {
                 newVolumes.manualBass = { ...newVolumes.manualBass, gain: value };
             }
+            
             return newVolumes;
         });
     }, []);
-
-    const handleMelodyGainChange = createChannelVolumeHandler('melody');
-    const handleManualBassGainChange = createChannelVolumeHandler('manualBass');
-    const handleLatchGainChange = createChannelVolumeHandler('latch');
-    const handleDrumsGainChange = createChannelVolumeHandler('drums');
+    
+    const handleMelodyGainChange = useCallback((v: number) => handleChannelVolumeChange('melody', v), [handleChannelVolumeChange]);
+    const handleManualBassGainChange = useCallback((v: number) => handleChannelVolumeChange('manualBass', v), [handleChannelVolumeChange]);
+    const handleLatchGainChange = useCallback((v: number) => handleChannelVolumeChange('latch', v), [handleChannelVolumeChange]);
+    const handleDrumsGainChange = useCallback((v: number) => handleChannelVolumeChange('drums', v), [handleChannelVolumeChange]);
 
     const handleTempoChange = useCallback((v: number) => {
         setLocalVolumes(prev => ({...prev, tempo: v}));
