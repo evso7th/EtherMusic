@@ -210,6 +210,7 @@ class Voice {
             }
         });
         
+        // Normalize by number of layers to prevent clipping inside the voice
         const numLayers = this.layers.length || 1;
         if (numLayers > 1) {
              mixedSample /= numLayers;
@@ -351,28 +352,26 @@ class SynthProcessor extends AudioWorkletProcessor {
                 currentPeak = absSample;
             }
             
-            // Attenuate based on number of voices to prevent clipping
+            // This is a crude but effective way to prevent clipping from multiple voices.
             const attenuation = 1 / Math.max(1, this.voices.size * 0.75);
             outputChannel[i] = Math.tanh(sample * attenuation);
         }
-
-        // Update peak level for logging
+        
         if(currentPeak > this.peakLevel) {
             this.peakLevel = currentPeak;
         }
         
-        // Log peak level periodically
         this.logCounter++;
-        if (this.logCounter >= 200) {
+        if (this.logCounter >= 200) { // Log roughly every 58ms at 44.1kHz
              if (this.voices.size > 0) {
                 const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
                 this.port.postMessage({
                     type: 'debug',
-                    message: `Active voices: ${this.voices.size}. Frequencies: [${activeFrequencies.join(', ')}]. Peak level: ${this.peakLevel.toFixed(4)}`
+                    message: `Active voices: ${this.voices.size}. Frequencies: [${activeFrequencies.join(', ')}]. Peak level before tanh: ${this.peakLevel.toFixed(4)}`
                 });
             }
             this.logCounter = 0;
-            this.peakLevel = 0; // Reset peak for next logging interval
+            this.peakLevel = 0;
         }
         
         return true;
@@ -392,4 +391,3 @@ class SynthProcessor extends AudioWorkletProcessor {
 
 registerProcessor('synth-processor', SynthProcessor);
 
-    

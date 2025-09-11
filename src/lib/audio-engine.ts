@@ -174,8 +174,8 @@ export class AudioEngine {
 
         try {
              await Promise.all([
-                this.context.audioWorklet.addModule('workers/synth-processor.js'),
-                this.context.audioWorklet.addModule('workers/drum-processor.js'),
+                this.context.audioWorklet.addModule('/workers/synth-processor.js'),
+                this.context.audioWorklet.addModule('/workers/drum-processor.js'),
              ]);
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
@@ -288,7 +288,7 @@ export class AudioEngine {
         if (!this.isInitialized) return;
         
         const partName = type === 'bass' ? (this.isBassLatchOn ? 'latch' : 'manualBass') : 'melody';
-        console.log(`[Interaction] type: ${type}, state: ${state}, part: ${partName}, data:`, data);
+        console.log(`[Interaction] type: ${type}, state: ${state}, part: ${partName.toUpperCase()}, data:`, data);
 
         if (partName === 'latch') {
             if (state === 'down' && data) { 
@@ -511,9 +511,9 @@ export class AudioEngine {
     
             const now = this.context.currentTime;
             this.limiter.threshold.setTargetAtTime(limiterSettings.threshold, now, 0.01);
-            this.limiter.knee.setTargetAtTime(0, now, 0.01);
-            this.limiter.ratio.setTargetAtTime(20, now, 0.01);
-            this.limiter.attack.setTargetAtTime(0.003, now, 0.01);
+            this.limiter.knee.setTargetAtTime(0, now, 0.01); // Hard knee for brickwall limiting
+            this.limiter.ratio.setTargetAtTime(20, now, 0.01); // Max ratio
+            this.limiter.attack.setTargetAtTime(0.003, now, 0.01); // Fast attack
             this.limiter.release.setTargetAtTime(limiterSettings.release, now, 0.01);
         } else {
             this.preLimiterOut.connect(this.masterOut);
@@ -533,4 +533,3 @@ export class AudioEngine {
     }
 }
 
-    
