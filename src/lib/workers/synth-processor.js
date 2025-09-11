@@ -1,4 +1,5 @@
 
+
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for all real-time synthesis, running in a high-priority
 // audio thread to ensure low-latency, glitch-free sound generation.
@@ -189,7 +190,7 @@ class Voice {
     render() {
         if (this.isFinished) return 0;
         
-        if (this.isReleasing && this.layers.every(l => l.env.currentValue <= 0)) {
+        if (this.isReleasing && this.layers.every(l => l.env.currentValue <= 0.0001)) {
             this.isFinished = true;
             return 0;
         }
@@ -252,6 +253,7 @@ class SynthProcessor extends AudioWorkletProcessor {
 
     applyPreset(preset) {
         this.preset = { ...this.getDefaultPreset(), ...preset };
+        this.allNotesOff();
     }
 
     noteOn(note) {
@@ -309,13 +311,16 @@ class SynthProcessor extends AudioWorkletProcessor {
     
         outputChannel.fill(0);
         
-        if (this.voices.size === 0) {
+        const voiceCount = this.voices.size;
+        if (voiceCount === 0) {
             return true;
         }
         
         // This factor helps prevent clipping when multiple voices are active.
-        // It's a simple form of mixing/attenuation.
-        const attenuation = 1 / (1 + Math.max(0, this.voices.size - 1) * 0.5);
+        // It's a simple form of mixing/attenuation. It's a bit more gentle than a sqrt.
+        const attenuation = 1 / (1 + Math.max(0, voiceCount - 1) * 0.25);
+
+        let peak = 0;
 
         for (let i = 0; i < outputChannel.length; i++) {
             let sample = 0;
@@ -325,8 +330,24 @@ class SynthProcessor extends AudioWorkletProcessor {
                     this.voices.delete(id);
                 }
             }
-            // Apply attenuation and a soft-clipper to prevent harsh distortion
-            outputChannel[i] = Math.tanh(sample * attenuation);
+            
+            const attenuatedSample = sample * attenuation;
+            // Apply a soft-clipper (tanh) to prevent harsh distortion if it still overloads.
+            const finalSample = Math.tanh(attenuatedSample * 1.2); 
+            outputChannel[i] = finalSample
+            
+            const absSample = Math.abs(finalSample);
+            if (absSample > peak) {
+                peak = absSample;
+            }
+        }
+
+        // Send a debug message every 100 processing blocks or so to avoid spamming the console
+        if (Math.random() < 0.01) {
+             this.port.postMessage({ 
+                type: 'debug', 
+                message: `Active voices: ${voiceCount}, Peak level: ${peak.toFixed(4)}`
+            });
         }
 
         return true;
@@ -345,3 +366,5 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
+
+    
