@@ -473,20 +473,16 @@ export class AudioEngine {
     public setVolumes(newVolumes: Volumes) {
         if (!this.isInitialized || !this.context) return;
         this.volumes = newVolumes;
-        const rampTime = 0.01;
+        const rampTime = 0.02; // Smoother transition
 
         this.applyChannelSettings('melody', newVolumes.melody);
         this.applyChannelSettings('manualBass', newVolumes.manualBass);
         this.applyChannelSettings('latch', newVolumes.latch);
-
-        const drumsNode = this.nodes.get('drums');
-        if (drumsNode && newVolumes.drums) {
-             drumsNode.gain.gain.setTargetAtTime(dbToGain(newVolumes.drums.gain), this.context.currentTime, rampTime);
-             drumsNode.reverbSend.gain.setTargetAtTime(dbToGain(newVolumes.drums.reverbSend), this.context.currentTime, rampTime);
-        }
-
+        this.applyChannelSettings('drums', newVolumes.drums);
+        
         this.reverbReturnGain.gain.setTargetAtTime(dbToGain(newVolumes.reverbReturn), this.context.currentTime, rampTime);
         this.setMasterCompressorSettings(newVolumes.compressor);
+
         if (newVolumes.swing !== undefined) {
             this.setSwing(newVolumes.swing);
         }
@@ -499,7 +495,7 @@ export class AudioEngine {
     public setMasterCompressorSettings(compressorSettings: CompressorSettings) {
         if (!this.isInitialized || !this.context || !this.masterCompressor) return;
         this.volumes.compressor = compressorSettings;
-        const rampTime = 0.01;
+        const rampTime = 0.02;
 
         this.preCompressorOut.disconnect();
         
@@ -528,5 +524,3 @@ export class AudioEngine {
         }
     }
 }
-
-    
