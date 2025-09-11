@@ -49,8 +49,8 @@ export default function Home() {
     const {
         isAppStarted,
         isReady,
-        isPlaying,
         audioEngine,
+        emitter,
         startApp,
         stopAllSounds,
         setBeatPattern,
@@ -63,7 +63,6 @@ export default function Home() {
         orbManager,
         volumes,
         setVolumes,
-        currentTempo,
     } = useAudioEngine();
     
     const [cookieConsent, setCookieConsent] = useState<boolean | undefined>(undefined);
@@ -96,16 +95,10 @@ export default function Home() {
         if (consent !== null) {
             const hasConsent = consent === 'true';
             setCookieConsent(hasConsent);
-            if (hasConsent) {
-                setVolumes(loadVolumes());
-            } else {
-                setVolumes(defaultVolumes);
-            }
         } else {
             setCookieConsent(undefined);
-            setVolumes(defaultVolumes);
         }
-    }, [setVolumes]);
+    }, []);
 
     useEffect(() => {
         if (isReady && activeMelodyInstrument) {
@@ -154,7 +147,6 @@ export default function Home() {
         value: number
     ) => {
         setVolumes(prevVolumes => {
-            if (!prevVolumes) return defaultVolumes; // Should not happen with new init logic
             const newVolumes = JSON.parse(JSON.stringify(prevVolumes));
             const targetChannelKey = channel === 'bass' ? 'manualBass' : 'melody';
             
@@ -214,7 +206,7 @@ export default function Home() {
                     <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
                 </div>
                 <div className={cn("absolute inset-0 z-0 transition-opacity duration-1000", isAppStarted ? 'opacity-100' : 'opacity-30')}>
-                    <MemoizedOrbitalAnimation isPlaying={false} tempo={120}/>
+                    <MemoizedOrbitalAnimation isPlaying={false} tempo={120} audioEngine={null} emitter={null}/>
                 </div>
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
@@ -245,7 +237,7 @@ export default function Home() {
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
             <div className="fixed inset-0 z-0">
-                 <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={currentTempo} />
+                 <MemoizedOrbitalAnimation audioEngine={audioEngine} emitter={emitter} />
             </div>
             
              <div className="relative z-10 flex h-full portrait:flex-col portrait:p-2 md:p-6 lg:p-8 landscape:flex-row landscape:p-1 landscape:gap-1">
@@ -279,12 +271,12 @@ export default function Home() {
                     </div>
                     <div className="flex items-center gap-1 md:gap-2 landscape:flex-col">
                          <PlaybackControls
-                            isPlaying={isPlaying}
                             isRecording={isRecording}
                             onRecord={handleRecord}
                             onExit={stopAllSounds}
                             isReady={isReady}
                             audioEngine={audioEngine}
+                            emitter={emitter}
                         />
                     </div>
                 </header>
@@ -298,7 +290,7 @@ export default function Home() {
                         activeBassInstrument={activeBassInstrument}
                         onInstrumentChange={handleSetBassInstrument}
                         orbManager={orbManager}
-                        volumes={volumes!}
+                        volumes={volumes}
                         onEffectChange={handleChannelEffectChange}
                         activeMelodyInstrument={activeMelodyInstrument}
                         onMelodyInstrumentChange={handleMelodyInstrumentChange}
@@ -311,7 +303,7 @@ export default function Home() {
                         <BeatBoxControls
                             activePattern={activePattern}
                             onPatternChange={handlePatternChange}
-                            volumes={volumes!}
+                            initialVolumes={volumes}
                             onApply={handleMixerApply}
                             isMobile={isMobile}
                         />
@@ -322,7 +314,7 @@ export default function Home() {
                      <BeatBoxControls
                         activePattern={activePattern}
                         onPatternChange={handlePatternChange}
-                        volumes={volumes!}
+                        initialVolumes={volumes}
                         onApply={handleMixerApply}
                         isMobile={isMobile}
                         isLandscape={true}
@@ -332,5 +324,3 @@ export default function Home() {
         </div>
     );
 }
-
-    

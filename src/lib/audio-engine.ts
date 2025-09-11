@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Volumes, Instrument, BassInstrument, CompressorSettings, BassInstrumentPresetParams, ChannelVolumes, SynthNote, WorkerMessage, DrumWorkerMessage } from '@/types';
+import type { Volumes, Instrument, BassInstrument, CompressorSettings, BassInstrumentPresetParams, ChannelVolumes, SynthNote, WorkerMessage, DrumWorkerMessage, AudioEngineEvents } from '@/types';
 import { OrbManager } from './orb-manager';
 import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
@@ -68,10 +68,6 @@ const DRUM_SAMPLES: Record<string, string> = {
     'p15': '/assets/sounds/drums/perc-015.wav',
 };
 
-type AudioEngineEvents = {
-    playStateChanged: boolean;
-    volumesChanged: Volumes;
-};
 
 export class AudioEngine {
     public isInitialized = false;
@@ -386,7 +382,7 @@ export class AudioEngine {
         }
     }
     
-    public setBassInstrument(instrumentName: BassInstrument): Volumes | undefined {
+    public setBassInstrument(instrumentName: BassInstrument) {
         const preset = bassInstruments.find(i => i.id === instrumentName);
         if (preset && this.volumes) {
             const newVolumes = JSON.parse(JSON.stringify(this.volumes)); // Deep copy
@@ -402,9 +398,7 @@ export class AudioEngine {
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
             this.setVolumes(newVolumes);
-            return newVolumes;
         }
-        return undefined;
     }
     
     public setBeatPattern(patternName: string) {
