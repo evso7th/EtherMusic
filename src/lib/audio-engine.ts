@@ -9,26 +9,32 @@ import { bassInstruments } from './bass-presets';
 import { DrumMachine } from './drum-machine';
 import type { Emitter } from 'mitt';
 
+
 function dbToGain(db: number): number {
     if (db <= -48) return 0;
     return Math.pow(10, db / 20);
 }
 
 function createDistortionCurve(amount: number): Float32Array {
-    const k = Math.max(0, Math.min(100, amount)) * 2;
-    if (k === 0) {
-        // Return a linear curve when distortion is 0 to avoid artifacts
-        return new Float32Array([ -1, 1 ]);
+    // Normalize amount to a range of 0-1
+    const normalizedAmount = Math.max(0, Math.min(100, amount)) / 100;
+    if (normalizedAmount === 0) {
+        return new Float32Array([-1, 1]); // Linear curve for no distortion
     }
+    
+    const k = normalizedAmount * 100; // Increase the shaping factor for more pronounced effect
     const n_samples = 44100;
     const curve = new Float32Array(n_samples);
     const deg = Math.PI / 180;
-    for (let i = 0; i < n_samples; ++i) {
+    
+    for (let i = 0; i < n_samples; i++) {
         const x = i * 2 / n_samples - 1;
+        // A classic waveshaping curve
         curve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
     }
     return curve;
 }
+
 
 type SynthPartName = 'melody' | 'manualBass' | 'latch';
 
@@ -183,7 +189,7 @@ export class AudioEngine {
         
         this.createSynthChannel('melody', 10, 'synth-processor');
         this.createSynthChannel('manualBass', 4, 'synth-processor');
-        this.createSynthChannel('latch', 4, 'synth-processor');
+        this.createSynthChannel('latch', 8, 'synth-processor');
         
         this.createDrumChannel();
         
@@ -385,15 +391,25 @@ export class AudioEngine {
         }
     }
     
-    public setBassInstrument(instrumentName: BassInstrument) {
+    public setBassInstrument(instrumentName: BassInstrument): Volumes | undefined {
         const preset = bassInstruments.find(i => i.id === instrumentName);
         if (preset && this.volumes) {
+            const newVolumes = JSON.parse(JSON.stringify(this.volumes)); // Deep copy
             const bassPresetParams = preset.params as BassInstrumentPresetParams;
             const message: WorkerMessage = { type: 'setPreset', preset: bassPresetParams };
             
             this.nodes.get('manualBass')?.worklet.port.postMessage(message);
             this.nodes.get('latch')?.worklet.port.postMessage(message);
+            
+            newVolumes.manualBass.reverbSend = bassPresetParams.reverbSend ?? newVolumes.manualBass.reverbSend;
+            newVolumes.manualBass.distortion = bassPresetParams.distortion ?? newVolumes.manualBass.distortion;
+            newVolumes.latch.reverbSend = bassPresetParams.reverbSend ?? newVolumes.latch.reverbSend;
+            newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
+            
+            this.setVolumes(newVolumes);
+            return newVolumes; // Return the modified volumes
         }
+        return undefined;
     }
     
     public setBeatPattern(patternName: string) {
@@ -452,7 +468,6 @@ export class AudioEngine {
     private applyVolumeForPart(partName: SynthPartName | 'drums', volumes: ChannelVolumes) {
         const nodeInfo = this.nodes.get(partName);
         if (nodeInfo && volumes) {
-            // Ramping is now handled inside the worklet for synths, but gain nodes are fine here.
             nodeInfo.gain.gain.setValueAtTime(dbToGain(volumes.gain), this.context.currentTime);
             nodeInfo.reverbSend.gain.setValueAtTime(dbToGain(volumes.reverbSend), this.context.currentTime);
             if (nodeInfo.distortion) {

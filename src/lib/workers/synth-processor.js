@@ -244,13 +244,55 @@ class Voice {
     release() { if (!this.isReleasing) this.isReleasing = true; }
 }
 
+// Simple RMS Compressor/Limiter
+class Limiter {
+    constructor(sampleRate, attack = 0.003, release = 0.25, threshold = -6, ratio = 4) {
+        this.sampleRate = sampleRate;
+        this.attackTime = attack;
+        this.releaseTime = release;
+        this.threshold = threshold; // in dB
+        this.ratio = ratio;
+
+        this.alphaAttack = Math.exp(-1 / (this.attackTime * this.sampleRate));
+        this.alphaRelease = Math.exp(-1 / (this.releaseTime * this.sampleRate));
+        this.envelope = 0.0;
+    }
+
+    process(inputSample) {
+        const inputdB = 20 * Math.log10(Math.abs(inputSample) || 1e-6);
+
+        let gain = 1.0;
+        if (inputdB > this.threshold) {
+            const excessdB = inputdB - this.threshold;
+            const gainReductiondB = excessdB * (1 - 1 / this.ratio);
+            gain = Math.pow(10, -gainReductiondB / 20);
+        }
+
+        // Smooth the gain change using the envelope
+        if (gain < this.envelope) {
+            this.envelope = this.alphaAttack * this.envelope + (1 - this.alphaAttack) * gain;
+        } else {
+            this.envelope = this.alphaRelease * this.envelope + (1 - this.alphaRelease) * gain;
+        }
+        
+        return inputSample * this.envelope;
+    }
+}
+
+
 class SynthProcessor extends AudioWorkletProcessor {
     constructor(options) {
         super();
         this.voices = new Map();
         this.polyphony = options.processorOptions?.polyphony || 8;
         this.preset = this.getDefaultPreset();
+        
+        this.limiter = new Limiter(sampleRate, 0.003, 0.2, -10, 4);
+
+        // Debug logging
         this.logCounter = 0;
+        this.peakLevel = 0;
+
         this.port.onmessage = this.handleMessage.bind(this);
     }
 
@@ -291,7 +333,6 @@ class SynthProcessor extends AudioWorkletProcessor {
             let oldestId = this.voices.keys().next().value;
             let oldestVoice = this.voices.get(oldestId);
             
-            // Prioritize replacing a releasing voice
             if (oldestVoice && !oldestVoice.isReleasing) {
                  for (const [id, voice] of this.voices.entries()) {
                     if (voice.isReleasing) {
@@ -327,7 +368,7 @@ class SynthProcessor extends AudioWorkletProcessor {
             // Use a very short release to prevent clicks but kill the sound quickly.
             voice.layers.forEach(l => {
                 if (l.env.releaseSamples > sampleRate * 0.05) {
-                    l.env.releaseSamples = sampleRate * 0.05;
+                    l.env.releaseSamples = sampleRate * 0.05; // 50ms fade
                 }
             });
         });
@@ -347,7 +388,7 @@ class SynthProcessor extends AudioWorkletProcessor {
             return true;
         }
 
-        let peakLevel = 0;
+        let currentPeak = 0;
         
         for (let i = 0; i < outputChannel.length; i++) {
             let sample = 0;
@@ -358,28 +399,33 @@ class SynthProcessor extends AudioWorkletProcessor {
                     sample += voice.render();
                 }
             }
-            
+
             const absSample = Math.abs(sample);
-            if (absSample > peakLevel) {
-                peakLevel = absSample;
+            if (absSample > currentPeak) {
+                currentPeak = absSample;
             }
             
-            // Attenuation based on number of voices to prevent clipping before compressor
-            const attenuation = 1 / (1 + Math.max(0, voiceCount - 1) * 0.5);
-            
-            // Soft clipping using tanh as a final safety net
-            outputChannel[i] = Math.tanh(sample * attenuation);
+            // Apply the limiter
+            const limitedSample = this.limiter.process(sample);
+            outputChannel[i] = limitedSample;
+        }
+        
+        if (currentPeak > this.peakLevel) {
+            this.peakLevel = currentPeak;
         }
 
         // Log active voices and peak level periodically for debugging.
         this.logCounter++;
-        if (this.logCounter >= 200 && this.voices.size > 0) {
-            const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
-            this.port.postMessage({
-                type: 'debug',
-                message: `Active voices: ${this.voices.size}. Frequencies: [${activeFrequencies.join(', ')}]. Peak level: ${peakLevel.toFixed(4)}`
-            });
+        if (this.logCounter >= 200) { // Log roughly every 500ms
+             if (this.voices.size > 0) {
+                const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
+                this.port.postMessage({
+                    type: 'debug',
+                    message: `Active voices: ${this.voices.size}. Frequencies: [${activeFrequencies.join(', ')}]. Peak level: ${this.peakLevel.toFixed(4)}`
+                });
+            }
             this.logCounter = 0;
+            this.peakLevel = 0;
         }
         
         return true;
