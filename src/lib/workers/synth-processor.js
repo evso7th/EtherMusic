@@ -1,4 +1,3 @@
-
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for all real-time synthesis, running in a high-priority
 // audio thread to ensure low-latency, glitch-free sound generation.
@@ -210,7 +209,6 @@ class Voice {
             }
         });
         
-        // Normalize by number of layers to prevent clipping inside the voice
         const numLayers = this.layers.length || 1;
         if (numLayers > 1) {
              mixedSample /= numLayers;
@@ -280,12 +278,11 @@ class SynthProcessor extends AudioWorkletProcessor {
             return;
         }
 
-        // Voice stealing logic
         if (this.voices.size >= this.polyphony) {
             let oldestId;
             let oldestTime = Infinity;
              for (const [id, voice] of this.voices.entries()) {
-                if (voice.isReleasing) { // Prioritize stealing a releasing voice
+                if (voice.isReleasing) {
                     oldestId = id;
                     break;
                 }
@@ -320,7 +317,6 @@ class SynthProcessor extends AudioWorkletProcessor {
     allNotesOff() {
         this.voices.forEach(voice => {
             voice.release();
-            // Use a very short release to prevent clicks but kill the sound quickly.
             voice.layers.forEach(l => {
                 l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05); 
             });
@@ -365,7 +361,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         }
         
         this.logCounter++;
-        if (this.logCounter >= 200) { // Log every ~4-5 seconds
+        if (this.logCounter >= 200) { 
              if (this.voices.size > 0) {
                 const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
                 this.port.postMessage({

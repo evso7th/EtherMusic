@@ -1,4 +1,3 @@
-
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for playing back pre-loaded drum samples
 // with low latency and high performance, off the main thread.
@@ -72,13 +71,13 @@ class DrumProcessor extends AudioWorkletProcessor {
     process(inputs, outputs, parameters) {
         const outputChannel = outputs[0]?.[0];
         if (!outputChannel) {
-            return true;
+            return true; // Stop processing if there's no output channel.
         }
 
         outputChannel.fill(0);
 
         if (this.voices.length === 0) {
-            return true;
+            return true; // No active voices, nothing to do.
         }
         
         let activeVoices = [];
@@ -88,15 +87,15 @@ class DrumProcessor extends AudioWorkletProcessor {
                 activeVoices.push(voice);
             }
         }
-
         this.voices = activeVoices;
         
+        // A simple limiter to prevent clipping and audio artifacts.
         for (let i = 0; i < outputChannel.length; i++) {
             const sample = outputChannel[i];
             outputChannel[i] = Math.max(-1, Math.min(1, sample));
         }
 
-        return true;
+        return true; // Keep the processor alive.
     }
 }
 

@@ -78,7 +78,7 @@ export class AudioEngine {
     private recordedChunks: Blob[] = [];
 
     private masterOut: GainNode;
-    private preCompressorOut: GainNode;
+    private preLimiterOut: GainNode;
     private limiter: DynamicsCompressorNode;
     
     private reverbSend: GainNode;
@@ -109,10 +109,10 @@ export class AudioEngine {
         this.masterOut = this.context.createGain();
         this.masterOut.connect(this.context.destination);
         
-        this.preCompressorOut = this.context.createGain();
+        this.preLimiterOut = this.context.createGain();
 
         this.limiter = this.context.createDynamicsCompressor();
-        this.preCompressorOut.connect(this.limiter);
+        this.preLimiterOut.connect(this.limiter);
         this.limiter.connect(this.masterOut);
 
         this.reverbSend = this.context.createGain();
@@ -120,7 +120,7 @@ export class AudioEngine {
         this.reverbReturnGain = this.context.createGain();
         this.reverbSend.connect(this.convolver);
         this.convolver.connect(this.reverbReturnGain);
-        this.reverbReturnGain.connect(this.preCompressorOut);
+        this.reverbReturnGain.connect(this.preLimiterOut);
 
         this.drumMachine = new DrumMachine(this, this.emitter);
     }
@@ -138,7 +138,7 @@ export class AudioEngine {
     }
     
     public getVolumes(): Volumes {
-        return JSON.parse(JSON.stringify(this.volumes)); // Return a deep copy
+        return JSON.parse(JSON.stringify(this.volumes));
     }
     
     public async initialize() {
@@ -210,12 +210,12 @@ export class AudioEngine {
         const reverbSend = this.context.createGain();
         
         worklet.connect(distortion).connect(gain);
-        gain.connect(this.preCompressorOut);
+        gain.connect(this.preLimiterOut);
         gain.connect(reverbSend).connect(this.reverbSend);
         
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'debug') {
-                console.log(`[DEBUG-${part.toUpperCase()}] ${e.data.message}`);
+                console.log(`[DEBUG-${part.toUpperCase()}]`, e.data.message);
             } else if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
             }
@@ -231,7 +231,7 @@ export class AudioEngine {
         const reverbSend = this.context.createGain();
 
         worklet.connect(gain);
-        gain.connect(this.preCompressorOut);
+        gain.connect(this.preLimiterOut);
         gain.connect(reverbSend).connect(this.reverbSend);
         
         worklet.port.onmessage = (e) => {
@@ -309,7 +309,7 @@ export class AudioEngine {
             this.activePointers.set(pointerId, { type, noteId });
             const note: SynthNote = { id: noteId, frequency: data.frequency, volume: data.volume };
             const message: WorkerMessage = { type: 'noteOn', note };
-            console.log(`[AudioEngine] -> ${partName} worklet:`, message);
+            console.log(`[AudioEngine] -> ${partName.toUpperCase()} worklet:`, message);
             nodeInfo.worklet.port.postMessage(message);
             this.orbManager.addOrb(pointerId, type, data.x, data.y);
         } else if (state === 'move' && data) {
@@ -324,7 +324,7 @@ export class AudioEngine {
             const activePointer = this.activePointers.get(pointerId);
             if (activePointer) {
                 const message: WorkerMessage = { type: 'noteOff', id: activePointer.noteId };
-                console.log(`[AudioEngine] -> ${partName} worklet:`, message);
+                console.log(`[AudioEngine] -> ${partName.toUpperCase()} worklet:`, message);
                 nodeInfo.worklet.port.postMessage(message);
                 this.activePointers.delete(pointerId);
                 this.orbManager.removeOrb(pointerId);
@@ -503,21 +503,19 @@ export class AudioEngine {
         
         this.volumes.compressor = compressorSettings;
     
-        // Disconnect and reconnect to apply the enabled/disabled state.
-        this.preCompressorOut.disconnect();
+        this.preLimiterOut.disconnect();
         if (compressorSettings.enabled) {
-            this.preCompressorOut.connect(this.limiter);
+            this.preLimiterOut.connect(this.limiter);
             this.limiter.connect(this.masterOut);
 
             const rampTime = this.context.currentTime + 0.02;
-            // Set limiter properties. A high ratio and fast attack/release make it a "brickwall" limiter.
             this.limiter.threshold.setTargetAtTime(compressorSettings.threshold, this.context.currentTime, rampTime);
-            this.limiter.knee.setTargetAtTime(0, this.context.currentTime, rampTime); // Hard knee for limiting
+            this.limiter.knee.setTargetAtTime(0, this.context.currentTime, rampTime); 
             this.limiter.ratio.setTargetAtTime(compressorSettings.ratio, this.context.currentTime, rampTime);
             this.limiter.attack.setTargetAtTime(compressorSettings.attack, this.context.currentTime, rampTime);
             this.limiter.release.setTargetAtTime(compressorSettings.release, this.context.currentTime, rampTime);
         } else {
-            this.preCompressorOut.connect(this.masterOut);
+            this.preLimiterOut.connect(this.masterOut);
         }
     }
     

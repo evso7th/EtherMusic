@@ -26,10 +26,11 @@ const nextConfig: NextConfig = {
         config.output.globalObject = 'self';
     }
 
-    config.module.rules.push({
-      test: /\.worklet\.js$/,
-      use: { loader: 'worker-loader' },
-    });
+    // This rule is no longer needed as we are not using .worklet.js extension
+    // config.module.rules.push({
+    //   test: /\.worklet\.js$/,
+    //   use: { loader: 'worker-loader' },
+    // });
 
     return config;
   },
