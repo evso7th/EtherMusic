@@ -42,7 +42,7 @@ export class LatchEngine {
 
         if (existingNoteIndex > -1) {
             // Note exists, remove it
-            const noteToRemove = this.activeNotes.splice(existingNote-index, 1)[0];
+            const noteToRemove = this.activeNotes.splice(existingNoteIndex, 1)[0];
             return {
                 action: 'removed',
                 noteOff: noteToRemove,
