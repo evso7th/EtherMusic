@@ -211,6 +211,7 @@ class Voice {
         
         const numLayers = this.layers.length || 1;
         if (numLayers > 1) {
+             // Normalizing by the number of layers to prevent clipping inside the voice
              mixedSample /= numLayers;
         }
 
@@ -266,7 +267,6 @@ class SynthProcessor extends AudioWorkletProcessor {
     noteOn(note) {
         if (this.voices.has(note.id)) {
             const voice = this.voices.get(note.id);
-            // Re-trigger envelope if the voice was releasing
             if(voice.isReleasing){
                 voice.isReleasing = false;
                 voice.layers.forEach(l => {
@@ -331,7 +331,9 @@ class SynthProcessor extends AudioWorkletProcessor {
         
         const voiceCount = this.voices.size;
         if (voiceCount === 0) {
-            this.peakLevel = 0;
+            if (this.peakLevel !== 0) {
+                this.peakLevel = 0;
+            }
             return true;
         }
         
@@ -352,6 +354,7 @@ class SynthProcessor extends AudioWorkletProcessor {
                 currentPeak = absSample;
             }
             
+            // Dynamic attenuation based on number of voices
             const attenuation = 1 / (1 + Math.max(0, this.voices.size - 1) * 0.25);
             outputChannel[i] = Math.tanh(sample * attenuation);
         }
@@ -361,7 +364,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         }
         
         this.logCounter++;
-        if (this.logCounter >= 200) { 
+        if (this.logCounter >= 200) { // Log roughly every 500ms
              if (this.voices.size > 0) {
                 const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
                 this.port.postMessage({
