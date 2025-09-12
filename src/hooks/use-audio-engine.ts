@@ -118,7 +118,7 @@ export function useAudioEngine() {
                 orbManager.current = new OrbManager(mainContainer);
                 audioEngine.current?.setOrbManager(orbManager.current);
             } else {
-                 console.error("Main container not found for OrbManager");
+                 console.error("Error: Main container not found for OrbManager");
             }
         }
     }, [isAppStarted, isReady]);
@@ -137,9 +137,19 @@ export function useAudioEngine() {
 
     useEffect(() => {
         const handlePlayState = (playing: boolean) => setIsPlaying(playing);
-        const handleVolumesChanged = (newVolumes: Volumes) => {
-            setVolumesState(newVolumes);
-            saveVolumes(newVolumes);
+        
+        const handleVolumesChanged = (newVolumes: Volumes | ((prev: Volumes) => Volumes)) => {
+            setVolumesState(prev => {
+                const updated = typeof newVolumes === 'function' ? newVolumes(prev) : newVolumes;
+                if (audioEngine.current) {
+                    audioEngine.current.setVolumes(updated);
+                }
+                 if (updated.tempo !== prev.tempo) {
+                    setCurrentTempo(updated.tempo);
+                }
+                saveVolumes(updated);
+                return updated;
+            });
         };
         
         emitter.on('playStateChanged', handlePlayState);
@@ -152,17 +162,7 @@ export function useAudioEngine() {
     }, []);
     
     const setVolumes = useCallback((newVolumes: Volumes | ((prev: Volumes) => Volumes)) => {
-        setVolumesState(prev => {
-            const updated = typeof newVolumes === 'function' ? newVolumes(prev) : newVolumes;
-             if (audioEngine.current) {
-                audioEngine.current.setVolumes(updated);
-            }
-            if (updated.tempo !== prev.tempo) {
-                setCurrentTempo(updated.tempo);
-            }
-            saveVolumes(updated);
-            return updated;
-        });
+        emitter.emit('volumesChanged', newVolumes);
     }, []);
 
     const stopAllSounds = useCallback(() => {
@@ -217,3 +217,5 @@ export function useAudioEngine() {
         handleThereminInteraction,
     };
 }
+
+    

@@ -345,7 +345,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         let peak = 0;
 
         if (this.voices.size > 0) {
-            for (let i = 0; i < outputChannel.length; i++) {
+             for (let i = 0; i < outputChannel.length; i++) {
                 let sample = 0;
                 this.voices.forEach((voice, id) => {
                     if (voice.isFinished) {
@@ -354,11 +354,12 @@ class SynthProcessor extends AudioWorkletProcessor {
                         sample += voice.render();
                     }
                 });
-
-                sample = Math.max(-1, Math.min(1, sample));
-                outputChannel[i] = sample;
                 
-                const absSample = Math.abs(sample);
+                // Hard-clipping limiter
+                const limitedSample = Math.max(-1, Math.min(1, sample));
+                outputChannel[i] = limitedSample;
+                
+                const absSample = Math.abs(limitedSample);
                 if (absSample > peak) {
                     peak = absSample;
                 }
@@ -369,7 +370,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.debugCounter += outputChannel.length;
         if (this.debugCounter > this.sampleRate) { 
             if (this.voices.size > 0) {
-                this.port.postMessage({ type: 'debug', payload: { voices: this.voices.size, peak: this.lastPeak.toFixed(2) } });
+                 this.port.postMessage({ type: 'debug', payload: { voices: this.voices.size, peak: this.lastPeak.toFixed(2) } });
             }
             this.debugCounter = 0;
             this.lastPeak = 0;
