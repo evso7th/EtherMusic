@@ -86,10 +86,12 @@ export function useAudioEngine() {
 
     const initializeAudioEngine = useCallback(async () => {
         try {
-            if (!orbManager.current) {
+             if (!orbManager.current) {
                 const padContainer = document.querySelector('main');
                 if (padContainer) {
                     orbManager.current = new OrbManager(padContainer);
+                } else {
+                    console.error("Main pad container not found for OrbManager.");
                 }
             }
 
@@ -99,6 +101,7 @@ export function useAudioEngine() {
                     await context.resume();
                 }
                 
+                // Pass orbManager only if it was successfully created
                 const engine = new AudioEngine(context, orbManager.current, onPlayStateChange);
                 await engine.initialize();
                 
@@ -221,6 +224,3 @@ export function useAudioEngine() {
         handleThereminInteraction,
     };
 }
-
-
-    
