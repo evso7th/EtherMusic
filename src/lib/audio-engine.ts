@@ -79,8 +79,8 @@ export class AudioEngine {
     private recordedChunks: Blob[] = [];
 
     private masterOut: GainNode;
-    private preLimiterOut: GainNode;
-    private limiter: DynamicsCompressorNode;
+    private preCompressorOut: GainNode;
+    private compressor: DynamicsCompressorNode;
     
     private reverbSend: GainNode;
     private reverbReturnGain: GainNode;
@@ -110,18 +110,18 @@ export class AudioEngine {
         this.masterOut = this.context.createGain();
         this.masterOut.connect(this.context.destination);
         
-        this.preLimiterOut = this.context.createGain();
+        this.preCompressorOut = this.context.createGain();
 
-        this.limiter = this.context.createDynamicsCompressor();
-        this.preLimiterOut.connect(this.limiter);
-        this.limiter.connect(this.masterOut);
+        this.compressor = this.context.createDynamicsCompressor();
+        this.preCompressorOut.connect(this.compressor);
+        this.compressor.connect(this.masterOut);
 
         this.reverbSend = this.context.createGain();
         this.convolver = this.context.createConvolver();
         this.reverbReturnGain = this.context.createGain();
         this.reverbSend.connect(this.convolver);
         this.convolver.connect(this.reverbReturnGain);
-        this.reverbReturnGain.connect(this.preLimiterOut);
+        this.reverbReturnGain.connect(this.preCompressorOut);
 
         this.drumMachine = new DrumMachine(this, this.emitter);
     }
@@ -211,7 +211,7 @@ export class AudioEngine {
         const reverbSend = this.context.createGain();
         
         worklet.connect(distortion).connect(gain);
-        gain.connect(this.preLimiterOut);
+        gain.connect(this.preCompressorOut);
         gain.connect(reverbSend).connect(this.reverbSend);
         
         worklet.port.onmessage = (e) => {
@@ -232,7 +232,7 @@ export class AudioEngine {
         const reverbSend = this.context.createGain();
 
         worklet.connect(gain);
-        gain.connect(this.preLimiterOut);
+        gain.connect(this.preCompressorOut);
         gain.connect(reverbSend).connect(this.reverbSend);
         
         worklet.port.onmessage = (e) => {
@@ -389,7 +389,7 @@ export class AudioEngine {
         }
     }
     
-    public setBassInstrument(instrumentName: BassInstrument): Volumes | undefined {
+    public setBassInstrument(instrumentName: BassInstrument) {
         const preset = bassInstruments.find(i => i.id === instrumentName);
         if (preset && this.volumes) {
             const newVolumes = JSON.parse(JSON.stringify(this.volumes)); // Deep copy
@@ -405,7 +405,7 @@ export class AudioEngine {
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
             this.setVolumes(newVolumes);
-            return newVolumes; // Return the modified volumes
+            return newVolumes;
         }
         return undefined;
     }
@@ -484,7 +484,7 @@ export class AudioEngine {
         this.applyChannelSettings('drums', newVolumes.drums);
         
         this.reverbReturnGain.gain.setTargetAtTime(dbToGain(newVolumes.reverbReturn), this.context.currentTime, 0.02);
-        this.setMasterLimiterSettings(newVolumes.compressor);
+        this.setCompressorSettings(newVolumes.compressor);
 
         if (newVolumes.swing !== undefined) {
             this.setSwing(newVolumes.swing);
@@ -495,25 +495,22 @@ export class AudioEngine {
         this.emitter.emit('volumesChanged', this.getVolumes());
     }
     
-    public setMasterLimiterSettings(limiterSettings: CompressorSettings) {
-        if (!this.isInitialized || !this.context || !this.limiter) return;
+    public setCompressorSettings(compressorSettings: CompressorSettings) {
+        if (!this.isInitialized || !this.context || !this.compressor) return;
+        this.volumes.compressor = compressorSettings;
+        const rampTime = this.context.currentTime + 0.05;
 
-        this.volumes.compressor = limiterSettings;
-    
-        this.preLimiterOut.disconnect();
-
-        if (limiterSettings.enabled) {
-            this.preLimiterOut.connect(this.limiter);
-            this.limiter.connect(this.masterOut);
-    
-            const now = this.context.currentTime;
-            this.limiter.threshold.setTargetAtTime(limiterSettings.threshold, now, 0.01);
-            this.limiter.knee.setTargetAtTime(0, now, 0.01); // Hard knee for brickwall limiting
-            this.limiter.ratio.setTargetAtTime(20, now, 0.01); // Max ratio
-            this.limiter.attack.setTargetAtTime(limiterSettings.attack, now, 0.01); 
-            this.limiter.release.setTargetAtTime(limiterSettings.release, now, 0.01);
+        this.preCompressorOut.disconnect();
+        if (compressorSettings.enabled) {
+            this.preCompressorOut.connect(this.compressor);
+            this.compressor.connect(this.masterOut);
+            
+            this.compressor.threshold.linearRampToValueAtTime(compressorSettings.threshold, rampTime);
+            this.compressor.ratio.linearRampToValueAtTime(compressorSettings.ratio, rampTime);
+            this.compressor.attack.linearRampToValueAtTime(compressorSettings.attack, rampTime);
+            this.compressor.release.linearRampToValueAtTime(compressorSettings.release, rampTime);
         } else {
-            this.preLimiterOut.connect(this.masterOut);
+            this.preCompressorOut.connect(this.masterOut);
         }
     }
     

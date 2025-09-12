@@ -123,7 +123,8 @@ export type WorkerMessage =
 export type DrumWorkerMessage =
     | { type: 'loadSample'; name: string; buffer: ArrayBuffer; }
     | { type: 'playSample'; sampleName: string; volume?: number; }
-    | { type: 'error', message: string };
+    | { type: 'error', message: string }
+    | { type: 'debug', message: string };
 
 
 export type EnvelopeCurve = "linear" | "exponential";

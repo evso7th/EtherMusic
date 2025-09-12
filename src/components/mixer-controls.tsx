@@ -74,13 +74,15 @@ export function MixerControls({
         setLocalVolumes(initialVolumes);
     }, [initialVolumes]);
 
-    const handleApplyChanges = () => {
-        onApply(localVolumes);
-        closeDialog();
-    };
-
-    const handleChannelVolumeChange = useCallback((part: VolumeChannel, value: number) => {
-        setLocalVolumes(prev => {
+    const handleLocalVolumeChange = (update: Partial<Volumes> | ((v: Volumes) => Volumes)) => {
+        setLocalVolumes(current => {
+            const updated = typeof update === 'function' ? update(current) : { ...current, ...update };
+            return updated;
+        });
+    }
+    
+    const handleChannelVolumeChange = (part: VolumeChannel, value: number) => {
+        handleLocalVolumeChange(prev => {
             const newVolumes = JSON.parse(JSON.stringify(prev)); // Deep copy to be safe
             const newChannelVolumes = { ...(newVolumes[part] as ChannelVolumes), gain: value };
             newVolumes[part] = newChannelVolumes;
@@ -94,7 +96,7 @@ export function MixerControls({
             
             return newVolumes;
         });
-    }, []);
+    };
     
     const handleMelodyGainChange = useCallback((v: number) => handleChannelVolumeChange('melody', v), [handleChannelVolumeChange]);
     const handleManualBassGainChange = useCallback((v: number) => handleChannelVolumeChange('manualBass', v), [handleChannelVolumeChange]);
@@ -119,6 +121,11 @@ export function MixerControls({
             compressor: { ...(prev.compressor || defaultVolumes.compressor), [setting]: value }
         }));
     }, []);
+
+    const handleApplyChanges = () => {
+        onApply(localVolumes);
+        closeDialog();
+    };
 
     return (
         <div className="space-y-6">

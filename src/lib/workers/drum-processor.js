@@ -3,7 +3,6 @@
 // It is responsible for playing back pre-loaded drum samples
 // with low latency and high performance, off the main thread.
 
-// A simple voice that plays a sample and then marks itself as finished.
 class Voice {
     constructor(buffer, gain) {
         this.buffer = buffer; // This is a Float32Array
@@ -81,19 +80,22 @@ class DrumProcessor extends AudioWorkletProcessor {
             return true; // No active voices, nothing to do.
         }
         
-        let activeVoices = [];
-        for (const voice of this.voices) {
-            if (!voice.isFinished) {
-                voice.process(outputChannel);
-                activeVoices.push(voice);
+        // This approach of creating a temporary buffer and then adding it
+        // is safer than directly modifying outputChannel inside the loop
+        // when multiple voices are processed.
+        const blockBuffer = new Float32Array(outputChannel.length);
+
+        this.voices = this.voices.filter(voice => {
+            if (voice.isFinished) {
+                return false;
             }
-        }
-        this.voices = activeVoices;
+            voice.process(blockBuffer);
+            return true;
+        });
         
-        // A simple limiter to prevent clipping and audio artifacts.
+        // Now, add the processed block to the main output
         for (let i = 0; i < outputChannel.length; i++) {
-            const sample = outputChannel[i];
-            outputChannel[i] = Math.max(-1, Math.min(1, sample));
+            outputChannel[i] += blockBuffer[i];
         }
 
         return true; // Keep the processor alive.

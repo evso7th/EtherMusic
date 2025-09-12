@@ -233,7 +233,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.peakLevel = 0;
 
         this.port.onmessage = this.handleMessage.bind(this);
-        this.port.postMessage({ type: 'debug', message: `Processor created with polyphony ${this.polyphony}` });
+        console.log(`[SynthProcessor] Created with polyphony ${this.polyphony}`);
     }
 
     handleMessage(event) {
@@ -327,13 +327,10 @@ class SynthProcessor extends AudioWorkletProcessor {
     
         outputChannel.fill(0);
         
-        let activeVoiceCount = 0;
-        
         this.voices.forEach((voice, id) => {
             if (voice.isFinished) {
                 this.voices.delete(id);
             } else {
-                activeVoiceCount++;
                 for (let i = 0; i < outputChannel.length; i++) {
                     const sample = voice.render();
                     outputChannel[i] += sample;
@@ -341,27 +338,23 @@ class SynthProcessor extends AudioWorkletProcessor {
             }
         });
         
-        // Log peak level for debugging
         let currentPeak = 0;
         for (let i = 0; i < outputChannel.length; i++) {
             const sampleAbs = Math.abs(outputChannel[i]);
             if (sampleAbs > currentPeak) {
                 currentPeak = sampleAbs;
             }
-        }
-        if(currentPeak > this.peakLevel) {
-            this.peakLevel = currentPeak;
-        }
-        
-        // Final brickwall limiter to prevent any clipping
-        for (let i = 0; i < outputChannel.length; i++) {
+            // Simple limiter to prevent clipping
             outputChannel[i] = Math.tanh(outputChannel[i]);
         }
         
-        // Log debug info periodically
+        if (currentPeak > this.peakLevel) {
+            this.peakLevel = currentPeak;
+        }
+        
         this.logCounter++;
-        if (this.logCounter > 200) { // Log every ~200 * 128 samples (~5.8ms at 44.1kHz)
-            if (this.voices.size > 0 || this.peakLevel > 0.01) {
+        if (this.logCounter > 44100 / 128 * 0.5) { // Log about 2 times per second
+            if (this.voices.size > 0 || this.peakLevel > 0.001) {
                  this.port.postMessage({ 
                      type: 'debug', 
                      message: `Active voices: ${this.voices.size}. Peak level: ${this.peakLevel.toFixed(4)}.`
