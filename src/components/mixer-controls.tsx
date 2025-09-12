@@ -61,28 +61,21 @@ interface MixerControlsProps {
     isAutopilotMixer?: boolean;
 }
 
-export function MixerControls({ 
+export const MixerControls = memo(function MixerControls({ 
     initialVolumes, 
     onApply,
     closeDialog,
     isAutopilotMixer = false,
 }: MixerControlsProps) {
     
-    const [localVolumes, setLocalVolumes] = useState(initialVolumes || defaultVolumes);
+    const [localVolumes, setLocalVolumes] = useState(() => initialVolumes || defaultVolumes);
 
     useEffect(() => {
         setLocalVolumes(initialVolumes);
     }, [initialVolumes]);
 
-    const handleLocalVolumeChange = (update: Partial<Volumes> | ((v: Volumes) => Volumes)) => {
-        setLocalVolumes(current => {
-            const updated = typeof update === 'function' ? update(current) : { ...current, ...update };
-            return updated;
-        });
-    }
-    
-    const handleChannelVolumeChange = (part: VolumeChannel, value: number) => {
-        handleLocalVolumeChange(prev => {
+    const handleChannelVolumeChange = useCallback((part: VolumeChannel, value: number) => {
+        setLocalVolumes(prev => {
             const newVolumes = JSON.parse(JSON.stringify(prev)); // Deep copy to be safe
             const newChannelVolumes = { ...(newVolumes[part] as ChannelVolumes), gain: value };
             newVolumes[part] = newChannelVolumes;
@@ -96,21 +89,8 @@ export function MixerControls({
             
             return newVolumes;
         });
-    };
-    
-    const handleMelodyGainChange = useCallback((v: number) => handleChannelVolumeChange('melody', v), [handleChannelVolumeChange]);
-    const handleManualBassGainChange = useCallback((v: number) => handleChannelVolumeChange('manualBass', v), [handleChannelVolumeChange]);
-    const handleLatchGainChange = useCallback((v: number) => handleChannelVolumeChange('latch', v), [handleChannelVolumeChange]);
-    const handleDrumsGainChange = useCallback((v: number) => handleChannelVolumeChange('drums', v), [handleChannelVolumeChange]);
-
-    const handleTempoChange = useCallback((v: number) => {
-        setLocalVolumes(prev => ({...prev, tempo: v}));
     }, []);
     
-    const handleSwingChange = useCallback((v: number) => {
-        setLocalVolumes(prev => ({...prev, swing: v / 100}));
-    }, []);
-
     const handleReverbReturnChange = useCallback((value: number) => {
         setLocalVolumes(prev => ({ ...prev, reverbReturn: value }));
     }, []);
@@ -120,6 +100,14 @@ export function MixerControls({
             ...prev,
             compressor: { ...(prev.compressor || defaultVolumes.compressor), [setting]: value }
         }));
+    }, []);
+
+    const handleTempoChange = useCallback((v: number) => {
+        setLocalVolumes(prev => ({...prev, tempo: v}));
+    }, []);
+
+    const handleSwingChange = useCallback((v: number) => {
+        setLocalVolumes(prev => ({...prev, swing: v / 100}));
     }, []);
 
     const handleApplyChanges = () => {
@@ -166,25 +154,25 @@ export function MixerControls({
                     label="Melody"
                     icon={Music}
                     volume={localVolumes.melody.gain}
-                    onVolumeChange={handleMelodyGainChange}
+                    onVolumeChange={(v) => handleChannelVolumeChange('melody', v)}
                 />
                  <VolumeControl 
                     label="Bass"
                     icon={Waves}
                     volume={localVolumes.manualBass.gain}
-                    onVolumeChange={handleManualBassGainChange}
+                    onVolumeChange={(v) => handleChannelVolumeChange('manualBass', v)}
                 />
                 <VolumeControl 
                     label="Latch"
                     icon={Anchor}
                     volume={localVolumes.latch.gain}
-                    onVolumeChange={handleLatchGainChange}
+                    onVolumeChange={(v) => handleChannelVolumeChange('latch', v)}
                 />
                 <VolumeControl 
                     label="Drums"
                     icon={Drum}
                     volume={localVolumes.drums.gain}
-                    onVolumeChange={handleDrumsGainChange}
+                    onVolumeChange={(v) => handleChannelVolumeChange('drums', v)}
                 />
             </div>
             
@@ -250,4 +238,4 @@ export function MixerControls({
             </Button>
         </div>
     );
-}
+});

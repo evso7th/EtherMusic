@@ -8,6 +8,7 @@ import { melodyInstruments } from './melody-presets';
 import { bassInstruments } from './bass-presets';
 import { DrumMachine } from './drum-machine';
 
+
 function dbToGain(db: number): number {
     if (db <= -48) return 0;
     return Math.pow(10, db / 20);
@@ -28,7 +29,6 @@ function createDistortionCurve(amount: number): Float32Array {
     }
     return curve;
 }
-
 
 type SynthPartName = 'melody' | 'manualBass' | 'latch';
 
@@ -98,12 +98,10 @@ export class AudioEngine {
     
     private activePointers = new Map<number, { type: 'melody' | 'bass', noteId: number }>();
     private nextNoteId = 0;
-    private onPlayStateChange: (isPlaying: boolean) => void;
     
     constructor(context: AudioContext, orbManager: OrbManager | null, onPlayStateChange: (isPlaying: boolean) => void) {
         this.context = context;
         this.orbManager = orbManager;
-        this.onPlayStateChange = onPlayStateChange;
         
         this.masterOut = this.context.createGain();
         this.masterOut.connect(this.context.destination);
@@ -121,7 +119,7 @@ export class AudioEngine {
         this.convolver.connect(this.reverbReturnGain);
         this.reverbReturnGain.connect(this.preCompressorOut);
 
-        this.drumMachine = new DrumMachine(this, this.onPlayStateChange);
+        this.drumMachine = new DrumMachine(this, onPlayStateChange);
     }
     
     getContext() {
@@ -173,8 +171,8 @@ export class AudioEngine {
 
         try {
              await Promise.all([
-                this.context.audioWorklet.addModule('/synth-processor.js'),
-                this.context.audioWorklet.addModule('/drum-processor.js'),
+                this.context.audioWorklet.addModule('/workers/synth-processor.js'),
+                this.context.audioWorklet.addModule('/workers/drum-processor.js'),
              ]);
              console.log('[AudioEngine] AudioWorklet modules loaded.');
         } catch (e) {
@@ -218,8 +216,6 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
-            } else if (e.data.type === 'debug') {
-                console.log(`[WORKLET-DEBUG-${part.toUpperCase()}]`, `Peak: ${e.data.peak.toFixed(4)}, Voices: ${e.data.voices}`);
             }
         };
 
@@ -239,8 +235,6 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error('[DRUM WORKLET ERROR]', e.data.message);
-            } else if (e.data.type === 'debug') {
-                 console.log(`[WORKLET-DEBUG-DRUMS]`, e.data.message);
             }
         };
         
@@ -295,8 +289,8 @@ export class AudioEngine {
         
         const partName = type === 'bass' ? (this.isBassLatchOn ? 'latch' : 'manualBass') : 'melody';
         
-        if (state !== 'move') { // Avoid spamming logs for move events
-            console.log(`[Interaction] type: ${type}, state: ${state}, part: ${partName}`, data ? `{freq: '${data.frequency.toFixed(2)}', vol: '${data.volume.toFixed(2)}', id: ${data.pointerId}}` : null);
+        if (state !== 'move') { 
+            console.log(`[Interaction] type: ${type}, state: ${state}, part: ${partName}`, data ? `{freq: '${data.frequency.toFixed(2)}', vol: '${data.volume.toFixed(2)}', id: ${data.pointerId}}` : 'null');
         }
         
         if (partName === 'latch') {
@@ -420,7 +414,7 @@ export class AudioEngine {
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
             this.setVolumes(newVolumes);
-            return newVolumes;
+            return newVolumes; // Return the modified volumes
         }
         return undefined;
     }
@@ -496,21 +490,26 @@ export class AudioEngine {
     public setVolumes(newVolumes: Volumes) {
         if (!this.isInitialized || !this.context) return;
         this.volumes = newVolumes;
-        // console.log('[AudioEngine] Applying new volumes:', newVolumes);
-
-        this.applyChannelSettings('melody', newVolumes.melody);
-        this.applyChannelSettings('manualBass', newVolumes.manualBass);
-        this.applyChannelSettings('latch', newVolumes.latch);
-        this.applyChannelSettings('drums', newVolumes.drums);
         
-        this.reverbReturnGain.gain.setTargetAtTime(dbToGain(newVolumes.reverbReturn), this.context.currentTime, 0.02);
-        this.setCompressorSettings(newVolumes.compressor);
+        if(JSON.stringify(this.volumes) !== JSON.stringify(newVolumes)) {
+            console.log('[AudioEngine] Applying new volumes:', newVolumes);
+            this.volumes = newVolumes;
+            const rampTime = this.context.currentTime + 0.05;
 
-        if (newVolumes.swing !== undefined) {
-            this.setSwing(newVolumes.swing);
-        }
-        if (newVolumes.tempo !== undefined) {
-            this.setTempo(newVolumes.tempo);
+            this.applyChannelSettings('melody', newVolumes.melody);
+            this.applyChannelSettings('manualBass', newVolumes.manualBass);
+            this.applyChannelSettings('latch', newVolumes.latch);
+            this.applyChannelSettings('drums', newVolumes.drums);
+            
+            this.reverbReturnGain.gain.setTargetAtTime(dbToGain(newVolumes.reverbReturn), this.context.currentTime, 0.02);
+            this.setCompressorSettings(newVolumes.compressor);
+
+            if (newVolumes.swing !== undefined) {
+                this.setSwing(newVolumes.swing);
+            }
+            if (newVolumes.tempo !== undefined) {
+                this.setTempo(newVolumes.tempo);
+            }
         }
     }
     
@@ -519,7 +518,6 @@ export class AudioEngine {
         
         const oldSettings = this.volumes?.compressor;
         if(JSON.stringify(oldSettings) !== JSON.stringify(compressorSettings)) {
-            // console.log('[AudioEngine] Applying new compressor settings:', compressorSettings);
             this.volumes.compressor = compressorSettings;
             const rampTime = this.context.currentTime + 0.05;
 
@@ -528,10 +526,10 @@ export class AudioEngine {
                 this.preCompressorOut.connect(this.compressor);
                 this.compressor.connect(this.masterOut);
                 
-                this.compressor.threshold.linearRampToValueAtTime(compressorSettings.threshold, rampTime);
-                this.compressor.ratio.linearRampToValueAtTime(compressorSettings.ratio, rampTime);
-                this.compressor.attack.linearRampToValueAtTime(compressorSettings.attack, rampTime);
-                this.compressor.release.linearRampToValueAtTime(compressorSettings.release, rampTime);
+                this.compressor.threshold.setTargetAtTime(compressorSettings.threshold, this.context.currentTime, 0.01);
+                this.compressor.ratio.setTargetAtTime(compressorSettings.ratio, this.context.currentTime, 0.01);
+                this.compressor.attack.setTargetAtTime(compressorSettings.attack, this.context.currentTime, 0.01);
+                this.compressor.release.setTargetAtTime(compressorSettings.release, this.context.currentTime, 0.01);
             } else {
                 this.preCompressorOut.connect(this.masterOut);
             }

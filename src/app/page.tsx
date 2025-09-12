@@ -72,17 +72,26 @@ export default function Home() {
         setIsClient(true);
     }, []);
 
-    useEffect(() => {
-        if (isReady) {
-            setMelodyInstrument(activeMelodyInstrument);
-            setBassInstrument(activeBassInstrument);
-        }
-    }, [isReady, activeMelodyInstrument, activeBassInstrument, setMelodyInstrument, setBassInstrument]);
+    const handleSetMelodyInstrument = useCallback((instrumentId: Instrument) => {
+        setActiveMelodyInstrument(instrumentId);
+        setMelodyInstrument(instrumentId);
+    }, [setMelodyInstrument]);
 
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
-        setBassInstrument(instrumentId);
-    }, [setBassInstrument]);
+        const newVolumes = setBassInstrument(instrumentId);
+        if (newVolumes) {
+            setVolumes(newVolumes);
+        }
+    }, [setBassInstrument, setVolumes]);
+    
+    // This effect initializes the instruments once the audio engine is ready.
+    useEffect(() => {
+        if (isReady) {
+            handleSetMelodyInstrument(activeMelodyInstrument);
+            handleSetBassInstrument(activeBassInstrument);
+        }
+    }, [isReady, activeMelodyInstrument, activeBassInstrument, handleSetMelodyInstrument, handleSetBassInstrument]);
     
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         const isKey = (k: string): k is MusicKey => Object.keys(ALL_NOTES).includes(k);
@@ -111,10 +120,12 @@ export default function Home() {
         value: number
     ) => {
         setVolumes(prevVolumes => {
+            // Create a deep copy to avoid direct state mutation.
             const newVolumes = JSON.parse(JSON.stringify(prevVolumes));
             const targetChannelKey = channel === 'bass' ? 'manualBass' : 'melody';
             
             newVolumes[targetChannelKey][effect] = value;
+            // Sync bass and latch effects
             if (channel === 'bass') {
                 newVolumes.latch[effect] = value;
             }
@@ -146,11 +157,6 @@ export default function Home() {
         setIsBassLatchOn(isOn);
         setBassLatch(isOn);
     }, [setBassLatch]);
-    
-    const handleMelodyInstrumentChange = useCallback((instrumentId: Instrument) => {
-        setActiveMelodyInstrument(instrumentId);
-        setMelodyInstrument(instrumentId);
-    }, [setMelodyInstrument]);
     
     const handleThereminInteractionCallback = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isReady || !audioEngine) return;
@@ -263,7 +269,7 @@ export default function Home() {
                         volumes={volumes}
                         onEffectChange={handleChannelEffectChange}
                         activeMelodyInstrument={activeMelodyInstrument}
-                        onMelodyInstrumentChange={handleMelodyInstrumentChange}
+                        onMelodyInstrumentChange={handleSetMelodyInstrument}
                         musicKey={musicKey}
                         onKeyChange={handleHarmonyChange}
                         musicScale={musicScale}
@@ -273,7 +279,7 @@ export default function Home() {
                         <BeatBoxControls
                             activePattern={activePattern}
                             onPatternChange={handlePatternChange}
-                            initialVolumes={volumes}
+                            volumes={volumes}
                             onApply={handleMixerApply}
                             isMobile={isMobile}
                         />
@@ -284,7 +290,7 @@ export default function Home() {
                      <BeatBoxControls
                         activePattern={activePattern}
                         onPatternChange={handlePatternChange}
-                        initialVolumes={volumes}
+                        volumes={volumes}
                         onApply={handleMixerApply}
                         isMobile={isMobile}
                         isLandscape={true}

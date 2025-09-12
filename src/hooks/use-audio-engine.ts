@@ -6,6 +6,18 @@ import { useToast } from "@/hooks/use-toast";
 import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
 import type { Volumes, Instrument, BassInstrument } from '@/types';
+import Cookies from 'js-cookie';
+
+function saveVolumes(volumes: Volumes) {
+    if (typeof window === 'undefined' || Cookies.get("ethermusic_consent") !== 'true') {
+        return;
+    }
+    try {
+        Cookies.set("ethermusic_volumes", JSON.stringify(volumes), { expires: 365, path: '/', sameSite: 'lax' });
+    } catch (e) {
+        console.error("Failed to save volume settings to cookies", e);
+    }
+}
 
 export const defaultVolumes: Volumes = { 
     melody: { gain: 0, reverbSend: -18, distortion: 0 },
@@ -23,6 +35,35 @@ export const defaultVolumes: Volumes = {
     swing: 0.33,
     tempo: 90,
 };
+
+export function loadVolumes(): Volumes {
+     if (typeof window === 'undefined') return defaultVolumes;
+     const consent = Cookies.get("ethermusic_consent") === 'true';
+     if (!consent) return defaultVolumes;
+     try {
+        const savedVolumes = Cookies.get("ethermusic_volumes");
+        if (!savedVolumes) return defaultVolumes;
+        
+        const parsed = JSON.parse(savedVolumes);
+
+        // Deep merge with defaults to ensure all properties are present and valid
+        const merged = {
+            ...defaultVolumes,
+            ...parsed,
+            melody: { ...defaultVolumes.melody, ...(parsed.melody || {}) },
+            manualBass: { ...defaultVolumes.manualBass, ...(parsed.manualBass || {}) },
+            latch: { ...defaultVolumes.latch, ...(parsed.latch || {}) },
+            drums: { ...defaultVolumes.drums, ...(parsed.drums || {}) },
+            compressor: { ...defaultVolumes.compressor, ...(parsed.compressor || {}) },
+        };
+        return merged;
+
+    } catch (e) {
+        console.error("Failed to load volume settings from cookies", e);
+        return defaultVolumes;
+    }
+}
+
 
 export function useAudioEngine() {
     const { toast } = useToast();
@@ -59,8 +100,10 @@ export function useAudioEngine() {
                 const engine = new AudioEngine(context, orbManager.current, onPlayStateChange);
                 await engine.initialize();
                 
-                engine.setVolumes(defaultVolumes);
-                setVolumesState(defaultVolumes); 
+                const currentVolumes = loadVolumes();
+                engine.setVolumes(currentVolumes);
+                setVolumesState(currentVolumes); 
+                setCurrentTempo(currentVolumes.tempo);
 
                 audioEngine.current = engine;
             }
@@ -105,14 +148,17 @@ export function useAudioEngine() {
     }, []);
     
     const setVolumes = useCallback((newVolumes: Volumes | ((prev: Volumes) => Volumes)) => {
+        const updatedVolumes = typeof newVolumes === 'function' ? setVolumesState(newVolumes) : setVolumesState(() => newVolumes);
+
         setVolumesState(prev => {
             const updated = typeof newVolumes === 'function' ? newVolumes(prev) : newVolumes;
-            if (audioEngine.current) {
+             if (audioEngine.current) {
                 audioEngine.current.setVolumes(updated);
             }
             if (updated.tempo !== currentTempo) {
                 setCurrentTempo(updated.tempo);
             }
+            saveVolumes(updated);
             return updated;
         });
     }, [currentTempo]);
@@ -146,14 +192,14 @@ export function useAudioEngine() {
         audioEngine.current?.setMelodyInstrument(instrumentName);
     }, []);
     
-    const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
+    const setBassInstrument = useCallback((instrumentName: BassInstrument): Volumes | undefined => {
         if(audioEngine.current){
-            const newVolumes = audioEngine.current.setBassInstrument(instrumentName);
-            if (newVolumes) {
-                setVolumes(newVolumes);
-            }
+            // This function in AudioEngine now directly applies the volume changes
+            // and returns the updated volume object if a change occurred.
+            return audioEngine.current.setBassInstrument(instrumentName);
         }
-    }, [setVolumes]);
+        return undefined;
+    }, []);
 
     return {
         isAppStarted,
