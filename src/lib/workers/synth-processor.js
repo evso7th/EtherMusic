@@ -231,7 +231,11 @@ class SynthProcessor extends AudioWorkletProcessor {
         super();
         this.voices = new Map();
         this.polyphony = options.processorOptions?.polyphony || 4;
+        this.sampleRate = options.processorOptions?.sampleRate || 44100;
         this.preset = this.getDefaultPreset();
+        
+        this.logCounter = 0;
+        this.peakLevel = 0;
         
         this.port.onmessage = this.handleMessage.bind(this);
     }
@@ -296,7 +300,7 @@ class SynthProcessor extends AudioWorkletProcessor {
                 this.voices.delete(oldestId);
             }
         }
-        const voice = new Voice(note.id, note.frequency, note.volume, this.preset, sampleRate);
+        const voice = new Voice(note.id, note.frequency, note.volume, this.preset, this.sampleRate);
         voice.startTime = currentTime;
         this.voices.set(note.id, voice);
     }
@@ -319,8 +323,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.voices.forEach(voice => {
             voice.isReleasing = true;
             voice.layers.forEach(l => {
-                // Quick fade out
-                l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05); 
+                l.env.releaseSamples = Math.min(l.env.releaseSamples, this.sampleRate * 0.05); 
             });
         });
     }
@@ -331,6 +334,8 @@ class SynthProcessor extends AudioWorkletProcessor {
     
         outputChannel.fill(0);
         
+        let currentPeak = 0;
+
         if (this.voices.size > 0) {
             this.voices.forEach((voice, id) => {
                 if (voice.isFinished) {
@@ -339,9 +344,30 @@ class SynthProcessor extends AudioWorkletProcessor {
                     for (let i = 0; i < outputChannel.length; i++) {
                         const sample = voice.render();
                         outputChannel[i] += sample;
+                        const absSample = Math.abs(sample);
+                        if (absSample > currentPeak) {
+                            currentPeak = absSample;
+                        }
                     }
                 }
             });
+
+            this.peakLevel = Math.max(this.peakLevel, currentPeak);
+            this.logCounter += outputChannel.length;
+            
+            if (this.logCounter >= this.sampleRate) { // Log roughly once per second
+                this.port.postMessage({
+                    type: 'debug',
+                    peak: this.peakLevel,
+                    voices: this.voices.size,
+                });
+                this.peakLevel = 0;
+                this.logCounter = 0;
+            }
+        } else {
+             // Reset when there are no voices
+            this.peakLevel = 0;
+            this.logCounter = 0;
         }
         
         // Simple hard clipping to prevent audio glitches if we exceed [-1, 1]

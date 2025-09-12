@@ -35,69 +35,70 @@ class Voice {
 }
 
 class DrumProcessor extends AudioWorkletProcessor {
-    constructor(options) {
-        super();
-        this.buffers = new Map();
-        this.voices = [];
-        this.maxVoices = 64; 
+  constructor(options) {
+    super();
+    this.maxVoices = 64;
+    this.voices = [];
+    this.buffers = new Map();
+    
+    this.port.onmessage = this.handleMessage.bind(this);
+    console.log('[DrumProcessor] Initialized');
+  }
 
-        this.port.onmessage = this.handleMessage.bind(this);
-        console.log('[DrumProcessor] Initialized');
-    }
+  handleMessage(event) {
+    try {
+        const { type, name, buffer, sampleName, volume } = event.data;
 
-    handleMessage(event) {
-        try {
-            const { type, name, buffer, sampleName, volume } = event.data;
-
-            if (type === 'loadSample' && name && buffer instanceof ArrayBuffer) {
-                const float32Array = new Float32Array(buffer);
-                this.buffers.set(name, float32Array);
-            } else if (type === 'playSample' && sampleName) {
-                const bufferToPlay = this.buffers.get(sampleName);
-                if (bufferToPlay) {
-                    if (this.voices.length >= this.maxVoices) {
-                        this.voices.shift();
-                    }
-                    this.voices.push(new Voice(bufferToPlay, volume ?? 1.0));
-                } else {
-                     this.port.postMessage({ type: 'error', message: `Sample not found: ${sampleName}` });
+        if (type === 'loadSample' && name && buffer instanceof ArrayBuffer) {
+            const float32Array = new Float32Array(buffer);
+            this.buffers.set(name, float32Array);
+            this.port.postMessage({ type: 'debug', message: `Sample loaded: ${name}` });
+        } else if (type === 'playSample' && sampleName) {
+            const bufferToPlay = this.buffers.get(sampleName);
+            if (bufferToPlay) {
+                if (this.voices.length >= this.maxVoices) {
+                    this.voices.shift();
                 }
+                this.voices.push(new Voice(bufferToPlay, volume ?? 1.0));
+            } else {
+                 this.port.postMessage({ type: 'error', message: `Sample not found: ${sampleName}` });
             }
-        } catch (e) {
-            if (e instanceof Error) {
-                this.port.postMessage({ type: 'error', message: `Error handling message: ${e.message}` });
-            }
+        }
+    } catch (e) {
+        if (e instanceof Error) {
+            this.port.postMessage({ type: 'error', message: `Error handling message: ${e.message}` });
         }
     }
+  }
 
-    process(inputs, outputs, parameters) {
-        const outputChannel = outputs[0]?.[0];
-        if (!outputChannel) {
-            return true;
-        }
-
-        outputChannel.fill(0);
-
-        if (this.voices.length === 0) {
-            return true; 
-        }
-        
-        let activeVoices = [];
-        for (const voice of this.voices) {
-            if (!voice.isFinished) {
-                voice.process(outputChannel);
-                activeVoices.push(voice);
-            }
-        }
-        this.voices = activeVoices;
-        
-        // Simple hard clipping to prevent audio glitches
-        for (let i = 0; i < outputChannel.length; i++) {
-            outputChannel[i] = Math.max(-1, Math.min(1, outputChannel[i]));
-        }
-
-        return true; // Keep the processor alive.
+  process(inputs, outputs, parameters) {
+    const outputChannel = outputs[0]?.[0];
+    if (!outputChannel) {
+        return true;
     }
+
+    outputChannel.fill(0);
+
+    if (this.voices.length === 0) {
+        return true; 
+    }
+    
+    let activeVoices = [];
+    for (const voice of this.voices) {
+        if (!voice.isFinished) {
+            voice.process(outputChannel);
+            activeVoices.push(voice);
+        }
+    }
+    this.voices = activeVoices;
+    
+    // Simple hard clipping to prevent audio glitches
+    for (let i = 0; i < outputChannel.length; i++) {
+        outputChannel[i] = Math.max(-1, Math.min(1, outputChannel[i]));
+    }
+
+    return true; // Keep the processor alive.
+  }
 }
 
 registerProcessor('drum-processor', DrumProcessor);
