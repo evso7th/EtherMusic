@@ -73,26 +73,16 @@ export default function Home() {
     }, []);
 
     useEffect(() => {
-        if (isReady && activeMelodyInstrument) {
+        if (isReady) {
             setMelodyInstrument(activeMelodyInstrument);
+            setBassInstrument(activeBassInstrument);
         }
-    }, [isReady, activeMelodyInstrument, setMelodyInstrument]);
+    }, [isReady, activeMelodyInstrument, activeBassInstrument, setMelodyInstrument, setBassInstrument]);
 
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
-        if (isReady) {
-            const newVolumes = setBassInstrument(instrumentId);
-            if (newVolumes) {
-                 setVolumes(newVolumes);
-            }
-        }
-    }, [setBassInstrument, isReady, setVolumes]);
-
-    useEffect(() => {
-        if (isReady && activeBassInstrument) {
-            handleSetBassInstrument(activeBassInstrument);
-        }
-    }, [isReady, activeBassInstrument, handleSetBassInstrument]);
+        setBassInstrument(instrumentId);
+    }, [setBassInstrument]);
     
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         const isKey = (k: string): k is MusicKey => Object.keys(ALL_NOTES).includes(k);
@@ -304,5 +294,3 @@ export default function Home() {
         </div>
     );
 }
-
-    

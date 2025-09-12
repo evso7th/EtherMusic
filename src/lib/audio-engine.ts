@@ -1,14 +1,12 @@
 
 'use client';
 
-import type { Volumes, Instrument, BassInstrument, CompressorSettings, BassInstrumentPresetParams, ChannelVolumes, SynthNote, WorkerMessage, DrumWorkerMessage, AudioEngineEvents } from '@/types';
+import type { Volumes, Instrument, BassInstrument, CompressorSettings, BassInstrumentPresetParams, ChannelVolumes, SynthNote, WorkerMessage, DrumWorkerMessage } from '@/types';
 import { OrbManager } from './orb-manager';
 import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
 import { bassInstruments } from './bass-presets';
 import { DrumMachine } from './drum-machine';
-import type { Emitter } from 'mitt';
-
 
 function dbToGain(db: number): number {
     if (db <= -48) return 0;
@@ -74,7 +72,6 @@ export class AudioEngine {
     public isInitialized = false;
     private context!: AudioContext;
     public orbManager: OrbManager | null;
-    public emitter: Emitter<AudioEngineEvents>;
     private mediaRecorder: MediaRecorder | null = null;
     private recordedChunks: Blob[] = [];
 
@@ -102,10 +99,9 @@ export class AudioEngine {
     private activePointers = new Map<number, { type: 'melody' | 'bass', noteId: number }>();
     private nextNoteId = 0;
     
-    constructor(context: AudioContext, orbManager: OrbManager | null, emitter: Emitter<AudioEngineEvents>) {
+    constructor(context: AudioContext, orbManager: OrbManager | null, onPlayStateChange: (isPlaying: boolean) => void) {
         this.context = context;
         this.orbManager = orbManager;
-        this.emitter = emitter;
         
         this.masterOut = this.context.createGain();
         this.masterOut.connect(this.context.destination);
@@ -123,7 +119,7 @@ export class AudioEngine {
         this.convolver.connect(this.reverbReturnGain);
         this.reverbReturnGain.connect(this.preCompressorOut);
 
-        this.drumMachine = new DrumMachine(this, this.emitter);
+        this.drumMachine = new DrumMachine(this, onPlayStateChange);
     }
     
     getContext() {
@@ -220,8 +216,6 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
-            } else if (e.data.type === 'debug') {
-                 console.log(`[WORKLET-DEBUG-${part.toUpperCase()}] Peak: ${e.data.peak.toFixed(4)}, Voices: ${e.data.voices}`);
             }
         };
 
@@ -242,8 +236,6 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error('[DRUM WORKLET ERROR]', e.data.message);
-            } else if (e.data.type === 'debug') {
-                console.log('[DRUM-WORKLET-DEBUG]', e.data.message);
             }
         };
         
@@ -465,6 +457,8 @@ export class AudioEngine {
                     throw new Error(`HTTP error! status: ${response.status} for ${url.split('/').pop()}`);
                 }
                 const arrayBuffer = await response.arrayBuffer();
+                // This is a synchronous decode, which is fine inside an async function on the main thread
+                // but would block if this were a more complex operation.
                 const audioBuffer = await this.context.decodeAudioData(arrayBuffer.slice(0)); 
                 
                 const channelData = audioBuffer.getChannelData(0);
@@ -486,6 +480,7 @@ export class AudioEngine {
     private applyChannelSettings(partName: SynthPartName | 'drums', volumes: ChannelVolumes) {
         const nodeInfo = this.nodes.get(partName);
         if (nodeInfo && volumes) {
+            // Ramping is now handled inside the worklet for synths, but gain nodes are fine here.
             nodeInfo.gain.gain.setTargetAtTime(dbToGain(volumes.gain), this.context.currentTime, 0.01);
             nodeInfo.reverbSend.gain.setTargetAtTime(dbToGain(volumes.reverbSend), this.context.currentTime, 0.01);
             if (nodeInfo.distortion) {
@@ -513,7 +508,6 @@ export class AudioEngine {
         if (newVolumes.tempo !== undefined) {
             this.setTempo(newVolumes.tempo);
         }
-        this.emitter.emit('volumesChanged', this.getVolumes());
     }
     
     public setCompressorSettings(compressorSettings: CompressorSettings) {
@@ -554,5 +548,3 @@ export class AudioEngine {
         }
     }
 }
-
-    
