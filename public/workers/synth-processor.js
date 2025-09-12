@@ -1,8 +1,8 @@
-
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for all real-time synthesis, running in a high-priority
 // audio thread to ensure low-latency, glitch-free sound generation.
-console.log('SynthProcessor loaded');
+console.log('[SynthProcessor] Script loaded.');
+
 
 class Oscillator {
     constructor(type, sampleRate) {
@@ -52,6 +52,7 @@ class Oscillator {
     }
 }
 
+// A class representing a single synth voice
 class Voice {
     constructor(id, frequency, volume, preset, sampleRate) {
         this.id = id;
@@ -70,6 +71,8 @@ class Voice {
         this.initLayers();
         this.initFilter();
         this.initLFO();
+
+        this.startTime = currentTime; // Used for voice stealing
     }
 
     initLayers() {
@@ -212,6 +215,7 @@ class Voice {
         
         const filteredSample = this.processFilter(mixedSample);
         
+        // Normalize based on number of layers to prevent internal clipping
         const numLayers = Math.max(1, this.layers.length);
         
         return (filteredSample / numLayers) * this.volume;
@@ -229,32 +233,39 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.preset = this.getDefaultPreset();
         
         this.port.onmessage = this.handleMessage.bind(this);
-        this.port.postMessage({ type: 'debug', message: 'SynthProcessor initialized' });
     }
 
     handleMessage(event) {
-        try {
-            const { type, note, id, preset } = event.data;
-            switch (type) {
-                case 'noteOn':
-                    if (note) this.noteOn(note);
-                    break;
-                case 'noteOff':
-                    if (id !== undefined) this.noteOff(id);
-                    break;
-                case 'noteUpdate':
-                    if (note) this.noteUpdate(note);
-                    break;
-                case 'allNotesOff':
-                    this.allNotesOff();
-                    break;
-                case 'setPreset':
-                    if (preset) this.applyPreset(preset);
-                    break;
-            }
-        } catch (e) {
-            const message = (e instanceof Error) ? e.message : String(e);
-            this.port.postMessage({ type: 'error', message: `[SynthProcessor] Error: ${message}` });
+        const { type, note, id, preset } = event.data;
+        switch (type) {
+            case 'noteOn':
+                if (note) {
+                    this.port.postMessage({ type: 'debug', message: `noteOn received: id=${note.id}, freq=${note.frequency.toFixed(2)}` });
+                    this.noteOn(note);
+                }
+                break;
+            case 'noteOff':
+                if (id !== undefined) {
+                    this.port.postMessage({ type: 'debug', message: `noteOff received: id=${id}` });
+                    this.noteOff(id);
+                }
+                break;
+            case 'noteUpdate':
+                 if (note) this.noteUpdate(note); // Too frequent to log
+                break;
+            case 'allNotesOff':
+                this.port.postMessage({ type: 'debug', message: `allNotesOff received` });
+                this.allNotesOff();
+                break;
+            case 'setPreset':
+                if (preset) {
+                    this.port.postMessage({ type: 'debug', message: `setPreset received: ${preset.oscillator.type}` });
+                    this.applyPreset(preset);
+                }
+                break;
+             case 'error':
+                console.error(`[SYNTH-WORKLET]`, event.data.message);
+                break;
         }
     }
 
@@ -317,7 +328,8 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.voices.forEach(voice => {
             voice.isReleasing = true;
             voice.layers.forEach(l => {
-                l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05); // 50ms quick fade
+                // Quick fade out
+                l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05); 
             });
         });
     }
@@ -340,8 +352,13 @@ class SynthProcessor extends AudioWorkletProcessor {
                 }
             });
         }
+        
+        // Simple hard clipping to prevent audio glitches if we exceed [-1, 1]
+        for (let i = 0; i < outputChannel.length; i++) {
+            outputChannel[i] = Math.max(-1, Math.min(1, outputChannel[i]));
+        }
 
-        return true;
+        return true; // Keep processor alive
     }
     
     getDefaultPreset() {

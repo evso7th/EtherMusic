@@ -1,8 +1,7 @@
-
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for playing back pre-loaded drum samples
 // with low latency and high performance, off the main thread.
-console.log('[DrumProcessor] Script loaded');
+console.log('[DrumProcessor] Script loaded.');
 
 class Voice {
     constructor(buffer, gain) {
@@ -42,7 +41,7 @@ class DrumProcessor extends AudioWorkletProcessor {
         this.maxVoices = 64; 
 
         this.port.onmessage = this.handleMessage.bind(this);
-        this.port.postMessage({ type: 'debug', message: 'DrumProcessor initialized' });
+        console.log('[DrumProcessor] Initialized');
     }
 
     handleMessage(event) {
@@ -52,7 +51,9 @@ class DrumProcessor extends AudioWorkletProcessor {
             if (type === 'loadSample' && name && buffer instanceof ArrayBuffer) {
                 const float32Array = new Float32Array(buffer);
                 this.buffers.set(name, float32Array);
+                this.port.postMessage({ type: 'debug', message: `Sample loaded: ${name}` });
             } else if (type === 'playSample' && sampleName) {
+                this.port.postMessage({ type: 'debug', message: `Play command received for: ${sampleName}` });
                 const bufferToPlay = this.buffers.get(sampleName);
                 if (bufferToPlay) {
                     if (this.voices.length >= this.maxVoices) {
@@ -60,12 +61,13 @@ class DrumProcessor extends AudioWorkletProcessor {
                     }
                     this.voices.push(new Voice(bufferToPlay, volume ?? 1.0));
                 } else {
-                     this.port.postMessage({ type: 'error', message: `[DrumProcessor] Sample not found: ${sampleName}` });
+                     this.port.postMessage({ type: 'error', message: `Sample not found: ${sampleName}` });
                 }
             }
         } catch (e) {
-            const message = (e instanceof Error) ? e.message : String(e);
-            this.port.postMessage({ type: 'error', message: `[DrumProcessor] Error handling message: ${message}` });
+            if (e instanceof Error) {
+                this.port.postMessage({ type: 'error', message: `Error handling message: ${e.message}` });
+            }
         }
     }
 
@@ -81,20 +83,18 @@ class DrumProcessor extends AudioWorkletProcessor {
             return true; 
         }
         
-        const blockBuffer = new Float32Array(outputChannel.length);
-
-        this.voices = this.voices.filter(voice => {
-            if (voice.isFinished) {
-                return false;
+        let activeVoices = [];
+        for (const voice of this.voices) {
+            if (!voice.isFinished) {
+                voice.process(outputChannel);
+                activeVoices.push(voice);
             }
-            voice.process(blockBuffer);
-            return true;
-        });
+        }
+        this.voices = activeVoices;
         
-        // Add the processed block to the main output and apply a limiter
+        // Simple hard clipping to prevent audio glitches if we exceed [-1, 1]
         for (let i = 0; i < outputChannel.length; i++) {
-            // Using tanh as a simple limiter to prevent hard clipping
-            outputChannel[i] = Math.tanh(blockBuffer[i]);
+            outputChannel[i] = Math.max(-1, Math.min(1, outputChannel[i]));
         }
 
         return true; // Keep the processor alive.

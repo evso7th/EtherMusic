@@ -144,6 +144,7 @@ export class AudioEngine {
     
     public async initialize() {
         if (this.isInitialized) return;
+        console.log('[AudioEngine] Initializing...');
 
         if (this.context.state === 'suspended') {
             await this.context.resume();
@@ -177,6 +178,7 @@ export class AudioEngine {
                 this.context.audioWorklet.addModule('/synth-processor.js'),
                 this.context.audioWorklet.addModule('/drum-processor.js'),
              ]);
+             console.log('[AudioEngine] AudioWorklet modules loaded.');
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
             throw new Error("Could not load core audio components. Please try refreshing the page.");
@@ -193,6 +195,7 @@ export class AudioEngine {
         await this.loadDrumSamples();
                 
         this.isInitialized = true;
+        console.log('[AudioEngine] Initialization complete.');
     }
 
     private createSynthChannel(part: SynthPartName, polyphony: number) {
@@ -217,6 +220,8 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
+            } else if (e.data.type === 'debug') {
+                console.log(`[DEBUG-${part.toUpperCase()}] ${e.data.message}`);
             }
         };
 
@@ -237,6 +242,8 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error('[DRUM WORKLET ERROR]', e.data.message);
+            } else if (e.data.type === 'debug') {
+                console.log(`[DEBUG-DRUMS] ${e.data.message}`);
             }
         };
         
@@ -435,6 +442,7 @@ export class AudioEngine {
     public playDrumSample(sampleName: string, volume: number = 1.0) {
         const drumNode = this.nodes.get('drums');
         if (!drumNode) {
+            console.log(`[AudioEngine] Attempted to play drum sample "${sampleName}" but drum node not ready.`);
             return;
         }
         const message: DrumWorkerMessage = { type: 'playSample', sampleName, volume };
@@ -458,8 +466,6 @@ export class AudioEngine {
                     throw new Error(`HTTP error! status: ${response.status} for ${url.split('/').pop()}`);
                 }
                 const arrayBuffer = await response.arrayBuffer();
-                // This is a synchronous decode, which is fine inside an async function on the main thread
-                // but would block if this were a more complex operation.
                 const audioBuffer = await this.context.decodeAudioData(arrayBuffer.slice(0)); 
                 
                 const channelData = audioBuffer.getChannelData(0);
@@ -514,7 +520,7 @@ export class AudioEngine {
     public setCompressorSettings(compressorSettings: CompressorSettings) {
         if (!this.isInitialized || !this.context || !this.compressor) return;
         
-        const oldSettings = this.volumes.compressor;
+        const oldSettings = this.volumes?.compressor;
         if(JSON.stringify(oldSettings) !== JSON.stringify(compressorSettings)) {
             console.log('[AudioEngine] Applying new compressor settings:', compressorSettings);
             this.volumes.compressor = compressorSettings;
