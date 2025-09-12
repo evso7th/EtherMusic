@@ -99,9 +99,12 @@ export class AudioEngine {
     private activePointers = new Map<number, { type: 'melody' | 'bass', noteId: number }>();
     private nextNoteId = 0;
     
+    private onPlayStateChange: (isPlaying: boolean) => void;
+
     constructor(context: AudioContext, orbManager: OrbManager | null, onPlayStateChange: (isPlaying: boolean) => void) {
         this.context = context;
         this.orbManager = orbManager;
+        this.onPlayStateChange = onPlayStateChange;
         
         this.masterOut = this.context.createGain();
         this.masterOut.connect(this.context.destination);
@@ -119,7 +122,7 @@ export class AudioEngine {
         this.convolver.connect(this.reverbReturnGain);
         this.reverbReturnGain.connect(this.preCompressorOut);
 
-        this.drumMachine = new DrumMachine(this, onPlayStateChange);
+        this.drumMachine = new DrumMachine(this, this.onPlayStateChange);
     }
     
     getContext() {
@@ -217,8 +220,6 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
-            } else if (e.data.type === 'debug') {
-                console.log(`[WORKLET-DEBUG-${part.toUpperCase()}]`, e.data.payload);
             }
         };
 
@@ -417,7 +418,7 @@ export class AudioEngine {
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
             this.setVolumes(newVolumes);
-            return newVolumes;
+            return newVolumes; // Return the modified volumes
         }
         return undefined;
     }
@@ -482,6 +483,7 @@ export class AudioEngine {
     private applyChannelSettings(partName: SynthPartName | 'drums', volumes: ChannelVolumes) {
         const nodeInfo = this.nodes.get(partName);
         if (nodeInfo && volumes) {
+            // Ramping is now handled inside the worklet for synths, but gain nodes are fine here.
             nodeInfo.gain.gain.setTargetAtTime(dbToGain(volumes.gain), this.context.currentTime, 0.01);
             nodeInfo.reverbSend.gain.setTargetAtTime(dbToGain(volumes.reverbSend), this.context.currentTime, 0.01);
             if (nodeInfo.distortion) {
@@ -553,6 +555,4 @@ export class AudioEngine {
     }
 }
 
-    
-
-    
+      
