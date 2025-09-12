@@ -2,6 +2,7 @@
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for all real-time synthesis, running in a high-priority
 // audio thread to ensure low-latency, glitch-free sound generation.
+console.log('[SynthProcessor] Script loaded and running.');
 
 class Oscillator {
     constructor(type, sampleRate) {
@@ -232,6 +233,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.peakLevel = 0;
 
         this.port.onmessage = this.handleMessage.bind(this);
+        this.port.postMessage({ type: 'debug', message: `Processor created with polyphony ${this.polyphony}` });
     }
 
     handleMessage(event) {
@@ -326,42 +328,43 @@ class SynthProcessor extends AudioWorkletProcessor {
         outputChannel.fill(0);
         
         let activeVoiceCount = 0;
-        for (const [id, voice] of this.voices.entries()) {
+        
+        this.voices.forEach((voice, id) => {
             if (voice.isFinished) {
                 this.voices.delete(id);
             } else {
                 activeVoiceCount++;
                 for (let i = 0; i < outputChannel.length; i++) {
-                    if(i === 0){
-                        const sample = voice.render();
-                        const absSample = Math.abs(sample);
-                        if(absSample > this.peakLevel) this.peakLevel = absSample;
-                        outputChannel[i] += sample;
-                    } else {
-                        // This avoids re-rendering the same block and just uses the first sample's value
-                        // A slightly more accurate approach would be to render every sample
-                        outputChannel[i] += outputChannel[0];
-                    }
+                    const sample = voice.render();
+                    outputChannel[i] += sample;
                 }
             }
+        });
+        
+        // Log peak level for debugging
+        let currentPeak = 0;
+        for (let i = 0; i < outputChannel.length; i++) {
+            const sampleAbs = Math.abs(outputChannel[i]);
+            if (sampleAbs > currentPeak) {
+                currentPeak = sampleAbs;
+            }
+        }
+        if(currentPeak > this.peakLevel) {
+            this.peakLevel = currentPeak;
         }
         
-        // Simple but effective limiter to prevent clipping
-        if (activeVoiceCount > 0) {
-            const attenuation = 1 / Math.sqrt(activeVoiceCount);
-             for (let i = 0; i < outputChannel.length; i++) {
-                outputChannel[i] = Math.tanh(outputChannel[i] * attenuation);
-            }
+        // Final brickwall limiter to prevent any clipping
+        for (let i = 0; i < outputChannel.length; i++) {
+            outputChannel[i] = Math.tanh(outputChannel[i]);
         }
         
         // Log debug info periodically
         this.logCounter++;
-        if (this.logCounter > 200) { // Log every ~200 * 128 samples
-            if (this.voices.size > 0) {
-                 const activeFrequencies = Array.from(this.voices.values()).map(v => v.targetFrequency.toFixed(2));
+        if (this.logCounter > 200) { // Log every ~200 * 128 samples (~5.8ms at 44.1kHz)
+            if (this.voices.size > 0 || this.peakLevel > 0.01) {
                  this.port.postMessage({ 
                      type: 'debug', 
-                     message: `Active voices: ${this.voices.size}. Peak level: ${this.peakLevel.toFixed(4)}. Freqs: [${activeFrequencies.join(', ')}]`
+                     message: `Active voices: ${this.voices.size}. Peak level: ${this.peakLevel.toFixed(4)}.`
                 });
             }
             this.peakLevel = 0;

@@ -139,7 +139,7 @@ export class AudioEngine {
     }
     
     public getVolumes(): Volumes {
-        return JSON.parse(JSON.stringify(this.volumes));
+        return JSON.parse(JSON.stringify(this.volumes)); // Return a deep copy
     }
     
     public async initialize() {
@@ -238,6 +238,8 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error('[DRUM WORKLET ERROR]', e.data.message);
+            } else if (e.data.type === 'debug') {
+                console.log('[DEBUG-DRUM]', e.data.message);
             }
         };
         
@@ -403,7 +405,7 @@ export class AudioEngine {
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
             this.setVolumes(newVolumes);
-            return newVolumes;
+            return newVolumes; // Return the modified volumes
         }
         return undefined;
     }
@@ -508,7 +510,7 @@ export class AudioEngine {
             this.limiter.threshold.setTargetAtTime(limiterSettings.threshold, now, 0.01);
             this.limiter.knee.setTargetAtTime(0, now, 0.01); // Hard knee for brickwall limiting
             this.limiter.ratio.setTargetAtTime(20, now, 0.01); // Max ratio
-            this.limiter.attack.setTargetAtTime(0.003, now, 0.01); // Fast attack
+            this.limiter.attack.setTargetAtTime(limiterSettings.attack, now, 0.01); 
             this.limiter.release.setTargetAtTime(limiterSettings.release, now, 0.01);
         } else {
             this.preLimiterOut.connect(this.masterOut);
