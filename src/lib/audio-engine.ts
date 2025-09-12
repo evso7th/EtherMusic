@@ -145,7 +145,6 @@ export class AudioEngine {
     
     public async initialize() {
         if (this.isInitialized) return;
-        console.log('[AudioEngine] Initializing...');
 
         if (this.context.state === 'suspended') {
             await this.context.resume();
@@ -180,7 +179,6 @@ export class AudioEngine {
                 this.context.audioWorklet.addModule('/workers/synth-processor.js'),
                 this.context.audioWorklet.addModule('/workers/drum-processor.js'),
              ]);
-             console.log('[AudioEngine] AudioWorklet modules loaded.');
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
             throw new Error("Could not load core audio components. Please try refreshing the page.");
@@ -257,7 +255,6 @@ export class AudioEngine {
             if (!response.ok) throw new Error('Reverb impulse not found');
             const arrayBuffer = await response.arrayBuffer();
             this.convolver.buffer = await this.context.decodeAudioData(arrayBuffer);
-            console.log('[AudioEngine] Loaded reverb impulse response.');
         } catch (error) {
             console.warn("[AudioEngine] Reverb impulse '/assets/sounds/impulses/space.wav' not found. Using a generated fallback reverb.");
             this.convolver.buffer = this.createFallbackReverb();
@@ -298,9 +295,6 @@ export class AudioEngine {
         if (!this.isInitialized || !this.orbManager) return;
         
         const partName = type === 'bass' ? (this.isBassLatchOn ? 'latch' : 'manualBass') : 'melody';
-        
-        const formattedData = data ? `{freq: '${data.frequency.toFixed(2)}', vol: '${data.volume.toFixed(2)}', id: ${data.pointerId}}` : 'null';
-        // console.log(`[Interaction] type: ${type}, state: ${state}, part: ${partName}`, formattedData);
         
         if (partName === 'latch') {
             if (state === 'down' && data) { 
@@ -378,13 +372,11 @@ export class AudioEngine {
         this.isBassLatchOn = isOn;
         this.nodes.get('manualBass')?.worklet.port.postMessage({ type: 'allNotesOff' });
         this.orbManager?.removeAllOrbs('bass');
-        console.log(`[AudioEngine] Bass latch set to: ${isOn}`);
         
         if (!isOn) {
             const notesToTurnOff = this.latchEngine.clear();
             const latchNode = this.nodes.get('latch')?.worklet;
             if (latchNode && notesToTurnOff.length > 0) {
-                console.log('[AudioEngine] Clearing all active latch notes.');
                 notesToTurnOff.forEach(note => {
                     latchNode.port.postMessage({ type: 'noteOff', id: note.id });
                     this.orbManager?.removeOrb(note.id);
@@ -398,14 +390,12 @@ export class AudioEngine {
         if (preset && this.nodes.has('melody')) {
             const message: WorkerMessage = { type: 'setPreset', preset: preset.params };
             this.nodes.get('melody')?.worklet.port.postMessage(message);
-            console.log(`[AudioEngine] Melody instrument set to: ${instrumentName}`);
         }
     }
     
     public setBassInstrument(instrumentName: BassInstrument): Volumes | undefined {
         const preset = bassInstruments.find(i => i.id === instrumentName);
         if (preset && this.volumes) {
-            console.log(`[AudioEngine] Bass instrument set to: ${instrumentName}`);
             
             const bassPresetParams = preset.params as BassInstrumentPresetParams;
             const message: WorkerMessage = { type: 'setPreset', preset: bassPresetParams };
@@ -420,7 +410,7 @@ export class AudioEngine {
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
             this.emitter.emit('volumesChanged', newVolumes);
-            return newVolumes;
+            return newVolumes; // Return the modified volumes
         }
         return undefined;
     }
@@ -453,10 +443,9 @@ export class AudioEngine {
             return;
         }
 
-        const sampleEntries = Object.entries(DRUM_SAMPLES);
-        console.log(`[AudioEngine] Loading ${sampleEntries.length} drum samples...`);
+        console.log(`[AudioEngine] Loading ${Object.keys(DRUM_SAMPLES).length} drum samples...`);
 
-        const promises = sampleEntries.map(async ([name, url]) => {
+        const promises = Object.entries(DRUM_SAMPLES).map(async ([name, url]) => {
             try {
                 const response = await fetch(url);
                 if (!response.ok) {
@@ -496,9 +485,6 @@ export class AudioEngine {
         if (!this.isInitialized || !this.context) return;
         
         if(isInitialization || JSON.stringify(this.volumes) !== JSON.stringify(newVolumes)) {
-            if (!isInitialization) {
-                 // console.log('[AudioEngine] Applying new volumes:', newVolumes);
-            }
             this.volumes = newVolumes;
 
             this.applyChannelSettings('melody', newVolumes.melody);
@@ -554,3 +540,5 @@ export class AudioEngine {
         }
     }
 }
+
+    

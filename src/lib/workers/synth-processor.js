@@ -345,6 +345,7 @@ class SynthProcessor extends AudioWorkletProcessor {
                     if (voice.isFinished) {
                         this.voices.delete(id);
                     } else {
+                        // The render method is now much simpler, it just returns the next sample.
                         sample += voice.render();
                     }
                 });
@@ -354,14 +355,14 @@ class SynthProcessor extends AudioWorkletProcessor {
                     peak = absSample;
                 }
                 
-                // Hard clipping to prevent audio glitches
+                // Hard clipping to prevent audio glitches from signal summation.
                 outputChannel[i] = Math.max(-1, Math.min(1, sample));
             }
         }
 
         this.debugCounter++;
         if (this.voices.size > 0 && this.debugCounter > this.sampleRate) { // Log roughly once per second
-            this.port.postMessage({type: 'debug', payload: { voices: this.voices.size, peak }});
+            this.port.postMessage({type: 'debug', payload: { voices: this.voices.size, peak: peak.toFixed(2) }});
             this.debugCounter = 0;
         }
 
@@ -382,3 +383,4 @@ class SynthProcessor extends AudioWorkletProcessor {
 
 registerProcessor('synth-processor', SynthProcessor);
 
+    

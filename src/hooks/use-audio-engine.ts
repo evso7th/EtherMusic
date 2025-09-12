@@ -137,9 +137,17 @@ export function useAudioEngine() {
 
     useEffect(() => {
         const handlePlayState = (playing: boolean) => setIsPlaying(playing);
+        const handleVolumesChanged = (newVolumes: Volumes) => {
+            setVolumesState(newVolumes);
+            saveVolumes(newVolumes);
+        };
+        
         emitter.on('playStateChanged', handlePlayState);
+        emitter.on('volumesChanged', handleVolumesChanged);
+        
         return () => {
             emitter.off('playStateChanged', handlePlayState);
+            emitter.off('volumesChanged', handleVolumesChanged);
         }
     }, []);
     
@@ -188,9 +196,10 @@ export function useAudioEngine() {
     const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
         const newVolumes = audioEngine.current?.setBassInstrument(instrumentName);
         if (newVolumes) {
-            setVolumes(newVolumes);
+            setVolumesState(newVolumes);
+            saveVolumes(newVolumes);
         }
-    }, [setVolumes]);
+    }, []);
 
     return {
         isAppStarted,
@@ -212,3 +221,5 @@ export function useAudioEngine() {
         handleThereminInteraction,
     };
 }
+
+    
