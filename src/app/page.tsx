@@ -81,9 +81,12 @@ export default function Home() {
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
         if (isReady) {
-            setBassInstrument(instrumentId);
+            const newVolumes = setBassInstrument(instrumentId);
+            if (newVolumes) {
+                 setVolumes(newVolumes);
+            }
         }
-    }, [setBassInstrument, isReady]);
+    }, [setBassInstrument, isReady, setVolumes]);
 
     useEffect(() => {
         if (isReady && activeBassInstrument) {

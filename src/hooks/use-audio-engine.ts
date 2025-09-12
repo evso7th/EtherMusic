@@ -169,12 +169,10 @@ export function useAudioEngine() {
     
     const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
         if(audioEngine.current){
-            const newVolumes = audioEngine.current.setBassInstrument(instrumentName);
-            if (newVolumes) {
-                setVolumes(newVolumes);
-            }
+            return audioEngine.current.setBassInstrument(instrumentName);
         }
-    }, [setVolumes]);
+        return undefined;
+    }, []);
 
     return {
         isAppStarted,
@@ -196,3 +194,5 @@ export function useAudioEngine() {
         handleThereminInteraction,
     };
 }
+
+    
