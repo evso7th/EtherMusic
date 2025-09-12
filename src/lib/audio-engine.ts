@@ -220,8 +220,6 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
-            } else if (e.data.type === 'debug') {
-                console.log(`[DEBUG-${part.toUpperCase()}] ${e.data.message}`);
             }
         };
 
@@ -242,8 +240,6 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error('[DRUM WORKLET ERROR]', e.data.message);
-            } else if (e.data.type === 'debug') {
-                console.log(`[DEBUG-DRUMS] ${e.data.message}`);
             }
         };
         
@@ -442,7 +438,6 @@ export class AudioEngine {
     public playDrumSample(sampleName: string, volume: number = 1.0) {
         const drumNode = this.nodes.get('drums');
         if (!drumNode) {
-            console.log(`[AudioEngine] Attempted to play drum sample "${sampleName}" but drum node not ready.`);
             return;
         }
         const message: DrumWorkerMessage = { type: 'playSample', sampleName, volume };

@@ -1,3 +1,4 @@
+
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for all real-time synthesis, running in a high-priority
 // audio thread to ensure low-latency, glitch-free sound generation.
@@ -239,32 +240,19 @@ class SynthProcessor extends AudioWorkletProcessor {
         const { type, note, id, preset } = event.data;
         switch (type) {
             case 'noteOn':
-                if (note) {
-                    this.port.postMessage({ type: 'debug', message: `noteOn received: id=${note.id}, freq=${note.frequency.toFixed(2)}` });
-                    this.noteOn(note);
-                }
+                if (note) this.noteOn(note);
                 break;
             case 'noteOff':
-                if (id !== undefined) {
-                    this.port.postMessage({ type: 'debug', message: `noteOff received: id=${id}` });
-                    this.noteOff(id);
-                }
+                if (id !== undefined) this.noteOff(id);
                 break;
             case 'noteUpdate':
-                 if (note) this.noteUpdate(note); // Too frequent to log
+                if (note) this.noteUpdate(note);
                 break;
             case 'allNotesOff':
-                this.port.postMessage({ type: 'debug', message: `allNotesOff received` });
                 this.allNotesOff();
                 break;
             case 'setPreset':
-                if (preset) {
-                    this.port.postMessage({ type: 'debug', message: `setPreset received: ${preset.oscillator.type}` });
-                    this.applyPreset(preset);
-                }
-                break;
-             case 'error':
-                console.error(`[SYNTH-WORKLET]`, event.data.message);
+                if (preset) this.applyPreset(preset);
                 break;
         }
     }
@@ -346,18 +334,12 @@ class SynthProcessor extends AudioWorkletProcessor {
                     this.voices.delete(id);
                 } else {
                     for (let i = 0; i < outputChannel.length; i++) {
-                        const sample = voice.render();
-                        outputChannel[i] += sample;
+                        channel[i] += voice.render();
                     }
                 }
             });
         }
         
-        // Simple hard clipping to prevent audio glitches if we exceed [-1, 1]
-        for (let i = 0; i < outputChannel.length; i++) {
-            outputChannel[i] = Math.max(-1, Math.min(1, outputChannel[i]));
-        }
-
         return true; // Keep processor alive
     }
     
