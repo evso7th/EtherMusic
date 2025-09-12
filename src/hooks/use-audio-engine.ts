@@ -194,7 +194,9 @@ export function useAudioEngine() {
     }, []);
     
     const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
-        audioEngine.current?.setBassInstrument(instrumentName);
+        if(audioEngine.current) {
+            audioEngine.current.setBassInstrument(instrumentName);
+        }
     }, []);
 
     return {
@@ -217,5 +219,3 @@ export function useAudioEngine() {
         handleThereminInteraction,
     };
 }
-
-    

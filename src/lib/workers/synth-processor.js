@@ -343,6 +343,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         if (!outputChannel) return true;
 
         outputChannel.fill(0);
+        
         let peak = 0;
 
         if (this.voices.size > 0) {
@@ -356,10 +357,9 @@ class SynthProcessor extends AudioWorkletProcessor {
                     }
                 });
                 
-                // Hard-clipping limiter
                 const limitedSample = Math.max(-1, Math.min(1, sample));
                 outputChannel[i] = limitedSample;
-                
+
                 const absSample = Math.abs(limitedSample);
                 if (absSample > peak) {
                     peak = absSample;

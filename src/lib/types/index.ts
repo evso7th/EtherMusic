@@ -118,12 +118,13 @@ export type WorkerMessage =
     | { type: 'noteOff', id: number }
     | { type: 'noteUpdate', note: SynthNote }
     | { type: 'allNotesOff' }
-    | { type: 'setPreset', preset: InstrumentPresetParams | BassInstrumentPresetParams };
+    | { type: 'setPreset', preset: InstrumentPresetParams | BassInstrumentPresetParams }
+    | { type: 'debug', payload: any };
+
 
 export type DrumWorkerMessage =
     | { type: 'loadSample'; name: string; buffer: ArrayBuffer; }
-    | { type: 'playSample'; sampleName: string; volume?: number; }
-    | { type: 'debug', payload: any };
+    | { type: 'playSample'; sampleName: string; volume?: number; };
 
 
 export type EnvelopeCurve = "linear" | "exponential";
@@ -154,4 +155,5 @@ export interface AutopilotSettings {
 
 export type AudioEngineEvents = {
     playStateChanged: boolean;
+    volumesChanged: Volumes | ((currentVolumes: Volumes) => Volumes);
 };
