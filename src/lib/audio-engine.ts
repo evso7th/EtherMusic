@@ -218,8 +218,6 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
-            } else if (e.data.type === 'debug') {
-                console.log(`[WORKLET-DEBUG-${part.toUpperCase()}]`, e.data.message);
             }
         };
 
@@ -240,8 +238,6 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error('[DRUM WORKLET ERROR]', e.data.message);
-            } else if (e.data.type === 'debug') {
-                console.log(`[DRUM-WORKLET-DEBUG]`, e.data.message);
             }
         };
         
@@ -296,7 +292,7 @@ export class AudioEngine {
         if (!this.isInitialized) return;
         
         const partName = type === 'bass' ? (this.isBassLatchOn ? 'latch' : 'manualBass') : 'melody';
-        console.log(`[Interaction] type: ${type}, state: ${state}, part: ${partName}, data:`, data ? { freq: data.frequency.toFixed(2), vol: data.volume.toFixed(2), id: data.pointerId } : null);
+        console.log(`[Interaction] type: ${type}, state: ${state}, part: ${partName}`, data ? { freq: data.frequency.toFixed(2), vol: data.volume.toFixed(2), id: data.pointerId } : null);
         
         if (partName === 'latch') {
             if (state === 'down' && data) { 
@@ -486,7 +482,6 @@ export class AudioEngine {
     private applyChannelSettings(partName: SynthPartName | 'drums', volumes: ChannelVolumes) {
         const nodeInfo = this.nodes.get(partName);
         if (nodeInfo && volumes) {
-            // Ramping is now handled inside the worklet for synths, but gain nodes are fine here.
             nodeInfo.gain.gain.setTargetAtTime(dbToGain(volumes.gain), this.context.currentTime, 0.01);
             nodeInfo.reverbSend.gain.setTargetAtTime(dbToGain(volumes.reverbSend), this.context.currentTime, 0.01);
             if (nodeInfo.distortion) {
@@ -554,5 +549,3 @@ export class AudioEngine {
         }
     }
 }
-
-    

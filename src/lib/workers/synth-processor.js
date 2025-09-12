@@ -238,7 +238,6 @@ class SynthProcessor extends AudioWorkletProcessor {
 
     handleMessage(event) {
         const { type, note, id, preset } = event.data;
-        this.port.postMessage({ type: 'debug', message: `Received command: ${type}`});
         switch (type) {
             case 'noteOn':
                 if (note) this.noteOn(note);
@@ -366,5 +365,3 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
-
-    
