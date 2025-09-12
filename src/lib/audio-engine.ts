@@ -7,8 +7,6 @@ import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
 import { bassInstruments } from './bass-presets';
 import { DrumMachine } from './drum-machine';
-import { Emitter } from 'mitt';
-import { AudioEngineEvents } from '@/types';
 
 
 function dbToGain(db: number): number {
@@ -220,7 +218,7 @@ export class AudioEngine {
             if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
             } else if (e.data.type === 'debug') {
-                 console.log(`[WORKLET-DEBUG-${part.toUpperCase()}]`, e.data.message);
+                console.log(`[WORKLET-DEBUG-${part.toUpperCase()}]`, e.data.payload);
             }
         };
 
@@ -240,8 +238,6 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error('[DRUM WORKLET ERROR]', e.data.message);
-            } else if (e.data.type === 'debug') {
-                console.log(`[DRUM-WORKLET-DEBUG]`, e.data.message);
             }
         };
         
@@ -403,9 +399,9 @@ export class AudioEngine {
         }
     }
     
-    public setBassInstrument(instrumentName: BassInstrument) {
+    public setBassInstrument(instrumentName: BassInstrument): Volumes | undefined {
         const preset = bassInstruments.find(i => i.id === instrumentName);
-        if (preset) {
+        if (preset && this.volumes) {
             console.log(`[AudioEngine] Bass instrument set to: ${instrumentName}`);
             
             const bassPresetParams = preset.params as BassInstrumentPresetParams;
@@ -413,7 +409,17 @@ export class AudioEngine {
             
             this.nodes.get('manualBass')?.worklet.port.postMessage(message);
             this.nodes.get('latch')?.worklet.port.postMessage(message);
+            
+            const newVolumes = JSON.parse(JSON.stringify(this.volumes)); // Deep copy
+            newVolumes.manualBass.reverbSend = bassPresetParams.reverbSend ?? newVolumes.manualBass.reverbSend;
+            newVolumes.manualBass.distortion = bassPresetParams.distortion ?? newVolumes.manualBass.distortion;
+            newVolumes.latch.reverbSend = bassPresetParams.reverbSend ?? newVolumes.latch.reverbSend;
+            newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
+            
+            this.setVolumes(newVolumes);
+            return newVolumes;
         }
+        return undefined;
     }
     
     public setBeatPattern(patternName: string) {
@@ -484,11 +490,13 @@ export class AudioEngine {
         }
     }
     
-    public setVolumes(newVolumes: Volumes) {
+    public setVolumes(newVolumes: Volumes, isInitialization = false) {
         if (!this.isInitialized || !this.context) return;
         
-        if(JSON.stringify(this.volumes) !== JSON.stringify(newVolumes)) {
-            console.log('[AudioEngine] Applying new volumes:', newVolumes);
+        if(isInitialization || JSON.stringify(this.volumes) !== JSON.stringify(newVolumes)) {
+            if (!isInitialization) {
+                console.log('[AudioEngine] Applying new volumes:', newVolumes);
+            }
             this.volumes = newVolumes;
 
             this.applyChannelSettings('melody', newVolumes.melody);
@@ -544,5 +552,7 @@ export class AudioEngine {
         }
     }
 }
+
+    
 
     

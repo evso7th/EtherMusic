@@ -1,4 +1,5 @@
 
+
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for playing back pre-loaded drum samples
 // with low latency and high performance, off the main thread.
@@ -59,8 +60,6 @@ class DrumProcessor extends AudioWorkletProcessor {
                     this.voices.shift();
                 }
                 this.voices.push(new Voice(bufferToPlay, volume ?? 1.0));
-            } else {
-                 this.port.postMessage({ type: 'error', message: `Sample not found: ${sampleName}` });
             }
         }
     } catch (e) {
@@ -101,5 +100,7 @@ class DrumProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('drum-processor', DrumProcessor);
+
+    
 
     

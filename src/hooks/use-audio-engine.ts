@@ -103,7 +103,7 @@ export function useAudioEngine() {
                 await engine.initialize();
                 
                 const currentVolumes = loadVolumes();
-                engine.setVolumes(currentVolumes);
+                engine.setVolumes(currentVolumes, true);
                 setVolumesState(currentVolumes); 
                 setCurrentTempo(currentVolumes.tempo);
 
@@ -221,3 +221,6 @@ export function useAudioEngine() {
         handleThereminInteraction,
     };
 }
+
+
+    

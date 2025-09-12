@@ -74,23 +74,13 @@ export default function Home() {
 
     const handleSetMelodyInstrument = useCallback((instrumentId: Instrument) => {
         setActiveMelodyInstrument(instrumentId);
-    }, []);
+        setMelodyInstrument(instrumentId);
+    }, [setMelodyInstrument]);
 
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
-    }, []);
-
-    useEffect(() => {
-        if (isReady) {
-            setMelodyInstrument(activeMelodyInstrument);
-        }
-    }, [isReady, activeMelodyInstrument, setMelodyInstrument]);
-
-    useEffect(() => {
-        if (isReady) {
-            setBassInstrument(activeBassInstrument);
-        }
-    }, [isReady, activeBassInstrument, setBassInstrument]);
+        setBassInstrument(instrumentId);
+    }, [setBassInstrument]);
     
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         const isKey = (k: string): k is MusicKey => Object.keys(ALL_NOTES).includes(k);
@@ -156,9 +146,8 @@ export default function Home() {
     }, [setBassLatch]);
     
     const handleThereminInteractionCallback = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
-        if (!isReady || !audioEngine) return;
         handleThereminInteraction(type, data, state);
-    }, [isReady, audioEngine, handleThereminInteraction]);
+    }, [handleThereminInteraction]);
 
     const handlePlayPause = useCallback(() => {
         if (!audioEngine) return;
@@ -297,5 +286,7 @@ export default function Home() {
         </div>
     );
 }
+
+    
 
     

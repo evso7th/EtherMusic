@@ -1,4 +1,5 @@
 
+
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for all real-time synthesis, running in a high-priority
 // audio thread to ensure low-latency, glitch-free sound generation.
@@ -235,6 +236,10 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.preset = this.getDefaultPreset();
         
         this.port.onmessage = this.handleMessage.bind(this);
+
+        this.peakLevel = 0;
+        this.logCounter = 0;
+        this.logInterval = this.sampleRate; // Log roughly once per second
     }
 
     handleMessage(event) {
@@ -340,10 +345,33 @@ class SynthProcessor extends AudioWorkletProcessor {
                     this.voices.delete(id);
                 } else {
                     for (let i = 0; i < outputChannel.length; i++) {
-                        outputChannel[i] += voice.render();
+                        const sample = voice.render();
+                        outputChannel[i] += sample;
+                        
+                        // Debugging logic
+                        const absSample = Math.abs(sample);
+                        if (absSample > this.peakLevel) {
+                            this.peakLevel = absSample;
+                        }
                     }
                 }
             });
+
+            this.logCounter += outputChannel.length;
+            if (this.logCounter >= this.logInterval) {
+                this.port.postMessage({
+                    type: 'debug',
+                    payload: {
+                        voices: this.voices.size,
+                        peak: this.peakLevel.toFixed(4)
+                    }
+                });
+                this.peakLevel = 0;
+                this.logCounter = 0;
+            }
+        } else {
+            this.peakLevel = 0;
+            this.logCounter = 0;
         }
         
         return true; // Keep processor alive
@@ -362,5 +390,7 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
+
+    
 
     
