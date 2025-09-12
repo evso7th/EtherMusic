@@ -1,119 +1,67 @@
-console.log('[DrumProcessor] Script loaded');
+
+
+// This script is designed to be loaded into an AudioWorklet.
+// It is responsible for playing back pre-loaded drum samples
+// with low latency and high performance, off the main thread.
+console.log('[DrumProcessor] Script loaded.');
 
 class Voice {
-    constructor(buffer, gain, sampleRate) {
-        this.buffer = buffer;
-        this.gain = gain;
-        this.sampleRate = sampleRate;
+    constructor(buffer, gain) {
+        this.buffer = buffer; // This is a Float32Array
         this.position = 0;
-        this.isFinished = false;
-
-        // Simple ADSR envelope
-        this.envelope = {
-            attack: 0.005, // 5ms
-            decay: 0.1,    // 100ms
-            sustain: 0.8,
-            release: 0.2, // 200ms
-            state: 'attack',
-            value: 0
-        };
+        this.gain = gain;
     }
 
-    process() {
-        if (this.isFinished) {
-            return 0;
+    // This method processes a block of 128 samples (the standard render quantum).
+    process(outputChannel) {
+        if (this.position >= this.buffer.length) {
+            return true; // true indicates finished
         }
 
-        // --- Envelope processing ---
-        const env = this.envelope;
-        const attackSamples = env.attack * this.sampleRate;
-        const decaySamples = env.decay * this.sampleRate;
-        
-        if (env.state === 'attack') {
-            env.value += 1.0 / attackSamples;
-            if (env.value >= 1.0) {
-                env.value = 1.0;
-                env.state = 'decay';
-            }
-        } else if (env.state === 'decay') {
-            env.value -= (1.0 - env.sustain) / decaySamples;
-            if (env.value <= env.sustain) {
-                env.value = env.sustain;
-                env.state = 'sustain';
-            }
-        }
-        
-        // Note: Release state is triggered externally by setting voice.isReleasing = true
-        if (this.isReleasing) {
-             const releaseSamples = env.release * this.sampleRate;
-             env.value -= env.sustain / releaseSamples;
-             if (env.value <= 0) {
-                env.value = 0;
-                this.isFinished = true;
-             }
+        const remainingSamples = this.buffer.length - this.position;
+        const samplesToProcess = Math.min(outputChannel.length, remainingSamples);
+
+        for (let i = 0; i < samplesToProcess; i++) {
+            // Add the sample to the output buffer, scaled by gain.
+            outputChannel[i] += this.buffer[this.position + i] * this.gain;
         }
 
-        const floor = Math.floor(this.position);
-        if (floor >= this.buffer.length) {
-            this.isFinished = true;
-            return 0;
-        }
+        this.position += samplesToProcess;
 
-        // --- Sample playback ---
-        const sample = this.buffer[floor] || 0;
-        this.position++;
-
-        return sample * this.gain * env.value;
-    }
-
-    stop() {
-        this.isReleasing = true;
+        return this.position >= this.buffer.length;
     }
 }
 
 class DrumProcessor extends AudioWorkletProcessor {
   constructor(options) {
     super();
-    this.maxVoices = 16;
+    this.maxVoices = 64;
     this.voices = [];
     this.buffers = new Map();
-    console.log('[DrumProcessor] Initialized');
-
+    
     this.port.onmessage = this.handleMessage.bind(this);
   }
 
   handleMessage(event) {
-    console.log('[DrumProcessor] Received:', event.data.type, event.data.name || event.data.sampleName);
-    const { type, name, buffer, sampleName, volume } = event.data;
+    try {
+        const { type, name, buffer, sampleName, volume } = event.data;
 
-    switch (type) {
-        case 'loadSample':
-            if (name && buffer) {
-                this.buffers.set(name, new Float32Array(buffer));
-                console.log(`[DrumProcessor] Sample loaded: ${name}, size: ${buffer.byteLength}`);
+        if (type === 'loadSample' && name && buffer instanceof ArrayBuffer) {
+            const float32Array = new Float32Array(buffer);
+            this.buffers.set(name, float32Array);
+        } else if (type === 'playSample' && sampleName) {
+            const bufferToPlay = this.buffers.get(sampleName);
+            if (bufferToPlay) {
+                if (this.voices.length >= this.maxVoices) {
+                    this.voices.shift();
+                }
+                this.voices.push(new Voice(bufferToPlay, volume ?? 1.0));
             }
-            break;
-        case 'playSample':
-            if (sampleName) {
-                this.playSample(sampleName, volume);
-            }
-            break;
-        default:
-            this.port.postMessage({ type: 'error', message: `[DrumProcessor] Unknown message type: ${type}` });
-    }
-  }
-
-  playSample(name, volume = 1.0) {
-    const buffer = this.buffers.get(name);
-    console.log(`[DrumProcessor] playSample called for '${name}'. Buffer found:`, !!buffer);
-    if (buffer) {
-        if (this.voices.length >= this.maxVoices) {
-            this.voices.shift();
         }
-        const voice = new Voice(buffer, volume, sampleRate);
-        this.voices.push(voice);
-    } else {
-        this.port.postMessage({ type: 'log', message: `Sample not found: ${name}. Buffers available: ${[...this.buffers.keys()].join(', ')}` });
+    } catch (e) {
+        if (e instanceof Error) {
+            this.port.postMessage({ type: 'error', message: `Error handling message: ${e.message}` });
+        }
     }
   }
 
@@ -122,40 +70,32 @@ class DrumProcessor extends AudioWorkletProcessor {
     if (!outputChannel) {
         return true;
     }
-    
+
     outputChannel.fill(0);
 
-    if (this.voices.length === 0) {
-        return true;
-    }
-    
-    let activeVoices = [];
-    for (const voice of this.voices) {
-        if (!voice.isFinished) {
-            for (let i = 0; i < outputChannel.length; i++) {
-                 // We call process for each sample in the block
-                 // This is not perfectly accurate but a simple approximation
-                 // A more correct implementation would process sample-by-sample inside the voice
-                 if (i === 0) { // Only advance the voice once per block for simplicity
-                     const sample = voice.process();
-                     // Add the sample to all output samples in the block
-                     for(let j=0; j<outputChannel.length; j++) {
-                        outputChannel[j] += sample;
-                     }
-                 }
+    if (this.voices.length > 0) {
+        // Create a temporary buffer to mix into, to avoid modifying the output directly in the loop
+        const mixBuffer = new Float32Array(outputChannel.length).fill(0);
+
+        this.voices = this.voices.filter(voice => {
+            const tempOutput = new Float32Array(outputChannel.length).fill(0);
+            const isFinished = voice.process(tempOutput);
+
+            // Add the voice's output to the mix buffer
+            for (let i = 0; i < mixBuffer.length; i++) {
+                mixBuffer[i] += tempOutput[i];
             }
-            activeVoices.push(voice);
+
+            return !isFinished;
+        });
+
+        // Apply the mixed signal to the actual output, with a simple limiter
+        for (let i = 0; i < outputChannel.length; i++) {
+            outputChannel[i] = Math.max(-1, Math.min(1, mixBuffer[i]));
         }
     }
-
-    this.voices = activeVoices;
-
-    // Apply a simple limiter to prevent clipping
-    for (let i = 0; i < outputChannel.length; i++) {
-        outputChannel[i] = Math.max(-1, Math.min(1, outputChannel[i]));
-    }
     
-    return true;
+    return true; // Keep the processor alive.
   }
 }
 

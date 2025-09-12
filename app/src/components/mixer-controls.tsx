@@ -73,38 +73,35 @@ export function MixerControls({
         setLocalVolumes(initialVolumes);
     }, [initialVolumes]);
 
-    const handleLocalVolumeChange = (update: Partial<Volumes> | ((v: Volumes) => Volumes)) => {
+    const handleLocalVolumeChange = (update: Partial<Volumes> | ((v: Volumes) => Partial<Volumes>)) => {
         setLocalVolumes(current => {
-            const updated = typeof update === 'function' ? update(current) : { ...current, ...update };
-            console.log('[MixerControls] Local state updated:', updated);
-            return updated;
+            const newValues = typeof update === 'function' ? update(current) : update;
+            return { ...current, ...newValues };
         });
     }
     
     const handleChannelVolumeChange = (part: VolumeChannel, value: number) => {
         handleLocalVolumeChange(prev => {
-            const newVolumes = JSON.parse(JSON.stringify(prev)); // Deep copy to be safe
-            const newChannelVolumes = { ...(newVolumes[part] as ChannelVolumes), gain: value };
-            newVolumes[part] = newChannelVolumes;
+            const newChannelVolumes = { ...(prev[part] as ChannelVolumes), gain: value };
+            const changes: Partial<Volumes> = { [part]: newChannelVolumes };
 
             // Sync manualBass and latch gain sliders
             if (part === 'manualBass') {
-                newVolumes.latch = { ...newVolumes.latch, gain: value };
+                changes.latch = { ...prev.latch, gain: value };
             } else if (part === 'latch') {
-                newVolumes.manualBass = { ...newVolumes.manualBass, gain: value };
+                changes.manualBass = { ...prev.manualBass, gain: value };
             }
             
-            return newVolumes;
+            return changes;
         });
     };
     
     const handleReverbReturnChange = (value: number) => {
-        handleLocalVolumeChange(prev => ({ ...prev, reverbReturn: value }));
+        handleLocalVolumeChange({ reverbReturn: value });
     };
     
     const handleCompressorSettingChange = useCallback((setting: keyof CompressorSettings, value: any) => {
         handleLocalVolumeChange(prev => ({
-            ...prev,
             compressor: { ...prev.compressor, [setting]: value }
         }));
     }, []);
@@ -123,7 +120,7 @@ export function MixerControls({
                             label="Tempo"
                             icon={Clock}
                             volume={localVolumes.tempo}
-                            onVolumeChange={(v) => handleLocalVolumeChange(prev => ({...prev, tempo: v}))}
+                            onVolumeChange={(v) => handleLocalVolumeChange({ tempo: v })}
                             min={30}
                             max={200}
                             step={1}
@@ -133,7 +130,7 @@ export function MixerControls({
                             label="Swing"
                             icon={Shuffle}
                             volume={(localVolumes.swing || 0) * 100}
-                            onVolumeChange={(v) => handleLocalVolumeChange(prev => ({...prev, swing: v / 100}))}
+                            onVolumeChange={(v) => handleLocalVolumeChange({ swing: v / 100 })}
                             min={0}
                             max={75}
                             step={1}
@@ -238,3 +235,4 @@ export function MixerControls({
         </div>
     );
 }
+

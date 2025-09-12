@@ -42,6 +42,7 @@ export default function Home() {
         isReady,
         isPlaying,
         audioEngine,
+        orbManager,
         startApp,
         stopAllSounds,
         setBeatPattern,
@@ -51,7 +52,6 @@ export default function Home() {
         handleThereminInteraction,
         setMelodyInstrument,
         setBassInstrument,
-        orbManager,
         volumes,
         setVolumes,
         currentTempo,
@@ -72,24 +72,18 @@ export default function Home() {
         setIsClient(true);
     }, []);
 
-    useEffect(() => {
-        if (isReady && activeMelodyInstrument) {
-            setMelodyInstrument(activeMelodyInstrument);
-        }
-    }, [isReady, activeMelodyInstrument, setMelodyInstrument]);
+    const handleSetMelodyInstrument = useCallback((instrumentId: Instrument) => {
+        setActiveMelodyInstrument(instrumentId);
+        setMelodyInstrument(instrumentId);
+    }, [setMelodyInstrument]);
 
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
-        if (isReady) {
-            setBassInstrument(instrumentId);
+        const newVolumes = setBassInstrument(instrumentId);
+        if (newVolumes) {
+            setVolumes(newVolumes);
         }
-    }, [setBassInstrument, isReady]);
-
-    useEffect(() => {
-        if (isReady && activeBassInstrument) {
-            handleSetBassInstrument(activeBassInstrument);
-        }
-    }, [isReady, activeBassInstrument, handleSetBassInstrument]);
+    }, [setBassInstrument, setVolumes]);
     
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         const isKey = (k: string): k is MusicKey => Object.keys(ALL_NOTES).includes(k);
@@ -154,15 +148,10 @@ export default function Home() {
         setBassLatch(isOn);
     }, [setBassLatch]);
     
-    const handleMelodyInstrumentChange = useCallback((instrumentId: Instrument) => {
-        setActiveMelodyInstrument(instrumentId);
-        setMelodyInstrument(instrumentId);
-    }, [setMelodyInstrument]);
-    
     const handleThereminInteractionCallback = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
-        if (!isReady || !audioEngine) return;
+        if (!isReady) return;
         handleThereminInteraction(type, data, state);
-    }, [isReady, audioEngine, handleThereminInteraction]);
+    }, [isReady, handleThereminInteraction]);
 
     const handlePlayPause = useCallback(() => {
         if (!audioEngine) return;
@@ -270,7 +259,7 @@ export default function Home() {
                         volumes={volumes}
                         onEffectChange={handleChannelEffectChange}
                         activeMelodyInstrument={activeMelodyInstrument}
-                        onMelodyInstrumentChange={handleMelodyInstrumentChange}
+                        onMelodyInstrumentChange={handleSetMelodyInstrument}
                         musicKey={musicKey}
                         onKeyChange={handleHarmonyChange}
                         musicScale={musicScale}
@@ -280,7 +269,7 @@ export default function Home() {
                         <BeatBoxControls
                             activePattern={activePattern}
                             onPatternChange={handlePatternChange}
-                            initialVolumes={volumes}
+                            volumes={volumes}
                             onApply={handleMixerApply}
                             isMobile={isMobile}
                         />
@@ -291,7 +280,7 @@ export default function Home() {
                      <BeatBoxControls
                         activePattern={activePattern}
                         onPatternChange={handlePatternChange}
-                        initialVolumes={volumes}
+                        volumes={volumes}
                         onApply={handleMixerApply}
                         isMobile={isMobile}
                         isLandscape={true}
@@ -302,4 +291,3 @@ export default function Home() {
     );
 }
 
-    
