@@ -217,8 +217,6 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
-            } else if (e.data.type === 'debug') {
-                console.log(`[DEBUG-${part.toUpperCase()}]`, `Peak: ${e.data.peak}, Voices: ${e.data.voices}`);
             }
         };
 
@@ -238,8 +236,6 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error('[DRUM WORKLET ERROR]', e.data.message);
-            } else if (e.data.type === 'debug') {
-                console.log(`[DEBUG-DRUM]`, e.data.message);
             }
         };
         
