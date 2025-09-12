@@ -2,7 +2,6 @@
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for all real-time synthesis, running in a high-priority
 // audio thread to ensure low-latency, glitch-free sound generation.
-console.log('[SynthProcessor] Script loaded and running.');
 
 class Oscillator {
     constructor(type, sampleRate) {
@@ -210,12 +209,12 @@ class Voice {
             }
         });
         
-        const numLayers = Math.max(1, this.layers.length);
-        mixedSample /= numLayers;
-
         const filteredSample = this.processFilter(mixedSample);
         
-        return filteredSample * this.volume;
+        // Normalize based on number of layers to prevent internal clipping
+        const numLayers = Math.max(1, this.layers.length);
+        
+        return (filteredSample / numLayers) * this.volume;
     }
 
     noteUpdate(frequency, volume) { this.targetFrequency = frequency; this.volume = volume; }
@@ -233,7 +232,6 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.peakLevel = 0;
 
         this.port.onmessage = this.handleMessage.bind(this);
-        console.log(`[SynthProcessor] Created with polyphony ${this.polyphony}`);
     }
 
     handleMessage(event) {
@@ -259,12 +257,14 @@ class SynthProcessor extends AudioWorkletProcessor {
 
     applyPreset(preset) {
         this.preset = { ...this.getDefaultPreset(), ...preset };
+        // Immediately stop all voices to apply the new preset cleanly
         this.allNotesOff();
     }
 
     noteOn(note) {
         if (this.voices.has(note.id)) {
             const voice = this.voices.get(note.id);
+            // If the voice is releasing, restart it from the attack phase
             if(voice.isReleasing){
                 voice.isReleasing = false;
                 voice.layers.forEach(l => {
@@ -279,6 +279,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         if (this.voices.size >= this.polyphony) {
             let oldestId;
             let oldestTime = Infinity;
+            // Prioritize removing voices that are already in the release phase
              for (const [id, voice] of this.voices.entries()) {
                 if (voice.isReleasing) {
                     oldestId = id;
@@ -294,7 +295,7 @@ class SynthProcessor extends AudioWorkletProcessor {
             }
         }
         const voice = new Voice(note.id, note.frequency, note.volume, this.preset, sampleRate);
-        voice.startTime = currentTime; 
+        voice.startTime = currentTime; // currentTime is a global from AudioWorkletProcessor
         this.voices.set(note.id, voice);
     }
     
@@ -315,18 +316,20 @@ class SynthProcessor extends AudioWorkletProcessor {
     allNotesOff() {
         this.voices.forEach(voice => {
             voice.release();
+            // Force a quick fade out to prevent lingering notes
             voice.layers.forEach(l => {
-                l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05); 
+                l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05); // 50ms quick fade
             });
         });
     }
 
     process(inputs, outputs, parameters) {
         const outputChannel = outputs[0]?.[0];
-        if (!outputChannel) return true;
+        if (!outputChannel) return true; // Stop processing if there's no output channel.
     
         outputChannel.fill(0);
         
+        // Render active voices
         this.voices.forEach((voice, id) => {
             if (voice.isFinished) {
                 this.voices.delete(id);
@@ -344,27 +347,30 @@ class SynthProcessor extends AudioWorkletProcessor {
             if (sampleAbs > currentPeak) {
                 currentPeak = sampleAbs;
             }
-            // Simple limiter to prevent clipping
+            // A simple soft-clipper / limiter
             outputChannel[i] = Math.tanh(outputChannel[i]);
         }
         
+        // Track the highest peak level in this block
         if (currentPeak > this.peakLevel) {
             this.peakLevel = currentPeak;
         }
         
         this.logCounter++;
-        if (this.logCounter > 44100 / 128 * 0.5) { // Log about 2 times per second
+        // Post a message with debug info roughly 4 times per second
+        if (this.logCounter > (sampleRate / 128 / 4)) {
+            // Only send a message if there's something to report
             if (this.voices.size > 0 || this.peakLevel > 0.001) {
                  this.port.postMessage({ 
                      type: 'debug', 
-                     message: `Active voices: ${this.voices.size}. Peak level: ${this.peakLevel.toFixed(4)}.`
+                     message: `Voices: ${this.voices.size}, Peak: ${this.peakLevel.toFixed(4)}`
                 });
             }
             this.peakLevel = 0;
             this.logCounter = 0;
         }
         
-        return true;
+        return true; // Keep the processor alive
     }
     
     getDefaultPreset() {
@@ -380,3 +386,5 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
+
+    
