@@ -98,10 +98,12 @@ export class AudioEngine {
     
     private activePointers = new Map<number, { type: 'melody' | 'bass', noteId: number }>();
     private nextNoteId = 0;
+    private onPlayStateChange: (isPlaying: boolean) => void;
     
     constructor(context: AudioContext, orbManager: OrbManager | null, onPlayStateChange: (isPlaying: boolean) => void) {
         this.context = context;
         this.orbManager = orbManager;
+        this.onPlayStateChange = onPlayStateChange;
         
         this.masterOut = this.context.createGain();
         this.masterOut.connect(this.context.destination);
@@ -119,7 +121,7 @@ export class AudioEngine {
         this.convolver.connect(this.reverbReturnGain);
         this.reverbReturnGain.connect(this.preCompressorOut);
 
-        this.drumMachine = new DrumMachine(this, onPlayStateChange);
+        this.drumMachine = new DrumMachine(this, this.onPlayStateChange);
     }
     
     getContext() {
@@ -216,6 +218,8 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
+            } else if (e.data.type === 'debug') {
+                console.log(`[WORKLET-DEBUG-${part.toUpperCase()}]`, e.data.message);
             }
         };
 
@@ -236,6 +240,8 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error('[DRUM WORKLET ERROR]', e.data.message);
+            } else if (e.data.type === 'debug') {
+                console.log(`[DRUM-WORKLET-DEBUG]`, e.data.message);
             }
         };
         
@@ -548,3 +554,5 @@ export class AudioEngine {
         }
     }
 }
+
+    
