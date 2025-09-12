@@ -175,8 +175,8 @@ export class AudioEngine {
 
         try {
              await Promise.all([
-                this.context.audioWorklet.addModule('/workers/synth-processor.js'),
-                this.context.audioWorklet.addModule('/workers/drum-processor.js'),
+                this.context.audioWorklet.addModule('workers/synth-processor.js'),
+                this.context.audioWorklet.addModule('workers/drum-processor.js'),
              ]);
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
@@ -184,8 +184,8 @@ export class AudioEngine {
         }
         
         this.createSynthChannel('melody', 10);
-        this.createSynthChannel('manualBass', 3);
-        this.createSynthChannel('latch', 3);
+        this.createSynthChannel('manualBass', 4);
+        this.createSynthChannel('latch', 4);
         
         this.createDrumChannel();
         
@@ -215,10 +215,10 @@ export class AudioEngine {
         gain.connect(reverbSend).connect(this.reverbSend);
         
         worklet.port.onmessage = (e) => {
-            if (e.data.type === 'debug') {
-                console.log(`[DEBUG-${part.toUpperCase()}]`, e.data.message);
-            } else if (e.data.type === 'error') {
+            if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
+            } else if (e.data.type === 'debug') {
+                console.log(`[DEBUG-${part.toUpperCase()}]`, `Peak: ${e.data.peak}, Voices: ${e.data.voices}`);
             }
         };
 
@@ -389,7 +389,7 @@ export class AudioEngine {
         }
     }
     
-    public setBassInstrument(instrumentName: BassInstrument) {
+    public setBassInstrument(instrumentName: BassInstrument): Volumes | undefined {
         const preset = bassInstruments.find(i => i.id === instrumentName);
         if (preset && this.volumes) {
             const newVolumes = JSON.parse(JSON.stringify(this.volumes)); // Deep copy
