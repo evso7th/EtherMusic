@@ -2,6 +2,7 @@
 "use client";
 
 import type { Note } from '@/types';
+import type { OrbManager } from './orb-manager';
 
 const MAX_LATCH_NOTES = 3;
 const TAP_RADIUS = 30; // Reduced radius for more precise tapping
@@ -26,6 +27,11 @@ interface TapData {
 export class LatchEngine {
     private activeNotes: (Note & { x: number; y: number })[] = [];
     private nextId = 0;
+    private orbManager: OrbManager | null = null;
+
+    public setOrbManager(manager: OrbManager | null) {
+        this.orbManager = manager;
+    }
 
     private findNearbyNoteIndex(x: number, y: number): number {
         return this.activeNotes.findIndex(note => {

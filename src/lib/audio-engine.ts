@@ -70,7 +70,7 @@ const DRUM_SAMPLES: Record<string, string> = {
 export class AudioEngine {
     public isInitialized = false;
     private context!: AudioContext;
-    public orbManager: OrbManager;
+    public orbManager: OrbManager | null = null;
     private emitter: Emitter<AudioEngineEvents>;
     private mediaRecorder: MediaRecorder | null = null;
     private recordedChunks: Blob[] = [];
@@ -99,9 +99,8 @@ export class AudioEngine {
     private activePointers = new Map<number, { type: 'melody' | 'bass', noteId: number }>();
     private nextNoteId = 0;
     
-    constructor(context: AudioContext, orbManager: OrbManager, emitter: Emitter<AudioEngineEvents>) {
+    constructor(context: AudioContext, emitter: Emitter<AudioEngineEvents>) {
         this.context = context;
-        this.orbManager = orbManager;
         this.emitter = emitter;
         
         this.masterOut = this.context.createGain();
@@ -121,6 +120,11 @@ export class AudioEngine {
         this.reverbReturnGain.connect(this.preCompressorOut);
 
         this.drumMachine = new DrumMachine(this, (isPlaying) => this.emitter.emit('playStateChanged', isPlaying));
+    }
+
+    setOrbManager(orbManager: OrbManager) {
+        this.orbManager = orbManager;
+        this.latchEngine.setOrbManager(orbManager);
     }
     
     getContext() {
@@ -285,7 +289,7 @@ export class AudioEngine {
         });
         
         const notesToTurnOff = this.latchEngine.clear();
-        notesToTurnOff.forEach(note => this.orbManager.removeOrb(note.id));
+        notesToTurnOff.forEach(note => this.orbManager?.removeOrb(note.id));
         this.orbManager?.removeAllOrbs();
         this.activePointers.clear();
     }
@@ -296,7 +300,7 @@ export class AudioEngine {
         const partName = type === 'bass' ? (this.isBassLatchOn ? 'latch' : 'manualBass') : 'melody';
         
         const formattedData = data ? `{freq: '${data.frequency.toFixed(2)}', vol: '${data.volume.toFixed(2)}', id: ${data.pointerId}}` : 'null';
-        console.log(`[Interaction] type: ${type}, state: ${state}, part: ${partName}`, formattedData);
+        // console.log(`[Interaction] type: ${type}, state: ${state}, part: ${partName}`, formattedData);
         
         if (partName === 'latch') {
             if (state === 'down' && data) { 
@@ -341,7 +345,7 @@ export class AudioEngine {
                             const message: WorkerMessage = { type: 'noteOff', id: pInfo.noteId };
                             nodeToStop.worklet.port.postMessage(message);
                         }
-                        this.orbManager.removeOrb(pId);
+                        this.orbManager?.removeOrb(pId);
                         this.activePointers.delete(pId);
                     }
                 });
@@ -353,11 +357,8 @@ export class AudioEngine {
         const latchNode = this.nodes.get('latch');
         if (!latchNode || !this.orbManager) return;
         
-        console.log(`[LatchEngine] Process result:`, result);
-
         if (result.noteOff) {
             const message: WorkerMessage = { type: 'noteOff', id: result.noteOff.id };
-            console.log(`[AudioEngine] -> LATCH worklet:`, message);
             latchNode.worklet.port.postMessage(message);
         }
         if (result.noteToAnimateRemove) {
@@ -366,7 +367,6 @@ export class AudioEngine {
         
         if (result.noteOn) {
             const message: WorkerMessage = { type: 'noteOn', note: result.noteOn };
-            console.log(`[AudioEngine] -> LATCH worklet:`, message);
             latchNode.worklet.port.postMessage(message);
         }
         if (result.noteToAnimateAdd) {
@@ -419,14 +419,13 @@ export class AudioEngine {
             newVolumes.latch.reverbSend = bassPresetParams.reverbSend ?? newVolumes.latch.reverbSend;
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
-            this.setVolumes(newVolumes);
+            this.emitter.emit('volumesChanged', newVolumes);
             return newVolumes;
         }
         return undefined;
     }
     
     public setBeatPattern(patternName: string) {
-        console.log(`[AudioEngine] Beat pattern set to: ${patternName}`);
         this.drumMachine.setPattern(patternName);
     }
 
@@ -498,7 +497,7 @@ export class AudioEngine {
         
         if(isInitialization || JSON.stringify(this.volumes) !== JSON.stringify(newVolumes)) {
             if (!isInitialization) {
-                 console.log('[AudioEngine] Applying new volumes:', newVolumes);
+                 // console.log('[AudioEngine] Applying new volumes:', newVolumes);
             }
             this.volumes = newVolumes;
 

@@ -7,7 +7,7 @@ import { AudioEngine } from '@/lib/audio-engine';
 import { OrbManager } from '@/lib/orb-manager';
 import type { Volumes, Instrument, BassInstrument, AudioEngineEvents } from '@/types';
 import Cookies from 'js-cookie';
-import mitt from 'mitt';
+import mitt, { Emitter } from 'mitt';
 
 function saveVolumes(volumes: Volumes) {
     if (typeof window === 'undefined') return;
@@ -82,37 +82,25 @@ export function useAudioEngine() {
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTempo, setCurrentTempo] = useState(defaultVolumes.tempo);
 
-
     const initializeAudioEngine = useCallback(async () => {
         try {
-            if (!orbManager.current) {
-                const padContainer = document.querySelector('main');
-                if (!padContainer) {
-                    console.error("Main container not found for OrbManager");
-                    return;
-                }
-                orbManager.current = new OrbManager(padContainer);
-            }
-
             if (!audioEngine.current) {
                 const context = new (window.AudioContext || (window as any).webkitAudioContext)();
                 if (context.state === 'suspended') {
                     await context.resume();
                 }
                 
-                const engine = new AudioEngine(context, orbManager.current, emitter);
+                const engine = new AudioEngine(context, emitter);
                 await engine.initialize();
                 
                 const currentVolumes = loadVolumes();
-                engine.setVolumes(currentVolumes, true); // isInitialization = true
+                engine.setVolumes(currentVolumes, true);
                 setVolumesState(currentVolumes); 
                 setCurrentTempo(currentVolumes.tempo);
 
                 audioEngine.current = engine;
             }
-            
             setIsReady(true);
-            
         } catch(e) {
             console.error("Failed to initialize audio engine:", e);
             toast({
@@ -122,6 +110,18 @@ export function useAudioEngine() {
             });
         }
     }, [toast]);
+    
+    useEffect(() => {
+        if (isReady && !orbManager.current) {
+            const mainContainer = document.querySelector('main');
+            if (mainContainer) {
+                orbManager.current = new OrbManager(mainContainer);
+                audioEngine.current?.setOrbManager(orbManager.current);
+            } else {
+                 console.error("Main container not found for OrbManager");
+            }
+        }
+    }, [isReady]);
 
     const startApp = useCallback(async () => {
         if (isAppStarted) return;
@@ -138,9 +138,11 @@ export function useAudioEngine() {
     useEffect(() => {
         const handlePlayState = (playing: boolean) => setIsPlaying(playing);
         emitter.on('playStateChanged', handlePlayState);
-        return () => emitter.off('playStateChanged', handlePlayState);
+        return () => {
+            emitter.off('playStateChanged', handlePlayState);
+        }
     }, []);
-
+    
     const setVolumes = useCallback((newVolumes: Volumes | ((prev: Volumes) => Volumes)) => {
         setVolumesState(prev => {
             const updated = typeof newVolumes === 'function' ? newVolumes(prev) : newVolumes;
@@ -184,11 +186,9 @@ export function useAudioEngine() {
     }, []);
     
     const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
-        if (audioEngine.current) {
-             const newVolumes = audioEngine.current.setBassInstrument(instrumentName);
-             if (newVolumes) {
-                setVolumes(newVolumes);
-             }
+        const newVolumes = audioEngine.current?.setBassInstrument(instrumentName);
+        if (newVolumes) {
+            setVolumes(newVolumes);
         }
     }, [setVolumes]);
 

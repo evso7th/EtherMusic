@@ -234,6 +234,8 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.sampleRate = options.processorOptions?.sampleRate || 44100;
         this.preset = this.getDefaultPreset();
         
+        this.debugCounter = 0;
+        
         this.port.onmessage = this.handleMessage.bind(this);
     }
 
@@ -347,18 +349,16 @@ class SynthProcessor extends AudioWorkletProcessor {
                     }
                 });
 
-                // Hard clipping to prevent audio glitches
-                sample = Math.max(-1, Math.min(1, sample));
-                outputChannel[i] = sample;
-                
                 const absSample = Math.abs(sample);
                 if (absSample > peak) {
                     peak = absSample;
                 }
+                
+                // Hard clipping to prevent audio glitches
+                outputChannel[i] = Math.max(-1, Math.min(1, sample));
             }
         }
 
-        if (this.debugCounter === undefined) this.debugCounter = 0;
         this.debugCounter++;
         if (this.voices.size > 0 && this.debugCounter > this.sampleRate) { // Log roughly once per second
             this.port.postMessage({type: 'debug', payload: { voices: this.voices.size, peak }});
@@ -381,3 +381,4 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
+
