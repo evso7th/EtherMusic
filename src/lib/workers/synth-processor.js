@@ -334,21 +334,35 @@ class SynthProcessor extends AudioWorkletProcessor {
     
         outputChannel.fill(0);
         
-        if (this.voices.size > 0) {
-            this.voices.forEach((voice, id) => {
-                if (voice.isFinished) {
-                    this.voices.delete(id);
-                } else {
-                    for (let i = 0; i < outputChannel.length; i++) {
-                        outputChannel[i] += voice.render();
-                    }
-                }
-            });
-        }
+        let peak = 0;
         
-        // Simple hard-clipping limiter to prevent distortion on the final summed output
-        for (let i = 0; i < outputChannel.length; i++) {
-            outputChannel[i] = Math.max(-1, Math.min(1, outputChannel[i]));
+        if (this.voices.size > 0) {
+            for (let i = 0; i < outputChannel.length; i++) {
+                let sample = 0;
+                this.voices.forEach((voice, id) => {
+                    if (voice.isFinished) {
+                        this.voices.delete(id);
+                    } else {
+                        sample += voice.render();
+                    }
+                });
+
+                // Hard clipping to prevent audio glitches
+                sample = Math.max(-1, Math.min(1, sample));
+                outputChannel[i] = sample;
+                
+                const absSample = Math.abs(sample);
+                if (absSample > peak) {
+                    peak = absSample;
+                }
+            }
+        }
+
+        if (this.debugCounter === undefined) this.debugCounter = 0;
+        this.debugCounter++;
+        if (this.voices.size > 0 && this.debugCounter > this.sampleRate) { // Log roughly once per second
+            this.port.postMessage({type: 'debug', payload: { voices: this.voices.size, peak }});
+            this.debugCounter = 0;
         }
 
         return true; // Keep processor alive

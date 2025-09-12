@@ -1,4 +1,7 @@
 
+
+import type { Emitter } from "mitt";
+
 // UI Component Props
 export type MusicKey = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B';
 
@@ -119,7 +122,8 @@ export type WorkerMessage =
 
 export type DrumWorkerMessage =
     | { type: 'loadSample'; name: string; buffer: ArrayBuffer; }
-    | { type: 'playSample'; sampleName: string; volume?: number; };
+    | { type: 'playSample'; sampleName: string; volume?: number; }
+    | { type: 'debug', payload: any };
 
 
 export type EnvelopeCurve = "linear" | "exponential";
@@ -147,3 +151,7 @@ export interface AutopilotSettings {
         bass: BassInstrument;
     }
 }
+
+export type AudioEngineEvents = {
+    playStateChanged: boolean;
+};

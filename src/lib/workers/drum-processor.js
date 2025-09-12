@@ -76,25 +76,40 @@ class DrumProcessor extends AudioWorkletProcessor {
     }
 
     outputChannel.fill(0);
-
-    if (this.voices.length === 0) {
-        return true; 
-    }
     
-    let activeVoices = [];
-    for (const voice of this.voices) {
-        if (!voice.isFinished) {
-            voice.process(outputChannel);
-            activeVoices.push(voice);
+    let peak = 0;
+
+    if (this.voices.length > 0) {
+        for (let i = 0; i < outputChannel.length; i++) {
+            let sample = 0;
+            this.voices.forEach(voice => {
+                if (!voice.isFinished) {
+                    sample += voice.buffer[voice.position + i] * voice.gain;
+                }
+            });
+            
+            sample = Math.max(-1, Math.min(1, sample));
+            outputChannel[i] = sample;
+            
+            const absSample = Math.abs(sample);
+            if (absSample > peak) {
+                peak = absSample;
+            }
         }
-    }
-    this.voices = activeVoices;
-    
-    // Simple hard clipping to prevent audio glitches
-    for (let i = 0; i < outputChannel.length; i++) {
-        outputChannel[i] = Math.max(-1, Math.min(1, outputChannel[i]));
+
+        this.voices = this.voices.filter(voice => {
+            voice.position += outputChannel.length;
+            return voice.position < voice.buffer.length;
+        });
     }
 
+    if (this.debugCounter === undefined) this.debugCounter = 0;
+    this.debugCounter++;
+    if (this.voices.length > 0 && this.debugCounter > sampleRate) { // Log roughly once per second
+        this.port.postMessage({type: 'debug', payload: { voices: this.voices.length, peak }});
+        this.debugCounter = 0;
+    }
+    
     return true; // Keep the processor alive.
   }
 }
