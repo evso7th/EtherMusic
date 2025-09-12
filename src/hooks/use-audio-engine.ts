@@ -78,7 +78,7 @@ export function useAudioEngine() {
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
     
-    const [volumes, setVolumesState] = useState<Volumes>(defaultVolumes);
+    const [volumes, setVolumesState] = useState<Volumes>(loadVolumes);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTempo, setCurrentTempo] = useState(defaultVolumes.tempo);
 
@@ -112,7 +112,7 @@ export function useAudioEngine() {
     }, [toast]);
     
     useEffect(() => {
-        if (isReady && !orbManager.current) {
+        if (isAppStarted && isReady && !orbManager.current) {
             const mainContainer = document.querySelector('main');
             if (mainContainer) {
                 orbManager.current = new OrbManager(mainContainer);
@@ -121,7 +121,7 @@ export function useAudioEngine() {
                  console.error("Main container not found for OrbManager");
             }
         }
-    }, [isReady]);
+    }, [isAppStarted, isReady]);
 
     const startApp = useCallback(async () => {
         if (isAppStarted) return;
@@ -194,11 +194,7 @@ export function useAudioEngine() {
     }, []);
     
     const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
-        const newVolumes = audioEngine.current?.setBassInstrument(instrumentName);
-        if (newVolumes) {
-            setVolumesState(newVolumes);
-            saveVolumes(newVolumes);
-        }
+        audioEngine.current?.setBassInstrument(instrumentName);
     }, []);
 
     return {
@@ -221,5 +217,3 @@ export function useAudioEngine() {
         handleThereminInteraction,
     };
 }
-
-    

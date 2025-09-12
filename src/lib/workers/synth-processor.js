@@ -195,31 +195,33 @@ class Voice {
         return env.currentValue;
     }
 
-    render() {
-        if (this.isReleasing && this.layers.every(l => l.env.currentValue <= 0.0001)) {
-            this.isFinished = true;
-        }
-        if (this.isFinished) return 0;
-        
-        this.baseFrequency += (this.targetFrequency - this.baseFrequency) * this.portamentoSpeed;
-        const lfoModulation = this.processLFO();
-        
-        let mixedSample = 0;
-        this.layers.forEach(layer => {
-            const envelopeValue = this.processLayerEnvelope(layer);
-            if (envelopeValue > 0) {
-                 const detunedFreq = this.baseFrequency * Math.pow(2, layer.detune / 1200);
-                 const modulatedFrequency = (detunedFreq * layer.freqMult) + lfoModulation;
-                 const oscSample = layer.osc.process(modulatedFrequency);
-                 mixedSample += oscSample * layer.level * envelopeValue;
+    renderBlock(outputBuffer, startSample, endSample) {
+        if (this.isFinished) return;
+
+        for (let i = startSample; i < endSample; i++) {
+             if (this.isReleasing && this.layers.every(l => l.env.currentValue <= 0.0001)) {
+                this.isFinished = true;
+                break;
             }
-        });
-        
-        const filteredSample = this.processFilter(mixedSample);
-        
-        const numLayers = Math.max(1, this.layers.length);
-        
-        return (filteredSample / numLayers) * this.volume;
+
+            this.baseFrequency += (this.targetFrequency - this.baseFrequency) * this.portamentoSpeed;
+            const lfoModulation = this.processLFO();
+
+            let mixedSample = 0;
+            this.layers.forEach(layer => {
+                const envelopeValue = this.processLayerEnvelope(layer);
+                if (envelopeValue > 0) {
+                    const detunedFreq = this.baseFrequency * Math.pow(2, layer.detune / 1200);
+                    const modulatedFrequency = (detunedFreq * layer.freqMult) + lfoModulation;
+                    const oscSample = layer.osc.process(modulatedFrequency);
+                    mixedSample += oscSample * layer.level * envelopeValue;
+                }
+            });
+            
+            const filteredSample = this.processFilter(mixedSample);
+            const numLayers = Math.max(1, this.layers.length);
+            outputBuffer[i] += (filteredSample / numLayers) * this.volume;
+        }
     }
 
     noteUpdate(frequency, volume) { this.targetFrequency = frequency; this.volume = volume; }
@@ -235,6 +237,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.preset = this.getDefaultPreset();
         
         this.debugCounter = 0;
+        this.lastPeak = 0;
         
         this.port.onmessage = this.handleMessage.bind(this);
     }
@@ -333,40 +336,49 @@ class SynthProcessor extends AudioWorkletProcessor {
     process(inputs, outputs, parameters) {
         const outputChannel = outputs[0]?.[0];
         if (!outputChannel) return true;
-    
+
         outputChannel.fill(0);
-        
         let peak = 0;
-        
+
         if (this.voices.size > 0) {
+            const voiceBuffers = new Map();
+            
+            // First, render each voice to its own temporary buffer
+            this.voices.forEach((voice, id) => {
+                if (voice.isFinished) {
+                    this.voices.delete(id);
+                } else {
+                    const voiceBuffer = new Float32Array(outputChannel.length);
+                    voice.renderBlock(voiceBuffer, 0, outputChannel.length);
+                    voiceBuffers.set(id, voiceBuffer);
+                }
+            });
+            
+            // Then, mix the buffers and apply the limiter
             for (let i = 0; i < outputChannel.length; i++) {
                 let sample = 0;
-                this.voices.forEach((voice, id) => {
-                    if (voice.isFinished) {
-                        this.voices.delete(id);
-                    } else {
-                        // The render method is now much simpler, it just returns the next sample.
-                        sample += voice.render();
-                    }
-                });
+                for (const voiceBuffer of voiceBuffers.values()) {
+                    sample += voiceBuffer[i];
+                }
+
+                // Hard clipping to prevent audio glitches
+                sample = Math.max(-1, Math.min(1, sample));
+                outputChannel[i] = sample;
 
                 const absSample = Math.abs(sample);
                 if (absSample > peak) {
                     peak = absSample;
                 }
-                
-                // Hard clipping to prevent audio glitches from signal summation.
-                outputChannel[i] = Math.max(-1, Math.min(1, sample));
             }
         }
 
-        this.debugCounter++;
+        this.debugCounter += outputChannel.length;
         if (this.voices.size > 0 && this.debugCounter > this.sampleRate) { // Log roughly once per second
-            this.port.postMessage({type: 'debug', payload: { voices: this.voices.size, peak: peak.toFixed(2) }});
+            this.port.postMessage({ type: 'debug', payload: { voices: this.voices.size, peak: peak.toFixed(2) } });
             this.debugCounter = 0;
         }
 
-        return true; // Keep processor alive
+        return true;
     }
     
     getDefaultPreset() {
@@ -382,5 +394,3 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
-
-    

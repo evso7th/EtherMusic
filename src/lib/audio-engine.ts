@@ -242,7 +242,7 @@ export class AudioEngine {
             if (e.data.type === 'error') {
                  console.error('[DRUM WORKLET ERROR]', e.data.message);
             } else if (e.data.type === 'debug') {
-                 console.log('[WORKLET-DEBUG-DRUMS]', e.data.payload);
+                 console.log(`[WORKLET-DEBUG-DRUMS]`, e.data.payload);
             }
         };
         
