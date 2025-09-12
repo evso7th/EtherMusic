@@ -51,6 +51,7 @@ class Oscillator {
     }
 }
 
+// A class representing a single synth voice
 class Voice {
     constructor(id, frequency, volume, preset, sampleRate) {
         this.id = id;
@@ -228,11 +229,8 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.polyphony = options.processorOptions?.polyphony || 4;
         this.preset = this.getDefaultPreset();
         
-        this.logCounter = 0;
-        this.peakLevel = 0;
-
         this.port.onmessage = this.handleMessage.bind(this);
-        this.port.postMessage({ type: 'debug', message: 'SynthProcessor initialized' });
+        this.port.postMessage({ type: 'debug', message: `SynthProcessor for polyphony ${this.polyphony} initialized.` });
     }
 
     handleMessage(event) {
@@ -311,7 +309,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         }
     }
 
-    allNotesOff() {
+allNotesOff() {
         this.voices.forEach(voice => {
             voice.isReleasing = true;
             voice.layers.forEach(l => {
@@ -326,8 +324,6 @@ class SynthProcessor extends AudioWorkletProcessor {
     
         outputChannel.fill(0);
         
-        let peak = 0;
-        
         if (this.voices.size > 0) {
             this.voices.forEach((voice, id) => {
                 if (voice.isFinished) {
@@ -335,28 +331,12 @@ class SynthProcessor extends AudioWorkletProcessor {
                 } else {
                     for (let i = 0; i < outputChannel.length; i++) {
                         const sample = voice.render();
-                        const absSample = Math.abs(sample);
-                        if (absSample > peak) {
-                            peak = absSample;
-                        }
                         outputChannel[i] += sample;
                     }
                 }
             });
-
-            this.peakLevel = Math.max(this.peakLevel, peak);
-            this.logCounter++;
-            
-            if (this.logCounter > 20) {
-                this.port.postMessage({ type: 'debug', peak: this.peakLevel.toFixed(4), voices: this.voices.size });
-                this.logCounter = 0;
-                this.peakLevel = 0;
-            }
-        } else {
-            this.logCounter = 0;
-            this.peakLevel = 0;
         }
-
+        
         // Simple hard clipping to prevent audio glitches if we exceed [-1, 1]
         for (let i = 0; i < outputChannel.length; i++) {
             outputChannel[i] = Math.max(-1, Math.min(1, outputChannel[i]));

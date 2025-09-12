@@ -217,7 +217,7 @@ export class AudioEngine {
             if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
             } else if (e.data.type === 'debug') {
-                console.log(`[DEBUG-${part.toUpperCase()}] Peak: ${e.data.peak}, Voices: ${e.data.voices}`);
+                console.log(`[DEBUG-${part.toUpperCase()}]`, e.data.message);
             }
         };
 
@@ -292,7 +292,7 @@ export class AudioEngine {
         if (!this.isInitialized) return;
         
         const partName = type === 'bass' ? (this.isBassLatchOn ? 'latch' : 'manualBass') : 'melody';
-        console.log(`[Interaction] type: ${type}, state: ${state}, part: ${partName}, data:`, data ? { ...data, frequency: data.frequency.toFixed(2) } : null);
+        console.log(`[Interaction] type: ${type}, state: ${state}, part: ${partName}, data:`, data ? { freq: data.frequency.toFixed(2), vol: data.volume.toFixed(2), id: data.pointerId } : null);
         
         if (partName === 'latch') {
             if (state === 'down' && data) { 
@@ -349,12 +349,11 @@ export class AudioEngine {
         const latchNode = this.nodes.get('latch');
         if (!latchNode) return;
         
-        console.log(`[LatchEngine] toggle result:`, result);
+        console.log(`[LatchEngine] Process result:`, result);
 
         if (result.noteOff) {
             const message: WorkerMessage = { type: 'noteOff', id: result.noteOff.id };
             latchNode.worklet.port.postMessage(message);
-            console.log(`[AudioEngine] -> LATCH worklet:`, message);
         }
         if (result.noteToAnimateRemove) {
             this.orbManager?.removeOrb(result.noteToAnimateRemove.id);
@@ -363,7 +362,6 @@ export class AudioEngine {
         if (result.noteOn) {
             const message: WorkerMessage = { type: 'noteOn', note: result.noteOn };
             latchNode.worklet.port.postMessage(message);
-             console.log(`[AudioEngine] -> LATCH worklet:`, message);
         }
         if (result.noteToAnimateAdd) {
             this.orbManager?.addOrb(result.noteToAnimateAdd.id, 'latch', result.noteToAnimateAdd.x, result.noteToAnimateAdd.y);

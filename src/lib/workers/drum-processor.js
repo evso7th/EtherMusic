@@ -42,7 +42,7 @@ class DrumProcessor extends AudioWorkletProcessor {
         this.maxVoices = 64; 
 
         this.port.onmessage = this.handleMessage.bind(this);
-        this.port.postMessage({ type: 'debug', message: 'DrumProcessor initialized' });
+        console.log('[DrumProcessor] Initialized');
     }
 
     handleMessage(event) {
@@ -60,12 +60,12 @@ class DrumProcessor extends AudioWorkletProcessor {
                     }
                     this.voices.push(new Voice(bufferToPlay, volume ?? 1.0));
                 } else {
-                     this.port.postMessage({ type: 'error', message: `[DrumProcessor] Sample not found: ${sampleName}` });
+                     this.port.postMessage({ type: 'error', message: `Sample not found: ${sampleName}` });
                 }
             }
         } catch (e) {
             if (e instanceof Error) {
-                this.port.postMessage({ type: 'error', message: `[DrumProcessor] Error handling message: ${e.message}` });
+                this.port.postMessage({ type: 'error', message: `Error handling message: ${e.message}` });
             }
         }
     }
@@ -82,21 +82,18 @@ class DrumProcessor extends AudioWorkletProcessor {
             return true; 
         }
         
-        const blockBuffer = new Float32Array(outputChannel.length);
-
-        this.voices = this.voices.filter(voice => {
-            if (voice.isFinished) {
-                return false;
+        let activeVoices = [];
+        for (const voice of this.voices) {
+            if (!voice.isFinished) {
+                voice.process(outputChannel);
+                activeVoices.push(voice);
             }
-            // Each voice adds its output to the blockBuffer
-            voice.process(blockBuffer);
-            return true;
-        });
+        }
+        this.voices = activeVoices;
         
-        // Add the processed block to the main output and apply a limiter
+        // Simple hard clipping to prevent audio glitches
         for (let i = 0; i < outputChannel.length; i++) {
-            // Using tanh as a simple limiter to prevent hard clipping
-            outputChannel[i] = Math.tanh(blockBuffer[i]);
+            outputChannel[i] = Math.max(-1, Math.min(1, outputChannel[i]));
         }
 
         return true; // Keep the processor alive.
