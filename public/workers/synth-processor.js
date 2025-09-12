@@ -1,235 +1,305 @@
 
-const RENDER_QUANTUM_FRAMES = 128;
+// This script is designed to be loaded into an AudioWorklet.
+// It is responsible for all real-time synthesis, running in a high-priority
+// audio thread to ensure low-latency, glitch-free sound generation.
 
-const getADSR = (envelope) => {
-    const { attack, decay, sustain, release } = envelope || {};
-    return {
-        attack: Math.max(0.001, attack || 0.01),
-        decay: Math.max(0.001, decay || 0.1),
-        sustain: Math.max(0, sustain ?? 1.0),
-        release: Math.max(0.001, release || 0.5),
-    };
-};
+class Oscillator {
+    constructor(type, sampleRate) {
+        this.phase = 0;
+        this.type = type;
+        this.sampleRate = sampleRate;
+        this.lastOut = 0;
+    }
+
+    // Polynomial Band-Limited Step function for anti-aliasing
+    poly_blep(t, dt) {
+        if (t < dt) {
+            t /= dt;
+            return t + t - t * t - 1.0;
+        } else if (t > 1.0 - dt) {
+            t = (t - 1.0) / dt;
+            return t * t + t + t + 1.0;
+        }
+        return 0.0;
+    }
+
+    process(frequency) {
+        let sample = 0;
+        const phaseIncrement = frequency / this.sampleRate;
+        
+        switch (this.type) {
+            case 'sine':
+                sample = Math.sin(this.phase * 2 * Math.PI);
+                break;
+            case 'square':
+                sample = this.phase < 0.5 ? 1 : -1;
+                sample += this.poly_blep(this.phase, phaseIncrement);
+                sample -= this.poly_blep((this.phase + 0.5) % 1.0, phaseIncrement);
+                break;
+            case 'sawtooth':
+                sample = 2 * this.phase - 1;
+                sample -= this.poly_blep(this.phase, phaseIncrement);
+                break;
+            case 'triangle':
+                 sample = 2 * (this.phase < 0.5 ? this.phase : 1.0 - this.phase) * 2 - 1;
+                break;
+            default:
+                sample = Math.sin(this.phase * 2 * Math.PI);
+        }
+        this.phase = (this.phase + phaseIncrement) % 1.0;
+        return sample;
+    }
+}
 
 class Voice {
-    constructor(processor, id, freq, vol, preset) {
-        this.processor = processor;
-        this.context = { sampleRate: processor.sampleRate };
-        this.sampleRate = this.context.sampleRate;
+    constructor(id, frequency, volume, preset, sampleRate) {
         this.id = id;
-        
-        this.volume = vol;
+        this.sampleRate = sampleRate;
+        this.isReleasing = false;
+        this.isFinished = false;
+
+        this.baseFrequency = frequency;
+        this.targetFrequency = frequency;
+        this.volume = volume;
         this.preset = preset;
         
-        this.envelope = getADSR(preset.envelope);
-        this.envelopeLevel = 0;
-        this.state = 'attack'; // attack, decay, sustain, release, finished
-        
-        this.portamentoTarget = freq;
-        this.frequency = freq;
-        this.portamentoTime = preset.portamento > 0 ? 1 - Math.pow(0.01, 1 / (preset.portamento * this.sampleRate)) : 0;
+        this.portamentoSpeed = preset.portamento > 0 ? 1 - Math.exp(-1 / (preset.portamento * this.sampleRate * 0.1)) : 1;
 
         this.layers = [];
-        this.initLayers(freq);
+        this.initLayers();
+        this.initFilter();
+        this.initLFO();
+    }
 
-        if (this.preset.vibrato) {
-            this.vibrato = {
-                lfoPhase: 0,
-                lfoSpeed: this.preset.vibrato.frequency / this.sampleRate,
-                depth: this.preset.vibrato.depth,
+    initLayers() {
+        this.layers = [];
+        const createLayer = (layerConfig, isMainOsc) => {
+            const envConfig = isMainOsc ? this.preset.envelope : (layerConfig.envelope || this.preset.envelope);
+            const attackSamples = Math.max(1, (envConfig.attack || 0.001) * this.sampleRate);
+            const releaseSamples = Math.max(1, (envConfig.release || 0.001) * this.sampleRate);
+            
+            return {
+                osc: new Oscillator(layerConfig.type || 'sine', this.sampleRate),
+                level: layerConfig.level ?? 1.0,
+                freqMult: layerConfig.freqMult || 1,
+                detune: layerConfig.detune || 0,
+                env: {
+                    attackInc: 1.0 / attackSamples,
+                    decayRate: envConfig.decay > 0 ? (1.0 - (envConfig.sustain ?? 1.0)) / (envConfig.decay * this.sampleRate) : 1,
+                    releaseSamples: releaseSamples,
+                    sustainLevel: envConfig.sustain ?? 1.0,
+                    state: 'attack',
+                    currentValue: 0,
+                    releaseStartValue: 0,
+                },
             };
+        };
+
+        if (this.preset.oscillator) {
+            this.layers.push(createLayer({ ...this.preset.oscillator, level: 1.0, freqMult: 1.0, envelope: this.preset.envelope }, true));
         }
-
-        if (this.preset.filter) {
-            this.filter = {
-                ...this.preset.filter,
-                x1: 0, x2: 0, y1: 0, y2: 0 // filter state
-            };
+        if (this.preset.layers) {
+             this.preset.layers.forEach(layer => this.layers.push(createLayer(layer, false)));
         }
     }
 
-    initLayers(baseFreq) {
-        const baseLayer = {
-            type: this.preset.oscillator.type,
-            detune: this.preset.oscillator.detune || 0,
-            level: 1.0,
-            freqMult: 1.0,
-            phase: 0,
-        };
-        this.layers.push(baseLayer);
-
-        if (this.preset.layers) {
-            this.preset.layers.forEach(layer => {
-                this.layers.push({
-                    type: layer.type,
-                    detune: layer.detune || 0,
-                    level: layer.level,
-                    freqMult: layer.freqMult,
-                    phase: 0,
-                });
-            });
+    initFilter() {
+        const filterConfig = this.preset.filter;
+        if (!filterConfig || filterConfig.frequency <= 0) {
+            this.filter = null;
+            return;
         }
+        this.filter = { ...filterConfig, y1: 0, y2: 0, x1: 0, x2: 0, active: false };
+        this.updateFilterCoeffs();
+    }
+
+    updateFilterCoeffs() {
+        if(!this.filter) return;
+        const { type, Q, gain, frequency } = this.filter;
+        const w0 = 2 * Math.PI * frequency / this.sampleRate;
+        const cos_w0 = Math.cos(w0);
+        const alpha = Math.sin(w0) / (2 * Math.max(0.001, Q));
+        
+        let a0=1, a1=0, a2=0, b0=1, b1=0, b2=0;
+
+        switch (type) {
+            case 'lowpass': b0 = (1 - cos_w0) / 2; b1 = 1 - cos_w0; b2 = (1 - cos_w0) / 2; a0 = 1 + alpha; a1 = -2 * cos_w0; a2 = 1 - alpha; break;
+            case 'peaking': const A = Math.pow(10, gain / 40); b0 = 1 + alpha * A; b1 = -2 * cos_w0; b2 = 1 - alpha * A; a0 = 1 + alpha / A; a1 = -2 * cos_w0; a2 = 1 - alpha / A; break;
+            case 'highpass': b0 = (1 + cos_w0) / 2; b1 = -(1 + cos_w0); b2 = (1 + cos_w0) / 2; a0 = 1 + alpha; a1 = -2 * cos_w0; a2 = 1 - alpha; break;
+            case 'bandpass': b0 = alpha; b1 = 0; b2 = -alpha; a0 = 1 + alpha; a1 = -2 * cos_w0; a2 = 1 - alpha; break;
+            case 'notch': b0 = 1; b1 = -2 * cos_w0; b2 = 1; a0 = 1 + alpha; a1 = -2 * cos_w0; a2 = 1 - alpha; break;
+            default: this.filter.active = false; return;
+        }
+
+        this.filter.b0=b0/a0; this.filter.b1=b1/a0; this.filter.b2=b2/a0; this.filter.a1=a1/a0; this.filter.a2=a2/a0;
+        this.filter.active = true;
+    }
+
+    initLFO(vibrato) {
+        if (!vibrato || vibrato.depth === 0) {
+            this.lfo = null;
+            return;
+        }
+        this.lfo = { phase: 0, inc: vibrato.frequency / this.sampleRate, depth: vibrato.depth };
     }
     
-    oscillator(phase, type) {
-        switch (type) {
-            case 'sine': return Math.sin(phase);
-            case 'triangle': return 1 - 4 * Math.abs(0.5 - (phase / (2 * Math.PI)) % 1.0);
-            case 'square': return Math.sign(Math.sin(phase));
-            case 'sawtooth': return 2 * ((phase / (2 * Math.PI)) - Math.floor(0.5 + (phase / (2 * Math.PI))));
-            default: return Math.sin(phase);
-        }
+    processLFO() {
+        if (!this.lfo) return 0;
+        const lfoSample = Math.sin(this.lfo.phase * 2 * Math.PI) * this.lfo.depth;
+        this.lfo.phase = (this.lfo.phase + this.lfo.inc) % 1.0;
+        return lfoSample;
     }
 
-    applyFilter(input) {
-        if (!this.filter) return input;
-        
+    processFilter(inputSample) {
+        if (!this.filter || !this.filter.active) return inputSample;
         const f = this.filter;
-        const w0 = 2 * Math.PI * f.frequency / this.sampleRate;
-        const cosW0 = Math.cos(w0);
-        const sinW0 = Math.sin(w0);
-        const alpha = sinW0 / (2 * f.Q);
-        
-        let b0, b1, b2, a0, a1, a2;
-        
-        switch (f.type) {
-            case 'lowpass':
-                b0 = (1 - cosW0) / 2; b1 = 1 - cosW0; b2 = (1 - cosW0) / 2;
-                a0 = 1 + alpha; a1 = -2 * cosW0; a2 = 1 - alpha;
-                break;
-            case 'highpass':
-                b0 = (1 + cosW0) / 2; b1 = -(1 + cosW0); b2 = (1 + cosW0) / 2;
-                a0 = 1 + alpha; a1 = -2 * cosW0; a2 = 1 - alpha;
-                break;
-            case 'peaking':
-                const A = Math.pow(10, f.gain / 40);
-                b0 = 1 + alpha * A; b1 = -2 * cosW0; b2 = 1 - alpha * A;
-                a0 = 1 + alpha / A; a1 = -2 * cosW0; a2 = 1 - alpha / A;
-                break;
-            default: return input;
+        let y = f.b0 * inputSample + f.b1 * f.x1 + f.b2 * f.x2 - f.a1 * f.y1 - f.a2 * f.y2;
+        if (isNaN(y)) y = 0;
+        f.x2 = f.x1; f.x1 = inputSample; f.y2 = f.y1; f.y1 = y;
+        return y;
+    }
+
+    processLayerEnvelope(layer) {
+        const env = layer.env;
+        if (this.isReleasing) {
+          if (env.state !== 'release') { 
+              env.state = 'release'; 
+              env.releaseStartValue = env.currentValue; 
+              env.releaseRate = env.currentValue / Math.max(1, env.releaseSamples);
+          }
         }
-
-        const xn = input;
-        const yn = (b0/a0)*xn + (b1/a0)*f.x1 + (b2/a0)*f.x2 - (a1/a0)*f.y1 - (a2/a0)*f.y2;
-        
-        f.x2 = f.x1; f.x1 = xn;
-        f.y2 = f.y1; f.y1 = yn;
-
-        return yn;
+        switch (env.state) {
+            case 'attack':
+                env.currentValue += env.attackInc;
+                if (env.currentValue >= 1.0) { env.currentValue = 1.0; env.state = 'decay'; }
+                break;
+            case 'decay':
+                if (env.sustainLevel < 1.0) {
+                    env.currentValue -= env.decayRate;
+                    if (env.currentValue <= env.sustainLevel) { env.currentValue = env.sustainLevel; env.state = 'sustain'; }
+                } else {
+                    env.state = 'sustain';
+                }
+                break;
+            case 'release':
+                env.currentValue -= env.releaseRate;
+                if (env.currentValue <= 0) { env.currentValue = 0; }
+                break;
+        }
+        return env.currentValue;
     }
 
     render() {
-        if (this.state === 'attack') {
-            this.envelopeLevel += 1 / (this.envelope.attack * this.sampleRate);
-            if (this.envelopeLevel >= 1.0) {
-                this.envelopeLevel = 1.0;
-                this.state = 'decay';
-            }
-        } else if (this.state === 'decay') {
-            const target = this.envelope.sustain;
-            const decayRate = (1.0 - target) / (this.envelope.decay * this.sampleRate);
-            this.envelopeLevel -= decayRate;
-            if (this.envelopeLevel <= target) {
-                this.envelopeLevel = target;
-                this.state = 'sustain';
-            }
-        } else if (this.state === 'sustain') {
-            // Level is constant
-        } else if (this.state === 'release') {
-            this.envelopeLevel -= this.envelope.sustain / (this.envelope.release * this.sampleRate);
-            if (this.envelopeLevel <= 0) {
-                this.envelopeLevel = 0;
-                this.state = 'finished';
-            }
+        if (this.isReleasing && this.layers.every(l => l.env.currentValue <= 0.0001)) {
+            this.isFinished = true;
         }
-
-        if (this.portamentoTime > 0) {
-            this.frequency += (this.portamentoTarget - this.frequency) * this.portamentoTime;
-        }
-
-        let vibOffset = 0;
-        if (this.vibrato && this.vibrato.depth > 0) {
-            vibOffset = Math.sin(this.vibrato.lfoPhase) * this.vibrato.depth;
-            this.vibrato.lfoPhase += this.vibrato.lfoSpeed * 2 * Math.PI;
-            if (this.vibrato.lfoPhase > 2 * Math.PI) this.vibrato.lfoPhase -= 2 * Math.PI;
-        }
-
-        let sample = 0;
+        if (this.isFinished) return 0;
+        
+        this.baseFrequency += (this.targetFrequency - this.baseFrequency) * this.portamentoSpeed;
+        const lfoModulation = this.processLFO();
+        
+        let mixedSample = 0;
         this.layers.forEach(layer => {
-            const freq = this.frequency * layer.freqMult * Math.pow(2, (layer.detune || 0) / 1200) + vibOffset;
-            const phaseIncrement = freq / this.sampleRate;
-            sample += this.oscillator(layer.phase, layer.type) * layer.level;
-            layer.phase = (layer.phase + phaseIncrement * 2 * Math.PI) % (2 * Math.PI);
+            const envelopeValue = this.processLayerEnvelope(layer);
+            if (envelopeValue > 0) {
+                 const detunedFreq = this.baseFrequency * Math.pow(2, layer.detune / 1200);
+                 const modulatedFrequency = (detunedFreq * layer.freqMult) + lfoModulation;
+                 const oscSample = layer.osc.process(modulatedFrequency);
+                 mixedSample += oscSample * layer.level * envelopeValue;
+            }
         });
         
-        const filteredSample = this.applyFilter(sample / this.layers.length);
-
-        return filteredSample * this.envelopeLevel * this.volume;
+        const filteredSample = this.processFilter(mixedSample);
+        
+        // Normalize based on number of layers to prevent internal clipping
+        const numLayers = Math.max(1, this.layers.length);
+        
+        return (filteredSample / numLayers) * this.volume;
     }
 
-    update(freq, vol) {
-        if(this.portamentoTime > 0) {
-            this.portamentoTarget = freq;
-        } else {
-            this.frequency = freq;
-        }
-        this.volume = vol;
-    }
-
-    release() {
-        this.state = 'release';
-    }
-
-    isFinished() {
-        return this.state === 'finished';
-    }
+    noteUpdate(frequency, volume) { this.targetFrequency = frequency; this.volume = volume; }
+    release() { if (!this.isReleasing) this.isReleasing = true; }
 }
 
 class SynthProcessor extends AudioWorkletProcessor {
     constructor(options) {
-        super(options);
+        super();
         this.voices = new Map();
-        this.polyphony = options.processorOptions.polyphony || 4;
-        this.sampleRate = options.processorOptions.sampleRate;
-        
+        this.polyphony = options.processorOptions?.polyphony || 4;
         this.preset = this.getDefaultPreset();
+        
+        this.logCounter = 0;
+        this.peakLevel = 0;
+
         this.port.onmessage = this.handleMessage.bind(this);
     }
 
     handleMessage(event) {
         const { type, note, id, preset } = event.data;
         switch (type) {
-            case 'setPreset':
-                if (preset) this.preset = { ...this.getDefaultPreset(), ...preset };
-                break;
             case 'noteOn':
                 if (note) this.noteOn(note);
-                break;
-            case 'noteUpdate':
-                 if (note) this.noteUpdate(note);
                 break;
             case 'noteOff':
                 if (id !== undefined) this.noteOff(id);
                 break;
+            case 'noteUpdate':
+                if (note) this.noteUpdate(note);
+                break;
             case 'allNotesOff':
                 this.allNotesOff();
+                break;
+            case 'setPreset':
+                if (preset) this.applyPreset(preset);
                 break;
         }
     }
 
+    applyPreset(preset) {
+        this.preset = { ...this.getDefaultPreset(), ...preset };
+        this.allNotesOff();
+    }
+
     noteOn(note) {
-        if (this.voices.size >= this.polyphony) {
-            const oldestVoiceId = this.voices.keys().next().value;
-            this.noteOff(oldestVoiceId);
+        if (this.voices.has(note.id)) {
+            const voice = this.voices.get(note.id);
+            if(voice.isReleasing){
+                voice.isReleasing = false;
+                voice.layers.forEach(l => {
+                    l.env.state = 'attack';
+                    l.env.currentValue = 0;
+                });
+            }
+            voice.noteUpdate(note.frequency, note.volume);
+            return;
         }
-        const voice = new Voice(this, note.id, note.frequency, note.volume, this.preset);
+
+        if (this.voices.size >= this.polyphony) {
+            let oldestId;
+            let oldestTime = Infinity;
+             for (const [id, voice] of this.voices.entries()) {
+                if (voice.isReleasing) {
+                    oldestId = id;
+                    break;
+                }
+                if (voice.startTime < oldestTime) {
+                    oldestTime = voice.startTime;
+                    oldestId = id;
+                }
+            }
+            if (oldestId) {
+                this.voices.delete(oldestId);
+            }
+        }
+        const voice = new Voice(note.id, note.frequency, note.volume, this.preset, sampleRate);
+        voice.startTime = currentTime;
         this.voices.set(note.id, voice);
     }
     
     noteUpdate(note) {
         const voice = this.voices.get(note.id);
         if (voice) {
-            voice.update(note.frequency, note.volume);
+            voice.noteUpdate(note.frequency, note.volume);
         }
     }
 
@@ -241,45 +311,67 @@ class SynthProcessor extends AudioWorkletProcessor {
     }
 
     allNotesOff() {
-        this.voices.forEach(voice => voice.release());
+        this.voices.forEach(voice => {
+            voice.release();
+            voice.layers.forEach(l => {
+                l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05); // 50ms quick fade
+            });
+        });
     }
 
+    process(inputs, outputs, parameters) {
+        const outputChannel = outputs[0]?.[0];
+        if (!outputChannel) return true;
+    
+        outputChannel.fill(0);
+        
+        let peak = 0;
+        
+        this.voices.forEach((voice, id) => {
+            if (voice.isFinished) {
+                this.voices.delete(id);
+            } else {
+                for (let i = 0; i < outputChannel.length; i++) {
+                    const sample = voice.render();
+                    const absSample = Math.abs(sample);
+                    if (absSample > peak) {
+                        peak = absSample;
+                    }
+                    outputChannel[i] += sample;
+                }
+            }
+        });
+        
+        for (let i = 0; i < outputChannel.length; i++) {
+            outputChannel[i] = Math.max(-1, Math.min(1, outputChannel[i]));
+        }
+
+        this.peakLevel = Math.max(this.peakLevel, peak);
+        
+        this.logCounter++;
+        if (this.logCounter > 20) {
+             if (this.voices.size > 0) {
+                this.port.postMessage({ type: 'debug', peak: this.peakLevel.toFixed(4), voices: this.voices.size });
+             }
+             this.logCounter = 0;
+             this.peakLevel = 0;
+        }
+        
+        return true;
+    }
+    
     getDefaultPreset() {
         return {
             oscillator: { type: 'sine' },
-            envelope: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.5 },
-            filter: { type: 'lowpass', frequency: 20000, Q: 1, gain: 0 },
-            portamento: 0,
-            vibrato: { frequency: 5, depth: 0 },
+            envelope: { attack: 0.01, decay: 0.1, sustain: 1.0, release: 0.5 },
+            filter: null,
+            vibrato: null,
             layers: [],
-            stagger: 0,
+            portamento: 0
         };
-    }
-
-    process(inputs, outputs) {
-        const output = outputs[0];
-        const channel = output[0];
-
-        for (let i = 0; i < RENDER_QUANTUM_FRAMES; i++) {
-            let mixedSample = 0;
-            
-            this.voices.forEach((voice, id) => {
-                if (voice.isFinished()) {
-                    this.voices.delete(id);
-                } else {
-                    mixedSample += voice.render();
-                }
-            });
-            channel[i] = mixedSample;
-        }
-        
-        // Simple hard clipping to prevent explosion
-        for (let i = 0; i < channel.length; i++) {
-            channel[i] = Math.max(-1, Math.min(1, channel[i]));
-        }
-
-        return true;
     }
 }
 
 registerProcessor('synth-processor', SynthProcessor);
+
+    
