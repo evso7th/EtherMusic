@@ -197,6 +197,7 @@ export class AudioEngine {
 
     private createSynthChannel(part: SynthPartName, polyphony: number) {
         if (!this.context) return;
+        console.log(`[AudioEngine] Creating synth channel: ${part}`);
         const worklet = new AudioWorkletNode(this.context, 'synth-processor', {
             processorOptions: { sampleRate: this.context.sampleRate, polyphony },
             outputChannelCount: [1]
@@ -216,8 +217,6 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
-            } else if (e.data.type === 'debug') {
-                console.log(`[DEBUG-${part.toUpperCase()}]`, e.data.message);
             }
         };
 
@@ -226,6 +225,7 @@ export class AudioEngine {
     
     private createDrumChannel() {
         if (!this.context) return;
+        console.log(`[AudioEngine] Creating drum channel`);
         const worklet = new AudioWorkletNode(this.context, 'drum-processor');
         const gain = this.context.createGain();
         const reverbSend = this.context.createGain();
@@ -237,8 +237,6 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error('[DRUM WORKLET ERROR]', e.data.message);
-            } else if (e.data.type === 'debug') {
-                console.log(`[DEBUG-DRUMS] ${e.data.message}`);
             }
         };
         
@@ -251,8 +249,9 @@ export class AudioEngine {
             if (!response.ok) throw new Error('Reverb impulse not found');
             const arrayBuffer = await response.arrayBuffer();
             this.convolver.buffer = await this.context.decodeAudioData(arrayBuffer);
+            console.log('[AudioEngine] Loaded reverb impulse response.');
         } catch (error) {
-            console.warn("[AudioEngine] Reverb impulse '/assets/sounds/impulses/space.wav' not found. Using a generated fallback reverb. This is expected if the file doesn't exist.");
+            console.warn("[AudioEngine] Reverb impulse '/assets/sounds/impulses/space.wav' not found. Using a generated fallback reverb.");
             this.convolver.buffer = this.createFallbackReverb();
         }
     }
@@ -353,6 +352,7 @@ export class AudioEngine {
 
         if (result.noteOff) {
             const message: WorkerMessage = { type: 'noteOff', id: result.noteOff.id };
+            console.log(`[AudioEngine] -> LATCH worklet:`, message);
             latchNode.worklet.port.postMessage(message);
         }
         if (result.noteToAnimateRemove) {
@@ -361,6 +361,7 @@ export class AudioEngine {
         
         if (result.noteOn) {
             const message: WorkerMessage = { type: 'noteOn', note: result.noteOn };
+            console.log(`[AudioEngine] -> LATCH worklet:`, message);
             latchNode.worklet.port.postMessage(message);
         }
         if (result.noteToAnimateAdd) {
@@ -457,6 +458,8 @@ export class AudioEngine {
                     throw new Error(`HTTP error! status: ${response.status} for ${url.split('/').pop()}`);
                 }
                 const arrayBuffer = await response.arrayBuffer();
+                // This is a synchronous decode, which is fine inside an async function on the main thread
+                // but would block if this were a more complex operation.
                 const audioBuffer = await this.context.decodeAudioData(arrayBuffer.slice(0)); 
                 
                 const channelData = audioBuffer.getChannelData(0);
@@ -466,6 +469,7 @@ export class AudioEngine {
                     buffer: channelData.buffer,
                 };
                 drumWorklet.port.postMessage(message, [channelData.buffer]);
+
             } catch (error) {
                 console.error(`[AudioEngine] Failed to load or process drum sample: ${name}`, error);
             }

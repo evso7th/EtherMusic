@@ -2,6 +2,8 @@
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for all real-time synthesis, running in a high-priority
 // audio thread to ensure low-latency, glitch-free sound generation.
+console.log('[SynthProcessor] Script loaded.');
+
 
 class Oscillator {
     constructor(type, sampleRate) {
@@ -70,6 +72,8 @@ class Voice {
         this.initLayers();
         this.initFilter();
         this.initLFO();
+
+        this.startTime = currentTime; // Used for voice stealing
     }
 
     initLayers() {
@@ -230,7 +234,6 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.preset = this.getDefaultPreset();
         
         this.port.onmessage = this.handleMessage.bind(this);
-        this.port.postMessage({ type: 'debug', message: `SynthProcessor for polyphony ${this.polyphony} initialized.` });
     }
 
     handleMessage(event) {
@@ -250,6 +253,9 @@ class SynthProcessor extends AudioWorkletProcessor {
                 break;
             case 'setPreset':
                 if (preset) this.applyPreset(preset);
+                break;
+             case 'error':
+                console.error(`[SYNTH-WORKLET]`, event.data.message);
                 break;
         }
     }
@@ -309,11 +315,12 @@ class SynthProcessor extends AudioWorkletProcessor {
         }
     }
 
-allNotesOff() {
+    allNotesOff() {
         this.voices.forEach(voice => {
             voice.isReleasing = true;
             voice.layers.forEach(l => {
-                l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05); // 50ms quick fade
+                // Quick fade out
+                l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05); 
             });
         });
     }
@@ -342,7 +349,7 @@ allNotesOff() {
             outputChannel[i] = Math.max(-1, Math.min(1, outputChannel[i]));
         }
 
-        return true;
+        return true; // Keep processor alive
     }
     
     getDefaultPreset() {

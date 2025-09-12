@@ -2,7 +2,7 @@
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for playing back pre-loaded drum samples
 // with low latency and high performance, off the main thread.
-console.log('[DrumProcessor] Script loaded');
+console.log('[DrumProcessor] Script loaded.');
 
 class Voice {
     constructor(buffer, gain) {
