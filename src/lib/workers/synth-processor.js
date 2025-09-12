@@ -232,6 +232,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.peakLevel = 0;
 
         this.port.onmessage = this.handleMessage.bind(this);
+        this.port.postMessage({ type: 'debug', message: 'SynthProcessor initialized' });
     }
 
     handleMessage(event) {
@@ -342,17 +343,16 @@ class SynthProcessor extends AudioWorkletProcessor {
                     }
                 }
             });
-             
+
             this.peakLevel = Math.max(this.peakLevel, peak);
-            
             this.logCounter++;
+            
             if (this.logCounter > 20) {
                 this.port.postMessage({ type: 'debug', peak: this.peakLevel.toFixed(4), voices: this.voices.size });
                 this.logCounter = 0;
                 this.peakLevel = 0;
             }
         } else {
-            // Reset counters when there are no voices
             this.logCounter = 0;
             this.peakLevel = 0;
         }

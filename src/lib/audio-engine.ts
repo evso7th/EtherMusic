@@ -216,8 +216,9 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
+            } else if (e.data.type === 'debug') {
+                console.log(`[DEBUG-${part.toUpperCase()}] Peak: ${e.data.peak}, Voices: ${e.data.voices}`);
             }
-            // All debug messages from the worklet are now removed to prevent spam.
         };
 
         this.nodes.set(part, { worklet, gain, reverbSend, distortion });
@@ -236,6 +237,8 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error('[DRUM WORKLET ERROR]', e.data.message);
+            } else if (e.data.type === 'debug') {
+                console.log(`[DEBUG-DRUMS] ${e.data.message}`);
             }
         };
         
@@ -310,7 +313,6 @@ export class AudioEngine {
             const note: SynthNote = { id: noteId, frequency: data.frequency, volume: data.volume };
             const message: WorkerMessage = { type: 'noteOn', note };
             nodeInfo.worklet.port.postMessage(message);
-            console.log(`[AudioEngine] -> ${partName.toUpperCase()} worklet:`, message);
             this.orbManager?.addOrb(pointerId, type, data.x, data.y);
         } else if (state === 'move' && data) {
             const activePointer = this.activePointers.get(pointerId);
@@ -318,13 +320,13 @@ export class AudioEngine {
                  const note: SynthNote = { id: activePointer.noteId, frequency: data.frequency, volume: data.volume };
                  const message: WorkerMessage = { type: 'noteUpdate', note };
                  nodeInfo.worklet.port.postMessage(message);
+                 this.orbManager?.updateOrb(pointerId, data.x, data.y);
             }
         } else if (state === 'up') {
             const activePointer = this.activePointers.get(pointerId);
             if (activePointer) {
                 const message: WorkerMessage = { type: 'noteOff', id: activePointer.noteId };
                 nodeInfo.worklet.port.postMessage(message);
-                console.log(`[AudioEngine] -> ${partName.toUpperCase()} worklet:`, message);
                 this.activePointers.delete(pointerId);
                 this.orbManager?.removeOrb(pointerId);
             } else { 
@@ -333,7 +335,7 @@ export class AudioEngine {
                         const nodeToStop = this.nodes.get(partName);
                         if (nodeToStop) {
                             const message: WorkerMessage = { type: 'noteOff', id: pInfo.noteId };
-                            nodeToStop.port.postMessage(message);
+                            nodeToStop.worklet.port.postMessage(message);
                         }
                         this.orbManager?.removeOrb(pId);
                         this.activePointers.delete(pId);
