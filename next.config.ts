@@ -18,21 +18,6 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  
-  // This is the correct way to handle worklets in Next.js
-  webpack(config, { isServer }) {
-    // This is required to make audio worklets work with SSR
-    if (isServer) {
-        config.output.globalObject = 'self';
-    }
-    
-    config.module.rules.push({
-      test: /\.worker\.js$/,
-      use: { loader: 'worker-loader' },
-    });
-
-    return config;
-  },
 };
 
 export default nextConfig;

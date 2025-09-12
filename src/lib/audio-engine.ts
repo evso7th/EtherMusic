@@ -175,8 +175,8 @@ export class AudioEngine {
 
         try {
              await Promise.all([
-                this.context.audioWorklet.addModule('workers/synth-processor.js'),
-                this.context.audioWorklet.addModule('workers/drum-processor.js'),
+                this.context.audioWorklet.addModule('/synth-processor.js'),
+                this.context.audioWorklet.addModule('/drum-processor.js'),
              ]);
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
@@ -239,7 +239,7 @@ export class AudioEngine {
             if (e.data.type === 'error') {
                 console.error('[DRUM WORKLET ERROR]', e.data.message);
             } else if (e.data.type === 'debug') {
-                console.log('[DEBUG-DRUM]', e.data.message);
+                console.log(`[DEBUG-DRUM]`, e.data.message);
             }
         };
         
@@ -405,7 +405,7 @@ export class AudioEngine {
             newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
             
             this.setVolumes(newVolumes);
-            return newVolumes;
+            return newVolumes; // Return the modified volumes
         }
         return undefined;
     }
