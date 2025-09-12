@@ -220,7 +220,7 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
-            } else if (e.data.type === 'debug') {
+            } else if (e.data.type === 'debug' && e.data.payload) {
                 console.log(`[WORKLET-DEBUG-${part.toUpperCase()}]`, e.data.payload);
             }
         };
@@ -241,7 +241,7 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                  console.error('[DRUM WORKLET ERROR]', e.data.message);
-            } else if (e.data.type === 'debug') {
+            } else if (e.data.type === 'debug' && e.data.payload) {
                  console.log(`[WORKLET-DEBUG-DRUMS]`, e.data.payload);
             }
         };
@@ -473,6 +473,7 @@ export class AudioEngine {
     private applyChannelSettings(partName: SynthPartName | 'drums', volumes: ChannelVolumes) {
         const nodeInfo = this.nodes.get(partName);
         if (nodeInfo && volumes) {
+            // Ramping is now handled inside the worklet for synths, but gain nodes are fine here.
             nodeInfo.gain.gain.setTargetAtTime(dbToGain(volumes.gain), this.context.currentTime, 0.01);
             nodeInfo.reverbSend.gain.setTargetAtTime(dbToGain(volumes.reverbSend), this.context.currentTime, 0.01);
             if (nodeInfo.distortion) {
