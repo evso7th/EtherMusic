@@ -141,7 +141,8 @@ class Voice {
         this.filter.active = true;
     }
 
-    initLFO(vibrato) {
+    initLFO() {
+        const vibrato = this.preset.vibrato;
         if (!vibrato || vibrato.depth === 0) {
             this.lfo = null;
             return;
@@ -370,7 +371,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.debugCounter += outputChannel.length;
         if (this.debugCounter > this.sampleRate) { 
             if (this.voices.size > 0) {
-                 this.port.postMessage({ type: 'debug', payload: { voices: this.voices.size, peak: this.lastPeak.toFixed(2) } });
+                 this.port.postMessage({type: 'debug', payload: { voices: this.voices.size, peak: this.lastPeak.toFixed(2) }});
             }
             this.debugCounter = 0;
             this.lastPeak = 0;
@@ -392,5 +393,3 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
-
-    

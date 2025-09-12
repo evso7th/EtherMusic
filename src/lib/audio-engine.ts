@@ -83,7 +83,7 @@ export class AudioEngine {
     private reverbReturnGain: GainNode;
     private convolver: ConvolverNode;
     
-    private drumMachine: DrumMachine;
+    private drumMachine!: DrumMachine;
 
     private nodes = new Map<SynthPartName | 'drums', { 
         worklet: AudioWorkletNode, 
@@ -120,15 +120,14 @@ export class AudioEngine {
         this.reverbSend.connect(this.convolver);
         this.convolver.connect(this.reverbReturnGain);
         this.reverbReturnGain.connect(this.preCompressorOut);
-
-        this.drumMachine = new DrumMachine(this, (isPlaying) => this.emitter.emit('playStateChanged', isPlaying));
-    }
-
-    setOrbManager(orbManager: OrbManager | null) {
-        this.orbManager = orbManager;
-        this.latchEngine.setOrbManager(orbManager);
     }
     
+    setDependencies(orbManager: OrbManager, onPlayStateChange: (isPlaying: boolean) => void) {
+        this.orbManager = orbManager;
+        this.latchEngine.setOrbManager(orbManager);
+        this.drumMachine = new DrumMachine(this, onPlayStateChange);
+    }
+
     getContext() {
         return this.context;
     }
@@ -243,8 +242,6 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                  console.error('[DRUM WORKLET ERROR]', e.data.message);
-            } else if (e.data.type === 'debug' && e.data.payload) {
-                 console.log(`[WORKLET-DEBUG-DRUMS]`, e.data.payload);
             }
         };
         
@@ -278,7 +275,7 @@ export class AudioEngine {
     }
     
     public stopAllSounds() {
-        if (!this.isInitialized) return;
+        if (!this.isInitialized || !this.drumMachine) return;
         this.drumMachine.stop();
         this.nodes.forEach((node, name) => {
             if (name !== 'drums') {
@@ -296,14 +293,14 @@ export class AudioEngine {
     public handleThereminInteraction(type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') {
         if (!this.isInitialized || !this.orbManager) return;
         
-        console.log(`[Interaction] type: ${type}, state: ${state}, part: ${type === 'bass' ? (this.isBassLatchOn ? 'latch' : 'manualBass') : 'melody'}`, data ? `{freq: '${data.frequency.toFixed(2)}', vol: '${data.volume.toFixed(2)}', id: ${data.pointerId}}` : '');
+        // console.log(`[Interaction] type: ${type}, state: ${state}, part: ${type === 'bass' ? (this.isBassLatchOn ? 'latch' : 'manualBass') : 'melody'}`, data ? `{freq: '${data.frequency.toFixed(2)}', vol: '${data.volume.toFixed(2)}', id: ${data.pointerId}}` : '');
 
         const partName = type === 'bass' ? (this.isBassLatchOn ? 'latch' : 'manualBass') : 'melody';
         
         if (partName === 'latch') {
             if (state === 'down' && data) { 
                  const result = this.latchEngine.toggleNote(data);
-                 console.log('[LatchEngine] Process result:', result);
+                 // console.log('[LatchEngine] Process result:', result);
                  this.processLatchResult(result);
             }
             return;
@@ -319,7 +316,7 @@ export class AudioEngine {
             this.activePointers.set(pointerId, { type, noteId });
             const note: SynthNote = { id: noteId, frequency: data.frequency, volume: data.volume };
             const message: WorkerMessage = { type: 'noteOn', note };
-            console.log(`[AudioEngine] -> ${partName.toUpperCase()} worklet:`, message);
+            // console.log(`[AudioEngine] -> ${partName.toUpperCase()} worklet:`, message);
             nodeInfo.worklet.port.postMessage(message);
             this.orbManager.addOrb(pointerId, type, data.x, data.y);
         } else if (state === 'move' && data) {
@@ -334,7 +331,7 @@ export class AudioEngine {
             const activePointer = this.activePointers.get(pointerId);
             if (activePointer) {
                 const message: WorkerMessage = { type: 'noteOff', id: activePointer.noteId };
-                console.log(`[AudioEngine] -> ${partName.toUpperCase()} worklet:`, message);
+                // console.log(`[AudioEngine] -> ${partName.toUpperCase()} worklet:`, message);
                 nodeInfo.worklet.port.postMessage(message);
                 this.activePointers.delete(pointerId);
                 this.orbManager.removeOrb(pointerId);
@@ -344,7 +341,7 @@ export class AudioEngine {
                         const nodeToStop = this.nodes.get(partName);
                         if (nodeToStop) {
                             const message: WorkerMessage = { type: 'noteOff', id: pInfo.noteId };
-                             console.log(`[AudioEngine] -> ${partName.toUpperCase()} worklet (cleanup):`, message);
+                            //  console.log(`[AudioEngine] -> ${partName.toUpperCase()} worklet (cleanup):`, message);
                             nodeToStop.worklet.port.postMessage(message);
                         }
                         this.orbManager?.removeOrb(pId);
@@ -361,7 +358,7 @@ export class AudioEngine {
         
         if (result.noteOff) {
             const message: WorkerMessage = { type: 'noteOff', id: result.noteOff.id };
-            console.log('[AudioEngine] -> LATCH worklet:', message);
+            // console.log('[AudioEngine] -> LATCH worklet:', message);
             latchNode.worklet.port.postMessage(message);
         }
         if (result.noteToAnimateRemove) {
@@ -370,7 +367,7 @@ export class AudioEngine {
         
         if (result.noteOn) {
             const message: WorkerMessage = { type: 'noteOn', note: result.noteOn };
-            console.log('[AudioEngine] -> LATCH worklet:', message);
+            // console.log('[AudioEngine] -> LATCH worklet:', message);
             latchNode.worklet.port.postMessage(message);
         }
         if (result.noteToAnimateAdd) {
@@ -379,13 +376,13 @@ export class AudioEngine {
     }
     
     public setBassLatch(isOn: boolean) {
-        console.log(`[AudioEngine] Bass latch set to: ${isOn}`);
+        // console.log(`[AudioEngine] Bass latch set to: ${isOn}`);
         this.isBassLatchOn = isOn;
         this.nodes.get('manualBass')?.worklet.port.postMessage({ type: 'allNotesOff' });
         this.orbManager?.removeAllOrbs('bass');
         
         if (!isOn) {
-            console.log('[AudioEngine] Clearing all active latch notes.');
+            // console.log('[AudioEngine] Clearing all active latch notes.');
             const notesToTurnOff = this.latchEngine.clear();
             const latchNode = this.nodes.get('latch')?.worklet;
             if (latchNode && notesToTurnOff.length > 0) {
@@ -398,7 +395,7 @@ export class AudioEngine {
     }
     
     public setMelodyInstrument(instrumentName: Instrument) {
-        console.log(`[AudioEngine] Melody instrument set to: ${instrumentName}`);
+        // console.log(`[AudioEngine] Melody instrument set to: ${instrumentName}`);
         const preset = melodyInstruments.find(p => p.id === instrumentName);
         if (preset && this.nodes.has('melody')) {
             const message: WorkerMessage = { type: 'setPreset', preset: preset.params };
@@ -407,7 +404,7 @@ export class AudioEngine {
     }
     
     public setBassInstrument(instrumentName: BassInstrument) {
-        console.log(`[AudioEngine] Bass instrument set to: ${instrumentName}`);
+        // console.log(`[AudioEngine] Bass instrument set to: ${instrumentName}`);
         const preset = bassInstruments.find(i => i.id === instrumentName);
         if (preset) {
             const bassPresetParams = preset.params as BassInstrumentPresetParams;
@@ -428,16 +425,20 @@ export class AudioEngine {
     }
     
     public setBeatPattern(patternName: string) {
-        console.log(`[AudioEngine] Beat pattern set to: ${patternName}`);
+        // console.log(`[AudioEngine] Beat pattern set to: ${patternName}`);
         this.drumMachine.setPattern(patternName);
     }
 
     public setTempo(newTempo: number) {
-        this.drumMachine.setTempo(newTempo);
+        if (this.drumMachine) {
+            this.drumMachine.setTempo(newTempo);
+        }
     }
 
     public setSwing(swing: number) {
-        this.drumMachine.setSwing(swing);
+        if (this.drumMachine) {
+            this.drumMachine.setSwing(swing);
+        }
     }
     
     public playDrumSample(sampleName: string, volume: number = 1.0) {
@@ -553,5 +554,3 @@ export class AudioEngine {
         }
     }
 }
-
-    
