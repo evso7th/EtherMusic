@@ -342,16 +342,20 @@ class SynthProcessor extends AudioWorkletProcessor {
             }
         });
         
+        // Simple hard clipping to prevent audio glitches if we exceed [-1, 1]
         for (let i = 0; i < outputChannel.length; i++) {
-            outputChannel[i] = Math.tanh(outputChannel[i]);
+            outputChannel[i] = Math.max(-1, Math.min(1, outputChannel[i]));
         }
+
+        this.peakLevel = Math.max(this.peakLevel, peak);
         
         this.logCounter++;
-        if (this.logCounter > 10) { // Log roughly every 10 * 128 samples
-             if (this.voices.size > 0 || peak > 0.001) {
-                this.port.postMessage({ type: 'debug', peak: peak.toFixed(4), voices: this.voices.size });
+        if (this.logCounter > 20) { // Log roughly every 20 * 128 samples
+             if (this.voices.size > 0 || this.peakLevel > 0.001) {
+                this.port.postMessage({ type: 'debug', peak: this.peakLevel.toFixed(4), voices: this.voices.size });
              }
              this.logCounter = 0;
+             this.peakLevel = 0;
         }
         
         return true;

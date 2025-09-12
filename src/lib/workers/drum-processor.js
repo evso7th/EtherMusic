@@ -2,6 +2,7 @@
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for playing back pre-loaded drum samples
 // with low latency and high performance, off the main thread.
+console.log('[DrumProcessor] Script loaded');
 
 class Voice {
     constructor(buffer, gain) {
@@ -34,13 +35,14 @@ class Voice {
 }
 
 class DrumProcessor extends AudioWorkletProcessor {
-    constructor() {
+    constructor(options) {
         super();
         this.buffers = new Map();
         this.voices = [];
         this.maxVoices = 64; 
 
         this.port.onmessage = this.handleMessage.bind(this);
+        this.port.postMessage({ type: 'debug', message: 'DrumProcessor initialized' });
     }
 
     handleMessage(event) {
@@ -71,31 +73,30 @@ class DrumProcessor extends AudioWorkletProcessor {
     process(inputs, outputs, parameters) {
         const outputChannel = outputs[0]?.[0];
         if (!outputChannel) {
-            return true; // Stop processing if there's no output channel.
+            return true;
         }
 
         outputChannel.fill(0);
 
         if (this.voices.length === 0) {
-            return true; // No active voices, nothing to do.
+            return true; 
         }
         
-        // This approach of creating a temporary buffer and then adding it
-        // is safer than directly modifying outputChannel inside the loop
-        // when multiple voices are processed.
         const blockBuffer = new Float32Array(outputChannel.length);
 
         this.voices = this.voices.filter(voice => {
             if (voice.isFinished) {
                 return false;
             }
+            // Each voice adds its output to the blockBuffer
             voice.process(blockBuffer);
             return true;
         });
         
-        // Now, add the processed block to the main output
+        // Add the processed block to the main output and apply a limiter
         for (let i = 0; i < outputChannel.length; i++) {
-            outputChannel[i] += blockBuffer[i];
+            // Using tanh as a simple limiter to prevent hard clipping
+            outputChannel[i] = Math.tanh(blockBuffer[i]);
         }
 
         return true; // Keep the processor alive.
