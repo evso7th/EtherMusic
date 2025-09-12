@@ -7,6 +7,8 @@ import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
 import { bassInstruments } from './bass-presets';
 import { DrumMachine } from './drum-machine';
+import { Emitter } from 'mitt';
+import { AudioEngineEvents } from '@/types';
 
 
 function dbToGain(db: number): number {
@@ -167,6 +169,7 @@ export class AudioEngine {
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
+            this.recordedChunks = [];
         };
 
         try {
@@ -216,6 +219,8 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
+            } else if (e.data.type === 'debug') {
+                 console.log(`[WORKLET-DEBUG-${part.toUpperCase()}]`, e.data.message);
             }
         };
 
@@ -235,6 +240,8 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error('[DRUM WORKLET ERROR]', e.data.message);
+            } else if (e.data.type === 'debug') {
+                console.log(`[DRUM-WORKLET-DEBUG]`, e.data.message);
             }
         };
         
@@ -289,9 +296,8 @@ export class AudioEngine {
         
         const partName = type === 'bass' ? (this.isBassLatchOn ? 'latch' : 'manualBass') : 'melody';
         
-        if (state !== 'move') { 
-            console.log(`[Interaction] type: ${type}, state: ${state}, part: ${partName}`, data ? `{freq: '${data.frequency.toFixed(2)}', vol: '${data.volume.toFixed(2)}', id: ${data.pointerId}}` : 'null');
-        }
+        const formattedData = data ? `{freq: '${data.frequency.toFixed(2)}', vol: '${data.volume.toFixed(2)}', id: ${data.pointerId}}` : 'null';
+        console.log(`[Interaction] type: ${type}, state: ${state}, part: ${partName}`, formattedData);
         
         if (partName === 'latch') {
             if (state === 'down' && data) { 
@@ -397,26 +403,17 @@ export class AudioEngine {
         }
     }
     
-    public setBassInstrument(instrumentName: BassInstrument): Volumes | undefined {
+    public setBassInstrument(instrumentName: BassInstrument) {
         const preset = bassInstruments.find(i => i.id === instrumentName);
-        if (preset && this.volumes) {
+        if (preset) {
             console.log(`[AudioEngine] Bass instrument set to: ${instrumentName}`);
-            const newVolumes = JSON.parse(JSON.stringify(this.volumes)); // Deep copy
+            
             const bassPresetParams = preset.params as BassInstrumentPresetParams;
             const message: WorkerMessage = { type: 'setPreset', preset: bassPresetParams };
             
             this.nodes.get('manualBass')?.worklet.port.postMessage(message);
             this.nodes.get('latch')?.worklet.port.postMessage(message);
-            
-            newVolumes.manualBass.reverbSend = bassPresetParams.reverbSend ?? newVolumes.manualBass.reverbSend;
-            newVolumes.manualBass.distortion = bassPresetParams.distortion ?? newVolumes.manualBass.distortion;
-            newVolumes.latch.reverbSend = bassPresetParams.reverbSend ?? newVolumes.latch.reverbSend;
-            newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
-            
-            this.setVolumes(newVolumes);
-            return newVolumes; // Return the modified volumes
         }
-        return undefined;
     }
     
     public setBeatPattern(patternName: string) {
@@ -489,12 +486,10 @@ export class AudioEngine {
     
     public setVolumes(newVolumes: Volumes) {
         if (!this.isInitialized || !this.context) return;
-        this.volumes = newVolumes;
         
         if(JSON.stringify(this.volumes) !== JSON.stringify(newVolumes)) {
             console.log('[AudioEngine] Applying new volumes:', newVolumes);
             this.volumes = newVolumes;
-            const rampTime = this.context.currentTime + 0.05;
 
             this.applyChannelSettings('melody', newVolumes.melody);
             this.applyChannelSettings('manualBass', newVolumes.manualBass);
@@ -519,7 +514,6 @@ export class AudioEngine {
         const oldSettings = this.volumes?.compressor;
         if(JSON.stringify(oldSettings) !== JSON.stringify(compressorSettings)) {
             this.volumes.compressor = compressorSettings;
-            const rampTime = this.context.currentTime + 0.05;
 
             this.preCompressorOut.disconnect();
             if (compressorSettings.enabled) {
@@ -550,3 +544,5 @@ export class AudioEngine {
         }
     }
 }
+
+    

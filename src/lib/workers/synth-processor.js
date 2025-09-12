@@ -234,33 +234,33 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.sampleRate = options.processorOptions?.sampleRate || 44100;
         this.preset = this.getDefaultPreset();
         
-        this.logCounter = 0;
-        this.peakLevel = 0;
-        
         this.port.onmessage = this.handleMessage.bind(this);
     }
 
     handleMessage(event) {
         const { type, note, id, preset } = event.data;
-        switch (type) {
-            case 'noteOn':
-                if (note) this.noteOn(note);
-                break;
-            case 'noteOff':
-                if (id !== undefined) this.noteOff(id);
-                break;
-            case 'noteUpdate':
-                if (note) this.noteUpdate(note);
-                break;
-            case 'allNotesOff':
-                this.allNotesOff();
-                break;
-            case 'setPreset':
-                if (preset) this.applyPreset(preset);
-                break;
-             case 'error':
-                console.error(`[SYNTH-WORKLET]`, event.data.message);
-                break;
+        try {
+            switch (type) {
+                case 'noteOn':
+                    if (note) this.noteOn(note);
+                    break;
+                case 'noteOff':
+                    if (id !== undefined) this.noteOff(id);
+                    break;
+                case 'noteUpdate':
+                    if (note) this.noteUpdate(note);
+                    break;
+                case 'allNotesOff':
+                    this.allNotesOff();
+                    break;
+                case 'setPreset':
+                    if (preset) this.applyPreset(preset);
+                    break;
+            }
+        } catch (e) {
+             if (e instanceof Error) {
+                this.port.postMessage({ type: 'error', message: `Error in handleMessage for type ${type}: ${e.message}` });
+            }
         }
     }
 
@@ -334,47 +334,18 @@ class SynthProcessor extends AudioWorkletProcessor {
     
         outputChannel.fill(0);
         
-        let currentPeak = 0;
-
         if (this.voices.size > 0) {
             this.voices.forEach((voice, id) => {
                 if (voice.isFinished) {
                     this.voices.delete(id);
                 } else {
                     for (let i = 0; i < outputChannel.length; i++) {
-                        const sample = voice.render();
-                        outputChannel[i] += sample;
-                        const absSample = Math.abs(sample);
-                        if (absSample > currentPeak) {
-                            currentPeak = absSample;
-                        }
+                        outputChannel[i] += voice.render();
                     }
                 }
             });
-
-            this.peakLevel = Math.max(this.peakLevel, currentPeak);
-            this.logCounter += outputChannel.length;
-            
-            if (this.logCounter >= this.sampleRate) { // Log roughly once per second
-                this.port.postMessage({
-                    type: 'debug',
-                    peak: this.peakLevel,
-                    voices: this.voices.size,
-                });
-                this.peakLevel = 0;
-                this.logCounter = 0;
-            }
-        } else {
-             // Reset when there are no voices
-            this.peakLevel = 0;
-            this.logCounter = 0;
         }
         
-        // Simple hard clipping to prevent audio glitches if we exceed [-1, 1]
-        for (let i = 0; i < outputChannel.length; i++) {
-            outputChannel[i] = Math.max(-1, Math.min(1, outputChannel[i]));
-        }
-
         return true; // Keep processor alive
     }
     
@@ -391,3 +362,5 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
+
+    

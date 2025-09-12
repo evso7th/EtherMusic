@@ -52,7 +52,6 @@ class DrumProcessor extends AudioWorkletProcessor {
         if (type === 'loadSample' && name && buffer instanceof ArrayBuffer) {
             const float32Array = new Float32Array(buffer);
             this.buffers.set(name, float32Array);
-            this.port.postMessage({ type: 'debug', message: `Sample loaded: ${name}` });
         } else if (type === 'playSample' && sampleName) {
             const bufferToPlay = this.buffers.get(sampleName);
             if (bufferToPlay) {
@@ -102,3 +101,5 @@ class DrumProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('drum-processor', DrumProcessor);
+
+    

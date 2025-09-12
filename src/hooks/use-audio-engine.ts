@@ -9,10 +9,13 @@ import type { Volumes, Instrument, BassInstrument } from '@/types';
 import Cookies from 'js-cookie';
 
 function saveVolumes(volumes: Volumes) {
-    if (typeof window === 'undefined' || Cookies.get("ethermusic_consent") !== 'true') {
-        return;
-    }
+    if (typeof window === 'undefined') return;
+
     try {
+        const consent = Cookies.get("ethermusic_consent") === 'true';
+        if (!consent) {
+            return;
+        }
         Cookies.set("ethermusic_volumes", JSON.stringify(volumes), { expires: 365, path: '/', sameSite: 'lax' });
     } catch (e) {
         console.error("Failed to save volume settings to cookies", e);
@@ -38,8 +41,7 @@ export const defaultVolumes: Volumes = {
 
 export function loadVolumes(): Volumes {
      if (typeof window === 'undefined') return defaultVolumes;
-     const consent = Cookies.get("ethermusic_consent") === 'true';
-     if (!consent) return defaultVolumes;
+     
      try {
         const savedVolumes = Cookies.get("ethermusic_volumes");
         if (!savedVolumes) return defaultVolumes;
@@ -148,20 +150,18 @@ export function useAudioEngine() {
     }, []);
     
     const setVolumes = useCallback((newVolumes: Volumes | ((prev: Volumes) => Volumes)) => {
-        const updatedVolumes = typeof newVolumes === 'function' ? setVolumesState(newVolumes) : setVolumesState(() => newVolumes);
-
         setVolumesState(prev => {
             const updated = typeof newVolumes === 'function' ? newVolumes(prev) : newVolumes;
              if (audioEngine.current) {
                 audioEngine.current.setVolumes(updated);
             }
-            if (updated.tempo !== currentTempo) {
+            if (updated.tempo !== prev.tempo) {
                 setCurrentTempo(updated.tempo);
             }
             saveVolumes(updated);
             return updated;
         });
-    }, [currentTempo]);
+    }, []);
 
     const stopAllSounds = useCallback(() => {
         audioEngine.current?.stopAllSounds();
@@ -192,14 +192,14 @@ export function useAudioEngine() {
         audioEngine.current?.setMelodyInstrument(instrumentName);
     }, []);
     
-    const setBassInstrument = useCallback((instrumentName: BassInstrument): Volumes | undefined => {
+    const setBassInstrument = useCallback((instrumentName: BassInstrument) => {
         if(audioEngine.current){
-            // This function in AudioEngine now directly applies the volume changes
-            // and returns the updated volume object if a change occurred.
-            return audioEngine.current.setBassInstrument(instrumentName);
+             const newVolumes = audioEngine.current.setBassInstrument(instrumentName);
+             if (newVolumes) {
+                setVolumes(newVolumes);
+             }
         }
-        return undefined;
-    }, []);
+    }, [setVolumes]);
 
     return {
         isAppStarted,

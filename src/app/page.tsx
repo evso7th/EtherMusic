@@ -74,24 +74,23 @@ export default function Home() {
 
     const handleSetMelodyInstrument = useCallback((instrumentId: Instrument) => {
         setActiveMelodyInstrument(instrumentId);
-        setMelodyInstrument(instrumentId);
-    }, [setMelodyInstrument]);
+    }, []);
 
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
-        const newVolumes = setBassInstrument(instrumentId);
-        if (newVolumes) {
-            setVolumes(newVolumes);
-        }
-    }, [setBassInstrument, setVolumes]);
-    
-    // This effect initializes the instruments once the audio engine is ready.
+    }, []);
+
     useEffect(() => {
         if (isReady) {
-            handleSetMelodyInstrument(activeMelodyInstrument);
-            handleSetBassInstrument(activeBassInstrument);
+            setMelodyInstrument(activeMelodyInstrument);
         }
-    }, [isReady, activeMelodyInstrument, activeBassInstrument, handleSetMelodyInstrument, handleSetBassInstrument]);
+    }, [isReady, activeMelodyInstrument, setMelodyInstrument]);
+
+    useEffect(() => {
+        if (isReady) {
+            setBassInstrument(activeBassInstrument);
+        }
+    }, [isReady, activeBassInstrument, setBassInstrument]);
     
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         const isKey = (k: string): k is MusicKey => Object.keys(ALL_NOTES).includes(k);
@@ -120,12 +119,10 @@ export default function Home() {
         value: number
     ) => {
         setVolumes(prevVolumes => {
-            // Create a deep copy to avoid direct state mutation.
             const newVolumes = JSON.parse(JSON.stringify(prevVolumes));
             const targetChannelKey = channel === 'bass' ? 'manualBass' : 'melody';
             
             newVolumes[targetChannelKey][effect] = value;
-            // Sync bass and latch effects
             if (channel === 'bass') {
                 newVolumes.latch[effect] = value;
             }
@@ -300,3 +297,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
