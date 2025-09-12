@@ -217,7 +217,6 @@ class Voice {
         
         const filteredSample = this.processFilter(mixedSample);
         
-        // Normalize based on number of layers to prevent internal clipping
         const numLayers = Math.max(1, this.layers.length);
         
         return (filteredSample / numLayers) * this.volume;
@@ -347,7 +346,7 @@ class SynthProcessor extends AudioWorkletProcessor {
             });
         }
         
-        // Simple hard-clipping limiter to prevent distortion
+        // Simple hard-clipping limiter to prevent distortion on the final summed output
         for (let i = 0; i < outputChannel.length; i++) {
             outputChannel[i] = Math.max(-1, Math.min(1, outputChannel[i]));
         }

@@ -2,6 +2,7 @@
 import type { AudioEngine } from './audio-engine';
 import type { BeatPattern } from '@/types';
 
+
 export const beatPatterns: Readonly<BeatPattern[]> = [
     // Meditative
     { name: 'Air', type: 'Meditative', length: 1, sequence: [{ time: 0, note: 'k' }, { time: 8, note: 'h' }, { time: 12, note: 'p1', vol: 0.4 }] },
@@ -53,7 +54,7 @@ export class DrumMachine {
     private step: number = 0;
     private measureCount: number = 0;
     private fills: Readonly<BeatPattern[]>;
-    private onPlayStateChange: (isPlaying: boolean) => void;
+    public onPlayStateChange: (isPlaying: boolean) => void;
     
     constructor(audioEngine: AudioEngine, onPlayStateChange: (isPlaying: boolean) => void) {
         this.audioEngine = audioEngine;
@@ -88,9 +89,11 @@ export class DrumMachine {
                 this.stop();
             }
             this._pattern = newPattern;
-             if (newPattern.name !== 'Off') {
+             if (newPattern.name !== 'Off' && wasPlaying) {
                 this.play();
-            }
+             } else if (newPattern.name === 'Off') {
+                this.stop();
+             }
         }
     }
 

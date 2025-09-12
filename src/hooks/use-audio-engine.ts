@@ -74,35 +74,22 @@ export function useAudioEngine() {
     const [isReady, setIsReady] = useState(false);
     
     const audioEngine = useRef<AudioEngine | null>(null);
-    const orbManager = useRef<OrbManager | null>(null);
+    const [orbManager, setOrbManager] = useState<OrbManager | null>(null);
     
     const [volumes, setVolumesState] = useState<Volumes>(defaultVolumes);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTempo, setCurrentTempo] = useState(defaultVolumes.tempo);
 
-    const onPlayStateChange = useCallback((playing: boolean) => {
-        setIsPlaying(playing);
-    }, []);
 
     const initializeAudioEngine = useCallback(async () => {
         try {
-             if (!orbManager.current) {
-                const padContainer = document.querySelector('main');
-                if (padContainer) {
-                    orbManager.current = new OrbManager(padContainer);
-                } else {
-                    console.error("Main pad container not found for OrbManager.");
-                }
-            }
-
             if (!audioEngine.current) {
                 const context = new (window.AudioContext || (window as any).webkitAudioContext)();
                 if (context.state === 'suspended') {
                     await context.resume();
                 }
                 
-                // Pass orbManager only if it was successfully created
-                const engine = new AudioEngine(context, orbManager.current, onPlayStateChange);
+                const engine = new AudioEngine(context);
                 await engine.initialize();
                 
                 const currentVolumes = loadVolumes();
@@ -123,7 +110,7 @@ export function useAudioEngine() {
                 variant: "destructive"
             });
         }
-    }, [toast, onPlayStateChange]);
+    }, [toast]);
 
     const startApp = useCallback(async () => {
         if (isAppStarted) return;
@@ -209,12 +196,17 @@ export function useAudioEngine() {
         isReady,
         isPlaying,
         audioEngine: audioEngine.current,
-        orbManager: orbManager.current,
+        setOrbManager: (manager: OrbManager | null) => {
+            if (audioEngine.current) {
+                audioEngine.current.setOrbManager(manager);
+            }
+        },
         startApp,
         stopAllSounds,
         volumes,
         setVolumes,
         currentTempo,
+        setIsPlaying,
         setMelodyInstrument,
         setBassInstrument,
         setBeatPattern,

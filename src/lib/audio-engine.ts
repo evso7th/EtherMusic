@@ -17,7 +17,6 @@ function dbToGain(db: number): number {
 function createDistortionCurve(amount: number): Float32Array {
     const k = Math.max(0, Math.min(100, amount)) * 2;
     if (k === 0) {
-        // Return a linear curve when distortion is 0 to avoid artifacts
         return new Float32Array([ -1, 1 ]);
     }
     const n_samples = 44100;
@@ -49,7 +48,6 @@ const DRUM_SAMPLES: Record<string, string> = {
     'T': '/assets/sounds/drums/mid_tom.wav',
     'l': '/assets/sounds/drums/low_tom.wav',
     'b': '/assets/sounds/drums/hh_bark_short.wav',
-    // Percussion Samples
     'p1': '/assets/sounds/drums/perc-001.wav',
     'p2': '/assets/sounds/drums/perc-002.wav',
     'p3': '/assets/sounds/drums/perc-003.wav',
@@ -71,7 +69,8 @@ const DRUM_SAMPLES: Record<string, string> = {
 export class AudioEngine {
     public isInitialized = false;
     private context!: AudioContext;
-    public orbManager: OrbManager | null;
+    public orbManager: OrbManager | null = null;
+    public onPlayStateChange: (isPlaying: boolean) => void = () => {};
     private mediaRecorder: MediaRecorder | null = null;
     private recordedChunks: Blob[] = [];
 
@@ -83,7 +82,7 @@ export class AudioEngine {
     private reverbReturnGain: GainNode;
     private convolver: ConvolverNode;
     
-    private drumMachine: DrumMachine;
+    private drumMachine!: DrumMachine;
 
     private nodes = new Map<SynthPartName | 'drums', { 
         worklet: AudioWorkletNode, 
@@ -99,12 +98,8 @@ export class AudioEngine {
     private activePointers = new Map<number, { type: 'melody' | 'bass', noteId: number }>();
     private nextNoteId = 0;
     
-    private onPlayStateChange: (isPlaying: boolean) => void;
-
-    constructor(context: AudioContext, orbManager: OrbManager | null, onPlayStateChange: (isPlaying: boolean) => void) {
+    constructor(context: AudioContext) {
         this.context = context;
-        this.orbManager = orbManager;
-        this.onPlayStateChange = onPlayStateChange;
         
         this.masterOut = this.context.createGain();
         this.masterOut.connect(this.context.destination);
@@ -121,8 +116,18 @@ export class AudioEngine {
         this.reverbSend.connect(this.convolver);
         this.convolver.connect(this.reverbReturnGain);
         this.reverbReturnGain.connect(this.preCompressorOut);
+    }
 
-        this.drumMachine = new DrumMachine(this, this.onPlayStateChange);
+    setDependencies(orbManager: OrbManager | null, onPlayStateChange: (isPlaying: boolean) => void) {
+        this.orbManager = orbManager;
+        this.onPlayStateChange = onPlayStateChange;
+        if (this.drumMachine) {
+            this.drumMachine.onPlayStateChange = onPlayStateChange;
+        }
+    }
+
+    setOrbManager(manager: OrbManager | null) {
+        this.orbManager = manager;
     }
     
     getContext() {
@@ -134,16 +139,18 @@ export class AudioEngine {
     }
 
     public get isPlaying(): boolean {
-        return this.drumMachine.isPlaying;
+        return this.drumMachine?.isPlaying ?? false;
     }
     
     public getVolumes(): Volumes {
-        return JSON.parse(JSON.stringify(this.volumes)); // Return a deep copy
+        return JSON.parse(JSON.stringify(this.volumes));
     }
     
     public async initialize() {
         if (this.isInitialized) return;
         console.log('[AudioEngine] Initializing...');
+
+        this.drumMachine = new DrumMachine(this, this.onPlayStateChange);
 
         if (this.context.state === 'suspended') {
             await this.context.resume();
@@ -238,7 +245,9 @@ export class AudioEngine {
         
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
-                console.error('[DRUM WORKLET ERROR]', e.data.message);
+                 console.error('[DRUM WORKLET ERROR]', e.data.message);
+            } else if (e.data.type === 'debug') {
+                 console.log('[WORKLET-DEBUG-DRUMS]', e.data.payload);
             }
         };
         
@@ -483,7 +492,6 @@ export class AudioEngine {
     private applyChannelSettings(partName: SynthPartName | 'drums', volumes: ChannelVolumes) {
         const nodeInfo = this.nodes.get(partName);
         if (nodeInfo && volumes) {
-            // Ramping is now handled inside the worklet for synths, but gain nodes are fine here.
             nodeInfo.gain.gain.setTargetAtTime(dbToGain(volumes.gain), this.context.currentTime, 0.01);
             nodeInfo.reverbSend.gain.setTargetAtTime(dbToGain(volumes.reverbSend), this.context.currentTime, 0.01);
             if (nodeInfo.distortion) {
@@ -554,5 +562,3 @@ export class AudioEngine {
         }
     }
 }
-
-      

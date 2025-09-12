@@ -19,6 +19,7 @@ import { bassInstruments, defaultBassInstrument } from '@/lib/bass-presets';
 import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, BeatPattern } from '@/types';
 import { cn } from '@/lib/utils';
 import { ThereminPads } from '@/components/theremin-pads';
+import { OrbManager } from '@/lib/orb-manager';
 
 const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
 
@@ -51,10 +52,11 @@ export default function Home() {
         handleThereminInteraction,
         setMelodyInstrument,
         setBassInstrument,
-        orbManager,
+        setOrbManager,
         volumes,
         setVolumes,
         currentTempo,
+        setIsPlaying,
     } = useAudioEngine();
     
     const [isRecording, setIsRecording] = useState(false);
@@ -67,20 +69,28 @@ export default function Home() {
     const [activeBassInstrument, setActiveBassInstrument] = useState<BassInstrument>(defaultBassInstrument);
     
     const [isBassLatchOn, setIsBassLatchOn] = useState(false);
+    const [orbManager, setOrbManagerInstance] = useState<OrbManager | null>(null);
 
     useEffect(() => {
         setIsClient(true);
-    }, []);
+        if (typeof window !== "undefined") {
+            const mainContainer = document.querySelector('main');
+            const newOrbManager = new OrbManager(mainContainer);
+            setOrbManagerInstance(newOrbManager);
+            setOrbManager(newOrbManager);
+        }
+    }, [setOrbManager]);
+
 
     const handleSetMelodyInstrument = useCallback((instrumentId: Instrument) => {
         setActiveMelodyInstrument(instrumentId);
-        setMelodyInstrument(instrumentId);
-    }, [setMelodyInstrument]);
+        if(isReady) setMelodyInstrument(instrumentId);
+    }, [isReady, setMelodyInstrument]);
 
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
-        setBassInstrument(instrumentId);
-    }, [setBassInstrument]);
+        if(isReady) setBassInstrument(instrumentId);
+    }, [isReady, setBassInstrument]);
     
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         const isKey = (k: string): k is MusicKey => Object.keys(ALL_NOTES).includes(k);
@@ -137,13 +147,13 @@ export default function Home() {
 
     const handlePatternChange = useCallback((pattern: BeatPattern) => {
         setActivePattern(pattern);
-        setBeatPattern(pattern.name);
-    }, [setBeatPattern]);
+        if(isReady) setBeatPattern(pattern.name);
+    }, [isReady, setBeatPattern]);
 
     const handleLatchToggle = useCallback((isOn: boolean) => {
         setIsBassLatchOn(isOn);
-        setBassLatch(isOn);
-    }, [setBassLatch]);
+        if(isReady) setBassLatch(isOn);
+    }, [isReady, setBassLatch]);
     
     const handleThereminInteractionCallback = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         handleThereminInteraction(type, data, state);
@@ -157,6 +167,15 @@ export default function Home() {
             audioEngine.getDrumMachine().play();
         }
     }, [audioEngine, isPlaying]);
+
+    useEffect(() => {
+        if (isReady && audioEngine) {
+            audioEngine.onPlayStateChange = setIsPlaying;
+            if (orbManager) {
+                audioEngine.setOrbManager(orbManager);
+            }
+        }
+    }, [isReady, audioEngine, orbManager, setIsPlaying]);
 
     if (!isClient) {
         return <Preloader />;
