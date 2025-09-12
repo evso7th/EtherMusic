@@ -220,6 +220,8 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
+            } else if (e.data.type === 'debug') {
+                 console.log(`[WORKLET-DEBUG-${part.toUpperCase()}] Peak: ${e.data.peak.toFixed(4)}, Voices: ${e.data.voices}`);
             }
         };
 
@@ -240,6 +242,8 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error('[DRUM WORKLET ERROR]', e.data.message);
+            } else if (e.data.type === 'debug') {
+                console.log('[DRUM-WORKLET-DEBUG]', e.data.message);
             }
         };
         
@@ -550,3 +554,5 @@ export class AudioEngine {
         }
     }
 }
+
+    
