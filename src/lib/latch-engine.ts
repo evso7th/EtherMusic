@@ -75,14 +75,12 @@ export class LatchEngine {
                 noteToAnimateRemove = { id: noteToTurnOff.id };
                 channelToUse = noteToTurnOff.channelIndex; // Reuse the channel
             } else {
-                 // This case should not happen if logic is correct
-                return { action: 'none' };
+                 return { action: 'none' };
             }
         } else {
             // Use a free channel from the pool
             const channel = this.channelPool.shift();
             if(channel === undefined) {
-                 console.error("[LatchEngine] Error: No available channels in pool.");
                  return { action: 'none' };
             }
             channelToUse = channel;

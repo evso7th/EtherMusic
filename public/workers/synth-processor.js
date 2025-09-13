@@ -1,4 +1,5 @@
 
+
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for all real-time synthesis, running in a high-priority
 // audio thread to ensure low-latency, glitch-free sound generation.
@@ -140,7 +141,8 @@ class Voice {
         this.filter.active = true;
     }
 
-    initLFO(vibrato) {
+    initLFO() {
+        const vibrato = this.preset.vibrato;
         if (!vibrato || vibrato.depth === 0) {
             this.lfo = null;
             return;
@@ -195,28 +197,33 @@ class Voice {
     }
 
     render() {
+        if (this.isFinished) return 0;
+
         if (this.isReleasing && this.layers.every(l => l.env.currentValue <= 0.0001)) {
             this.isFinished = true;
+            return 0;
         }
-        if (this.isFinished) return 0;
         
-        this.baseFrequency += (this.targetFrequency - this.baseFrequency) * this.portamentoSpeed;
+        if (this.portamentoSpeed < 1) {
+            this.baseFrequency += (this.targetFrequency - this.baseFrequency) * this.portamentoSpeed;
+        } else {
+            this.baseFrequency = this.targetFrequency;
+        }
+
         const lfoModulation = this.processLFO();
         
         let mixedSample = 0;
         this.layers.forEach(layer => {
             const envelopeValue = this.processLayerEnvelope(layer);
             if (envelopeValue > 0) {
-                 const detunedFreq = this.baseFrequency * Math.pow(2, layer.detune / 1200);
-                 const modulatedFrequency = (detunedFreq * layer.freqMult) + lfoModulation;
-                 const oscSample = layer.osc.process(modulatedFrequency);
-                 mixedSample += oscSample * layer.level * envelopeValue;
+                const detunedFreq = this.baseFrequency * Math.pow(2, layer.detune / 1200);
+                const modulatedFrequency = (detunedFreq * layer.freqMult) + lfoModulation;
+                const oscSample = layer.osc.process(modulatedFrequency);
+                mixedSample += oscSample * layer.level * envelopeValue;
             }
         });
         
         const filteredSample = this.processFilter(mixedSample);
-        
-        // Normalize based on number of layers to prevent internal clipping
         const numLayers = Math.max(1, this.layers.length);
         
         return (filteredSample / numLayers) * this.volume;
@@ -231,10 +238,8 @@ class SynthProcessor extends AudioWorkletProcessor {
         super();
         this.voices = new Map();
         this.polyphony = options.processorOptions?.polyphony || 4;
+        this.sampleRate = options.processorOptions?.sampleRate || 44100;
         this.preset = this.getDefaultPreset();
-        
-        this.logCounter = 0;
-        this.peakLevel = 0;
         
         this.port.onmessage = this.handleMessage.bind(this);
     }
@@ -258,13 +263,10 @@ class SynthProcessor extends AudioWorkletProcessor {
                 case 'setPreset':
                     if (preset) this.applyPreset(preset);
                     break;
-                case 'debug':
-                    this.port.postMessage({ type: 'debug', message: `Message received: ${event.data.type}`});
-                    break;
             }
-        } catch(e) {
-            if (e instanceof Error) {
-                this.port.postMessage({ type: 'error', message: e.message });
+        } catch (e) {
+             if (e instanceof Error) {
+                this.port.postMessage({ type: 'error', message: `Error in handleMessage for type ${type}: ${e.message}` });
             }
         }
     }
@@ -305,7 +307,7 @@ class SynthProcessor extends AudioWorkletProcessor {
                 this.voices.delete(oldestId);
             }
         }
-        const voice = new Voice(note.id, note.frequency, note.volume, this.preset, sampleRate);
+        const voice = new Voice(note.id, note.frequency, note.volume, this.preset, this.sampleRate);
         voice.startTime = currentTime;
         this.voices.set(note.id, voice);
     }
@@ -328,50 +330,38 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.voices.forEach(voice => {
             voice.isReleasing = true;
             voice.layers.forEach(l => {
-                // Quick fade out
-                l.env.releaseSamples = Math.min(l.env.releaseSamples, sampleRate * 0.05); 
+                l.env.releaseSamples = Math.min(l.env.releaseSamples, this.sampleRate * 0.05); 
             });
         });
+    }
+    
+    softLimiter(sample) {
+      // Use tanh as a soft-clipper. It's a classic and effective way to prevent harsh digital clipping.
+      return Math.tanh(sample * 0.9)
     }
 
     process(inputs, outputs, parameters) {
         const outputChannel = outputs[0]?.[0];
         if (!outputChannel) return true;
-    
+
         outputChannel.fill(0);
         
-        let hasActiveVoices = this.voices.size > 0;
-        
-        if (hasActiveVoices) {
-            this.voices.forEach((voice, id) => {
-                if (voice.isFinished) {
-                    this.voices.delete(id);
-                } else {
-                    for (let i = 0; i < outputChannel.length; i++) {
-                        const sample = voice.render();
-                        outputChannel[i] += sample;
-                        
-                        const absSample = Math.abs(sample);
-                        if (absSample > this.peakLevel) {
-                            this.peakLevel = absSample;
-                        }
+        if (this.voices.size > 0) {
+            for (let i = 0; i < outputChannel.length; i++) {
+                let sample = 0;
+                this.voices.forEach((voice, id) => {
+                    if (voice.isFinished) {
+                        this.voices.delete(id);
+                    } else {
+                        sample += voice.render();
                     }
-                }
-            });
-
-            this.logCounter++;
-            if (this.logCounter >= 20) { // Log roughly every 20 * 128 / 44100 = ~58ms
-                this.port.postMessage({ type: 'debug', peak: this.peakLevel, voices: this.voices.size });
-                this.peakLevel = 0;
-                this.logCounter = 0;
+                });
+                
+                outputChannel[i] = this.softLimiter(sample);
             }
-        } else {
-            // Reset peak level and counter when idle
-            this.peakLevel = 0;
-            this.logCounter = 0;
         }
-        
-        return true; // Keep processor alive
+
+        return true;
     }
     
     getDefaultPreset() {
@@ -387,5 +377,3 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
-
-    
