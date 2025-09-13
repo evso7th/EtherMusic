@@ -83,6 +83,9 @@ export class AudioEngine {
     
     private drumMachine: DrumMachine;
 
+    // New dedicated compressor for the latch channels
+    private latchCompressor: DynamicsCompressorNode;
+    
     private nodes = new Map<SynthPartName | 'drums', { 
         worklet: AudioWorkletNode, 
         gain: GainNode,
@@ -111,6 +114,15 @@ export class AudioEngine {
         this.compressor = this.context.createDynamicsCompressor();
         this.preCompressorOut.connect(this.compressor);
         this.compressor.connect(this.masterOut);
+
+        // Latch-specific compressor setup
+        this.latchCompressor = this.context.createDynamicsCompressor();
+        this.latchCompressor.threshold.value = -18; // Start compressing earlier
+        this.latchCompressor.knee.value = 15;
+        this.latchCompressor.ratio.value = 12; // High ratio for strong compression
+        this.latchCompressor.attack.value = 0.005;
+        this.latchCompressor.release.value = 0.15;
+        this.latchCompressor.connect(this.preCompressorOut); // Connect to the main pre-compressor mix
 
         this.reverbSend = this.context.createGain();
         this.convolver = this.context.createConvolver();
@@ -218,14 +230,19 @@ export class AudioEngine {
         const reverbSend = this.context.createGain();
         
         worklet.connect(distortion).connect(gain);
-        gain.connect(this.preCompressorOut);
+        
+        if (part.startsWith('latch')) {
+            // Route latch channels to the dedicated latch compressor
+            gain.connect(this.latchCompressor);
+        } else {
+            // Route other channels to the main pre-compressor bus
+            gain.connect(this.preCompressorOut);
+        }
         gain.connect(reverbSend).connect(this.reverbSend);
         
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
-            } else if (e.data.type === 'debug' && e.data.payload) {
-                 console.log(`[WORKLET-DEBUG-${part.toUpperCase()}]`, e.data.payload);
             }
         };
 
@@ -456,8 +473,6 @@ export class AudioEngine {
             return;
         }
 
-        console.log(`[AudioEngine] Loading ${Object.keys(DRUM_SAMPLES).length} drum samples...`);
-
         const promises = Object.entries(DRUM_SAMPLES).map(async ([name, url]) => {
             try {
                 const response = await fetch(url);
@@ -480,11 +495,12 @@ export class AudioEngine {
             }
         });
         await Promise.all(promises);
-        console.log('[AudioEngine] All drum samples sent to worklet.');
     }
 
     private applyChannelSettings(partName: SynthPartName | 'drums' | 'latch', volumes: ChannelVolumes) {
-        if (partName === 'latch') {
+        const isLatchGroup = partName === 'latch';
+        
+        if (isLatchGroup) {
             this.applyChannelSettings('latch1', volumes);
             this.applyChannelSettings('latch2', volumes);
             this.applyChannelSettings('latch3', volumes);
