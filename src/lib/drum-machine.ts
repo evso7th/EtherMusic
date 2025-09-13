@@ -24,7 +24,7 @@ export const beatPatterns: Readonly<BeatPattern[]> = [
     ]},
     { name: 'Aria', type: 'Classic', length: 1, sequence: [{ time: 0, note: 'c', vol: 0.7 }, { time: 8, note: 'b', vol: 0.9 }, {time: 14, note: 'p11', vol: 0.6}] },
     { name: 'Funky', type: 'Classic', length: 1, sequence: [
-        { time: 0, note: 'k' }, { time: 4, note: 'h' }, { time: 6, note: 'H' }, { time: 8, note: 's' }, { time: 10, note: 'p12', vol: 0.5 }, { time: 12, note: 'k' }, { time: 14, note: 'H'},
+        { time: 0, note: 'k' }, { time: 4, note: 'h' }, {time: 6, note: 'o'}, { time: 8, note: 's' }, { time: 10, note: 'p12', vol: 0.5 }, { time: 12, note: 'k' }, { time: 14, note: 'H'},
     ]},
      { name: 'Airy', type: 'Classic', length: 1, sequence: [
         { time: 0, note: 'k' }, { time: 4, note: 'h' }, {time: 6, note: 'o'}, { time: 8, note: 's', vol: 0.6 }, { time: 12, note: 'h' }, { time: 14, note: 'p13', vol: 0.5}
@@ -108,6 +108,7 @@ export class DrumMachine {
         this.step = 0; 
         this.measureCount = 0;
         this.onPlayStateChange(true);
+        console.log('[DrumMachine] Play started.');
         this.scheduler();
     }
     
@@ -118,6 +119,7 @@ export class DrumMachine {
             this.step = 0;
             this.measureCount = 0;
             this.onPlayStateChange(false);
+            console.log('[DrumMachine] Play stopped.');
         }
     }
 
@@ -132,6 +134,7 @@ export class DrumMachine {
 
         currentPattern.sequence.forEach(note => {
             if (note.time === this.step) {
+                console.log(`[DrumMachine] Scheduling note: ${note.note} at step ${this.step}`);
                 this.audioEngine.playDrumSample(note.note, note.vol);
             }
         });

@@ -49,20 +49,22 @@ class DrumProcessor extends AudioWorkletProcessor {
   handleMessage(event) {
     try {
         const { type, name, buffer, sampleName, volume } = event.data;
-        console.log(`[DrumProcessor] Received message: ${type}`, event.data); // DIAGNOSTIC LOG
+        console.log(`[DrumProcessor] Received message: ${type}`, event.data);
 
         if (type === 'loadSample' && name && buffer instanceof ArrayBuffer) {
             const float32Array = new Float32Array(buffer);
             this.buffers.set(name, float32Array);
+             console.log(`[DrumProcessor] Loaded sample: ${name}, size: ${float32Array.length}`);
         } else if (type === 'playSample' && sampleName) {
             const bufferToPlay = this.buffers.get(sampleName);
             if (bufferToPlay) {
                 if (this.voices.length >= this.maxVoices) {
                     this.voices.shift();
                 }
+                console.log(`[DrumProcessor] Playing sample: ${sampleName}`);
                 this.voices.push(new Voice(bufferToPlay, volume ?? 1.0));
             } else {
-                console.warn(`[DrumProcessor] Sample not found: ${sampleName}`); // DIAGNOSTIC LOG
+                console.warn(`[DrumProcessor] Sample not found: ${sampleName}`);
             }
         }
     } catch (e) {
@@ -111,7 +113,7 @@ class DrumProcessor extends AudioWorkletProcessor {
 
     if (this.debugCounter === undefined) this.debugCounter = 0;
     this.debugCounter++;
-    if (this.voices.length > 0 && this.debugCounter > sampleRate) { // Log roughly once per second
+    if (this.voices.length > 0 && this.debugCounter > (sampleRate / 128) * 1) { // Log roughly once per second
         this.port.postMessage({type: 'debug', payload: { voices: this.voices.length, peak }});
         this.debugCounter = 0;
     }

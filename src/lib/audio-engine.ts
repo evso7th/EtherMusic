@@ -256,21 +256,31 @@ export class AudioEngine {
     
     private createDrumChannel() {
         if (!this.context) return;
+        console.log('[AudioEngine] Creating drum channel...');
         const worklet = new AudioWorkletNode(this.context, 'drum-processor');
         const gain = this.context.createGain();
         const reverbSend = this.context.createGain();
 
         worklet.connect(gain);
+        console.log('[AudioEngine] Drum Worklet connected to GainNode.');
+        
         gain.connect(this.preCompressorOut);
+        console.log('[AudioEngine] Drum GainNode connected to preCompressorOut.');
+
         gain.connect(reverbSend).connect(this.reverbSend);
+        console.log('[AudioEngine] Drum GainNode also connected to Reverb Send.');
         
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                  console.error('[DRUM WORKLET ERROR]', e.data.message);
             }
+            if (e.data.type === 'debug') {
+                 console.log('[DRUM WORKLET DEBUG]', e.data.payload);
+            }
         };
         
         this.nodes.set('drums', { worklet, gain, reverbSend });
+        console.log('[AudioEngine] Drum channel created.');
     }
     
     private async loadReverbImpulse() {
@@ -463,8 +473,10 @@ export class AudioEngine {
     public playDrumSample(sampleName: string, volume: number = 1.0) {
         const drumNode = this.nodes.get('drums');
         if (!drumNode) {
+            console.error('[AudioEngine] ERROR: Drum node not found when trying to play sample.');
             return;
         }
+        console.log(`[AudioEngine] Playing drum sample: ${sampleName} at volume ${volume}`);
         const message: DrumWorkerMessage = { type: 'playSample', sampleName, volume };
         drumNode.worklet.port.postMessage(message);
     }
