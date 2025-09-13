@@ -10,8 +10,8 @@
 }
 
 .plane {
-  width: 120px;
-  height: 120px;
+  width: 300px;
+  height: 300px;
   transform-style: preserve-3d;
 }
 
@@ -27,8 +27,8 @@
 }
 
 .circle {
-  width: 120px;
-  height: 120px;
+  width: 300px;
+  height: 300px;
   position: absolute;
   transform-style: preserve-3d;
   border-radius: 100%;
@@ -55,11 +55,11 @@
 }
 
 .circle::before {
-  transform: translateZ(-90px);
+  transform: translateZ(-225px);
 }
 
 .circle::after {
-  transform: translateZ(90px);
+  transform: translateZ(225px);
 }
 
 .circle:nth-child(1) { transform: rotateZ(calc(1 / 6 * 360deg)) rotateX(63.435deg); }
@@ -114,5 +114,3 @@
         transform: rotate(360deg);
     }
 }
-
-    
