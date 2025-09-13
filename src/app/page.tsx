@@ -79,18 +79,11 @@ export default function Home() {
         }
     }, [isReady, activeMelodyInstrument, setMelodyInstrument]);
 
-    const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
-        setActiveBassInstrument(instrumentId);
-        if (audioEngine) {
-            audioEngine.setBassInstrument(instrumentId);
-        }
-    }, [audioEngine]);
-
     useEffect(() => {
         if (isReady && activeBassInstrument) {
-            handleSetBassInstrument(activeBassInstrument);
+            setBassInstrument(activeBassInstrument);
         }
-    }, [isReady, activeBassInstrument, handleSetBassInstrument]);
+    }, [isReady, activeBassInstrument, setBassInstrument]);
     
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         const isKey = (k: string): k is MusicKey => Object.keys(ALL_NOTES).includes(k);
@@ -159,6 +152,13 @@ export default function Home() {
         setMelodyInstrument(instrumentId);
     }, [setMelodyInstrument]);
     
+     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
+        setActiveBassInstrument(instrumentId);
+        if (audioEngine) {
+            audioEngine.setBassInstrument(instrumentId);
+        }
+    }, [audioEngine]);
+
     const handleThereminInteractionCallback = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isReady || !audioEngine) return;
         handleThereminInteraction(type, data, state);
@@ -191,7 +191,7 @@ export default function Home() {
                         <p className="text-sm md:text-base text-white/80 font-light mt-2 tracking-wide">Neuro Meditation Processor</p>
                     </div>
                     <div className="relative flex-grow flex items-center justify-center w-full">
-                      <OrbitalAnimation />
+                      <MemoizedOrbitalAnimation />
                     </div>
                     <Button size="lg" onClick={handleStartApp}>
                         Start Meditation
