@@ -26,8 +26,9 @@ const Preloader = () => (
     <div className="absolute inset-0 bg-background flex items-center justify-center z-50">
         <div className="text-center text-white">
             <div className='preloader'>
-                <div><div><div><div><div></div></div></div></div></div>
+                <div></div><div></div><div></div><div></div>
             </div>
+            <p className="text-lg animate-pulse mt-4">Loading Audio Engine...</p>
         </div>
     </div>
 );
@@ -80,10 +81,10 @@ export default function Home() {
 
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
-        if (isReady) {
-            setBassInstrument(instrumentId);
+        if (audioEngine) {
+            audioEngine.setBassInstrument(instrumentId);
         }
-    }, [setBassInstrument, isReady]);
+    }, [audioEngine]);
 
     useEffect(() => {
         if (isReady && activeBassInstrument) {
@@ -146,6 +147,8 @@ export default function Home() {
         setBeatPattern(pattern.name);
     }, [setBeatPattern]);
 
+
+
     const handleLatchToggle = useCallback((isOn: boolean) => {
         setIsBassLatchOn(isOn);
         setBassLatch(isOn);
@@ -182,13 +185,13 @@ export default function Home() {
                 <div className="absolute top-4 right-4 z-20">
                     <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
                 </div>
-                <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
+                <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full max-w-lg mx-auto">
                     <div>
                         <h1 className="text-4xl md:text-5xl font-bold text-primary">EtherMusic</h1>
                         <p className="text-sm md:text-base text-white/80 font-light mt-2 tracking-wide">Neuro Meditation Processor</p>
                     </div>
-                    <div className="flex-grow flex items-center justify-center">
-                        <OrbitalAnimation />
+                    <div className="relative flex-grow flex items-center justify-center w-full">
+                      <OrbitalAnimation />
                     </div>
                     <Button size="lg" onClick={handleStartApp}>
                         Start Meditation
@@ -295,3 +298,4 @@ export default function Home() {
     );
 }
 
+    

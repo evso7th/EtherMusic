@@ -5,13 +5,13 @@
   left: 0;
   right: 0;
   bottom: 0;
-  perspective: 800px;
+  perspective: 400px;
   overflow: hidden;
 }
 
 .plane {
-  width: 240px;
-  height: 240px;
+  width: 120px;
+  height: 120px;
   transform-style: preserve-3d;
   position: absolute;
   top: 0;
@@ -24,22 +24,14 @@
 }
 
 .circle {
-  width: 240px;
-  height: 240px;
+  width: 120px;
+  height: 120px;
   position: absolute;
   transform-style: preserve-3d;
   border-radius: 100%;
   box-sizing: border-box;
-  box-shadow: 0 0 120px hsl(var(--primary)), inset 0 0 120px hsl(var(--primary));
-  /* Base animation state */
-  transform: scale(1);
-  transition: transform 0.1s ease-out;
+  box-shadow: 0 0 60px hsl(var(--primary)), inset 0 0 60px hsl(var(--primary));
 }
-
-.circle.pulsating {
-  animation: pulse 2s infinite ease-in-out;
-}
-
 
 .circle::before,
 .circle::after {
@@ -56,15 +48,15 @@
   border-radius: 100%;
   background: hsl(var(--primary));
   box-sizing: border-box;
-  box-shadow: 0 0 120px 4px hsl(var(--primary));
+  box-shadow: 0 0 60px 2px hsl(var(--primary));
 }
 
 .circle::before {
-  transform: translateZ(-180px);
+  transform: translateZ(-90px);
 }
 
 .circle::after {
-  transform: translateZ(180px);
+  transform: translateZ(90px);
 }
 
 .circle:nth-child(1) {
@@ -85,20 +77,10 @@
 
 @keyframes rotate {
   0% {
-    transform: rotateX(0) rotateY(0) rotateZ(0);
+    transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg);
   }
   100% {
     transform: rotateX(360deg) rotateY(360deg) rotateZ(360deg);
-  }
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 120px hsl(var(--primary)), inset 0 0 120px hsl(var(--primary));
-  }
-  50% {
-    box-shadow: 0 0 140px 10px hsl(var(--primary)), inset 0 0 140px 10px hsl(var(--primary));
   }
 }
 
@@ -137,3 +119,5 @@
         transform: rotate(360deg);
     }
 }
+
+    
