@@ -189,7 +189,7 @@ export default function Home() {
                     <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
                 </div>
                  <div className="z-10 text-center flex-grow flex flex-col items-center justify-center py-16 w-full">
-                    <MemoizedOrbitalAnimation />
+                    <OrbitalAnimation />
                     <div className="mt-8">
                         <h1 className="text-4xl md:text-5xl font-bold text-primary">EtherMusic</h1>
                         <p className="text-sm md:text-base text-white/80 font-light mt-2 tracking-wide">Neuro Meditation Processor</p>
