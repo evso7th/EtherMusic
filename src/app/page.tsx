@@ -34,8 +34,8 @@ const Preloader = () => (
                             <rect x="0" y="50" width="100" height="100" />
                         </clipPath>
                          <linearGradient id="gradient">
-                            <stop offset="0" stop-color="hsl(var(--primary))"></stop>
-                            <stop offset="100%" stop-color="hsl(var(--primary))" stop-opacity="0"></stop>
+                            <stop offset="0" stopColor="hsl(var(--primary))"></stop>
+                            <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0"></stop>
                         </linearGradient>
                     </defs>
                     <circle
@@ -52,8 +52,8 @@ const Preloader = () => (
                             <rect x="0" y="50" width="100" height="100" />
                         </clipPath>
                         <linearGradient id="gradient2">
-                            <stop offset="0" stop-color="hsl(var(--accent))"></stop>
-                            <stop offset="100%" stop-color="hsl(var(--accent))" stop-opacity="0"></stop>
+                            <stop offset="0" stopColor="hsl(var(--accent))"></stop>
+                            <stop offset="100%" stopColor="hsl(var(--accent))" stopOpacity="0"></stop>
                         </linearGradient>
                     </defs>
                     <circle
@@ -70,8 +70,8 @@ const Preloader = () => (
                             <rect x="0" y="50" width="100" height="100" />
                         </clipPath>
                          <linearGradient id="gradient3">
-                            <stop offset="0" stop-color="hsl(var(--primary))"></stop>
-                            <stop offset="100%" stop-color="hsl(var(--primary))" stop-opacity="0"></stop>
+                            <stop offset="0" stopColor="hsl(var(--primary))"></stop>
+                            <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0"></stop>
                         </linearGradient>
                     </defs>
                     <circle
