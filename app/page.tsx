@@ -5,7 +5,6 @@ import { useState, useEffect, useCallback, memo } from 'react';
 import { Button } from "@/components/ui/button";
 import { BeatBoxControls } from '@/components/beat-box-controls';
 import { useToast } from "@/hooks/use-toast";
-import { OrbitalAnimation } from '@/components/orbital-animation';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PlaybackControls } from '@/components/playback-controls';
 import { ArrowRight } from 'lucide-react';
@@ -20,14 +19,11 @@ import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, BeatPat
 import { cn } from '@/lib/utils';
 import { ThereminPads } from '@/components/theremin-pads';
 
-const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
 
 const Preloader = () => (
     <div className="absolute inset-0 bg-background flex items-center justify-center z-50">
         <div className="text-center text-white">
-            <div className='preloader'>
-                <div><div><div><div><div></div></div></div></div></div>
-            </div>
+            <p className="text-lg animate-pulse">Loading Audio Engine...</p>
         </div>
     </div>
 );
@@ -42,7 +38,6 @@ export default function Home() {
         isReady,
         isPlaying,
         audioEngine,
-        orbManager,
         startApp,
         stopAllSounds,
         setBeatPattern,
@@ -52,13 +47,14 @@ export default function Home() {
         handleThereminInteraction,
         setMelodyInstrument,
         setBassInstrument,
+        orbManager,
         volumes,
         setVolumes,
         currentTempo,
     } = useAudioEngine();
     
     const [isRecording, setIsRecording] = useState(false);
-    const [activePattern, setActivePattern] = useState<BeatPattern>(beatPatterns.find(p => p.name === 'Off')!);
+    const [activePattern, setActivePattern] = useState<BeatPattern>(() => beatPatterns.find(p => p.name === 'Off')!);
     const [musicKey, setMusicKey] = useState<MusicKey>('G');
     const [musicScale, setMusicScale] = useState<MusicScale>('Minor');
     const [allowedFrequencies, setAllowedFrequencies] = useState<{melody: number[], bass: number[]}>({melody: [], bass: []});
@@ -72,18 +68,24 @@ export default function Home() {
         setIsClient(true);
     }, []);
 
-    const handleSetMelodyInstrument = useCallback((instrumentId: Instrument) => {
-        setActiveMelodyInstrument(instrumentId);
-        setMelodyInstrument(instrumentId);
-    }, [setMelodyInstrument]);
+    useEffect(() => {
+        if (isReady && activeMelodyInstrument) {
+            setMelodyInstrument(activeMelodyInstrument);
+        }
+    }, [isReady, activeMelodyInstrument, setMelodyInstrument]);
 
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
-        const newVolumes = setBassInstrument(instrumentId);
-        if (newVolumes) {
-            setVolumes(newVolumes);
+        if (isReady) {
+            setBassInstrument(instrumentId);
         }
-    }, [setBassInstrument, setVolumes]);
+    }, [setBassInstrument, isReady]);
+
+    useEffect(() => {
+        if (isReady && activeBassInstrument) {
+            handleSetBassInstrument(activeBassInstrument);
+        }
+    }, [isReady, activeBassInstrument, handleSetBassInstrument]);
     
     const handleHarmonyChange = useCallback((keyOrScale: MusicKey | MusicScale) => {
         const isKey = (k: string): k is MusicKey => Object.keys(ALL_NOTES).includes(k);
@@ -116,9 +118,6 @@ export default function Home() {
             const targetChannelKey = channel === 'bass' ? 'manualBass' : 'melody';
             
             newVolumes[targetChannelKey][effect] = value;
-            if (channel === 'bass') {
-                newVolumes.latch[effect] = value;
-            }
             return newVolumes;
         });
     }, [setVolumes]);
@@ -148,10 +147,15 @@ export default function Home() {
         setBassLatch(isOn);
     }, [setBassLatch]);
     
+    const handleMelodyInstrumentChange = useCallback((instrumentId: Instrument) => {
+        setActiveMelodyInstrument(instrumentId);
+        setMelodyInstrument(instrumentId);
+    }, [setMelodyInstrument]);
+    
     const handleThereminInteractionCallback = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
-        if (!isReady) return;
+        if (!isReady || !audioEngine) return;
         handleThereminInteraction(type, data, state);
-    }, [isReady, handleThereminInteraction]);
+    }, [isReady, audioEngine, handleThereminInteraction]);
 
     const handlePlayPause = useCallback(() => {
         if (!audioEngine) return;
@@ -163,7 +167,11 @@ export default function Home() {
     }, [audioEngine, isPlaying]);
 
     if (!isClient) {
-        return <Preloader />;
+        return (
+             <div className="absolute inset-0 bg-background flex items-center justify-center z-50">
+                <p className="text-lg">Loading...</p>
+            </div>
+        );
     }
 
     if (!isAppStarted) {
@@ -173,9 +181,6 @@ export default function Home() {
             >
                 <div className="absolute top-4 right-4 z-20">
                     <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
-                </div>
-                <div className={cn("absolute inset-0 z-0 transition-opacity duration-1000", 'opacity-30')}>
-                     <MemoizedOrbitalAnimation isPlaying={false} tempo={defaultVolumes.tempo}/>
                 </div>
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
@@ -201,11 +206,7 @@ export default function Home() {
     }
     
     return (
-        <div className="relative flex flex-col h-screen overflow-hidden">
-            <div className="fixed inset-0 z-0">
-                 <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={currentTempo} />
-            </div>
-            
+        <div className="relative flex flex-col h-screen overflow-hidden bg-background">
              <div className="relative z-10 flex h-full portrait:flex-col portrait:p-2 md:p-6 lg:p-8 landscape:flex-row landscape:p-1 landscape:gap-1">
                 <header className="flex-shrink-0 portrait:flex portrait:items-center portrait:justify-between portrait:mb-2 landscape:flex landscape:flex-col landscape:items-center landscape:justify-center landscape:w-16 landscape:gap-4">
                      <div className="portrait:block landscape:hidden">
@@ -259,7 +260,7 @@ export default function Home() {
                         volumes={volumes}
                         onEffectChange={handleChannelEffectChange}
                         activeMelodyInstrument={activeMelodyInstrument}
-                        onMelodyInstrumentChange={handleSetMelodyInstrument}
+                        onMelodyInstrumentChange={handleMelodyInstrumentChange}
                         musicKey={musicKey}
                         onKeyChange={handleHarmonyChange}
                         musicScale={musicScale}
@@ -291,3 +292,6 @@ export default function Home() {
     );
 }
 
+    
+
+    
