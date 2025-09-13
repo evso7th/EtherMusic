@@ -214,6 +214,8 @@ export class AudioEngine {
         await this.loadReverbImpulse();
         
         await this.loadDrumSamples();
+        
+        this.drumMachine.initialize(this.volumes.tempo, this.volumes.swing);
                 
         this.isInitialized = true;
         console.log('[AudioEngine] Initialization complete.');
@@ -271,9 +273,6 @@ export class AudioEngine {
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                  console.error('[DRUM WORKLET ERROR]', e.data.message);
-            }
-            if (e.data.type === 'debug') {
-                 console.log('[DRUM WORKLET DEBUG]', e.data.payload);
             }
         };
         
@@ -469,12 +468,15 @@ export class AudioEngine {
     }
     
     public playDrumSample(sampleName: string, volume: number = 1.0) {
+        console.log(`[AudioEngine] playDrumSample called: ${sampleName}`);
         const drumNode = this.nodes.get('drums');
         if (!drumNode) {
+            console.error('[AudioEngine] Drum node not found.');
             return;
         }
         const message: DrumWorkerMessage = { type: 'playSample', sampleName, volume };
         drumNode.worklet.port.postMessage(message);
+        console.log('[AudioEngine] Posted playSample message to drum worklet.');
     }
     
     private async loadDrumSamples(): Promise<void> {

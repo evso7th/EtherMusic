@@ -95,7 +95,6 @@ export interface CompressorSettings {
 export interface Volumes {
   melody: ChannelVolumes;
   manualBass: ChannelVolumes;
-  latch: ChannelVolumes;
   drums: ChannelVolumes;
   reverbReturn: number; // in dB
   compressor: CompressorSettings;
@@ -121,7 +120,8 @@ export type WorkerMessage =
 
 export type DrumWorkerMessage =
     | { type: 'loadSample'; name: string; buffer: ArrayBuffer; }
-    | { type: 'playSample'; sampleName: string; volume?: number; };
+    | { type: 'playSample'; sampleName: string; volume?: number; }
+    | { type: 'error', message: string };
 
 
 export type EnvelopeCurve = "linear" | "exponential";
@@ -152,5 +152,7 @@ export interface AutopilotSettings {
 
 export type AudioEngineEvents = {
     playStateChanged: boolean;
-    volumesChanged: Volumes;
+    volumesChanged: Volumes | ((currentVolumes: Volumes) => Volumes);
 };
+
+export type SynthPartName = 'melody' | 'manualBass' | 'latch1' | 'latch2' | 'latch3';

@@ -1,5 +1,4 @@
 
-
 // This script is designed to be loaded into an AudioWorklet.
 // It is responsible for playing back pre-loaded drum samples
 // with low latency and high performance, off the main thread.
@@ -52,11 +51,10 @@ class DrumProcessor extends AudioWorkletProcessor {
         if (type === 'loadSample' && name && buffer instanceof ArrayBuffer) {
             const float32Array = new Float32Array(buffer);
             this.buffers.set(name, float32Array);
-             console.log(`[DrumProcessor] Loaded sample: ${name}, size: ${float32Array.length}`);
         } else if (type === 'playSample' && sampleName) {
+            console.log(`[DrumProcessor] Received playSample: ${sampleName}`);
             const bufferToPlay = this.buffers.get(sampleName);
             if (bufferToPlay) {
-                console.log(`[DrumProcessor] Playing sample: ${sampleName}`);
                 if (this.voices.length >= this.maxVoices) {
                     this.voices.shift();
                 }
@@ -110,7 +108,7 @@ class DrumProcessor extends AudioWorkletProcessor {
     }
 
     if (this.voices.length > 0) {
-         this.port.postMessage({type: 'debug', payload: { voices: this.voices.length, peak: peak }});
+         console.log(`[DrumProcessor] Processing ${this.voices.length} voices. Peak: ${peak.toFixed(2)}`);
     }
     
     return true; // Keep the processor alive.

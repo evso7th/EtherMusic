@@ -62,6 +62,13 @@ export class DrumMachine {
         this._pattern = beatPatterns.find(p => p.name === 'Off')!;
         this.fills = beatPatterns.filter(p => p.type === 'Fill' && p.sequence.length > 0);
     }
+    
+    public initialize(tempo: number, swing: number) {
+        this._tempo = tempo;
+        this._swing = swing;
+        console.log('[DrumMachine] Initialized with tempo and swing.');
+    }
+
 
     public get isPlaying(): boolean {
         return this.timeoutId !== null;
@@ -132,7 +139,6 @@ export class DrumMachine {
 
         currentPattern.sequence.forEach(note => {
             if (note.time === this.step) {
-                console.log(`[DrumMachine] Scheduling note: ${note.note} at step ${this.step}`);
                 this.audioEngine.playDrumSample(note.note, note.vol);
             }
         });

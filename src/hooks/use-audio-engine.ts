@@ -104,11 +104,12 @@ export function useAudioEngine() {
                 }
                 
                 const engine = new AudioEngine(context, emitter);
-                await engine.initialize();
                 
                 const currentVolumes = loadVolumes();
-                engine.setVolumes(currentVolumes, true);
-                setVolumesState(currentVolumes); 
+                setVolumesState(currentVolumes);
+                
+                await engine.initialize(currentVolumes);
+                
                 setCurrentTempo(currentVolumes.tempo);
 
                 audioEngine.current = engine;
