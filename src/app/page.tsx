@@ -178,6 +178,9 @@ export default function Home() {
             <div 
                 className="absolute inset-0 bg-background flex flex-col items-center justify-center z-50 p-4"
             >
+                <div className={cn("absolute inset-0 z-0 transition-opacity duration-1000", 'opacity-30')}>
+                    <MemoizedOrbitalAnimation isPlaying={false} />
+                </div>
                 <div className="absolute top-4 right-4 z-20">
                     <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
                 </div>
@@ -189,9 +192,6 @@ export default function Home() {
                     </div>
 
                     <div className="relative flex-grow flex items-center justify-center w-full">
-                         <div className={cn("absolute inset-0 z-0 transition-opacity duration-1000", 'opacity-30')}>
-                             <MemoizedOrbitalAnimation isPlaying={false} />
-                        </div>
                     </div>
 
                     <Button size="lg" onClick={handleStartApp}>
@@ -218,7 +218,7 @@ export default function Home() {
                  <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={currentTempo} />
             </div>
             
-             <div className="relative z-10 flex h-full portrait:flex-col portrait:p-2 md:p-6 lg:p-8 landscape:flex-row landscape:p-1 landscape:gap-1">
+             <div className="relative z-10 flex h-full portrait:flex-col portrait:p-2 md:p-6 lg:p-8 landscape:flex-row landscape:gap-1">
                 <header className="flex-shrink-0 portrait:flex portrait:items-center portrait:justify-between portrait:mb-2 landscape:flex landscape:flex-col landscape:items-center landscape:justify-center landscape:w-16 landscape:gap-4">
                      <div className="portrait:block landscape:hidden">
                         {isMobile ? (
