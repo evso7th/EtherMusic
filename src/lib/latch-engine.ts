@@ -5,7 +5,7 @@ import type { Note } from '@/types';
 import type { OrbManager } from './orb-manager';
 
 const MAX_LATCH_NOTES = 3;
-const TAP_RADIUS = 30; // Reduced radius for more precise tapping
+const TAP_RADIUS = 30;
 const TAP_RADIUS_SQUARED = TAP_RADIUS * TAP_RADIUS;
 
 export type LatchToggleResult = {
@@ -14,6 +14,7 @@ export type LatchToggleResult = {
     noteOff?: Note;
     noteToAnimateAdd?: { id: number; x: number; y: number; };
     noteToAnimateRemove?: { id: number };
+    channelIndex?: number; // The channel that was used or freed
 };
 
 interface TapData {
@@ -25,9 +26,10 @@ interface TapData {
 }
 
 export class LatchEngine {
-    private activeNotes: (Note & { x: number; y: number })[] = [];
+    private activeNotes: (Note & { x: number; y: number; channelIndex: number })[] = [];
     private nextId = 0;
     private orbManager: OrbManager | null = null;
+    private channelPool = [0, 1, 2]; // Pool of available channel indices
 
     public setOrbManager(manager: OrbManager | null) {
         this.orbManager = manager;
@@ -52,48 +54,66 @@ export class LatchEngine {
         if (existingNoteIndex > -1) {
             // Note exists, remove it
             const noteToRemove = this.activeNotes.splice(existingNoteIndex, 1)[0];
-            console.log(`[LatchEngine] Removing existing note. ID: ${noteToRemove.id}, Freq: ${noteToRemove.frequency.toFixed(2)}. Total active: ${this.activeNotes.length}`);
+            this.channelPool.push(noteToRemove.channelIndex); // Return channel to pool
+            this.channelPool.sort(); // Keep it sorted for predictability
+            console.log(`[LatchEngine] Removing note. ID: ${noteToRemove.id}, Freq: ${noteToRemove.frequency.toFixed(2)}, Channel: ${noteToRemove.channelIndex}. Total active: ${this.activeNotes.length}`);
             return {
                 action: 'removed',
                 noteOff: noteToRemove,
-                noteToAnimateRemove: { id: noteToRemove.id }
+                noteToAnimateRemove: { id: noteToRemove.id },
+                channelIndex: noteToRemove.channelIndex,
             };
         }
         
         // Note doesn't exist, add it
-        let noteToTurnOff: Note | undefined;
+        let noteToTurnOff: Note & { channelIndex: number } | undefined;
         let noteToAnimateRemove: { id: number } | undefined;
+        let channelToUse: number;
 
         if (this.activeNotes.length >= MAX_LATCH_NOTES) {
             // If we are at the limit, remove the oldest note
             noteToTurnOff = this.activeNotes.shift(); 
             if (noteToTurnOff) {
                 noteToAnimateRemove = { id: noteToTurnOff.id };
-                console.log(`[LatchEngine] Max notes reached. Removing oldest note. ID: ${noteToTurnOff.id}`);
+                channelToUse = noteToTurnOff.channelIndex; // Reuse the channel
+                console.log(`[LatchEngine] Max notes reached. Removing oldest note ID: ${noteToTurnOff.id} on channel ${channelToUse}`);
+            } else {
+                 // This case should not happen if logic is correct
+                console.error("[LatchEngine] Error: Note limit reached but no note to turn off.");
+                return { action: 'none' };
+            }
+        } else {
+            // Use a free channel from the pool
+            channelToUse = this.channelPool.shift()!;
+            if(channelToUse === undefined) {
+                 console.error("[LatchEngine] Error: No available channels in pool.");
+                 return { action: 'none' };
             }
         }
         
         const id = this.nextId++;
-        const newNote: Note & { x: number; y: number } = { id, frequency, volume, x, y };
+        const newNote = { id, frequency, volume, x, y, channelIndex: channelToUse };
         this.activeNotes.push(newNote);
 
-        console.log(`[LatchEngine] Adding new note. ID: ${newNote.id}, Freq: ${newNote.frequency.toFixed(2)}. Total active: ${this.activeNotes.length}`);
+        console.log(`[LatchEngine] Adding new note. ID: ${newNote.id}, Freq: ${newNote.frequency.toFixed(2)}, Channel: ${channelToUse}. Total active: ${this.activeNotes.length}`);
 
         const result: LatchToggleResult = {
             action: 'added',
             noteOn: newNote,
             noteOff: noteToTurnOff,
             noteToAnimateAdd: { id: newNote.id, x, y },
-            noteToAnimateRemove: noteToAnimateRemove
+            noteToAnimateRemove: noteToAnimateRemove,
+            channelIndex: channelToUse
         };
         
         return result;
     }
     
-    public clear(): Note[] {
+    public clear(): (Note & { channelIndex: number })[] {
         const notesToTurnOff = [...this.activeNotes];
         console.log(`[LatchEngine] Clearing all ${notesToTurnOff.length} active notes.`);
         this.activeNotes = [];
+        this.channelPool = [0, 1, 2]; // Reset channel pool
         return notesToTurnOff;
     }
 

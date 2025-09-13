@@ -159,3 +159,4 @@ export type AudioEngineEvents = {
     volumesChanged: Volumes | ((currentVolumes: Volumes) => Volumes);
 };
 
+export type SynthPartName = 'melody' | 'manualBass' | 'latch1' | 'latch2' | 'latch3';

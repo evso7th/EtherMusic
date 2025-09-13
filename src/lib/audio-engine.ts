@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Volumes, Instrument, BassInstrument, CompressorSettings, BassInstrumentPresetParams, ChannelVolumes, SynthNote, WorkerMessage, DrumWorkerMessage, AudioEngineEvents } from '@/types';
+import type { Volumes, Instrument, BassInstrument, CompressorSettings, BassInstrumentPresetParams, ChannelVolumes, SynthNote, WorkerMessage, DrumWorkerMessage, AudioEngineEvents, SynthPartName } from '@/types';
 import { OrbManager } from './orb-manager';
 import { LatchEngine, type LatchToggleResult } from './latch-engine';
 import { melodyInstruments } from './melody-presets';
@@ -29,8 +29,6 @@ function createDistortionCurve(amount: number): Float32Array {
     }
     return curve;
 }
-
-type SynthPartName = 'melody' | 'manualBass' | 'latch';
 
 const DRUM_SAMPLES: Record<string, string> = {
     'k': '/assets/sounds/drums/kick_drum.wav',
@@ -188,7 +186,11 @@ export class AudioEngine {
         
         this.createSynthChannel('melody', 10);
         this.createSynthChannel('manualBass', 4);
-        this.createSynthChannel('latch', 4);
+        
+        // Create three monophonic latch channels
+        this.createSynthChannel('latch1', 1);
+        this.createSynthChannel('latch2', 1);
+        this.createSynthChannel('latch3', 1);
         
         this.createDrumChannel();
         
@@ -294,9 +296,7 @@ export class AudioEngine {
     public handleThereminInteraction(type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') {
         if (!this.isInitialized || !this.orbManager) return;
         
-        const partName = type === 'bass' ? (this.isBassLatchOn ? 'latch' : 'manualBass') : 'melody';
-        
-        if (partName === 'latch') {
+        if (type === 'bass' && this.isBassLatchOn) {
             if (state === 'down' && data) { 
                  const result = this.latchEngine.toggleNote(data);
                  this.processLatchResult(result);
@@ -304,6 +304,7 @@ export class AudioEngine {
             return;
         }
 
+        const partName = type === 'melody' ? 'melody' : 'manualBass';
         const nodeInfo = this.nodes.get(partName);
         if (!nodeInfo) return;
 
@@ -348,8 +349,15 @@ export class AudioEngine {
     }
 
      private processLatchResult(result: LatchToggleResult) {
-        const latchNode = this.nodes.get('latch');
-        if (!latchNode || !this.orbManager) return;
+        if (!this.orbManager || result.channelIndex === undefined) return;
+        
+        const channelName = `latch${result.channelIndex + 1}` as SynthPartName;
+        const latchNode = this.nodes.get(channelName);
+
+        if (!latchNode) {
+            console.error(`[AudioEngine] Latch channel ${channelName} not found.`);
+            return;
+        }
         
         if (result.noteOff) {
             const message: WorkerMessage = { type: 'noteOff', id: result.noteOff.id };
@@ -375,13 +383,14 @@ export class AudioEngine {
         
         if (!isOn) {
             const notesToTurnOff = this.latchEngine.clear();
-            const latchNode = this.nodes.get('latch')?.worklet;
-            if (latchNode && notesToTurnOff.length > 0) {
-                notesToTurnOff.forEach(note => {
+            notesToTurnOff.forEach(note => {
+                const channelName = `latch${note.channelIndex + 1}` as SynthPartName;
+                const latchNode = this.nodes.get(channelName)?.worklet;
+                 if (latchNode) {
                     latchNode.port.postMessage({ type: 'noteOff', id: note.id });
                     this.orbManager?.removeOrb(note.id);
-                });
-            }
+                 }
+            });
         }
     }
     
@@ -400,7 +409,9 @@ export class AudioEngine {
             const message: WorkerMessage = { type: 'setPreset', preset: bassPresetParams };
             
             this.nodes.get('manualBass')?.worklet.port.postMessage(message);
-            this.nodes.get('latch')?.worklet.port.postMessage(message);
+            this.nodes.get('latch1')?.worklet.port.postMessage(message);
+            this.nodes.get('latch2')?.worklet.port.postMessage(message);
+            this.nodes.get('latch3')?.worklet.port.postMessage(message);
             
             this.emitter.emit('volumesChanged', (v) => {
                 const newVolumes = JSON.parse(JSON.stringify(v));
@@ -472,7 +483,14 @@ export class AudioEngine {
         console.log('[AudioEngine] All drum samples sent to worklet.');
     }
 
-    private applyChannelSettings(partName: SynthPartName | 'drums', volumes: ChannelVolumes) {
+    private applyChannelSettings(partName: SynthPartName | 'drums' | 'latch', volumes: ChannelVolumes) {
+        if (partName === 'latch') {
+            this.applyChannelSettings('latch1', volumes);
+            this.applyChannelSettings('latch2', volumes);
+            this.applyChannelSettings('latch3', volumes);
+            return;
+        }
+        
         const nodeInfo = this.nodes.get(partName);
         if (nodeInfo && volumes) {
             nodeInfo.gain.gain.setTargetAtTime(dbToGain(volumes.gain), this.context.currentTime, 0.01);
