@@ -108,7 +108,6 @@ export class DrumMachine {
         this.step = 0; 
         this.measureCount = 0;
         this.onPlayStateChange(true);
-        console.log('[DrumMachine] Play started.');
         this.scheduler();
     }
     
@@ -119,7 +118,6 @@ export class DrumMachine {
             this.step = 0;
             this.measureCount = 0;
             this.onPlayStateChange(false);
-            console.log('[DrumMachine] Play stopped.');
         }
     }
 

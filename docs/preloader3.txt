@@ -1,0 +1,68 @@
+HTML
+<div class="preloader-container">
+  <svg class="preloader" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 340">
+         <circle class="preloader__circle preloader__circle--one" cx="170" cy="170" r="160" stroke="#E2007C"/>
+         <circle class="preloader__circle preloader__circle--two" cx="170" cy="170" r="135" stroke="#404041"/>
+         <circle class="preloader__circle preloader__circle--three" cx="170" cy="170" r="110" stroke="#E2007C"/>
+         <circle class="preloader__circle preloader__circle--four" cx="170" cy="170" r="85" stroke="#404041"/>
+    </svg>
+  
+</div>
+
+CSS (SCSS)
+$preloader-width: 244px;
+$preloader-height: 244px;
+
+@keyframes preloader {
+
+  50% {
+    transform: rotate(360deg);
+  }
+  
+}
+
+.preloader-container {
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  min-height:100vh;
+}
+
+.preloader {
+  max-width:$preloader-width;
+  max-height:$preloader-height;
+  fill:none;
+  stroke-width:3;
+  
+  &__circle {
+    
+    transform-origin:170px 170px;
+    animation-name: preloader;
+    animation-iteration-count: infinite;
+    animation-duration: 5s;
+    animation-timing-function: ease-in-out;
+    
+    &--one {
+      animation-delay:-1s;
+      stroke-dasharray: 550;
+    }
+    
+    &--two {
+      animation-delay:-2s;
+      stroke-dasharray: 500;
+    }
+    
+    &--three {
+      animation-delay:-3s;
+      stroke-dasharray: 450;
+    }
+    
+    &--four {
+      animation-delay:-4s;
+      stroke-dasharray: 300;
+    }
+    
+  }
+  
+}
+

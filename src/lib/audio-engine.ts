@@ -256,19 +256,17 @@ export class AudioEngine {
     
     private createDrumChannel() {
         if (!this.context) return;
-        console.log('[AudioEngine] Creating drum channel...');
+        
         const worklet = new AudioWorkletNode(this.context, 'drum-processor');
         const gain = this.context.createGain();
         const reverbSend = this.context.createGain();
 
         worklet.connect(gain);
-        console.log('[AudioEngine] Drum Worklet connected to GainNode.');
         
         gain.connect(this.preCompressorOut);
         console.log('[AudioEngine] Drum GainNode connected to preCompressorOut.');
 
         gain.connect(reverbSend).connect(this.reverbSend);
-        console.log('[AudioEngine] Drum GainNode also connected to Reverb Send.');
         
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
@@ -473,10 +471,8 @@ export class AudioEngine {
     public playDrumSample(sampleName: string, volume: number = 1.0) {
         const drumNode = this.nodes.get('drums');
         if (!drumNode) {
-            console.error('[AudioEngine] ERROR: Drum node not found when trying to play sample.');
             return;
         }
-        console.log(`[AudioEngine] Playing drum sample: ${sampleName} at volume ${volume}`);
         const message: DrumWorkerMessage = { type: 'playSample', sampleName, volume };
         drumNode.worklet.port.postMessage(message);
     }
@@ -497,8 +493,6 @@ export class AudioEngine {
                 const arrayBuffer = await response.arrayBuffer();
                 const audioBuffer = await this.context.decodeAudioData(arrayBuffer.slice(0)); 
                 
-                // For simplicity, we'll just use the left channel if it's stereo.
-                // For mono samples, this will be the only channel.
                 const channelData = audioBuffer.getChannelData(0);
                 const message: DrumWorkerMessage = {
                     type: 'loadSample',
@@ -520,7 +514,6 @@ export class AudioEngine {
             nodeInfo.gain.gain.setTargetAtTime(dbToGain(volumes.gain), this.context.currentTime, 0.01);
             nodeInfo.reverbSend.gain.setTargetAtTime(dbToGain(volumes.reverbSend), this.context.currentTime, 0.01);
             if (nodeInfo.distortion) {
-                // Ensure curve is not set for 0 distortion to avoid issues.
                 const curve = volumes.distortion > 0 ? createDistortionCurve(volumes.distortion) : null;
                 nodeInfo.distortion.curve = curve;
             }
@@ -535,7 +528,6 @@ export class AudioEngine {
 
             this.applyChannelSettings('melody', newVolumes.melody);
             this.applyChannelSettings('manualBass', newVolumes.manualBass);
-            // Apply the 'manualBass' settings to all latch channels
             this.applyChannelSettings('latch1', newVolumes.manualBass);
             this.applyChannelSettings('latch2', newVolumes.manualBass);
             this.applyChannelSettings('latch3', newVolumes.manualBass);
@@ -579,13 +571,11 @@ export class AudioEngine {
         if (!this.mediaRecorder || this.mediaRecorder.state === 'recording') return;
         this.recordedChunks = [];
         this.mediaRecorder.start();
-        console.log('[AudioEngine] Recording started.');
     }
     
     public stopRecording() {
         if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
             this.mediaRecorder.stop();
-            console.log('[AudioEngine] Recording stopped.');
         }
     }
 }

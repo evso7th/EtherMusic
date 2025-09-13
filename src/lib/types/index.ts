@@ -1,5 +1,4 @@
 
-
 import type { Emitter } from "mitt";
 
 // UI Component Props
@@ -7,7 +6,7 @@ export type MusicKey = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' |
 
 export type MusicScale = 'Major' | 'Minor' | 'Major Pentatonic' | 'Minor Pentatonic';
 
-export type Instrument = 'synth' | 'organ' | 'theremin' | 'mellotron';
+export type Instrument = 'synth' | 'organ' | 'mellotron' | 'theremin';
 export type BassInstrument = 'classicBass' | 'organ' | 'mellotron' | 'synth' | 'ambientDrone' | 'hypnoticDrone';
 
 // These presets are sent to the AudioWorklet, so they must contain only serializable data.

@@ -79,38 +79,33 @@
   }
 }
 
-.preloader {
-    display: inline-block;
-    position: relative;
-    width: 80px;
-    height: 80px;
+.preloader-container {
+  height: 100px;
+  position: relative;
+  width: 100px;
 }
-.preloader div {
-    box-sizing: border-box;
-    display: block;
-    position: absolute;
-    width: 64px;
-    height: 64px;
-    margin: 8px;
-    border: 8px solid hsl(var(--primary));
-    border-radius: 50%;
-    animation: preloader 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
-    border-color: hsl(var(--primary)) transparent transparent transparent;
+.preloader-container .preloader-svg {
+  animation: spin 3s infinite linear;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
 }
-.preloader div:nth-child(1) {
-    animation-delay: -0.45s;
+.preloader-container .preloader-svg.svg-two {
+  animation-duration: 2.5s;
 }
-.preloader div:nth-child(2) {
-    animation-delay: -0.3s;
+.preloader-container .preloader-svg.svg-three {
+  animation-duration: 2s;
 }
-.preloader div:nth-child(3) {
-    animation-delay: -0.15s;
+.preloader-container .preloader-svg circle {
+  stroke-dasharray: 0 15;
+  stroke-linecap: round;
+  stroke-width: 4;
 }
-@keyframes preloader {
-    0% {
-        transform: rotate(0deg);
-    }
-    100% {
-        transform: rotate(360deg);
-    }
+
+@keyframes spin {
+  100% {
+    transform: rotate(360deg);
+  }
 }

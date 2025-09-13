@@ -1,0 +1,79 @@
+HTML
+<div class="container">
+   
+   <div class="spinner rotate1"></div>
+   <div class="spinner rotate2 large"></div>
+   <div class="spinner rotate3 small"></div>
+   
+   
+</div>
+
+CSS
+
+body
+  background: #ccc
+
+.container
+  margin-left: 50px
+  margin-right: 50px
+  background: white
+  box-shadow: 2.5px 2.5px 20px 5px rgba(176,176,176,1)
+  margin-top: 50px
+  padding: 100px
+  max-height: 250px
+
+.spinner
+  width: 100px
+  height: 100px
+  position: relative
+  border-radius: 50%
+  margin: 50px auto
+
+  &:after, &:before
+    content: ''
+    display: block
+    width: 100%
+    height: 100%
+    border-radius: 50%
+
+.rotate1:after
+  position: absolute
+  top: 0px
+  left: 0px
+  border: 5px solid transparent
+  border-top-color: mediumblue
+  border-bottom-color: mediumblue
+  animation: 1s rotate ease-in-out infinite
+
+.rotate2:after
+  position: absolute
+  top: -160px
+  left: 0px
+  border: 5px solid transparent
+  border-top-color: mediumblue
+  border-bottom-color: mediumblue
+  animation: 3s rotate ease-in-out infinite
+
+.rotate3:after
+  position: absolute
+  top: -280px
+  left: 20px
+  border: 10px solid transparent
+  border-top-color: mediumblue
+  border-bottom-color: mediumblue
+  animation: 5s rotate ease-in-out infinite
+
+.large:after
+  width: 125%
+  height: 125%
+  left: -10px
+
+.small:after
+  width: 50%
+  height: 50%
+
+@keyframes rotate
+  0%
+    transform: rotate(0deg)
+  100%
+    transform: rotate(360deg)
