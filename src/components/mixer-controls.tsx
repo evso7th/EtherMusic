@@ -10,7 +10,6 @@ import { useState, useCallback, useEffect, memo } from 'react';
 import type { Volumes, CompressorSettings, ChannelVolumes } from '@/types';
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
-import { defaultVolumes } from "@/hooks/use-audio-engine";
 
 const VolumeControl = memo(({
     label,
@@ -55,53 +54,49 @@ VolumeControl.displayName = 'VolumeControl';
 type VolumeChannel = keyof Omit<Volumes, 'compressor' | 'reverbReturn' | 'swing' | 'tempo' >;
 
 interface MixerControlsProps {
-    volumes: Volumes;
+    initialVolumes: Volumes;
     onApply: (newVolumes: Volumes) => void;
     closeDialog: () => void;
     isAutopilotMixer?: boolean;
 }
 
 export const MixerControls = memo(function MixerControls({ 
-    volumes, 
+    initialVolumes, 
     onApply,
     closeDialog,
     isAutopilotMixer = false,
 }: MixerControlsProps) {
     
-    const [localVolumes, setLocalVolumes] = useState(() => volumes || defaultVolumes);
+    const [localVolumes, setLocalVolumes] = useState(initialVolumes);
 
     useEffect(() => {
-        setLocalVolumes(volumes);
-    }, [volumes]);
+        setLocalVolumes(initialVolumes);
+    }, [initialVolumes]);
+
+    const handleLocalVolumeChange = useCallback((update: Partial<Volumes> | ((v: Volumes) => Partial<Volumes>)) => {
+        setLocalVolumes(current => {
+            const newValues = typeof update === 'function' ? update(current) : update;
+            return { ...current, ...newValues };
+        });
+    }, []);
     
     const handleChannelVolumeChange = useCallback((part: VolumeChannel, value: number) => {
         setLocalVolumes(prev => {
-            const newVolumes = JSON.parse(JSON.stringify(prev)); // Deep copy to be safe
-            const newChannelVolumes = { ...(newVolumes[part] as ChannelVolumes), gain: value };
-            newVolumes[part] = newChannelVolumes;
-            
+            const newVolumes = JSON.parse(JSON.stringify(prev)); // Deep copy
+            (newVolumes[part] as ChannelVolumes).gain = value;
             return newVolumes;
         });
     }, []);
     
     const handleReverbReturnChange = useCallback((value: number) => {
-        setLocalVolumes(prev => ({ ...prev, reverbReturn: value }));
-    }, []);
+        handleLocalVolumeChange({ reverbReturn: value });
+    }, [handleLocalVolumeChange]);
     
     const handleCompressorSettingChange = useCallback((setting: keyof CompressorSettings, value: any) => {
-        setLocalVolumes(prev => ({
-            ...prev,
-            compressor: { ...(prev.compressor || defaultVolumes.compressor), [setting]: value }
+        handleLocalVolumeChange(prev => ({
+            compressor: { ...prev.compressor, [setting]: value }
         }));
-    }, []);
-
-    const handleTempoChange = useCallback((v: number) => {
-        setLocalVolumes(prev => ({...prev, tempo: v}));
-    }, []);
-
-    const handleSwingChange = useCallback((v: number) => {
-        setLocalVolumes(prev => ({...prev, swing: v / 100}));
-    }, []);
+    }, [handleLocalVolumeChange]);
 
     const handleApplyChanges = () => {
         onApply(localVolumes);
@@ -117,7 +112,7 @@ export const MixerControls = memo(function MixerControls({
                             label="Tempo"
                             icon={Clock}
                             volume={localVolumes.tempo}
-                            onVolumeChange={handleTempoChange}
+                            onVolumeChange={(v) => handleLocalVolumeChange({ tempo: v })}
                             min={30}
                             max={200}
                             step={1}
@@ -127,7 +122,7 @@ export const MixerControls = memo(function MixerControls({
                             label="Swing"
                             icon={Shuffle}
                             volume={(localVolumes.swing || 0) * 100}
-                            onVolumeChange={handleSwingChange}
+                            onVolumeChange={(v) => handleLocalVolumeChange({ swing: v / 100 })}
                             min={0}
                             max={75}
                             step={1}
@@ -176,7 +171,7 @@ export const MixerControls = memo(function MixerControls({
                 />
             </div>
 
-            {!isAutopilotMixer && localVolumes.compressor && (
+            {!isAutopilotMixer && (
                 <>
                     <Separator />
                     <div className="space-y-4">
@@ -196,7 +191,7 @@ export const MixerControls = memo(function MixerControls({
                                 label="Threshold"
                                 icon={Waves}
                                 volume={localVolumes.compressor.threshold}
-                                onVolumeChange={(threshold) => handleCompressorSettingChange('threshold', threshold)}
+                                onVolumeChange={(v) => handleCompressorSettingChange('threshold', v)}
                                 min={-100}
                                 max={0}
                                 step={1}
@@ -206,7 +201,7 @@ export const MixerControls = memo(function MixerControls({
                                 label="Ratio"
                                 icon={Waves}
                                 volume={localVolumes.compressor.ratio}
-                                onVolumeChange={(ratio) => handleCompressorSettingChange('ratio', ratio)}
+                                onVolumeChange={(v) => handleCompressorSettingChange('ratio', v)}
                                 min={1}
                                 max={20}
                                 step={1}

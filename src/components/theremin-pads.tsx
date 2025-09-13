@@ -97,5 +97,3 @@ const ThereminPadsComponent = ({
 };
 
 export const ThereminPads = memo(ThereminPadsComponent);
-
-    
