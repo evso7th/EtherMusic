@@ -6,6 +6,13 @@
 console.log('[SynthProcessor] Script loaded.');
 
 
+const softLimiter = (value) => {
+    // A gentle tanh curve for soft clipping. It smoothly compresses peaks
+    // without harsh distortion, preserving the musical quality of the sound.
+    return Math.tanh(value);
+};
+
+
 class Oscillator {
     constructor(type, sampleRate) {
         this.phase = 0;
@@ -223,10 +230,10 @@ class Voice {
             }
         });
         
-        const filteredSample = this.processFilter(mixedSample);
-        const numLayers = Math.max(1, this.layers.length);
+        const limitedSample = softLimiter(mixedSample);
+        const filteredSample = this.processFilter(limitedSample);
         
-        return (filteredSample / numLayers) * this.volume;
+        return (filteredSample / Math.max(1, this.layers.length)) * this.volume;
     }
 
     noteUpdate(frequency, volume) { this.targetFrequency = frequency; this.volume = volume; }
@@ -357,10 +364,11 @@ class SynthProcessor extends AudioWorkletProcessor {
                     }
                 });
                 
-                const limitedSample = Math.max(-1, Math.min(1, sample));
-                outputChannel[i] = limitedSample;
+                // Final safety clip
+                const finalSample = Math.max(-1, Math.min(1, sample));
+                outputChannel[i] = finalSample;
 
-                const absSample = Math.abs(limitedSample);
+                const absSample = Math.abs(finalSample);
                 if (absSample > peak) {
                     peak = absSample;
                 }
@@ -370,9 +378,9 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.lastPeak = Math.max(this.lastPeak, peak);
         this.debugCounter += outputChannel.length;
         if (this.debugCounter > this.sampleRate) { 
-            if (this.voices.size > 0) {
-                 this.port.postMessage({type: 'debug', payload: { voices: this.voices.size, peak: this.lastPeak }});
-            }
+            // if (this.voices.size > 0) {
+            //      this.port.postMessage({type: 'debug', payload: { voices: this.voices.size, peak: this.lastPeak }});
+            // }
             this.debugCounter = 0;
             this.lastPeak = 0;
         }
