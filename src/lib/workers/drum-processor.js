@@ -49,6 +49,7 @@ class DrumProcessor extends AudioWorkletProcessor {
   handleMessage(event) {
     try {
         const { type, name, buffer, sampleName, volume } = event.data;
+        console.log(`[DrumProcessor] Received message: ${type}`, event.data); // DIAGNOSTIC LOG
 
         if (type === 'loadSample' && name && buffer instanceof ArrayBuffer) {
             const float32Array = new Float32Array(buffer);
@@ -60,6 +61,8 @@ class DrumProcessor extends AudioWorkletProcessor {
                     this.voices.shift();
                 }
                 this.voices.push(new Voice(bufferToPlay, volume ?? 1.0));
+            } else {
+                console.warn(`[DrumProcessor] Sample not found: ${sampleName}`); // DIAGNOSTIC LOG
             }
         }
     } catch (e) {
@@ -84,7 +87,10 @@ class DrumProcessor extends AudioWorkletProcessor {
             let sample = 0;
             this.voices.forEach(voice => {
                 if (!voice.isFinished) {
-                    sample += voice.buffer[voice.position + i] * voice.gain;
+                    const voiceSamplePosition = voice.position + i;
+                    if (voiceSamplePosition < voice.buffer.length) {
+                        sample += voice.buffer[voiceSamplePosition] * voice.gain;
+                    }
                 }
             });
             
