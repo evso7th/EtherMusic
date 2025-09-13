@@ -58,7 +58,7 @@ export default function Home() {
     } = useAudioEngine();
     
     const [isRecording, setIsRecording] = useState(false);
-    const [activePattern, setActivePattern] = useState<BeatPattern>(beatPatterns.find(p => p.name === 'Off')!);
+    const [activePattern, setActivePattern] = useState<BeatPattern>(() => beatPatterns.find(p => p.name === 'Off')!);
     const [musicKey, setMusicKey] = useState<MusicKey>('G');
     const [musicScale, setMusicScale] = useState<MusicScale>('Minor');
     const [allowedFrequencies, setAllowedFrequencies] = useState<{melody: number[], bass: number[]}>({melody: [], bass: []});
@@ -277,7 +277,7 @@ export default function Home() {
                         <BeatBoxControls
                             activePattern={activePattern}
                             onPatternChange={handlePatternChange}
-                            initialVolumes={volumes}
+                            volumes={volumes}
                             onApply={handleMixerApply}
                             isMobile={isMobile}
                         />
@@ -288,7 +288,7 @@ export default function Home() {
                      <BeatBoxControls
                         activePattern={activePattern}
                         onPatternChange={handlePatternChange}
-                        initialVolumes={volumes}
+                        volumes={volumes}
                         onApply={handleMixerApply}
                         isMobile={isMobile}
                         isLandscape={true}
@@ -299,3 +299,4 @@ export default function Home() {
     );
 }
 
+    
