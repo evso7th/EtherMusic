@@ -26,8 +26,9 @@ const Preloader = () => (
     <div className="absolute inset-0 bg-background flex items-center justify-center z-50">
         <div className="text-center text-white">
             <div className='preloader'>
-                <div><div><div><div><div></div></div></div></div></div>
+                <div></div><div></div><div></div><div></div>
             </div>
+            <p className="text-lg animate-pulse mt-4">Loading Audio Engine...</p>
         </div>
     </div>
 );
@@ -58,7 +59,7 @@ export default function Home() {
     } = useAudioEngine();
     
     const [isRecording, setIsRecording] = useState(false);
-    const [activePattern, setActivePattern] = useState<BeatPattern>(beatPatterns.find(p => p.name === 'Off')!);
+    const [activePattern, setActivePattern] = useState<BeatPattern>(() => beatPatterns.find(p => p.name === 'Off')!);
     const [musicKey, setMusicKey] = useState<MusicKey>('G');
     const [musicScale, setMusicScale] = useState<MusicScale>('Minor');
     const [allowedFrequencies, setAllowedFrequencies] = useState<{melody: number[], bass: number[]}>({melody: [], bass: []});
@@ -80,13 +81,10 @@ export default function Home() {
 
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
-        if (isReady) {
-            const newVolumes = setBassInstrument(instrumentId);
-            if (newVolumes) {
-                 setVolumes(newVolumes);
-            }
+        if (audioEngine) {
+            audioEngine.setBassInstrument(instrumentId);
         }
-    }, [setBassInstrument, isReady, setVolumes]);
+    }, [audioEngine]);
 
     useEffect(() => {
         if (isReady && activeBassInstrument) {
@@ -125,9 +123,6 @@ export default function Home() {
             const targetChannelKey = channel === 'bass' ? 'manualBass' : 'melody';
             
             newVolumes[targetChannelKey][effect] = value;
-            if (channel === 'bass') {
-                newVolumes.latch[effect] = value;
-            }
             return newVolumes;
         });
     }, [setVolumes]);
@@ -151,6 +146,8 @@ export default function Home() {
         setActivePattern(pattern);
         setBeatPattern(pattern.name);
     }, [setBeatPattern]);
+
+
 
     const handleLatchToggle = useCallback((isOn: boolean) => {
         setIsBassLatchOn(isOn);
@@ -188,13 +185,13 @@ export default function Home() {
                 <div className="absolute top-4 right-4 z-20">
                     <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
                 </div>
-                <div className={cn("absolute inset-0 z-0 transition-opacity duration-1000", 'opacity-30')}>
-                     <MemoizedOrbitalAnimation isPlaying={false} tempo={defaultVolumes.tempo}/>
-                </div>
-                <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
+                <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full max-w-lg mx-auto">
                     <div>
                         <h1 className="text-4xl md:text-5xl font-bold text-primary">EtherMusic</h1>
                         <p className="text-sm md:text-base text-white/80 font-light mt-2 tracking-wide">Neuro Meditation Processor</p>
+                    </div>
+                    <div className="relative flex-grow flex items-center justify-center w-full">
+                      <MemoizedOrbitalAnimation />
                     </div>
                     <Button size="lg" onClick={handleStartApp}>
                         Start Meditation
@@ -215,11 +212,7 @@ export default function Home() {
     }
     
     return (
-        <div className="relative flex flex-col h-screen overflow-hidden">
-            <div className="fixed inset-0 z-0">
-                 <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={currentTempo} />
-            </div>
-            
+        <div className="relative flex flex-col h-screen overflow-hidden bg-background">
              <div className="relative z-10 flex h-full portrait:flex-col portrait:p-2 md:p-6 lg:p-8 landscape:flex-row landscape:p-1 landscape:gap-1">
                 <header className="flex-shrink-0 portrait:flex portrait:items-center portrait:justify-between portrait:mb-2 landscape:flex landscape:flex-col landscape:items-center landscape:justify-center landscape:w-16 landscape:gap-4">
                      <div className="portrait:block landscape:hidden">
@@ -283,7 +276,7 @@ export default function Home() {
                         <BeatBoxControls
                             activePattern={activePattern}
                             onPatternChange={handlePatternChange}
-                            initialVolumes={volumes}
+                            volumes={volumes}
                             onApply={handleMixerApply}
                             isMobile={isMobile}
                         />
@@ -294,7 +287,7 @@ export default function Home() {
                      <BeatBoxControls
                         activePattern={activePattern}
                         onPatternChange={handlePatternChange}
-                        initialVolumes={volumes}
+                        volumes={volumes}
                         onApply={handleMixerApply}
                         isMobile={isMobile}
                         isLandscape={true}
