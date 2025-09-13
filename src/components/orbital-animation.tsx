@@ -14,7 +14,7 @@ export function OrbitalAnimation({ isPlaying = false, tempo = 90 }: OrbitalAnima
 
   useEffect(() => {
     if (planeRef.current) {
-        const animationDuration = isPlaying ? `${60 / tempo * 8}s` : '20s';
+        const animationDuration = isPlaying ? `${(60 / tempo) * 16}s` : '40s';
         planeRef.current.style.animationDuration = animationDuration;
     }
   }, [isPlaying, tempo]);

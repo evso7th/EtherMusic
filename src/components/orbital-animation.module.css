@@ -23,7 +23,7 @@
   bottom: 0;
   margin: auto;
   transform: rotateX(60deg) rotateZ(-30deg);
-  animation: rotate 20s infinite linear;
+  animation: rotate 40s infinite linear;
 }
 
 .circle {
