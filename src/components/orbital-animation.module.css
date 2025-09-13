@@ -5,13 +5,13 @@
   left: 0;
   right: 0;
   bottom: 0;
-  perspective: 400px;
+  perspective: 60vmin;
   overflow: hidden;
 }
 
 .plane {
-  width: 300px;
-  height: 300px;
+  width: 70vmin;
+  height: 70vmin;
   transform-style: preserve-3d;
 }
 
@@ -27,8 +27,8 @@
 }
 
 .circle {
-  width: 300px;
-  height: 300px;
+  width: 70vmin;
+  height: 70vmin;
   position: absolute;
   transform-style: preserve-3d;
   border-radius: 100%;
@@ -55,11 +55,11 @@
 }
 
 .circle::before {
-  transform: translateZ(-225px);
+  transform: translateZ(-52.5vmin); /* 70vmin * 0.75 */
 }
 
 .circle::after {
-  transform: translateZ(225px);
+  transform: translateZ(52.5vmin); /* 70vmin * 0.75 */
 }
 
 .circle:nth-child(1) { transform: rotateZ(calc(1 / 6 * 360deg)) rotateX(63.435deg); }
