@@ -112,11 +112,11 @@ export function useAudioEngine() {
     }, [toast]);
     
     useEffect(() => {
-        if (isAppStarted && isReady && !orbManager.current) {
+        if (isAppStarted && isReady && !orbManager.current && audioEngine.current) {
             const mainContainer = document.querySelector('main');
             if (mainContainer) {
                 orbManager.current = new OrbManager(mainContainer);
-                audioEngine.current?.setOrbManager(orbManager.current);
+                audioEngine.current.setOrbManager(orbManager.current);
             } else {
                  console.error("Error: Main container not found for OrbManager");
             }

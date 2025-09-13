@@ -1,0 +1,937 @@
+This page was translated from English by the community. Learn more and join the MDN Web Docs community.
+
+
+View in English
+ 
+Always switch to English
+
+Web Audio API
+Baseline Widely available *
+Web audio API - мощный и многогранный инструмент для манипуляции звуковой составляющей на веб-странице, что даёт возможность разработчикам выбрать источники, добавить к ним специальные звуковые эффекты (такие как panning), визуализировать их и многое другое.
+
+In this article
+Общие концепции и использование Web Audio
+Web Audio API интерфейсы
+Obsolete interfaces
+Пример
+Спецификации
+Совместимость с браузерами
+Смотрите также
+Общие концепции и использование Web Audio
+Web audio API позволяет обрабатывать операции над аудио с помощью специального аудио контекста (audio context), и был спроектирован на использование модульной маршрутизации (modular routing). Базовые операции выполняются с помощью аудио узлов (audio nodes), которые объединяются вместе, формируя аудио-маршрутизатору *таблицу (audio routing graph). Несколько источников - с разными видами поточных схем - поддерживаются даже изнутри простого контекста. Эта модульная концепция обеспечивает гибкость в создании сложных функций для динамических эффектов.
+
+Аудио узлы объединяются в цепи и простые сети их вводами и выводами. Они, как правило, запускаются с одним или более источниками. Источники представляют собой массивы сэмплов на единицу времени. Например, при частоте дискретизации 44100 Гц, в каждой секунде каждого канала расположено 22050 сэмплов. Они могут быть либо обработаны математически (смотрите : OscillatorNode), либо считаны с звуко/видео файлов (смотрите : AudioBufferSourceNode и MediaElementAudioSourceNode) или с аудио потоков (смотрите : MediaStreamAudioSourceNode). По факту, звуковые файлы - просто запись звуковых колебаний, которые поступают от микрофона и музыкальных инструментов, смешиваясь в одну сложную волну. Выводные данные этих узлов могут быть связаны с вводными других, что смешивают или модифицируют потоки звуковых образцов в иные потоки. Популярная модификация - умножение образца на значение, чтобы сделать выходной звук менее или более громким (смотрите : GainMode). Когда звук был успешно обработан предназначенным ему эффектом, он может быть привязан к выходному потоку (смотрите : AudioContext.destination), что направляет звук в динамики или микрофон. Данный шаг нужен лишь если вы предпочтёте дать возможность пользователю услышать ваши шедевры.
+
+Простой, типичный порядок действий выполнения манипуляций над аудио выглядит так :
+
+Создадим аудио контекст
+Внутри нашего контекста определим источники - такие как <audio>, генератор (oscillator), поток
+Определим узлы эффектов, такие как реверберация (reverb), биквадратный фильтр (biquad filter), панорамирование (panner), сжатие (compressor)
+Выберем конечную точку аудио сигнала, например ваши системные звуковые устройства
+Привяжем наши источники к эффектам, и эффекты к конечному сигналу.
+A simple box diagram with an outer box labeled Audio context, and three inner boxes labeled Sources, Effects and Destination. The three inner boxes have arrow between them pointing from left to right, indicating the flow of audio information.
+
+Распределение времени контролируется с высокой точностью и низкими задержками, позволяя разработчикам писать код, что точно реагирует на события и в состоянии обработать образец даже на высокой оценке образцов (sample rate). Так что такие приложения как ритм-компьютер и программный автомат всегда под рукой.
+
+Web audio API также даёт нам возможность контролировать то, каким аудио является в пространстве. Используя особую систему, что базируется на модели source-listener, он позволяет контролировать модель панорамирования и обходиться без дистанционно-вызванного ослабления (distance-induced attenuation) или duppler shift, вызванного сдвигом источника (или сдвигом слушателя).
+
+Примечание: Вы можете прочитать более детальный теоретический материал о Web audio API в нашей статье Basic concepts behind Web Audio API.
+
+Web Audio API интерфейсы
+В Web audio API есть всего 28 интерфейсов и соответствующих событий, которые мы сгруппировали в 9 категорий по функциональности.
+
+Главные объекты определения аудио
+Главные контейнеры и определения, что формируют аудио объект в Web Audio API.
+
+AudioContext
+AudioContext представляет собой некий аудио обрабатывающий объект, сооружённый из аудио модулей связанных вместе, где каждый является экземпляром класса AudioNode. AudioContext управляет созданием узлов, содержащихся в нём и выполняет обработку или декодирование аудио данных.
+
+AudioNode
+Интерфейс AudioNode представляет собой некий обрабатывающий модуль такой как источник аудио (то есть HTML <audio> или <video> элемент), конечный аудио объект, модуль непосредственной обработки (например фильтр BiquadFilterNode или звуковой контроллер такой как GainNode).
+
+AudioParam
+Интерфейс AudioParam представляет аудио-параметры связанные с AudioNode. Он может содержать как точное значение параметра, так и параметры изменяющиеся во времени.
+
+ended (event)
+Событие ended генерируется тогда, когда воспроизведение остановлено по причине окончания носителя.
+
+Источники звука
+Интерфейсы, которые определяют источники звука для использования в Web Audio API.
+
+OscillatorNode
+OscillatorNode представляет собой источник синусоидальной волны. Это модуль AudioNode который принимает на вход частоту и генерирует синусоидальную волну с этой частотой.
+
+AudioBuffer
+Интерфейс AudioBuffer представляет собой короткий аудио сэмпл находящийся в памяти, созданный из аудио файла с использованием метода AudioContext.decodeAudioData(), или созданный из необработанных(сырых) данных с использованием метода AudioContext.createBuffer(). После декодирования аудио данные могут быть помещены в AudioBufferSourceNode.
+
+AudioBufferSourceNode
+Интерфейс AudioBufferSourceNode представляет собой источник звука, состоящий из аудио данных, хранящихся в AudioBuffer. Это AudioNode, который действует в качестве источника звука.
+
+MediaElementAudioSourceNode
+Интерфейс MediaElementAudioSourceNode представляет источник звука, содержащегося в элементе HTML5 <audio> или <video> . Это AudioNode, который действует в качестве источника звука.
+
+MediaStreamAudioSourceNode
+Интерфейс MediaStreamAudioSourceNode представляет источник звука, содержащегося в потоке WebRTC MediaStream (например веб-камеры или микрофона). Это AudioNode, который действует в качестве источника звука.
+
+Аудио фильтры
+Интерфейсы для определения эффектов которые можно применить к источникам звука.
+
+BiquadFilterNode
+BiquadFilterNode представляет простой фильтр низкого порядка. Это AudioNode представляющий различные виды фильтров такие как эквалайзер или управление тональностью. BiquadFilterNode имеет ровно один вход и один выход.
+
+ConvolverNode
+ConvolverNode это AudioNode выполняющий линейную свёртку AudioBuffer, часто применяется для достижения эффекта реверберации по заданной импульсной характеристике.
+
+DelayNode
+DelayNode представляет собой линию задержки (delay-line); содержит AudioNode вызывающий задержку между выходным и входным сигналом.
+
+DynamicsCompressorNode
+The DynamicsCompressorNode interface provides a compression effect, which lowers the volume of the loudest parts of the signal in order to help prevent clipping and distortion that can occur when multiple sounds are played and multiplexed together at once.
+
+GainNode
+The GainNode interface represents a change in volume. It is an AudioNode audio-processing module that causes a given gain to be applied to the input data before its propagation to the output.
+
+StereoPannerNode
+The StereoPannerNode interface represents a simple stereo panner node that can be used to pan an audio stream left or right.
+
+WaveShaperNode
+The WaveShaperNode interface represents a non-linear distorter. It is an AudioNode that use a curve to apply a waveshaping distortion to the signal. Beside obvious distortion effects, it is often used to add a warm feeling to the signal.
+
+PeriodicWave
+Used to define a periodic waveform that can be used to shape the output of an OscillatorNode.
+
+Defining audio destinations
+Once you are done processing your audio, these interfaces define where to output it.
+
+AudioDestinationNode
+The AudioDestinationNode interface represents the end destination of an audio source in a given context — usually the speakers of your device.
+
+MediaStreamAudioDestinationNode
+The MediaStreamAudioDestinationNode interface represents an audio destination consisting of a WebRTC MediaStream with a single AudioMediaStreamTrack, which can be used in a similar way to a MediaStream obtained from Navigator.getUserMedia. It is an AudioNode that acts as an audio destination.
+
+Анализ и визуализация данных
+If you want to extract time, frequency and other data from your audio, the AnalyserNode is what you need.
+
+AnalyserNode
+The AnalyserNode interface represents a node able to provide real-time frequency and time-domain analysis information, for the purposes of data analysis and visualization.
+
+Splitting and merging audio channels
+To split and merge audio channels, you'll use these interfaces.
+
+ChannelSplitterNode
+The ChannelSplitterNode interface separates the different channels of an audio source out into a set of mono outputs.
+
+ChannelMergerNode
+The ChannelMergerNode interface reunites different mono inputs into a single output. Each input will be used to fill a channel of the output.
+
+Audio spatialization
+These interfaces allow you to add audio spatialization panning effects to your audio sources.
+
+AudioListener
+The AudioListener interface represents the position and orientation of the unique person listening to the audio scene used in audio spatialization.
+
+PannerNode
+The PannerNode interface represents the behavior of a signal in space. It is an AudioNode audio-processing module describing its position with right-hand Cartesian coordinates, its movement using a velocity vector and its directionality using a directionality cone.
+
+Audio processing via JavaScript
+If you want to use an external script to process your audio source, the below Node and events make it possible.
+
+Примечание: As of the August 29 2014 Web Audio API spec publication, these features have been marked as deprecated, and are soon to be replaced by Audio_Workers.
+
+ScriptProcessorNode
+The ScriptProcessorNode interface allows the generation, processing, or analyzing of audio using JavaScript. It is an AudioNode audio-processing module that is linked to two buffers, one containing the current input, one containing the output. An event, implementing the AudioProcessingEvent interface, is sent to the object each time the input buffer contains new data, and the event handler terminates when it has filled the output buffer with data.
+
+audioprocess (event)
+The audioprocess event is fired when an input buffer of a Web Audio API ScriptProcessorNode is ready to be processed.
+
+AudioProcessingEvent
+The Web Audio API AudioProcessingEvent represents events that occur when a ScriptProcessorNode input buffer is ready to be processed.
+
+Offline/background audio processing
+It is possible to process/render an audio graph very quickly in the background — rendering it to an AudioBuffer rather than to the device's speakers — with the following.
+
+OfflineAudioContext
+The OfflineAudioContext interface is an AudioContext interface representing an audio-processing graph built from linked together AudioNodes. In contrast with a standard AudioContext, an OfflineAudioContext doesn't really render the audio but rather generates it, as fast as it can, in a buffer.
+
+complete (event)
+The complete event is fired when the rendering of an OfflineAudioContext is terminated.
+
+OfflineAudioCompletionEvent
+The OfflineAudioCompletionEvent represents events that occur when the processing of an OfflineAudioContext is terminated. The complete event implements this interface.
+
+Audio Workers
+Audio workers provide the ability for direct scripted audio processing to be done inside a web worker context, and are defined by a couple of interfaces (new as of 29th August 2014.) These are not implemented in any browsers yet. When implemented, they will replace ScriptProcessorNode, and the other features discussed in the Audio processing via JavaScript section above.
+
+AudioWorkerNode
+The AudioWorkerNode interface represents an AudioNode that interacts with a worker thread to generate, process, or analyse audio directly.
+
+AudioWorkerGlobalScope
+The AudioWorkerGlobalScope interface is a DedicatedWorkerGlobalScope-derived object representing a worker context in which an audio processing script is run; it is designed to enable the generation, processing, and analysis of audio data directly using JavaScript in a worker thread.
+
+AudioProcessEvent
+This is an Event object that is dispatched to AudioWorkerGlobalScope objects to perform processing.
+
+Obsolete interfaces
+The following interfaces were defined in old versions of the Web Audio API spec, but are now obsolete and have been replaced by other interfaces.
+
+JavaScriptNode
+Used for direct audio processing via JavaScript. This interface is obsolete, and has been replaced by ScriptProcessorNode.
+
+WaveTableNode
+Used to define a periodic waveform. This interface is obsolete, and has been replaced by PeriodicWave.
+
+Пример
+This example shows a wide variety of Web Audio API functions being used. You can see this code in action on the Voice-change-o-matic demo (also check out the full source code at Github) — this is an experimental voice changer toy demo; keep your speakers turned down low when you use it, at least to start!
+
+The Web Audio API lines are highlighted; if you want to find more out about what the different methods, etc. do, have a search around the reference pages.
+
+js
+
+Copy
+var audioCtx = new (window.AudioContext || window.webkitAudioContext)(); // define audio context
+// Webkit/blink browsers need prefix, Safari won't work without window.
+
+var voiceSelect = document.getElementById("voice"); // select box for selecting voice effect options
+var visualSelect = document.getElementById("visual"); // select box for selecting audio visualization options
+var mute = document.querySelector(".mute"); // mute button
+var drawVisual; // requestAnimationFrame
+
+var analyser = audioCtx.createAnalyser();
+var distortion = audioCtx.createWaveShaper();
+var gainNode = audioCtx.createGain();
+var biquadFilter = audioCtx.createBiquadFilter();
+
+function makeDistortionCurve(amount) {
+  // function to make curve shape for distortion/wave shaper node to use
+  var k = typeof amount === "number" ? amount : 50,
+    n_samples = 44100,
+    curve = new Float32Array(n_samples),
+    deg = Math.PI / 180,
+    i = 0,
+    x;
+  for (; i < n_samples; ++i) {
+    x = (i * 2) / n_samples - 1;
+    curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
+  }
+  return curve;
+}
+
+navigator.getUserMedia(
+  // constraints - only audio needed for this app
+  {
+    audio: true,
+  },
+
+  // Success callback
+  function (stream) {
+    source = audioCtx.createMediaStreamSource(stream);
+    source.connect(analyser);
+    analyser.connect(distortion);
+    distortion.connect(biquadFilter);
+    biquadFilter.connect(gainNode);
+    gainNode.connect(audioCtx.destination); // connecting the different audio graph nodes together
+
+    visualize(stream);
+    voiceChange();
+  },
+
+  // Error callback
+  function (err) {
+    console.log("The following gUM error occured: " + err);
+  },
+);
+
+function visualize(stream) {
+  WIDTH = canvas.width;
+  HEIGHT = canvas.height;
+
+  var visualSetting = visualSelect.value;
+  console.log(visualSetting);
+
+  if (visualSetting == "sinewave") {
+    analyser.fftSize = 2048;
+    var bufferLength = analyser.frequencyBinCount; // half the FFT value
+    var dataArray = new Uint8Array(bufferLength); // create an array to store the data
+
+    canvasCtx.clearRect(0, 0, WIDTH, HEIGHT);
+
+    function draw() {
+      drawVisual = requestAnimationFrame(draw);
+
+      analyser.getByteTimeDomainData(dataArray); // get waveform data and put it into the array created above
+
+      canvasCtx.fillStyle = "rgb(200, 200, 200)"; // draw wave with canvas
+      canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
+
+      canvasCtx.lineWidth = 2;
+      canvasCtx.strokeStyle = "rgb(0, 0, 0)";
+
+      canvasCtx.beginPath();
+
+      var sliceWidth = (WIDTH * 1.0) / bufferLength;
+      var x = 0;
+
+      for (var i = 0; i < bufferLength; i++) {
+        var v = dataArray[i] / 128.0;
+        var y = (v * HEIGHT) / 2;
+
+        if (i === 0) {
+          canvasCtx.moveTo(x, y);
+        } else {
+          canvasCtx.lineTo(x, y);
+        }
+
+        x += sliceWidth;
+      }
+
+      canvasCtx.lineTo(canvas.width, canvas.height / 2);
+      canvasCtx.stroke();
+    }
+
+    draw();
+  } else if (visualSetting == "off") {
+    canvasCtx.clearRect(0, 0, WIDTH, HEIGHT);
+    canvasCtx.fillStyle = "red";
+    canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
+  }
+}
+
+function voiceChange() {
+  distortion.curve = new Float32Array();
+  biquadFilter.gain.value = 0; // reset the effects each time the voiceChange function is run
+
+  var voiceSetting = voiceSelect.value;
+  console.log(voiceSetting);
+
+  if (voiceSetting == "distortion") {
+    distortion.curve = makeDistortionCurve(400); // apply distortion to sound using waveshaper node
+  } else if (voiceSetting == "biquad") {
+    biquadFilter.type = "lowshelf";
+    biquadFilter.frequency.value = 1000;
+    biquadFilter.gain.value = 25; // apply lowshelf filter to sounds using biquad
+  } else if (voiceSetting == "off") {
+    console.log("Voice settings turned off"); // do nothing, as off option was chosen
+  }
+}
+
+// event listeners to change visualize and voice settings
+
+visualSelect.onchange = function () {
+  window.cancelAnimationFrame(drawVisual);
+  visualize(stream);
+};
+
+voiceSelect.onchange = function () {
+  voiceChange();
+};
+
+mute.onclick = voiceMute;
+
+function voiceMute() {
+  // toggle to mute and unmute sound
+  if (mute.id == "") {
+    gainNode.gain.value = 0; // gain set to 0 to mute sound
+    mute.id = "activated";
+    mute.innerHTML = "Unmute";
+  } else {
+    gainNode.gain.value = 1; // gain set to 1 to unmute sound
+    mute.id = "";
+    mute.innerHTML = "Mute";
+  }
+}
+Спецификации
+Specification
+Web Audio API
+# AudioContext
+Совместимость с браузерами
+Report problems with this compatibility data • View data on GitHub 
+desktop
+mobile
+Chrome
+Edge
+Firefox
+Opera
+Safari
+Chrome Android
+Firefox for Android
+Opera Android
+Safari on iOS
+Samsung Internet
+WebView Android
+WebView on iOS
+AudioContext
+
+35
+more
+
+12
+
+25
+
+22
+more
+
+14.1
+more
+
+35
+more
+
+25
+
+22
+more
+
+14.5
+more
+
+3
+more
+
+37
+more
+
+14.5
+more
+AudioContext() constructor
+
+35
+footnote more
+
+12
+
+25
+
+22
+footnote more
+
+14.1
+footnote more
+
+35
+footnote more
+
+25
+
+22
+footnote more
+
+14.5
+footnote more
+
+3
+footnote more
+
+37
+footnote more
+
+14.5
+footnote more
+options.latencyHint parameter
+
+58
+
+79
+
+No
+
+45
+
+14.1
+
+58
+
+No
+
+43
+
+14.5
+
+7
+
+58
+
+14.5
+options.sampleRate parameter
+
+74
+
+79
+
+61
+
+62
+
+14.1
+
+74
+
+61
+
+53
+
+14.5
+
+11
+
+74
+
+14.5
+options.sinkId parameter
+Experimental
+
+110
+
+110
+
+No
+
+96
+
+No
+
+110
+
+No
+
+74
+
+No
+
+21
+
+110
+
+No
+baseLatency
+
+58
+
+79
+
+70
+
+45
+
+14.1
+
+58
+
+79
+
+43
+
+14.5
+
+7
+
+58
+
+14.5
+close
+
+42
+
+14
+
+40
+
+29
+
+9
+
+42
+
+40
+
+29
+
+9
+
+4
+
+42
+
+9
+createMediaElementSource
+
+15
+
+12
+
+25
+footnote
+
+15
+
+6
+
+18
+
+25
+footnote
+
+14
+
+6
+
+1
+
+4.4
+
+6
+createMediaStreamDestination
+
+25
+
+79
+
+25
+
+15
+
+11
+
+25
+
+25
+
+14
+
+11
+
+1.5
+
+4.4
+
+11
+createMediaStreamSource
+
+22
+
+12
+
+25
+
+15
+
+11
+
+25
+
+25
+
+14
+
+11
+
+1.5
+
+4.4
+
+11
+createMediaStreamTrackSource
+
+No
+footnote
+
+No
+footnote
+
+68
+footnote
+
+No
+footnote
+
+No
+
+No
+footnote
+
+68
+footnote
+
+No
+footnote
+
+No
+
+No
+footnote
+
+No
+footnote
+
+No
+error event
+Experimental
+
+128
+
+128
+
+No
+
+114
+
+No
+
+128
+
+No
+
+85
+
+No
+
+28
+
+128
+
+No
+getOutputTimestamp
+
+57
+
+79
+
+70
+
+44
+
+14.1
+
+57
+
+79
+
+43
+
+14.5
+
+7
+
+57
+
+14.5
+outputLatency
+
+102
+
+102
+
+70
+
+88
+
+18.4
+
+102
+
+79
+
+70
+
+18.4
+
+19
+
+102
+
+18.4
+resume
+
+41
+
+14
+
+40
+
+28
+
+9
+
+41
+
+40
+
+28
+
+9
+
+4
+
+41
+
+9
+setSinkId
+Experimental
+
+110
+
+110
+
+No
+
+96
+
+No
+
+110
+
+No
+
+74
+
+No
+
+21
+
+110
+
+No
+sinkId
+Experimental
+
+110
+
+110
+
+No
+
+96
+
+No
+
+110
+
+No
+
+74
+
+No
+
+21
+
+110
+
+No
+sinkchange event
+Experimental
+
+110
+
+110
+
+No
+
+96
+
+No
+
+110
+
+No
+
+74
+
+No
+
+21
+
+110
+
+No
+suspend
+
+41
+
+14
+
+40
+
+28
+
+9
+
+41
+
+40
+
+28
+
+9
+
+4
+
+41
+
+9
+Legend
+Tip: you can click/tap on a cell for more information.
+
+Full support
+Full support
+No support
+No support
+⁨Experimental⁩. Expect behavior to change in the future.
+See implementation notes.
+Requires a vendor prefix or different name for use.
+Has more compatibility info.
+Смотрите также
+Using the Web Audio API
+Visualizations with Web Audio API
+Voice-change-O-matic example
+Violent Theremin example
+Web audio spatialisation basics
+Mixing Positional Audio and WebGL
+Developing Game Audio with the Web Audio API
+Porting webkitAudioContext code to standards based AudioContext
+Tones: a simple library for playing specific tones/notes using the Web Audio API.
+howler.js: a JS audio library that defaults to Web Audio API and falls back to HTML5 Audio, as well as providing other useful features.
+Mooog: jQuery-style chaining of AudioNodes, mixer-style sends/returns, and more.
+Quicklinks
+Guides
+
+Basic concepts behind Web Audio API
+Using the Web Audio API
+Visualizations with Web Audio API
+Web audio spatialisation basics
+Porting webkitAudioContext code to standards based AudioContext
+Examples
+
+Voice-change-O-matic
+Violent Theremin
+Interfaces
+
+AnalyserNode
+AudioBuffer
+AudioBufferSourceNode
+AudioContext
+AudioDestinationNode
+AudioListener
+AudioNode
+AudioParam
+audioprocess (event)
+AudioProcessingEvent
+BiquadFilterNode
+ChannelMergerNode
+ChannelSplitterNode
+complete (event)
+ConvolverNode
+DelayNode
+DynamicsCompressorNode
+ended (event)
+GainNode
+MediaElementAudioSourceNode
+MediaStreamAudioDestinationNode
+MediaStreamAudioSourceNode
+OfflineAudioCompletionEvent
+OfflineAudioContext
+OscillatorNode
+PannerNode
+PeriodicWaveNode
+ScriptProcessorNode
+WaveShaperNode
+
