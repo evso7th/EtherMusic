@@ -213,6 +213,18 @@ export function useAudioEngine() {
         }
     }, []);
 
+    const handlePlayPause = useCallback(() => {
+        if (!audioEngine.current) return;
+        console.log('[useAudioEngine] handlePlayPause triggered. isPlaying:', isPlaying);
+        if (isPlaying) {
+            console.log('[useAudioEngine] Calling stop() on drum machine.');
+            audioEngine.current.getDrumMachine().stop();
+        } else {
+            console.log('[useAudioEngine] Calling play() on drum machine.');
+            audioEngine.current.getDrumMachine().play();
+        }
+    }, [audioEngine, isPlaying]);
+
     return {
         isAppStarted,
         isReady,
