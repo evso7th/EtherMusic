@@ -178,7 +178,7 @@ export default function Home() {
             <div 
                 className="absolute inset-0 bg-background flex flex-col items-center justify-center z-50 p-4"
             >
-                <div className={cn("absolute inset-0 z-0 transition-opacity duration-1000", 'opacity-30')}>
+                <div className={cn("absolute inset-0 z-0 transition-opacity duration-1000", 'opacity-50')}>
                     <MemoizedOrbitalAnimation isPlaying={false} />
                 </div>
                 <div className="absolute top-4 right-4 z-20">
@@ -214,7 +214,7 @@ export default function Home() {
     
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
-            <div className="fixed inset-0 z-0 opacity-30">
+            <div className="fixed inset-0 z-0 opacity-50">
                  <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={currentTempo} />
             </div>
             
