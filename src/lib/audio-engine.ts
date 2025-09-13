@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import type { Volumes, Instrument, BassInstrument, CompressorSettings, BassInstrumentPresetParams, ChannelVolumes, SynthNote, WorkerMessage, DrumWorkerMessage, AudioEngineEvents } from '@/types';
@@ -199,21 +198,21 @@ export class AudioEngine {
 
         this.analyserLatchBeforeGain = this.context.createAnalyser();
         this.analyserLatchBeforeGain.fftSize = 256;
+        const dataArrayBefore = new Uint8Array(this.analyserLatchBeforeGain.frequencyBinCount);
+        
         this.analyserLatchAfterGain = this.context.createAnalyser();
         this.analyserLatchAfterGain.fftSize = 256;
-
-        const dataArrayBefore = new Uint8Array(this.analyserLatchBeforeGain.frequencyBinCount);
         const dataArrayAfter = new Uint8Array(this.analyserLatchAfterGain.frequencyBinCount);
 
         this.analysisInterval = window.setInterval(() => {
             if (this.analyserLatchBeforeGain) {
                 this.analyserLatchBeforeGain.getByteTimeDomainData(dataArrayBefore);
-                const peakBefore = dataArrayBefore.reduce((max, current) => Math.max(max, Math.abs(current / 128 - 1)), 0);
+                const peakBefore = dataArrayBefore.reduce((max, current) => Math.max(max, Math.abs(current / 128.0 - 1.0)), 0);
                 console.log(`[LATCH-BEFORE-GAIN]: peak=${peakBefore.toFixed(3)}`);
             }
             if (this.analyserLatchAfterGain) {
                 this.analyserLatchAfterGain.getByteTimeDomainData(dataArrayAfter);
-                const peakAfter = dataArrayAfter.reduce((max, current) => Math.max(max, Math.abs(current / 128 - 1)), 0);
+                const peakAfter = dataArrayAfter.reduce((max, current) => Math.max(max, Math.abs(current / 128.0 - 1.0)), 0);
                 console.log(`[LATCH-AFTER-GAIN]: peak=${peakAfter.toFixed(3)}`);
             }
         }, 1000);
@@ -242,11 +241,12 @@ export class AudioEngine {
         const reverbSend = this.context.createGain();
         
         if (part === 'latch' && this.analyserLatchBeforeGain && this.analyserLatchAfterGain) {
-            worklet.connect(this.analyserLatchBeforeGain).connect(distortion);
+            worklet.connect(this.analyserLatchBeforeGain);
+            this.analyserLatchBeforeGain.connect(distortion);
             distortion.connect(gain);
             gain.connect(this.analyserLatchAfterGain);
-            gain.connect(this.preCompressorOut);
-            gain.connect(reverbSend).connect(this.reverbSend);
+            this.analyserLatchAfterGain.connect(this.preCompressorOut);
+            this.analyserLatchAfterGain.connect(reverbSend).connect(this.reverbSend);
         } else {
             worklet.connect(distortion).connect(gain);
             gain.connect(this.preCompressorOut);
@@ -580,5 +580,3 @@ export class AudioEngine {
         }
     }
 }
-
-    
