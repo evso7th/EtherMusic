@@ -14,8 +14,7 @@ function OrbitalAnimationComponent() {
           <div 
             key={i} 
             className={cn(
-              styles.circle,
-              styles.pulsating // Always pulsating
+              styles.circle
             )}
           ></div>
         ))}
