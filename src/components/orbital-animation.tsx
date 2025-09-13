@@ -7,8 +7,11 @@ export function OrbitalAnimation() {
   return (
     <div className={styles.view}>
       <div className={styles.plane}>
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className={styles.circle} style={{ '--i': i } as React.CSSProperties}></div>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div 
+            key={i} 
+            className={styles.circle}
+          ></div>
         ))}
       </div>
     </div>

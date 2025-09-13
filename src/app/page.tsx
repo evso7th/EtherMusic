@@ -80,10 +80,10 @@ export default function Home() {
 
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
-        if(audioEngine) {
-            audioEngine.setBassInstrument(instrumentId);
+        if (isReady) {
+            setBassInstrument(instrumentId);
         }
-    }, [audioEngine]);
+    }, [setBassInstrument, isReady]);
 
     useEffect(() => {
         if (isReady && activeBassInstrument) {
@@ -143,24 +143,18 @@ export default function Home() {
 
     const handlePatternChange = useCallback((pattern: BeatPattern) => {
         setActivePattern(pattern);
-        if (audioEngine) {
-            audioEngine.setBeatPattern(pattern.name);
-        }
-    }, [audioEngine]);
+        setBeatPattern(pattern.name);
+    }, [setBeatPattern]);
 
     const handleLatchToggle = useCallback((isOn: boolean) => {
         setIsBassLatchOn(isOn);
-        if (audioEngine) {
-            audioEngine.setBassLatch(isOn);
-        }
-    }, [audioEngine]);
+        setBassLatch(isOn);
+    }, [setBassLatch]);
     
     const handleMelodyInstrumentChange = useCallback((instrumentId: Instrument) => {
         setActiveMelodyInstrument(instrumentId);
-        if (audioEngine) {
-            setMelodyInstrument(instrumentId);
-        }
-    }, [audioEngine, setMelodyInstrument]);
+        setMelodyInstrument(instrumentId);
+    }, [setMelodyInstrument]);
     
     const handleThereminInteractionCallback = useCallback((type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') => {
         if (!isReady || !audioEngine) return;
@@ -188,15 +182,15 @@ export default function Home() {
                 <div className="absolute top-4 right-4 z-20">
                     <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
                 </div>
-                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-center py-16 w-full">
-                    <OrbitalAnimation />
-                    <div className="mt-8">
+                <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
+                    <div>
                         <h1 className="text-4xl md:text-5xl font-bold text-primary">EtherMusic</h1>
                         <p className="text-sm md:text-base text-white/80 font-light mt-2 tracking-wide">Neuro Meditation Processor</p>
                     </div>
-                 </div>
-                <div className="z-10 pb-16">
-                     <Button size="lg" onClick={handleStartApp}>
+                    <div className="flex-grow flex items-center justify-center">
+                        <OrbitalAnimation />
+                    </div>
+                    <Button size="lg" onClick={handleStartApp}>
                         Start Meditation
                         <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
@@ -215,7 +209,7 @@ export default function Home() {
     }
     
     return (
-        <div className="relative flex flex-col h-screen overflow-hidden">
+        <div className="relative flex flex-col h-screen overflow-hidden bg-background">
              <div className="relative z-10 flex h-full portrait:flex-col portrait:p-2 md:p-6 lg:p-8 landscape:flex-row landscape:p-1 landscape:gap-1">
                 <header className="flex-shrink-0 portrait:flex portrait:items-center portrait:justify-between portrait:mb-2 landscape:flex landscape:flex-col landscape:items-center landscape:justify-center landscape:w-16 landscape:gap-4">
                      <div className="portrait:block landscape:hidden">
@@ -286,7 +280,7 @@ export default function Home() {
                     </div>
                 </main>
 
-                 <div className="portrait:hidden landscape:flex landscape:flex-col landscape:items-center landscape:w-16 landscape:gap-2 landscape:py-4 justify-end">
+                <div className="portrait:hidden landscape:flex landscape:flex-col landscape:items-center justify-between landscape:w-16 landscape:gap-2 landscape:py-4">
                      <BeatBoxControls
                         activePattern={activePattern}
                         onPatternChange={handlePatternChange}
@@ -300,3 +294,4 @@ export default function Home() {
         </div>
     );
 }
+
