@@ -41,7 +41,10 @@ export class LatchEngine {
     }
 
     public toggleNote(tapData: TapData): LatchToggleResult {
-        if (!tapData) return { action: 'none' };
+        if (!tapData) {
+            console.log('[LatchEngine] toggleNote called with no tapData. Action: none.');
+            return { action: 'none' };
+        }
         
         const { x, y, frequency, volume } = tapData;
         const existingNoteIndex = this.findNearbyNoteIndex(x, y);
@@ -49,6 +52,7 @@ export class LatchEngine {
         if (existingNoteIndex > -1) {
             // Note exists, remove it
             const noteToRemove = this.activeNotes.splice(existingNoteIndex, 1)[0];
+            console.log(`[LatchEngine] Removing existing note. ID: ${noteToRemove.id}, Freq: ${noteToRemove.frequency.toFixed(2)}. Total active: ${this.activeNotes.length}`);
             return {
                 action: 'removed',
                 noteOff: noteToRemove,
@@ -65,12 +69,15 @@ export class LatchEngine {
             noteToTurnOff = this.activeNotes.shift(); 
             if (noteToTurnOff) {
                 noteToAnimateRemove = { id: noteToTurnOff.id };
+                console.log(`[LatchEngine] Max notes reached. Removing oldest note. ID: ${noteToTurnOff.id}`);
             }
         }
         
         const id = this.nextId++;
         const newNote: Note & { x: number; y: number } = { id, frequency, volume, x, y };
         this.activeNotes.push(newNote);
+
+        console.log(`[LatchEngine] Adding new note. ID: ${newNote.id}, Freq: ${newNote.frequency.toFixed(2)}. Total active: ${this.activeNotes.length}`);
 
         const result: LatchToggleResult = {
             action: 'added',
@@ -85,6 +92,7 @@ export class LatchEngine {
     
     public clear(): Note[] {
         const notesToTurnOff = [...this.activeNotes];
+        console.log(`[LatchEngine] Clearing all ${notesToTurnOff.length} active notes.`);
         this.activeNotes = [];
         return notesToTurnOff;
     }
