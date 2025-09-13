@@ -214,7 +214,7 @@ export default function Home() {
     
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
-            <div className="fixed inset-0 z-0 opacity-50">
+            <div className="fixed inset-0 z-0 opacity-75">
                  <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={currentTempo} />
             </div>
             
