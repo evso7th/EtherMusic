@@ -66,7 +66,6 @@ export class DrumMachine {
     public initialize(tempo: number, swing: number) {
         this._tempo = tempo;
         this._swing = swing;
-        console.log('[DrumMachine] Initialized with tempo and swing.');
     }
 
 
@@ -162,3 +161,5 @@ export class DrumMachine {
         this.timeoutId = window.setTimeout(() => this.scheduler(), delay * 1000);
     }
 }
+
+    

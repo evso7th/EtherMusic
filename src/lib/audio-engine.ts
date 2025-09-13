@@ -160,8 +160,10 @@ export class AudioEngine {
         return JSON.parse(JSON.stringify(this.volumes)); // Return a deep copy
     }
     
-    public async initialize() {
+    public async initialize(initialVolumes: Volumes) {
         if (this.isInitialized) return;
+
+        this.setVolumes(initialVolumes, true);
 
         if (this.context.state === 'suspended') {
             await this.context.resume();
@@ -266,7 +268,6 @@ export class AudioEngine {
         worklet.connect(gain);
         
         gain.connect(this.preCompressorOut);
-        console.log('[AudioEngine] Drum GainNode connected to preCompressorOut.');
 
         gain.connect(reverbSend).connect(this.reverbSend);
         
@@ -277,7 +278,6 @@ export class AudioEngine {
         };
         
         this.nodes.set('drums', { worklet, gain, reverbSend });
-        console.log('[AudioEngine] Drum channel created.');
     }
     
     private async loadReverbImpulse() {
@@ -468,7 +468,6 @@ export class AudioEngine {
     }
     
     public playDrumSample(sampleName: string, volume: number = 1.0) {
-        console.log(`[AudioEngine] playDrumSample called: ${sampleName}`);
         const drumNode = this.nodes.get('drums');
         if (!drumNode) {
             console.error('[AudioEngine] Drum node not found.');
@@ -476,7 +475,6 @@ export class AudioEngine {
         }
         const message: DrumWorkerMessage = { type: 'playSample', sampleName, volume };
         drumNode.worklet.port.postMessage(message);
-        console.log('[AudioEngine] Posted playSample message to drum worklet.');
     }
     
     private async loadDrumSamples(): Promise<void> {
@@ -523,10 +521,12 @@ export class AudioEngine {
     }
     
     public setVolumes(newVolumes: Volumes, isInitialization = false) {
-        if (!this.isInitialized || !this.context) return;
+        if (!this.context) return;
         
         if(isInitialization || JSON.stringify(this.volumes) !== JSON.stringify(newVolumes)) {
             this.volumes = newVolumes;
+
+            if (!this.isInitialized) return;
 
             this.applyChannelSettings('melody', newVolumes.melody);
             this.applyChannelSettings('manualBass', newVolumes.manualBass);
@@ -581,3 +581,5 @@ export class AudioEngine {
         }
     }
 }
+
+    
