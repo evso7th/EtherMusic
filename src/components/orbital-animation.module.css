@@ -10,8 +10,8 @@
 }
 
 .plane {
-  width: 50vw;
-  height: 50vw;
+  width: 30vw;
+  height: 30vw;
   transform-style: preserve-3d;
 }
 
@@ -27,8 +27,8 @@
 }
 
 .circle {
-  width: 50vw;
-  height: 50vw;
+  width: 30vw;
+  height: 30vw;
   position: absolute;
   transform-style: preserve-3d;
   border-radius: 100%;
@@ -55,11 +55,11 @@
 }
 
 .circle::before {
-  transform: translateZ(-37.5vw); /* 50vw * 0.75 */
+  transform: translateZ(-22.5vw); /* 30vw * 0.75 */
 }
 
 .circle::after {
-  transform: translateZ(37.5vw); /* 50vw * 0.75 */
+  transform: translateZ(22.5vw); /* 30vw * 0.75 */
 }
 
 .circle:nth-child(1) { transform: rotateZ(calc(1 / 6 * 360deg)) rotateX(63.435deg); }
