@@ -223,7 +223,7 @@ export function useAudioEngine() {
             console.log('[useAudioEngine] Calling play() on drum machine.');
             audioEngine.current.getDrumMachine().play();
         }
-    }, [audioEngine, isPlaying]);
+    }, [isPlaying]);
 
     return {
         isAppStarted,
@@ -243,5 +243,6 @@ export function useAudioEngine() {
         startRecording,
         stopRecording,
         handleThereminInteraction,
+        handlePlayPause,
     };
 }

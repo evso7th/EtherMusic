@@ -95,16 +95,16 @@ export class DrumMachine {
                 this.stop();
             }
             this._pattern = newPattern;
-             if (newPattern.name !== 'Off' && wasPlaying) {
+             if (newPattern.name !== 'Off') {
                 this.play();
-             } else if (newPattern.name === 'Off') {
+             } else {
                 this.stop();
              }
         }
     }
 
     public play() {
-        console.log(`[DrumMachine] play() method called.`);
+        console.log(`[DrumMachine] play() called.`);
         if (this.isPlaying || !this._pattern || this._pattern.sequence.length === 0) {
             if (this._pattern?.name === 'Off') {
                 this.stop();
@@ -119,7 +119,7 @@ export class DrumMachine {
     }
     
     public stop() {
-        console.log(`[DrumMachine] stop() method called.`);
+        console.log(`[DrumMachine] stop() called.`);
         if (this.timeoutId !== null) {
             clearTimeout(this.timeoutId);
             this.timeoutId = null;
@@ -130,6 +130,7 @@ export class DrumMachine {
     }
 
     private scheduler() {
+        console.log(`[DrumMachine] scheduler() running for step ${this.step}.`);
         const isFillMeasure = this.fills.length > 0 && this._pattern.type === 'Classic' && (this.measureCount === 3 || this.measureCount === 7);
         const currentPattern = isFillMeasure 
             ? this.fills[Math.floor(Math.random() * this.fills.length)] 
@@ -140,7 +141,7 @@ export class DrumMachine {
 
         currentPattern.sequence.forEach(note => {
             if (note.time === this.step) {
-                console.log(`[DrumMachine] scheduler: sending note ${note.note} to be played at step ${this.step}`);
+                console.log(`[DrumMachine] scheduler: playing note ${note.note} at step ${this.step}`);
                 this.audioEngine.playDrumSample(note.note, note.vol);
             }
         });

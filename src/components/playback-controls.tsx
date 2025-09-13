@@ -69,11 +69,16 @@ export function PlaybackControls({
         }
     };
     
+    const handlePlayPauseClick = () => {
+        console.log('[PlaybackControls] Play/Pause button clicked.');
+        onPlayPause();
+    }
+    
     return (
         <TooltipProvider>
              <ControlButton
                 tooltipText={isPlaying ? "Pause" : "Play"}
-                onClick={onPlayPause}
+                onClick={handlePlayPauseClick}
                 variant="outline"
                 size="icon" 
                 className="w-10 h-10 rounded-full"
@@ -133,5 +138,3 @@ export function PlaybackControls({
         </TooltipProvider>
     );
 }
-
-    

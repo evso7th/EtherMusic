@@ -33,13 +33,17 @@ const Preloader = () => (
                         <clipPath id="cut-off">
                             <rect x="0" y="50" width="100" height="100" />
                         </clipPath>
+                         <linearGradient id="gradient">
+                            <stop offset="0" stop-color="hsl(var(--primary))"></stop>
+                            <stop offset="100%" stop-color="hsl(var(--primary))" stop-opacity="0"></stop>
+                        </linearGradient>
                     </defs>
                     <circle
                         cx="50"
                         cy="50"
                         r="40"
                         clipPath="url(#cut-off)"
-                        stroke="hsl(var(--primary))"
+                        stroke="url(#gradient)"
                     />
                 </svg>
                 <svg className={`${styles['preloader-svg']} ${styles['svg-two']}`} height="100" width="100">
@@ -47,13 +51,17 @@ const Preloader = () => (
                         <clipPath id="cut-off-2">
                             <rect x="0" y="50" width="100" height="100" />
                         </clipPath>
+                        <linearGradient id="gradient2">
+                            <stop offset="0" stop-color="hsl(var(--accent))"></stop>
+                            <stop offset="100%" stop-color="hsl(var(--accent))" stop-opacity="0"></stop>
+                        </linearGradient>
                     </defs>
                     <circle
                         cx="50"
                         cy="50"
                         r="30"
                         clipPath="url(#cut-off-2)"
-                        stroke="hsl(var(--accent))"
+                        stroke="url(#gradient2)"
                     />
                 </svg>
                 <svg className={`${styles['preloader-svg']} ${styles['svg-three']}`} height="100" width="100">
@@ -61,13 +69,17 @@ const Preloader = () => (
                         <clipPath id="cut-off-3">
                             <rect x="0" y="50" width="100" height="100" />
                         </clipPath>
+                         <linearGradient id="gradient3">
+                            <stop offset="0" stop-color="hsl(var(--primary))"></stop>
+                            <stop offset="100%" stop-color="hsl(var(--primary))" stop-opacity="0"></stop>
+                        </linearGradient>
                     </defs>
                     <circle
                         cx="50"
                         cy="50"
                         r="20"
                         clipPath="url(#cut-off-3)"
-                        stroke="hsl(var(--primary))"
+                        stroke="url(#gradient3)"
                     />
                 </svg>
             </div>
@@ -98,6 +110,7 @@ export default function Home() {
         volumes,
         setVolumes,
         currentTempo,
+        handlePlayPause,
     } = useAudioEngine();
     
     const [isRecording, setIsRecording] = useState(false);
@@ -200,15 +213,6 @@ export default function Home() {
         if (!isReady || !audioEngine) return;
         handleThereminInteraction(type, data, state);
     }, [isReady, audioEngine, handleThereminInteraction]);
-
-    const handlePlayPause = useCallback(() => {
-        if (!audioEngine) return;
-        if (isPlaying) {
-            audioEngine.getDrumMachine().stop();
-        } else {
-            audioEngine.getDrumMachine().play();
-        }
-    }, [audioEngine, isPlaying]);
 
     if (!isClient) {
         return <Preloader />;
