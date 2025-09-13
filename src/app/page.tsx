@@ -33,17 +33,13 @@ const Preloader = () => (
                         <clipPath id="cut-off">
                             <rect x="0" y="50" width="100" height="100" />
                         </clipPath>
-                        <linearGradient id="gradient">
-                            <stop offset="0" stopColor="#ffd185"></stop>
-                            <stop offset="100%" stopColor="#ffd185" stopOpacity="0"></stop>
-                        </linearGradient>
                     </defs>
                     <circle
                         cx="50"
                         cy="50"
                         r="40"
                         clipPath="url(#cut-off)"
-                        stroke="url(#gradient)"
+                        stroke="hsl(var(--primary))"
                     />
                 </svg>
                 <svg className={`${styles['preloader-svg']} ${styles['svg-two']}`} height="100" width="100">
@@ -51,17 +47,13 @@ const Preloader = () => (
                         <clipPath id="cut-off-2">
                             <rect x="0" y="50" width="100" height="100" />
                         </clipPath>
-                        <linearGradient id="gradient2">
-                            <stop offset="0" stopColor="#ffa400"></stop>
-                            <stop offset="100%" stopColor="#ffa400" stopOpacity="0"></stop>
-                        </linearGradient>
                     </defs>
                     <circle
                         cx="50"
                         cy="50"
                         r="30"
                         clipPath="url(#cut-off-2)"
-                        stroke="url(#gradient2)"
+                        stroke="hsl(var(--accent))"
                     />
                 </svg>
                 <svg className={`${styles['preloader-svg']} ${styles['svg-three']}`} height="100" width="100">
@@ -69,17 +61,13 @@ const Preloader = () => (
                         <clipPath id="cut-off-3">
                             <rect x="0" y="50" width="100" height="100" />
                         </clipPath>
-                        <linearGradient id="gradient3">
-                            <stop offset="0" stopColor="#ff5300"></stop>
-                            <stop offset="100%" stopColor="#ff5300" stopOpacity="0"></stop>
-                        </linearGradient>
                     </defs>
                     <circle
                         cx="50"
                         cy="50"
                         r="20"
                         clipPath="url(#cut-off-3)"
-                        stroke="url(#gradient3)"
+                        stroke="hsl(var(--primary))"
                     />
                 </svg>
             </div>

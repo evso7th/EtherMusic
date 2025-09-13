@@ -5,7 +5,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  perspective: 60vw;
+  perspective: 75vw;
   overflow: hidden;
 }
 
@@ -55,11 +55,11 @@
 }
 
 .circle::before {
-  transform: translateZ(-22.5vw); /* 30vw * 0.75 */
+  transform: translateZ(-22.5vw);
 }
 
 .circle::after {
-  transform: translateZ(22.5vw); /* 30vw * 0.75 */
+  transform: translateZ(22.5vw);
 }
 
 .circle:nth-child(1) { transform: rotateZ(calc(1 / 6 * 360deg)) rotateX(63.435deg); }
@@ -79,11 +79,35 @@
   }
 }
 
+.preloader {
+  align-items: center;
+  background-color: black;
+  display: flex;
+  flex-direction:column;
+  height: 100%;
+  justify-content: center;
+  left: 0;
+  opacity: 0;
+  padding: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  transition: opacity 1s ease;
+  width: 100%;
+}
+
+.preloader.active {
+    transition: opacity .2s ease;
+    opacity: 1;
+    pointer-events: all;
+}
+
 .preloader-container {
   height: 100px;
   position: relative;
   width: 100px;
 }
+
 .preloader-container .preloader-svg {
   animation: spin 3s infinite linear;
   position: absolute;
@@ -92,12 +116,15 @@
   top: 0;
   bottom: 0;
 }
+
 .preloader-container .preloader-svg.svg-two {
   animation-duration: 2.5s;
 }
+
 .preloader-container .preloader-svg.svg-three {
   animation-duration: 2s;
 }
+
 .preloader-container .preloader-svg circle {
   stroke-dasharray: 0 15;
   stroke-linecap: round;
