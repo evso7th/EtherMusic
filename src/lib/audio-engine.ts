@@ -434,8 +434,6 @@ export class AudioEngine {
                 const newVolumes = JSON.parse(JSON.stringify(v));
                 newVolumes.manualBass.reverbSend = bassPresetParams.reverbSend ?? newVolumes.manualBass.reverbSend;
                 newVolumes.manualBass.distortion = bassPresetParams.distortion ?? newVolumes.manualBass.distortion;
-                newVolumes.latch.reverbSend = bassPresetParams.reverbSend ?? newVolumes.latch.reverbSend;
-                newVolumes.latch.distortion = bassPresetParams.distortion ?? newVolumes.latch.distortion;
                 return newVolumes;
             });
         }
@@ -497,16 +495,7 @@ export class AudioEngine {
         await Promise.all(promises);
     }
 
-    private applyChannelSettings(partName: SynthPartName | 'drums' | 'latch', volumes: ChannelVolumes) {
-        const isLatchGroup = partName === 'latch';
-        
-        if (isLatchGroup) {
-            this.applyChannelSettings('latch1', volumes);
-            this.applyChannelSettings('latch2', volumes);
-            this.applyChannelSettings('latch3', volumes);
-            return;
-        }
-        
+    private applyChannelSettings(partName: SynthPartName | 'drums', volumes: ChannelVolumes) {
         const nodeInfo = this.nodes.get(partName);
         if (nodeInfo && volumes) {
             nodeInfo.gain.gain.setTargetAtTime(dbToGain(volumes.gain), this.context.currentTime, 0.01);
@@ -525,7 +514,10 @@ export class AudioEngine {
 
             this.applyChannelSettings('melody', newVolumes.melody);
             this.applyChannelSettings('manualBass', newVolumes.manualBass);
-            this.applyChannelSettings('latch', newVolumes.latch);
+            // Apply the 'manualBass' settings to all latch channels
+            this.applyChannelSettings('latch1', newVolumes.manualBass);
+            this.applyChannelSettings('latch2', newVolumes.manualBass);
+            this.applyChannelSettings('latch3', newVolumes.manualBass);
             this.applyChannelSettings('drums', newVolumes.drums);
             
             this.reverbReturnGain.gain.setTargetAtTime(dbToGain(newVolumes.reverbReturn), this.context.currentTime, 0.02);

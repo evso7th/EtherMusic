@@ -26,7 +26,6 @@ function saveVolumes(volumes: Volumes) {
 export const defaultVolumes: Volumes = { 
     melody: { gain: 0, reverbSend: -18, distortion: 0 },
     manualBass: { gain: -6, reverbSend: -48, distortion: 0 },
-    latch: { gain: -6, reverbSend: -48, distortion: 0 },
     drums: { gain: -12, reverbSend: -48, distortion: 0 },
     reverbReturn: -25,
     compressor: {
@@ -55,10 +54,15 @@ export function loadVolumes(): Volumes {
             ...parsed,
             melody: { ...defaultVolumes.melody, ...(parsed.melody || {}) },
             manualBass: { ...defaultVolumes.manualBass, ...(parsed.manualBass || {}) },
-            latch: { ...defaultVolumes.latch, ...(parsed.latch || {}) },
             drums: { ...defaultVolumes.drums, ...(parsed.drums || {}) },
             compressor: { ...defaultVolumes.compressor, ...(parsed.compressor || {}) },
         };
+        
+        // Remove obsolete latch volume setting if it exists
+        if ('latch' in merged) {
+            delete (merged as any).latch;
+        }
+
         return merged;
 
     } catch (e) {

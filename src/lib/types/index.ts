@@ -96,7 +96,6 @@ export interface CompressorSettings {
 export interface Volumes {
   melody: ChannelVolumes;
   manualBass: ChannelVolumes;
-  latch: ChannelVolumes;
   drums: ChannelVolumes;
   reverbReturn: number; // in dB
   compressor: CompressorSettings;
@@ -118,8 +117,7 @@ export type WorkerMessage =
     | { type: 'noteOff', id: number }
     | { type: 'noteUpdate', note: SynthNote }
     | { type: 'allNotesOff' }
-    | { type: 'setPreset', preset: InstrumentPresetParams | BassInstrumentPresetParams }
-    | { type: 'debug', payload: any };
+    | { type: 'setPreset', preset: InstrumentPresetParams | BassInstrumentPresetParams };
 
 
 export type DrumWorkerMessage =

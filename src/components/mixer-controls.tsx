@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Waves, Drum, Anchor, Blend, AudioLines, Music, Clock, Shuffle } from 'lucide-react';
+import { Waves, Drum, Blend, AudioLines, Music, Clock, Shuffle } from 'lucide-react';
 import { useState, useCallback, useEffect, memo } from 'react';
 import type { Volumes, CompressorSettings, ChannelVolumes } from '@/types';
 import { cn } from "@/lib/utils";
@@ -73,19 +73,12 @@ export const MixerControls = memo(function MixerControls({
     useEffect(() => {
         setLocalVolumes(volumes);
     }, [volumes]);
-
+    
     const handleChannelVolumeChange = useCallback((part: VolumeChannel, value: number) => {
         setLocalVolumes(prev => {
             const newVolumes = JSON.parse(JSON.stringify(prev)); // Deep copy to be safe
             const newChannelVolumes = { ...(newVolumes[part] as ChannelVolumes), gain: value };
             newVolumes[part] = newChannelVolumes;
-
-            // Sync manualBass and latch gain sliders
-            if (part === 'manualBass') {
-                newVolumes.latch = { ...newVolumes.latch, gain: value };
-            } else if (part === 'latch') {
-                newVolumes.manualBass = { ...newVolumes.manualBass, gain: value };
-            }
             
             return newVolumes;
         });
@@ -147,7 +140,7 @@ export const MixerControls = memo(function MixerControls({
 
             <div className="space-y-4">
                 <h3 className="text-lg font-semibold tracking-tight text-foreground">
-                    {isAutopilotMixer ? "Autopilot Levels" : "Manual Player Levels"}
+                    {isAutopilotMixer ? "Autopilot Levels" : "Player Levels"}
                 </h3>
                 
                 <VolumeControl 
@@ -161,12 +154,6 @@ export const MixerControls = memo(function MixerControls({
                     icon={Waves}
                     volume={localVolumes.manualBass.gain}
                     onVolumeChange={(v) => handleChannelVolumeChange('manualBass', v)}
-                />
-                <VolumeControl 
-                    label="Latch"
-                    icon={Anchor}
-                    volume={localVolumes.latch.gain}
-                    onVolumeChange={(v) => handleChannelVolumeChange('latch', v)}
                 />
                 <VolumeControl 
                     label="Drums"
@@ -239,5 +226,3 @@ export const MixerControls = memo(function MixerControls({
         </div>
     );
 });
-
-    
