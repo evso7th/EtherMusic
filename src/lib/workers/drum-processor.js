@@ -41,36 +41,29 @@ class DrumProcessor extends AudioWorkletProcessor {
     this.buffers = new Map();
     
     this.port.onmessage = this.handleMessage.bind(this);
-    console.log('[DrumProcessor] Worklet constructed.');
   }
 
   handleMessage(event) {
     try {
         const { type, name, buffer, sampleName, volume } = event.data;
-        console.log(`[DrumProcessor] handleMessage: Received message type: ${type}`);
 
         if (type === 'loadSample' && name && buffer instanceof ArrayBuffer) {
             const float32Array = new Float32Array(buffer);
             this.buffers.set(name, float32Array);
-            console.log(`[DrumProcessor] handleMessage: Loaded sample '${name}', buffer size: ${float32Array.length}`);
         } else if (type === 'playSample' && sampleName) {
             const bufferToPlay = this.buffers.get(sampleName);
             if (bufferToPlay) {
                 if (this.voices.length >= this.maxVoices) {
+                    // Find the oldest voice to replace
                     this.voices.shift();
                 }
                 this.voices.push(new Voice(bufferToPlay, volume ?? 1.0));
-                console.log(`[DrumProcessor] handleMessage: Playing sample '${sampleName}'. Voices: ${this.voices.length}`);
             } else {
-                console.error(`[DrumProcessor] handleMessage: Sample not found: ${sampleName}`);
                 this.port.postMessage({ type: 'error', message: `Sample not found: ${sampleName}` });
             }
-        } else {
-             console.log(`[DrumProcessor] handleMessage: Received unknown or malformed message`, event.data);
         }
     } catch (e) {
         if (e instanceof Error) {
-            console.error(`[DrumProcessor] handleMessage error: ${e.message}`, e.stack);
             this.port.postMessage({ type: 'error', message: `Error handling message: ${e.message}` });
         }
     }
@@ -82,39 +75,26 @@ class DrumProcessor extends AudioWorkletProcessor {
         return true;
     }
 
+    // Zero out the buffer for this frame.
     outputChannel.fill(0);
     
-    let peak = 0;
-
     if (this.voices.length > 0) {
-        for (let i = 0; i < outputChannel.length; i++) {
-            let sample = 0;
-            this.voices.forEach(voice => {
-                if (!voice.isFinished) {
-                    const voiceSamplePosition = voice.position + i;
-                    if (voiceSamplePosition < voice.buffer.length) {
-                        sample += voice.buffer[voiceSamplePosition] * voice.gain;
-                    }
+        for (let i = 0; i < this.voices.length; i++) {
+            const voice = this.voices[i];
+            
+            for (let j = 0; j < outputChannel.length; j++) {
+                if (voice.position < voice.buffer.length) {
+                    outputChannel[j] += voice.buffer[voice.position] * voice.gain;
+                    voice.position++;
+                } else {
+                    voice.isFinished = true;
+                    break; 
                 }
-            });
-            
-            sample = Math.max(-1, Math.min(1, sample));
-            outputChannel[i] = sample;
-            
-            const absSample = Math.abs(sample);
-            if (absSample > peak) {
-                peak = absSample;
             }
         }
-        
-        if (peak > 0.001) { // Log only if there's audible sound
-             console.log(`[DrumProcessor] process: Generating audio. Peak: ${peak.toFixed(3)}, Voices: ${this.voices.length}`);
-        }
 
-        this.voices = this.voices.filter(voice => {
-            voice.position += outputChannel.length;
-            return voice.position < voice.buffer.length;
-        });
+        // Clean up finished voices
+        this.voices = this.voices.filter(voice => !voice.isFinished);
     }
 
     return true; // Keep the processor alive.
@@ -122,5 +102,3 @@ class DrumProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('drum-processor', DrumProcessor);
-
-    

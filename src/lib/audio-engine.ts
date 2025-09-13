@@ -220,7 +220,6 @@ export class AudioEngine {
         this.drumMachine.initialize(this.volumes.tempo, this.volumes.swing);
                 
         this.isInitialized = true;
-        console.log('[AudioEngine] Initialization complete.');
     }
 
     private createSynthChannel(part: SynthPartName, polyphony: number) {
@@ -260,8 +259,7 @@ export class AudioEngine {
     
     private createDrumChannel() {
         if (!this.context) return;
-        console.log('[AudioEngine] createDrumChannel: Creating drum channel.');
-
+        
         const worklet = new AudioWorkletNode(this.context, 'drum-processor');
         const gain = this.context.createGain();
         const reverbSend = this.context.createGain();
@@ -270,13 +268,11 @@ export class AudioEngine {
         gain.connect(this.preCompressorOut);
         gain.connect(reverbSend).connect(this.reverbSend);
         
-        console.log('[AudioEngine] createDrumChannel: Drum channel graph: worklet -> gain -> preCompressorOut. And gain -> reverbSend -> masterReverbSend.');
-        
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                  console.error('[DRUM WORKLET ERROR]', e.data.message);
             } else if (e.data.type === 'debug') {
-                console.log('[DRUM WORKLET DEBUG]', e.data.payload);
+                // console.log('[DRUM WORKLET DEBUG]', e.data.payload);
             }
         };
         
@@ -458,10 +454,13 @@ export class AudioEngine {
         this.drumMachine.setPattern(patternName);
     }
 
-    public setTempo(newTempo: number) {
+    public setTempo(bpm: number) {
+        const wasPlaying = this.isPlaying;
+        if (wasPlaying) this.stopAllSounds();
         if (this.drumMachine) {
-            this.drumMachine.setTempo(newTempo);
+            this.drumMachine.setTempo(bpm);
         }
+        if (wasPlaying) this.drumMachine.play();
     }
 
     public setSwing(swing: number) {
@@ -471,13 +470,11 @@ export class AudioEngine {
     }
     
     public playDrumSample(sampleName: string, volume: number = 1.0) {
-        console.log(`[AudioEngine] playDrumSample: Received request to play sample: ${sampleName}`);
         const drumNode = this.nodes.get('drums');
         if (!drumNode) {
             console.error('[AudioEngine] playDrumSample: Drum node not found.');
             return;
         }
-        console.log('[AudioEngine] playDrumSample: Drum node found, posting message to worklet.');
         const message: DrumWorkerMessage = { type: 'playSample', sampleName, volume };
         drumNode.worklet.port.postMessage(message);
     }
@@ -491,15 +488,12 @@ export class AudioEngine {
 
         const promises = Object.entries(DRUM_SAMPLES).map(async ([name, url]) => {
             try {
-                console.log(`[AudioEngine] loadDrumSamples: Fetching sample ${name} from ${url}`);
                 const response = await fetch(url);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status} for ${url.split('/').pop()}`);
                 }
                 const arrayBuffer = await response.arrayBuffer();
-                console.log(`[AudioEngine] loadDrumSamples: Fetched ${name}, decoding...`);
                 const audioBuffer = await this.context.decodeAudioData(arrayBuffer.slice(0));
-                console.log(`[AudioEngine] loadDrumSamples: Decoded ${name}, sending to worklet.`);
                 
                 const channelData = audioBuffer.getChannelData(0);
                 const message: DrumWorkerMessage = {
@@ -514,7 +508,6 @@ export class AudioEngine {
             }
         });
         await Promise.all(promises);
-        console.log('[AudioEngine] loadDrumSamples: All samples sent to worklet.');
     }
 
     private applyChannelSettings(partName: SynthPartName | 'drums', volumes: ChannelVolumes) {
@@ -594,5 +587,3 @@ export class AudioEngine {
         }
     }
 }
-
-    
