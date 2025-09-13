@@ -99,6 +99,10 @@ export class AudioEngine {
     
     private activePointers = new Map<number, { type: 'melody' | 'bass', noteId: number }>();
     private nextNoteId = 0;
+
+    private analyserLatchBeforeGain: AnalyserNode | null = null;
+    private analyserLatchAfterGain: AnalyserNode | null = null;
+    private analysisInterval: number | null = null;
     
     constructor(context: AudioContext, emitter: Emitter<AudioEngineEvents>) {
         this.context = context;
@@ -192,6 +196,27 @@ export class AudioEngine {
         this.createSynthChannel('latch', 4);
         
         this.createDrumChannel();
+
+        this.analyserLatchBeforeGain = this.context.createAnalyser();
+        this.analyserLatchBeforeGain.fftSize = 256;
+        this.analyserLatchAfterGain = this.context.createAnalyser();
+        this.analyserLatchAfterGain.fftSize = 256;
+
+        const dataArrayBefore = new Uint8Array(this.analyserLatchBeforeGain.frequencyBinCount);
+        const dataArrayAfter = new Uint8Array(this.analyserLatchAfterGain.frequencyBinCount);
+
+        this.analysisInterval = window.setInterval(() => {
+            if (this.analyserLatchBeforeGain) {
+                this.analyserLatchBeforeGain.getByteTimeDomainData(dataArrayBefore);
+                const peakBefore = dataArrayBefore.reduce((max, current) => Math.max(max, Math.abs(current / 128 - 1)), 0);
+                console.log(`[LATCH-BEFORE-GAIN]: peak=${peakBefore.toFixed(3)}`);
+            }
+            if (this.analyserLatchAfterGain) {
+                this.analyserLatchAfterGain.getByteTimeDomainData(dataArrayAfter);
+                const peakAfter = dataArrayAfter.reduce((max, current) => Math.max(max, Math.abs(current / 128 - 1)), 0);
+                console.log(`[LATCH-AFTER-GAIN]: peak=${peakAfter.toFixed(3)}`);
+            }
+        }, 1000);
         
         await this.loadReverbImpulse();
         
@@ -216,15 +241,23 @@ export class AudioEngine {
         const gain = this.context.createGain();
         const reverbSend = this.context.createGain();
         
-        worklet.connect(distortion).connect(gain);
-        gain.connect(this.preCompressorOut);
-        gain.connect(reverbSend).connect(this.reverbSend);
+        if (part === 'latch' && this.analyserLatchBeforeGain && this.analyserLatchAfterGain) {
+            worklet.connect(this.analyserLatchBeforeGain).connect(distortion);
+            distortion.connect(gain);
+            gain.connect(this.analyserLatchAfterGain);
+            gain.connect(this.preCompressorOut);
+            gain.connect(reverbSend).connect(this.reverbSend);
+        } else {
+            worklet.connect(distortion).connect(gain);
+            gain.connect(this.preCompressorOut);
+            gain.connect(reverbSend).connect(this.reverbSend);
+        }
         
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                 console.error(`[WORKLET-ERROR-${part.toUpperCase()}]`, e.data.message);
             } else if (e.data.type === 'debug' && e.data.payload) {
-                console.log(`[WORKLET-DEBUG-${part.toUpperCase()}]`, e.data.payload);
+                 console.log(`[WORKLET-DEBUG-${part.toUpperCase()}]`, e.data.payload);
             }
         };
 
@@ -290,6 +323,10 @@ export class AudioEngine {
         notesToTurnOff.forEach(note => this.orbManager?.removeOrb(note.id));
         this.orbManager?.removeAllOrbs();
         this.activePointers.clear();
+        if (this.analysisInterval) {
+            clearInterval(this.analysisInterval);
+            this.analysisInterval = null;
+        }
     }
     
     public handleThereminInteraction(type: 'melody' | 'bass', data: { frequency: number; volume: number; pointerId: number; x: number, y: number } | null, state: 'down' | 'move' | 'up') {
@@ -543,3 +580,5 @@ export class AudioEngine {
         }
     }
 }
+
+    
