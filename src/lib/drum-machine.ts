@@ -104,6 +104,7 @@ export class DrumMachine {
     }
 
     public play() {
+        console.log(`[DrumMachine] play called. isPlaying: ${this.isPlaying}, pattern: ${this._pattern?.name}`);
         if (this.isPlaying || !this._pattern || this._pattern.sequence.length === 0) {
             if (this._pattern?.name === 'Off') {
                 this.stop();
@@ -128,6 +129,7 @@ export class DrumMachine {
     }
 
     private scheduler() {
+        console.log(`[DrumMachine] scheduler, step: ${this.step}, measure: ${this.measureCount}`);
         const isFillMeasure = this.fills.length > 0 && this._pattern.type === 'Classic' && (this.measureCount === 3 || this.measureCount === 7);
         const currentPattern = isFillMeasure 
             ? this.fills[Math.floor(Math.random() * this.fills.length)] 
@@ -138,6 +140,7 @@ export class DrumMachine {
 
         currentPattern.sequence.forEach(note => {
             if (note.time === this.step) {
+                console.log(`[DrumMachine] scheduler: playing note ${note.note} at step ${this.step}`);
                 this.audioEngine.playDrumSample(note.note, note.vol);
             }
         });
