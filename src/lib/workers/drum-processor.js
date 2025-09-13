@@ -58,8 +58,6 @@ class DrumProcessor extends AudioWorkletProcessor {
                     this.voices.shift();
                 }
                 this.voices.push(new Voice(bufferToPlay, volume ?? 1.0));
-            } else {
-                this.port.postMessage({ type: 'error', message: `Sample not found: ${sampleName}` });
             }
         }
     } catch (e) {

@@ -217,10 +217,9 @@ export class AudioEngine {
         
         await this.loadDrumSamples();
         
-        this.drumMachine.initialize(initialVolumes.tempo, initialVolumes.swing);
+        this.drumMachine.initialize(this.volumes.tempo, this.volumes.swing);
                 
         this.isInitialized = true;
-        console.log('[AudioEngine] Initialization complete.');
     }
 
     private createSynthChannel(part: SynthPartName, polyphony: number) {
@@ -266,17 +265,12 @@ export class AudioEngine {
         const reverbSend = this.context.createGain();
 
         worklet.connect(gain);
-        console.log(`[AudioEngine] createDrumChannel: Connecting drum worklet to gain node.`);
         gain.connect(this.preCompressorOut);
-        console.log(`[AudioEngine] createDrumChannel: Connecting gain node to preCompressorOut.`);
         gain.connect(reverbSend).connect(this.reverbSend);
-        console.log(`[AudioEngine] createDrumChannel: Connecting reverb send.`);
         
         worklet.port.onmessage = (e) => {
             if (e.data.type === 'error') {
                  console.error('[DRUM WORKLET ERROR]', e.data.message);
-            } else if (e.data.type === 'debug') {
-                 console.log('[DRUM WORKLET DEBUG]', e.data.payload);
             }
         };
         
@@ -474,10 +468,8 @@ export class AudioEngine {
     }
     
     public playDrumSample(sampleName: string, volume: number = 1.0) {
-        console.log(`[AudioEngine] playDrumSample called for: ${sampleName}`);
         const drumNode = this.nodes.get('drums');
         if (!drumNode) {
-            console.error('[AudioEngine] playDrumSample: Drum node not found.');
             return;
         }
         const message: DrumWorkerMessage = { type: 'playSample', sampleName, volume };
@@ -493,15 +485,12 @@ export class AudioEngine {
 
         const promises = Object.entries(DRUM_SAMPLES).map(async ([name, url]) => {
             try {
-                console.log(`[AudioEngine] loadDrumSamples: Fetching sample ${name} from ${url}`);
                 const response = await fetch(url);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status} for ${url.split('/').pop()}`);
                 }
                 const arrayBuffer = await response.arrayBuffer();
-                console.log(`[AudioEngine] loadDrumSamples: Fetched ${name}, decoding...`);
                 const audioBuffer = await this.context.decodeAudioData(arrayBuffer.slice(0));
-                console.log(`[AudioEngine] loadDrumSamples: Decoded ${name}, sending to worklet.`);
                 
                 const channelData = audioBuffer.getChannelData(0);
                 const message: DrumWorkerMessage = {
@@ -516,7 +505,6 @@ export class AudioEngine {
             }
         });
         await Promise.all(promises);
-        console.log('[AudioEngine] loadDrumSamples: All samples sent to worklet.');
     }
 
     private applyChannelSettings(partName: SynthPartName | 'drums', volumes: ChannelVolumes) {

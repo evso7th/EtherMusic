@@ -106,9 +106,8 @@ export function useAudioEngine() {
                 const engine = new AudioEngine(context, emitter);
                 
                 const currentVolumes = loadVolumes();
-                setVolumesState(currentVolumes);
-                
                 await engine.initialize(currentVolumes);
+                setVolumesState(currentVolumes);
                 
                 setCurrentTempo(currentVolumes.tempo);
 
@@ -215,12 +214,9 @@ export function useAudioEngine() {
 
     const handlePlayPause = useCallback(() => {
         if (!audioEngine.current) return;
-        console.log('[useAudioEngine] handlePlayPause triggered. isPlaying:', isPlaying);
         if (isPlaying) {
-            console.log('[useAudioEngine] Calling stop() on drum machine.');
             audioEngine.current.getDrumMachine().stop();
         } else {
-            console.log('[useAudioEngine] Calling play() on drum machine.');
             audioEngine.current.getDrumMachine().play();
         }
     }, [isPlaying]);
