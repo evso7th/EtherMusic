@@ -41,14 +41,18 @@ class DrumProcessor extends AudioWorkletProcessor {
     this.buffers = new Map();
     
     this.port.onmessage = this.handleMessage.bind(this);
+    console.log('[DrumProcessor] Worklet constructed.');
   }
 
   handleMessage(event) {
     try {
         const { type, name, buffer, sampleName, volume } = event.data;
+        console.log(`[DrumProcessor] handleMessage: Received message type: ${type}`);
+
         if (type === 'loadSample' && name && buffer instanceof ArrayBuffer) {
             const float32Array = new Float32Array(buffer);
             this.buffers.set(name, float32Array);
+            console.log(`[DrumProcessor] handleMessage: Loaded sample '${name}', buffer size: ${float32Array.length}`);
         } else if (type === 'playSample' && sampleName) {
             const bufferToPlay = this.buffers.get(sampleName);
             if (bufferToPlay) {
@@ -56,12 +60,17 @@ class DrumProcessor extends AudioWorkletProcessor {
                     this.voices.shift();
                 }
                 this.voices.push(new Voice(bufferToPlay, volume ?? 1.0));
+                console.log(`[DrumProcessor] handleMessage: Playing sample '${sampleName}'. Voices: ${this.voices.length}`);
             } else {
+                console.error(`[DrumProcessor] handleMessage: Sample not found: ${sampleName}`);
                 this.port.postMessage({ type: 'error', message: `Sample not found: ${sampleName}` });
             }
+        } else {
+             console.log(`[DrumProcessor] handleMessage: Received unknown or malformed message`, event.data);
         }
     } catch (e) {
         if (e instanceof Error) {
+            console.error(`[DrumProcessor] handleMessage error: ${e.message}`, e.stack);
             this.port.postMessage({ type: 'error', message: `Error handling message: ${e.message}` });
         }
     }
@@ -96,6 +105,10 @@ class DrumProcessor extends AudioWorkletProcessor {
             if (absSample > peak) {
                 peak = absSample;
             }
+        }
+        
+        if (peak > 0.001) { // Log only if there's audible sound
+             console.log(`[DrumProcessor] process: Generating audio. Peak: ${peak.toFixed(3)}, Voices: ${this.voices.length}`);
         }
 
         this.voices = this.voices.filter(voice => {
