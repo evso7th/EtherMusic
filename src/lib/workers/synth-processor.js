@@ -345,30 +345,18 @@ class SynthProcessor extends AudioWorkletProcessor {
         outputChannel.fill(0);
         
         let peak = 0;
-        const tempVoiceBuffers = new Map();
 
-        // 1. Render each active voice into its own temporary buffer
-        this.voices.forEach((voice, id) => {
-            if (voice.isFinished) {
-                this.voices.delete(id);
-                return;
-            }
-            const voiceBuffer = new Float32Array(outputChannel.length);
-            for (let i = 0; i < outputChannel.length; i++) {
-                voiceBuffer[i] = voice.render();
-            }
-            tempVoiceBuffers.set(id, voiceBuffer);
-        });
-        
-        // 2. Mix all temporary buffers into the output buffer and apply limiter
-        if (tempVoiceBuffers.size > 0) {
+        if (this.voices.size > 0) {
             for (let i = 0; i < outputChannel.length; i++) {
                 let sample = 0;
-                tempVoiceBuffers.forEach(voiceBuffer => {
-                    sample += voiceBuffer[i];
+                this.voices.forEach((voice, id) => {
+                    if (voice.isFinished) {
+                        this.voices.delete(id);
+                    } else {
+                        sample += voice.render();
+                    }
                 });
                 
-                // Hard-clip limiter
                 const limitedSample = Math.max(-1, Math.min(1, sample));
                 outputChannel[i] = limitedSample;
 
@@ -379,12 +367,11 @@ class SynthProcessor extends AudioWorkletProcessor {
             }
         }
         
-        // 3. Handle debug logging
         this.lastPeak = Math.max(this.lastPeak, peak);
         this.debugCounter += outputChannel.length;
         if (this.debugCounter > this.sampleRate) { 
             if (this.voices.size > 0) {
-                 this.port.postMessage({type: 'debug', payload: { voices: this.voices.size, peak: this.lastPeak.toFixed(2) }});
+                 this.port.postMessage({type: 'debug', payload: { voices: this.voices.size, peak: this.lastPeak }});
             }
             this.debugCounter = 0;
             this.lastPeak = 0;
@@ -406,5 +393,3 @@ class SynthProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor('synth-processor', SynthProcessor);
-
-    

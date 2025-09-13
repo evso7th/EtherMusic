@@ -124,7 +124,8 @@ export type WorkerMessage =
 
 export type DrumWorkerMessage =
     | { type: 'loadSample'; name: string; buffer: ArrayBuffer; }
-    | { type: 'playSample'; sampleName: string; volume?: number; };
+    | { type: 'playSample'; sampleName: string; volume?: number; }
+    | { type: 'error', message: string };
 
 
 export type EnvelopeCurve = "linear" | "exponential";
@@ -157,3 +158,4 @@ export type AudioEngineEvents = {
     playStateChanged: boolean;
     volumesChanged: Volumes | ((currentVolumes: Volumes) => Volumes);
 };
+
