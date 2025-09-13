@@ -1,34 +1,21 @@
 
 "use client";
-import { CSSProperties, memo } from 'react';
+import { memo } from 'react';
 import styles from './orbital-animation.module.css';
 import { cn } from '@/lib/utils';
 
-interface OrbitalAnimationProps {
-  isPlaying: boolean;
-  tempo: number;
-}
-
-function OrbitalAnimationComponent({ isPlaying, tempo }: OrbitalAnimationProps) {
-  const pulseDuration = 60 / tempo;
-
-  const animationStyle: CSSProperties = {
-    // @ts-ignore
-    '--pulse-duration': `${pulseDuration}s`,
-  };
-
+function OrbitalAnimationComponent() {
+  // This component is now purely presentational.
+  // The 'rotate' and 'pulse' animations are continuous and defined in the CSS module.
   return (
-    <div 
-      className={styles.view}
-      style={animationStyle}
-    >
-      <div className={cn(styles.plane, !isPlaying && styles.paused)}>
+    <div className={styles.view}>
+      <div className={cn(styles.plane)}>
         {Array.from({ length: 5 }).map((_, i) => (
           <div 
             key={i} 
             className={cn(
               styles.circle,
-              isPlaying && styles.pulsating
+              styles.pulsating // Always pulsating
             )}
           ></div>
         ))}
@@ -38,5 +25,3 @@ function OrbitalAnimationComponent({ isPlaying, tempo }: OrbitalAnimationProps) 
 }
 
 export const OrbitalAnimation = memo(OrbitalAnimationComponent);
-
-    

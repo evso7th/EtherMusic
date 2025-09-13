@@ -23,10 +23,6 @@
   animation: rotate 20s infinite linear;
 }
 
-.plane.paused {
-  animation-play-state: paused;
-}
-
 .circle {
   width: 240px;
   height: 240px;
@@ -41,7 +37,7 @@
 }
 
 .circle.pulsating {
-  animation: pulse var(--pulse-duration, 2s) infinite ease-in-out;
+  animation: pulse 2s infinite ease-in-out;
 }
 
 
@@ -105,5 +101,3 @@
     box-shadow: 0 0 140px 10px hsl(var(--primary)), inset 0 0 140px 10px hsl(var(--primary));
   }
 }
-
-    

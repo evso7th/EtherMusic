@@ -113,9 +113,6 @@ export default function Home() {
             const targetChannelKey = channel === 'bass' ? 'manualBass' : 'melody';
             
             newVolumes[targetChannelKey][effect] = value;
-            if (channel === 'bass') {
-                newVolumes.latch[effect] = value;
-            }
             return newVolumes;
         });
     }, [setVolumes]);
@@ -172,7 +169,7 @@ export default function Home() {
                     <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
                 </div>
                 <div className={cn("absolute inset-0 z-0 transition-opacity duration-1000", 'opacity-30')}>
-                     <MemoizedOrbitalAnimation isPlaying={false} tempo={defaultVolumes.tempo}/>
+                     <MemoizedOrbitalAnimation />
                 </div>
                 <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
@@ -200,7 +197,7 @@ export default function Home() {
     return (
         <div className="relative flex flex-col h-screen overflow-hidden">
             <div className="fixed inset-0 z-0">
-                 <MemoizedOrbitalAnimation isPlaying={isPlaying} tempo={currentTempo} />
+                 <MemoizedOrbitalAnimation />
             </div>
             
              <div className="relative z-10 flex h-full portrait:flex-col portrait:p-2 md:p-6 lg:p-8 landscape:flex-row landscape:p-1 landscape:gap-1">
@@ -287,4 +284,3 @@ export default function Home() {
         </div>
     );
 }
-
