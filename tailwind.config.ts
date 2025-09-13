@@ -42,6 +42,7 @@ export default {
         code: ['monospace'],
       },
       colors: {
+        'red-500': '#ef4444',
         'off-button': '#491768',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
@@ -138,3 +139,5 @@ export default {
     require('@tailwindcss/typography'),
   ],
 } satisfies Config;
+
+    

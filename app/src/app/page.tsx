@@ -5,7 +5,6 @@ import { useState, useEffect, useCallback, memo } from 'react';
 import { Button } from "@/components/ui/button";
 import { BeatBoxControls } from '@/components/beat-box-controls';
 import { useToast } from "@/hooks/use-toast";
-import { OrbitalAnimation } from '@/components/orbital-animation';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PlaybackControls } from '@/components/playback-controls';
 import { ArrowRight } from 'lucide-react';
@@ -20,15 +19,11 @@ import type { MusicKey, MusicScale, Volumes, Instrument, BassInstrument, BeatPat
 import { cn } from '@/lib/utils';
 import { ThereminPads } from '@/components/theremin-pads';
 
-const MemoizedOrbitalAnimation = memo(OrbitalAnimation);
 
 const Preloader = () => (
     <div className="absolute inset-0 bg-background flex items-center justify-center z-50">
         <div className="text-center text-white">
-            <div className='preloader'>
-                <div></div><div></div><div></div><div></div>
-            </div>
-            <p className="text-lg animate-pulse mt-4">Loading Audio Engine...</p>
+            <p className="text-lg animate-pulse">Loading Audio Engine...</p>
         </div>
     </div>
 );
@@ -81,10 +76,10 @@ export default function Home() {
 
     const handleSetBassInstrument = useCallback((instrumentId: BassInstrument) => {
         setActiveBassInstrument(instrumentId);
-        if (audioEngine) {
-            audioEngine.setBassInstrument(instrumentId);
+        if (isReady) {
+            setBassInstrument(instrumentId);
         }
-    }, [audioEngine]);
+    }, [setBassInstrument, isReady]);
 
     useEffect(() => {
         if (isReady && activeBassInstrument) {
@@ -147,8 +142,6 @@ export default function Home() {
         setBeatPattern(pattern.name);
     }, [setBeatPattern]);
 
-
-
     const handleLatchToggle = useCallback((isOn: boolean) => {
         setIsBassLatchOn(isOn);
         setBassLatch(isOn);
@@ -174,7 +167,11 @@ export default function Home() {
     }, [audioEngine, isPlaying]);
 
     if (!isClient) {
-        return <Preloader />;
+        return (
+             <div className="absolute inset-0 bg-background flex items-center justify-center z-50">
+                <p className="text-lg">Loading...</p>
+            </div>
+        );
     }
 
     if (!isAppStarted) {
@@ -185,13 +182,13 @@ export default function Home() {
                 <div className="absolute top-4 right-4 z-20">
                     <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
                 </div>
-                <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full max-w-lg mx-auto">
+                <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
                     <div>
                         <h1 className="text-4xl md:text-5xl font-bold text-primary">EtherMusic</h1>
                         <p className="text-sm md:text-base text-white/80 font-light mt-2 tracking-wide">Neuro Meditation Processor</p>
                     </div>
-                    <div className="relative flex-grow flex items-center justify-center w-full">
-                      <MemoizedOrbitalAnimation />
+                    <div className="flex-grow flex items-center justify-center">
+                        <div className="w-40 h-40 bg-red-500"></div>
                     </div>
                     <Button size="lg" onClick={handleStartApp}>
                         Start Meditation
@@ -297,3 +294,5 @@ export default function Home() {
         </div>
     );
 }
+
+    
