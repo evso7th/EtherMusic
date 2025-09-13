@@ -18,7 +18,12 @@ function dbToGain(db: number): number {
 function createDistortionCurve(amount: number): Float32Array {
     const k = Math.max(0, Math.min(100, amount)) * 2;
     if (k === 0) {
-        return new Float32Array([ -1, 1 ]);
+        // When distortion is zero, return a linear curve to avoid altering the signal.
+        // A simple [-1, 1] would cause clipping for values between -1 and 1.
+        const linearCurve = new Float32Array(2);
+        linearCurve[0] = -1;
+        linearCurve[1] = 1;
+        return linearCurve;
     }
     const n_samples = 44100;
     const curve = new Float32Array(n_samples);
@@ -188,8 +193,8 @@ export class AudioEngine {
 
         try {
              await Promise.all([
-                this.context.audioWorklet.addModule('/workers/synth-processor.js'),
-                this.context.audioWorklet.addModule('/workers/drum-processor.js'),
+                this.context.audioWorklet.addModule('/worklets/synth-processor.js'),
+                this.context.audioWorklet.addModule('/worklets/drum-processor.js'),
              ]);
         } catch (e) {
             console.error("Failed to add AudioWorklet module", e);
@@ -480,6 +485,8 @@ export class AudioEngine {
                 const arrayBuffer = await response.arrayBuffer();
                 const audioBuffer = await this.context.decodeAudioData(arrayBuffer.slice(0)); 
                 
+                // For simplicity, we'll just use the left channel if it's stereo.
+                // For mono samples, this will be the only channel.
                 const channelData = audioBuffer.getChannelData(0);
                 const message: DrumWorkerMessage = {
                     type: 'loadSample',
@@ -501,7 +508,9 @@ export class AudioEngine {
             nodeInfo.gain.gain.setTargetAtTime(dbToGain(volumes.gain), this.context.currentTime, 0.01);
             nodeInfo.reverbSend.gain.setTargetAtTime(dbToGain(volumes.reverbSend), this.context.currentTime, 0.01);
             if (nodeInfo.distortion) {
-                nodeInfo.distortion.curve = createDistortionCurve(volumes.distortion);
+                // Ensure curve is not set for 0 distortion to avoid issues.
+                const curve = volumes.distortion > 0 ? createDistortionCurve(volumes.distortion) : null;
+                nodeInfo.distortion.curve = curve;
             }
         }
     }

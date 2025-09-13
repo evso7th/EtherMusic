@@ -119,7 +119,6 @@ export type WorkerMessage =
     | { type: 'allNotesOff' }
     | { type: 'setPreset', preset: InstrumentPresetParams | BassInstrumentPresetParams };
 
-
 export type DrumWorkerMessage =
     | { type: 'loadSample'; name: string; buffer: ArrayBuffer; }
     | { type: 'playSample'; sampleName: string; volume?: number; }

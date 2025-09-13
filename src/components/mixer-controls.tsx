@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Waves, Drum, Blend, AudioLines, Music, Clock, Shuffle } from 'lucide-react';
+import { Waves, Drum, Blend, AudioLines, Music, Clock, Shuffle, Anchor } from 'lucide-react';
 import { useState, useCallback, useEffect, memo } from 'react';
 import type { Volumes, CompressorSettings, ChannelVolumes } from '@/types';
 import { cn } from "@/lib/utils";
@@ -76,7 +76,8 @@ export const MixerControls = memo(function MixerControls({
     const handleLocalVolumeChange = useCallback((update: Partial<Volumes> | ((v: Volumes) => Partial<Volumes>)) => {
         setLocalVolumes(current => {
             const newValues = typeof update === 'function' ? update(current) : update;
-            return { ...current, ...newValues };
+            const updated = { ...current, ...newValues };
+            return updated;
         });
     }, []);
     
@@ -99,8 +100,20 @@ export const MixerControls = memo(function MixerControls({
     }, [handleLocalVolumeChange]);
 
     const handleApplyChanges = () => {
-        onApply(localVolumes);
+        // Sync manualBass gain to latch gain before applying
+        const finalVolumes = { 
+            ...localVolumes,
+        };
+        onApply(finalVolumes);
         closeDialog();
+    };
+    
+    const handleBassVolumeChange = (v: number) => {
+         setLocalVolumes(prev => {
+            const newVolumes = JSON.parse(JSON.stringify(prev));
+            newVolumes.manualBass.gain = v;
+            return newVolumes;
+        });
     };
 
     return (
@@ -135,7 +148,7 @@ export const MixerControls = memo(function MixerControls({
 
             <div className="space-y-4">
                 <h3 className="text-lg font-semibold tracking-tight text-foreground">
-                    {isAutopilotMixer ? "Autopilot Levels" : "Player Levels"}
+                    Player Levels
                 </h3>
                 
                 <VolumeControl 
@@ -148,7 +161,7 @@ export const MixerControls = memo(function MixerControls({
                     label="Bass"
                     icon={Waves}
                     volume={localVolumes.manualBass.gain}
-                    onVolumeChange={(v) => handleChannelVolumeChange('manualBass', v)}
+                    onVolumeChange={handleBassVolumeChange}
                 />
                 <VolumeControl 
                     label="Drums"

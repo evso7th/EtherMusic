@@ -58,10 +58,19 @@ export function loadVolumes(): Volumes {
             compressor: { ...defaultVolumes.compressor, ...(parsed.compressor || {}) },
         };
         
-        // Remove obsolete latch volume setting if it exists
+        // Remove obsolete latch volume setting if it exists from old configs
         if ('latch' in merged) {
             delete (merged as any).latch;
         }
+        
+        if ('autopilot' in merged) {
+             delete (merged as any).autopilot;
+        }
+        
+        if ('accompaniment' in merged) {
+             delete (merged as any).accompaniment;
+        }
+
 
         return merged;
 
@@ -82,7 +91,7 @@ export function useAudioEngine() {
     const audioEngine = useRef<AudioEngine | null>(null);
     const orbManager = useRef<OrbManager | null>(null);
     
-    const [volumes, setVolumesState] = useState<Volumes>(loadVolumes);
+    const [volumes, setVolumesState] = useState<Volumes>(() => loadVolumes());
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTempo, setCurrentTempo] = useState(defaultVolumes.tempo);
 
@@ -223,5 +232,3 @@ export function useAudioEngine() {
         handleThereminInteraction,
     };
 }
-
-    
