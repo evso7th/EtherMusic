@@ -182,7 +182,7 @@ export default function Home() {
                     <HelpGuide showText={false} buttonVariant="ghost" buttonClassName="rounded-full w-10 h-10 hover:bg-white/10" />
                 </div>
                 
-                <div className="z-10 text-center flex-grow flex flex-col items-center justify-between py-16 w-full">
+                <div className="z-10 text-center flex flex-col items-center justify-between py-16 w-full h-full">
                     <div>
                         <h1 className="text-4xl md:text-5xl font-bold text-primary">EtherMusic</h1>
                         <p className="text-sm md:text-base text-white/80 font-light mt-2 tracking-wide">Neuro Meditation Processor</p>
@@ -275,7 +275,7 @@ export default function Home() {
                         musicKey={musicKey}
                         onKeyChange={handleHarmonyChange}
                         musicScale={musicScale}
-                        onScaleChange={onScaleChange}
+                        onScaleChange={handleHarmonyChange}
                     />
                     <div className="flex-shrink-0 portrait:block landscape:hidden">
                         <BeatBoxControls
@@ -302,3 +302,5 @@ export default function Home() {
         </div>
     );
 }
+
+    

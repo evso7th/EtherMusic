@@ -83,10 +83,10 @@ const ThereminPadsComponent = ({
                 onKeyChange={onKeyChange}
                 musicScales={Object.keys(SCALES) as MusicScale[]}
                 activeScale={musicScale}
-                onScaleChange={onScaleChange}
+                onScaleChange={onScaleChange as any}
                 instruments={melodyInstruments}
                 activeInstrument={activeMelodyInstrument}
-                onInstrumentChange={onMelodyInstrumentChange}
+                onMelodyInstrumentChange={onMelodyInstrumentChange}
                 isPolyphonic
                 orbManager={orbManager}
                 effects={melodyEffects}
@@ -97,3 +97,5 @@ const ThereminPadsComponent = ({
 };
 
 export const ThereminPads = memo(ThereminPadsComponent);
+
+    
